@@ -4228,7 +4228,14 @@ function somAddMsg(role, text, recs){
         '<div class="som-rec-right">'+
           '<div style="display:flex;flex-direction:column;align-items:flex-end;gap:0.15rem">'+
             '<span class="som-rec-price">$'+esc(String(p.price))+'</span>'+
-            '<span style="font-size:0.52rem;color:var(--muted)">Decant <span style="color:var(--gold)">$'+(p.decantPrice?parseFloat(p.decantPrice).toFixed(0):Math.round((getPr(p.id).onSale&&getPr(p.id).salePrice?Math.round(+getPr(p.id).salePrice):parseFloat(p.price))*0.30))+'</span></span>'+
+            (function(){
+              var dp10 = p.decantPrice ? parseFloat(p.decantPrice) : Math.round((getPr(p.id).onSale&&getPr(p.id).salePrice?Math.round(+getPr(p.id).salePrice):parseFloat(p.price))*0.30);
+              var dp5  = p.decantPrice5 ? parseFloat(p.decantPrice5) : Math.round(dp10 * 0.55);
+              if(p.luxury){
+                return '<span style="font-size:0.52rem;color:var(--muted)">10ml <span style="color:var(--gold)">$'+dp10+'</span> · 5ml <span style="color:var(--gold)">$'+dp5+'</span></span>';
+              }
+              return '<span style="font-size:0.52rem;color:var(--muted)">Decant <span style="color:var(--gold)">$'+dp10+'</span></span>';
+            })()+
           '</div>'+
           '<span class="som-rec-arrow">&#8594;</span>'+
         '</div>';
