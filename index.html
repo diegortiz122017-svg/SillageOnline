@@ -2244,45 +2244,48 @@ function buildGrid(){
     var brands = [];
     var seen = {};
     P.forEach(function(p){ if(p.brand && !seen[p.brand]){ seen[p.brand]=true; brands.push(p.brand); } });
-    brands.sort();
+    // Sort: hierarchy first, then by product count descending, then alphabetically
+    brands.sort(function(a, b){
+      var ai = BRAND_HIERARCHY.indexOf(a);
+      var bi = BRAND_HIERARCHY.indexOf(b);
+      if(ai !== -1 && bi !== -1) return ai - bi;
+      if(ai !== -1) return -1;
+      if(bi !== -1) return 1;
+      // Both unlisted — sort by product count
+      var diff = (brandCounts[b]||0) - (brandCounts[a]||0);
+      return diff !== 0 ? diff : a.localeCompare(b);
+    });
     var currentBrand = fBrand || 'all';
-    var BRAND_PILLS_LIMIT = 7;
+    var LIMIT = 7;
+    var visible = _brandsExpanded ? brands : brands.slice(0, LIMIT);
 
-    function renderBrandPills(){
-      brandPills.innerHTML = '';
-      // Todos pill
-      var allBtn = document.createElement('button');
-      allBtn.className = 'pill' + (currentBrand==='all'?' active':'');
-      allBtn.dataset.brand = 'all';
-      allBtn.textContent = 'Todos';
-      brandPills.appendChild(allBtn);
+    // Todos pill
+    brandPills.innerHTML = '';
+    var allBtn = document.createElement('button');
+    allBtn.className = 'pill' + (currentBrand==='all'?' active':'');
+    allBtn.dataset.brand = 'all';
+    allBtn.textContent = 'Todos';
+    brandPills.appendChild(allBtn);
 
-      var visible = _brandsExpanded ? brands : brands.slice(0, BRAND_PILLS_LIMIT);
-      visible.forEach(function(b){
-        var btn = document.createElement('button');
-        btn.className = 'pill' + (currentBrand===b?' active':'');
-        btn.dataset.brand = b;
-        btn.textContent = b;
-        brandPills.appendChild(btn);
+    visible.forEach(function(b){
+      var btn = document.createElement('button');
+      btn.className = 'pill' + (currentBrand===b?' active':'');
+      btn.dataset.brand = b;
+      btn.textContent = b;
+      brandPills.appendChild(btn);
+    });
+
+    if(brands.length > LIMIT){
+      var toggle = document.createElement('button');
+      toggle.className = 'pill pill-more';
+      toggle.textContent = _brandsExpanded ? 'Ver menos ↑' : '+ ' + (brands.length - LIMIT) + ' marcas';
+      toggle.addEventListener('click', function(e){
+        e.stopPropagation();
+        _brandsExpanded = !_brandsExpanded;
+        buildGrid();
       });
-
-      if(brands.length > BRAND_PILLS_LIMIT){
-        var toggle = document.createElement('button');
-        toggle.className = 'pill pill-more';
-        if(_brandsExpanded){
-          toggle.textContent = 'Ver menos ↑';
-        } else {
-          toggle.textContent = '+ ' + (brands.length - BRAND_PILLS_LIMIT) + ' marcas';
-        }
-        toggle.addEventListener('click', function(e){
-          e.stopPropagation();
-          _brandsExpanded = !_brandsExpanded;
-          renderBrandPills();
-        });
-        brandPills.appendChild(toggle);
-      }
+      brandPills.appendChild(toggle);
     }
-    renderBrandPills();
   }
 
   applyFilters();
