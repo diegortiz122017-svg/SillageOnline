@@ -1086,17 +1086,12 @@ app.patch('/api/customer/profile', requireCustomer, async (req, res) => {
 
 // Get full customer profile
 app.get('/api/customer/profile', requireCustomer, async (req, res) => {
-  try {
-    const [rows] = await db.execute(
-      'SELECT id,name,email,phone,address,city,state,postcode,country,created_at FROM customers WHERE id=?',
-      [req.customer.user.id]
-    );
-    if (!rows.length) return res.status(404).json({ error: 'No encontrado' });
-    res.json(rows[0]);
-  } catch(e) {
-    console.error('Profile fetch error:', e.message);
-    res.status(503).json({ error: 'Servicio temporalmente no disponible' });
-  }
+  const [rows] = await db.execute(
+    'SELECT id,name,email,phone,address,city,state,postcode,country,created_at FROM customers WHERE id=?',
+    [req.customer.user.id]
+  );
+  if (!rows.length) return res.status(404).json({ error: 'No encontrado' });
+  res.json(rows[0]);
 });
 
 // Change customer password
