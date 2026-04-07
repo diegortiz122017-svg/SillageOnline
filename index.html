@@ -2247,7 +2247,6 @@ function buildGrid(){
     brands.sort();
     var currentBrand = fBrand || 'all';
     var BRAND_PILLS_LIMIT = 7;
-    var brandsExpanded = false;
 
     function renderBrandPills(){
       brandPills.innerHTML = '';
@@ -2258,7 +2257,7 @@ function buildGrid(){
       allBtn.textContent = 'Todos';
       brandPills.appendChild(allBtn);
 
-      var visible = brandsExpanded ? brands : brands.slice(0, BRAND_PILLS_LIMIT);
+      var visible = _brandsExpanded ? brands : brands.slice(0, BRAND_PILLS_LIMIT);
       visible.forEach(function(b){
         var btn = document.createElement('button');
         btn.className = 'pill' + (currentBrand===b?' active':'');
@@ -2270,14 +2269,14 @@ function buildGrid(){
       if(brands.length > BRAND_PILLS_LIMIT){
         var toggle = document.createElement('button');
         toggle.className = 'pill pill-more';
-        if(brandsExpanded){
+        if(_brandsExpanded){
           toggle.textContent = 'Ver menos ↑';
         } else {
           toggle.textContent = '+ ' + (brands.length - BRAND_PILLS_LIMIT) + ' marcas';
         }
         toggle.addEventListener('click', function(e){
           e.stopPropagation();
-          brandsExpanded = !brandsExpanded;
+          _brandsExpanded = !_brandsExpanded;
           renderBrandPills();
         });
         brandPills.appendChild(toggle);
@@ -3964,6 +3963,7 @@ function dismissRegisterPrompt(){
 var _somOpen      = false;
 var _somMessages  = [];   // full conversation history
 var _somProfile   = null; // extracted scent profile
+var _brandsExpanded = false; // brand pills drawer state
 var _lastRecIds   = [];   // last recommended IDs for objection card fallback
 var _somQuestion  = 0;    // 0-5
 var _somSession = localStorage.getItem('sillage_session_id') || null;
