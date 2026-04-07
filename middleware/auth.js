@@ -113,6 +113,7 @@ function requireCustomer(req, res, next) {
     return res.status(401).json({ error: 'Unauthorized' });
   }
   req.customerSession = session;
+  req.customer = session; // backwards compat — routes use req.customer.user.id
   next();
 }
 
@@ -120,6 +121,7 @@ function optionalCustomer(req, res, next) {
   const token   = req.headers['x-customer-token'];
   const session = token ? validateSession(token) : null;
   req.customerSession = (session?.role === 'customer') ? session : null;
+  req.customer = req.customerSession; // backwards compat
   next();
 }
 
