@@ -2238,6 +2238,10 @@ function buildGrid(){
     }catch(err){console.error('Card build error for product',p.id,err);}
   });
 
+  // ── Build brand counts (used by pills and cards) ──
+  var brandCounts = {};
+  (P||[]).forEach(function(p){ if(p.brand) brandCounts[p.brand] = (brandCounts[p.brand]||0)+1; });
+
   // ── Build brand pills dynamically from catalogue ──
   var brandPills = document.getElementById('brandPills');
   if(brandPills){
@@ -3412,8 +3416,7 @@ function buildCollections(){
   // ── Brand cards — all brands from catalogue, sorted by revenue ──
   var brandsGrid = document.getElementById('brandsGrid');
   brandsGrid.innerHTML = '<div style="font-size:0.6rem;color:var(--muted);letter-spacing:0.1em">Cargando...</div>';
-  var brandCounts = {};
-  products.forEach(function(p){ if(p.brand) brandCounts[p.brand] = (brandCounts[p.brand]||0)+1; });
+  // brandCounts already built above
 
   function renderBrandCards(ranked, showAll){
     brandsGrid.innerHTML = '';
