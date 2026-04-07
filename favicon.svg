@@ -1,0 +1,14 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32">
+  <!-- Dark rounded background -->
+  <rect width="32" height="32" rx="6" fill="#0e0c0a"/>
+  <!-- Thin gold border -->
+  <rect x="1" y="1" width="30" height="30" rx="5" fill="none" stroke="#b8955a" stroke-width="0.6" opacity="0.6"/>
+  <!-- Italic S in Cormorant style -->
+  <text x="16.5" y="24.5"
+    font-family="Georgia,'Times New Roman',serif"
+    font-size="23"
+    font-style="italic"
+    font-weight="400"
+    fill="#b8955a"
+    text-anchor="middle">S</text>
+</svg>
