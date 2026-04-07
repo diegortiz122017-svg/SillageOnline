@@ -2900,7 +2900,10 @@ async function start() {
   }));
 
   try {
-    // DB connection is lazy — pool created on first query via services/db.js
+    // Warm up DB connection pool before accepting traffic
+    // Prevents cold-start 503s on first user request
+    await db.execute('SELECT 1');
+    console.log('✅ DB connection established');
     await initDB();
     await migrateOrders();
     await migrateConsultCounts();
