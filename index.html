@@ -1805,14 +1805,10 @@ footer{background:var(--dark);padding:3.5rem 4rem;text-align:center;border-top:1
     <div class="coll-header">
       <div>
         <div class="coll-title">Las <em>Colecciones</em></div>
-        <div class="coll-sub">Explora por marca o estilo</div>
+        <div class="coll-sub">Explora por estilo y ocasión</div>
       </div>
       <button class="coll-close" onclick="closeCollections()">&#10005;</button>
     </div>
-
-    <!-- By Brand -->
-    <div class="coll-section-title">Por Marca</div>
-    <div class="brands-grid" id="brandsGrid"></div>
 
     <!-- Curated -->
     <div class="coll-section-title">Colecciones Curadas</div>
@@ -1855,9 +1851,14 @@ function loadViaREST() {
     setConn(results[0] ? 'live' : 'offline', results[0] ? 'En línea' : 'Sin conexión');
     buildGrid();
     buildGrid();
-    // Open product from shared URL ?producto=ID
+    // Open product from shared URL ?producto=ID — only once, then clear param
     var _urlProd = new URLSearchParams(window.location.search).get('producto');
-    if(_urlProd) setTimeout(function(){ openDetail(parseInt(_urlProd)); }, 400);
+    if(_urlProd){
+      setTimeout(function(){ openDetail(parseInt(_urlProd)); }, 400);
+      // Remove param from URL so polling doesn't reopen the modal
+      var _cleanUrl = window.location.pathname + window.location.hash;
+      window.history.replaceState(null, '', _cleanUrl);
+    }
   }).catch(function() {
     setConn('offline', 'Sin conexión');
     buildGrid();
