@@ -24,38 +24,14 @@ function getPool() {
   return pool;
 }
 
-/** Execute with a 15s timeout and one automatic retry on timeout */
+/** Execute — no artificial timeout, let MySQL handle it */
 async function execute(sql, params = []) {
-  for (let attempt = 1; attempt <= 2; attempt++) {
-    try {
-      return await Promise.race([
-        getPool().execute(sql, params),
-        new Promise((_, reject) =>
-          setTimeout(() => reject(new Error('DB query timeout')), 15_000)
-        ),
-      ]);
-    } catch(e) {
-      if (attempt === 2 || !e.message.includes('timeout')) throw e;
-      console.warn(`DB execute timeout on attempt ${attempt}, retrying...`);
-    }
-  }
+  return getPool().execute(sql, params);
 }
 
-/** Query with a 15s timeout and one automatic retry on timeout */
+/** Query — no artificial timeout, let MySQL handle it */
 async function query(sql, params = []) {
-  for (let attempt = 1; attempt <= 2; attempt++) {
-    try {
-      return await Promise.race([
-        getPool().query(sql, params),
-        new Promise((_, reject) =>
-          setTimeout(() => reject(new Error('DB query timeout')), 15_000)
-        ),
-      ]);
-    } catch(e) {
-      if (attempt === 2 || !e.message.includes('timeout')) throw e;
-      console.warn(`DB query timeout on attempt ${attempt}, retrying...`);
-    }
-  }
+  return getPool().query(sql, params);
 }
 
 module.exports = { getPool, execute, query };
