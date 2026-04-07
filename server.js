@@ -585,20 +585,14 @@ function getReplyCacheKey(messages, profileContext) {
   return 'reply:' + genderHint + ':' + query;
 }
 
-// ── Simple rate limiter (no extra package needed) ─────
-const _rateLimitStore = new Map();
-// Prune stale entries every 10 minutes to prevent memory leak under sustained attack
-setInterval(() => {
-  const now = Date.now();
-  for (const [key, record] of _rateLimitStore) {
-    if (now - record.start > 2 * 60 * 60 * 1000) _rateLimitStore.delete(key); // 2h TTL
-  }
-}, 10 * 60 * 1000);
-// rateLimit → middleware/security.js
-// authLimiter → middleware/security.js
-const orderLimiter     = rateLimit(20, 60 * 60 * 1000);           // 20 per hour
-const sommelierLimiter = rateLimit(30, 60 * 60 * 1000, ':hourly'); // 30 per hour per IP
-const sommelierBurst   = rateLimit(5,  60 * 1000,       ':burst'); // 5 per minute (burst)
+// ── Rate limiters ─────────────────────────────────────
+// Local wrapper so named limiters keep their old call signature
+function rateLimit(max, window) {
+  return security.rateLimit({ max, window });
+}
+const orderLimiter     = rateLimit(20, 60 * 60 * 1000);   // 20/hour
+const sommelierLimiter = rateLimit(30, 60 * 60 * 1000);   // 30/hour
+const sommelierBurst   = rateLimit(5,  60 * 1000);        // 5/min
 // ─── Anon session registry — server-issued sessionIds ────────────────────────
 // Prevents bots from inventing arbitrary sessionIds to bypass per-session limits
 const _anonSessions = new Map();
