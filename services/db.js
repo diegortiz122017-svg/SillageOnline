@@ -10,7 +10,6 @@ function getPool() {
     pool = mysql.createPool({
       ...cfg.DB,
       connectTimeout:      10_000,  // 10s to establish connection
-      acquireTimeout:      10_000,  // 10s to acquire from pool
       waitForConnections:  true,
       connectionLimit:     10,
       queueLimit:          0,
