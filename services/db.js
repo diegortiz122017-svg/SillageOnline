@@ -24,24 +24,38 @@ function getPool() {
   return pool;
 }
 
-/** Execute with a hard 8s timeout — prevents Cloudflare 524s */
+/** Execute with a 15s timeout and one automatic retry on timeout */
 async function execute(sql, params = []) {
-  return Promise.race([
-    getPool().execute(sql, params),
-    new Promise((_, reject) =>
-      setTimeout(() => reject(new Error('DB query timeout')), 8_000)
-    ),
-  ]);
+  for (let attempt = 1; attempt <= 2; attempt++) {
+    try {
+      return await Promise.race([
+        getPool().execute(sql, params),
+        new Promise((_, reject) =>
+          setTimeout(() => reject(new Error('DB query timeout')), 15_000)
+        ),
+      ]);
+    } catch(e) {
+      if (attempt === 2 || !e.message.includes('timeout')) throw e;
+      console.warn(`DB execute timeout on attempt ${attempt}, retrying...`);
+    }
+  }
 }
 
-/** Query with a hard 8s timeout */
+/** Query with a 15s timeout and one automatic retry on timeout */
 async function query(sql, params = []) {
-  return Promise.race([
-    getPool().query(sql, params),
-    new Promise((_, reject) =>
-      setTimeout(() => reject(new Error('DB query timeout')), 8_000)
-    ),
-  ]);
+  for (let attempt = 1; attempt <= 2; attempt++) {
+    try {
+      return await Promise.race([
+        getPool().query(sql, params),
+        new Promise((_, reject) =>
+          setTimeout(() => reject(new Error('DB query timeout')), 15_000)
+        ),
+      ]);
+    } catch(e) {
+      if (attempt === 2 || !e.message.includes('timeout')) throw e;
+      console.warn(`DB query timeout on attempt ${attempt}, retrying...`);
+    }
+  }
 }
 
 module.exports = { getPool, execute, query };
