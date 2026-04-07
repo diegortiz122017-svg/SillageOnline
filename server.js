@@ -585,14 +585,33 @@ function getReplyCacheKey(messages, profileContext) {
   return 'reply:' + genderHint + ':' + query;
 }
 
-// ── Rate limiters ─────────────────────────────────────
-// Local wrapper so named limiters keep their old call signature
-function rateLimit(max, window) {
-  return security.rateLimit({ max, window });
+// ── Rate limiters — each with isolated store ──────────
+function rateLimit(max, windowMs) {
+  const store = new Map();
+  // Prune every 10min
+  setInterval(() => {
+    const now = Date.now();
+    for (const [k, v] of store) if (now - v.start > windowMs * 2) store.delete(k);
+  }, 10 * 60 * 1000).unref();
+
+  return function(req, res, next) {
+    const fwd = req.headers['x-forwarded-for'];
+    const ip  = fwd ? fwd.split(',').map(s => s.trim()).pop() : req.socket.remoteAddress;
+    const now = Date.now();
+    const rec = store.get(ip) || { count: 0, start: now };
+    if (now - rec.start > windowMs) { rec.count = 0; rec.start = now; }
+    rec.count++;
+    store.set(ip, rec);
+    if (rec.count > max) {
+      return res.status(429).json({ error: 'El sommelier está muy solicitado en este momento. Espera unos segundos e intenta de nuevo.' });
+    }
+    next();
+  };
 }
+
 const orderLimiter     = rateLimit(20, 60 * 60 * 1000);   // 20/hour
 const sommelierLimiter = rateLimit(30, 60 * 60 * 1000);   // 30/hour
-const sommelierBurst   = rateLimit(5,  60 * 1000);        // 5/min
+const sommelierBurst   = rateLimit(8,  60 * 1000);        // 8/min (was 5, too aggressive)
 // ─── Anon session registry — server-issued sessionIds ────────────────────────
 // Prevents bots from inventing arbitrary sessionIds to bypass per-session limits
 const _anonSessions = new Map();
