@@ -3381,7 +3381,7 @@ function buildCollections(){
 
   // ── Brand cards — all brands from catalogue, sorted by revenue ──
   var brandsGrid = document.getElementById('brandsGrid');
-  brandsGrid.innerHTML = '<div style="font-size:0.6rem;color:var(--muted);letter-spacing:0.1em">Cargando...</div>';
+  if(brandsGrid) brandsGrid.innerHTML = '<div style="font-size:0.6rem;color:var(--muted);letter-spacing:0.1em">Cargando...</div>';
   // brandCounts already built above
 
   function renderBrandCards(ranked, showAll){
@@ -3433,15 +3433,17 @@ function buildCollections(){
     }
   }
 
-  fetch(API+'/catalogue/brand-ranking')
-    .then(function(r){ return r.ok ? r.json() : []; })
-    .then(function(ranked){
-      if(!ranked.length) ranked = Object.keys(brandCounts).sort().map(function(b){ return {brand:b}; });
-      renderBrandCards(ranked, false);
-    })
-    .catch(function(){
-      renderBrandCards(Object.keys(brandCounts).sort().map(function(b){ return {brand:b}; }), false);
-    });
+  if(brandsGrid){
+    fetch(API+'/catalogue/brand-ranking')
+      .then(function(r){ return r.ok ? r.json() : []; })
+      .then(function(ranked){
+        if(!ranked.length) ranked = Object.keys(brandCounts).sort().map(function(b){ return {brand:b}; });
+        renderBrandCards(ranked, false);
+      })
+      .catch(function(){
+        renderBrandCards(Object.keys(brandCounts).sort().map(function(b){ return {brand:b}; }), false);
+      });
+  }
 
   // ── Curated cards ──
   var curatedGrid = document.getElementById('curatedGrid');
