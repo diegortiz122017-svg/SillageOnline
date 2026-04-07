@@ -1844,10 +1844,10 @@ CUÁNDO preguntar: SOLO si el mensaje no da ninguna pista útil.
 NUNCA preguntes lo que ya sabes. NUNCA digas que algo no existe sin buscarlo.
 
 SEÑALES DE INTENCIÓN ALTA — interprétalas y actúa:
-- "Algo que no lo tenga cualquiera", "algo exclusivo", "algo diferente", "algo especial", "algo único" → el cliente quiere carácter y rareza. Busca directamente en familias menos comunes: oud, chypre, oriental, leather. Recomienda desde el tier premium/luxury. No preguntes género ni ocasión — pregunta UNA sola cosa si acaso: "¿Prefieres algo más fresco o más cálido?" y busca de inmediato.
-- "Lo mejor que tengas", "algo lujoso", "sin límite de presupuesto" → luxury tier directo. Baccarat Rouge, Aventus, Delina, Santal 33, Layton.
+- "Algo que no lo tenga cualquiera", "algo exclusivo", "algo diferente", "algo especial", "algo único", "algo de nicho" → el cliente quiere carácter y rareza. USA min_price:150 en search_catalogue para filtrar el tier diamond/gold y quedarte solo con premium. Busca en families: ["chypre","woody","oriental","leather","oud"]. Las marcas de nicho en nuestro catálogo son: Maison Francis Kurkdjian, Creed, Tom Ford, Initio, Parfums de Marly, Le Labo, Vilhelm Parfumerie, Mancera, Montale, Sospiro. NO recomiendes Lattafa, Afnan, Armaf, Ajmal, Zimaya para estas solicitudes.
+- "Lo mejor que tengas", "algo lujoso", "sin límite de presupuesto" → luxury tier directo. USA min_price:250. Baccarat Rouge, Aventus, Delina, Santal 33, Layton, Guidance.
 - "Algo que dure todo el día", "que se sienta desde lejos" → prioriza sillage:Very Strong en los resultados.
-- "Algo para impresionar" → proyección fuerte, fragancias con firma clara, nada genérico.
+- "Algo para impresionar" → proyección fuerte, fragancias con firma clara. min_price:100.
 
 BÚSQUEDA:
 - SIEMPRE usa exclude_ids con los IDs ya recomendados — NUNCA repitas productos ya mostrados
@@ -1861,7 +1861,7 @@ FORMATO — MUY IMPORTANTE:
 - Sin párrafos largos. Sin explicaciones de notas. Directo.
 
 RECOMENDACIONES: 1-3 según contexto. Sin precios. Si stock:low_stock → menciona sutilmente.
-Presupuesto limitado → menciona precio del decant (decant:$XX en el resultado).
+Presupuesto limitado → menciona el precio del decant. Para fragancias luxury el resultado incluye decant10:$XX y decant5:$XX — el 5ml es la entrada más accesible.
 
 GÉNERO: perfil con género → úsalo siempre. Sin género → pregunta UNA vez. Unisex válido para cualquier género.
 
@@ -2054,8 +2054,8 @@ Responde en el idioma del cliente.`
 
           // Price range
           const price = parseFloat(p.price);
-          if (args.max_price && price > args.max_price) score -= 15;
-          if (args.min_price && price < args.min_price) score -= 5;
+          if (args.max_price && price > args.max_price) score -= 50; // hard exclude
+          if (args.min_price && price < args.min_price) score -= 50; // hard exclude
 
           // Season
           if (args.season && args.season !== 'any') {
@@ -2085,6 +2085,7 @@ Responde en el idioma del cliente.`
           .filter(p => !excludeIds.has(Number(p.id)))
           .filter(p => !args.gender || args.gender === 'any' || p.g === args.gender || p.g === 'U')
           .filter(p => !args.max_price || parseFloat(p.price) <= args.max_price)
+          .filter(p => !args.min_price || parseFloat(p.price) >= args.min_price)
           .slice(0, 8);
         if (!fallback.length) return 'Catálogo vacío — agrega fragancias desde el panel de administración.';
         return fallback.map(p =>
@@ -2109,9 +2110,13 @@ Responde en el idioma del cliente.`
         const effPrice = (pr.onSale && pr.salePrice) ? Math.round(+pr.salePrice) : parseFloat(p.price);
         const stockLabel = inv.lowStock ? 'low_stock' : 'in_stock';
         const priceLabel = (pr.onSale && pr.salePrice) ? `$${effPrice} (sale, was $${p.price})` : `$${effPrice}`;
-        const decantP = p.decantPrice ? parseFloat(p.decantPrice) : Math.round(effPrice * 0.30);
+        const decantP  = p.decantPrice  ? parseFloat(p.decantPrice)  : Math.round(effPrice * 0.30);
+        const decant5P = p.decantPrice5 ? parseFloat(p.decantPrice5) : Math.round(decantP * 0.55);
+        const decantLabel = p.luxury
+          ? `decant10:$${decantP} decant5:$${decant5P}`
+          : `decant:$${decantP}`;
         const parts = [
-          `id:${p.id} ${p.brand} ${p.name} ${priceLabel} decant:$${decantP} ${p.g}`,
+          `id:${p.id} ${p.brand} ${p.name} ${priceLabel} ${decantLabel} ${p.g}`,
           p.family   ? `family:${p.family}`       : null,
           p.notes    ? `notes:${p.notes}`          : null,
           p.top      ? `top:${p.top}`              : null,
