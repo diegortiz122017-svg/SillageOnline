@@ -1457,13 +1457,6 @@ footer{background:var(--dark);padding:3.5rem 4rem;text-align:center;border-top:1
   <div class="filters-bar">
     <div class="filter-group" id="brandPills">
       <button class="pill active" data-brand="all">Todos</button>
-      <button class="pill" data-brand="Chanel">Chanel</button>
-      <button class="pill" data-brand="Dior">Dior</button>
-      <button class="pill" data-brand="Hermes">Herm&egrave;s</button>
-      <button class="pill" data-brand="Tom Ford">Tom Ford</button>
-      <button class="pill" data-brand="Maison Margiela">Margiela</button>
-      <button class="pill" data-brand="Jo Malone">Jo Malone</button>
-      <button class="pill" data-brand="Creed">Creed</button>
     </div>
     <div class="filter-group" id="genderPills">
       <button class="pill active" data-gender="all">Todos</button>
@@ -1859,12 +1852,15 @@ function loadViaREST() {
     if(results[2] && results[2].length > 0) P = results[2];
     setConn(results[0] ? 'live' : 'offline', results[0] ? 'En línea' : 'Sin conexión');
     buildGrid();
+    buildBrandPills();
+    buildBrandPills();
     // Open product from shared URL ?producto=ID
     var _urlProd = new URLSearchParams(window.location.search).get('producto');
     if(_urlProd) setTimeout(function(){ openDetail(parseInt(_urlProd)); }, 400);
   }).catch(function() {
     setConn('offline', 'Sin conexión');
     buildGrid();
+    buildBrandPills();
   });
 }
 
@@ -1915,19 +1911,23 @@ function connectWS() {
           adminState.inventory = msg.payload.inventory || {};
           adminState.pricing   = msg.payload.pricing   || {};
           buildGrid();
+          buildBrandPills();
         }
         if (msg.type === 'inventory') {
           adminState.inventory = msg.payload;
           buildGrid();
+          buildBrandPills();
         }
         if (msg.type === 'pricing') {
           adminState.pricing = msg.payload;
           buildGrid();
+          buildBrandPills();
         }
         if (msg.type === 'catalogue') {
           if (msg.payload && msg.payload.length > 0) {
             P = msg.payload;
             buildGrid();
+            buildBrandPills();
           }
         }
         if (msg.type === 'order_update') {
@@ -2120,6 +2120,62 @@ function injectProductSchema(products) {
   checkFabVisibility();
 })();
 
+// Brand prestige hierarchy — controls pill order
+var BRAND_HIERARCHY = [
+  'Maison Francis Kurkdjian','Creed','Tom Ford','Initio',
+  'Parfums de Marly','Le Labo','Vilhelm Parfumerie','Mancera','Montale',
+  'Chanel','Dior','Hermes','Jo Malone','Maison Margiela','Prada',
+  'Jean Paul Gaultier','Al Haramain','Sospiro',
+  'Lattafa','Afnan','Armaf','Ajmal','Zimaya'
+];
+
+// Display labels for brands with special characters
+var BRAND_LABELS = {
+  'Hermes': 'Hermès',
+  'Maison Francis Kurkdjian': 'MFK',
+  'Maison Margiela': 'Margiela',
+  'Jean Paul Gaultier': 'JPGaultier',
+  'Vilhelm Parfumerie': 'Vilhelm',
+  'Al Haramain': 'Al Haramain',
+  'Parfums de Marly': 'Parly',
+};
+
+function buildBrandPills(){
+  var container = document.getElementById('brandPills');
+  if(!container || !P || !P.length) return;
+
+  // Get unique brands from catalogue
+  var brands = [];
+  var seen = new Set();
+  // First add brands in hierarchy order
+  BRAND_HIERARCHY.forEach(function(b){
+    if(!seen.has(b) && P.some(function(p){ return p.brand === b; })){
+      brands.push(b);
+      seen.add(b);
+    }
+  });
+  // Then any remaining brands alphabetically
+  P.forEach(function(p){
+    if(!seen.has(p.brand)){
+      brands.push(p.brand);
+      seen.add(p.brand);
+    }
+  });
+
+  // Keep "Todos" button, rebuild the rest
+  var todosBtn = container.querySelector('[data-brand="all"]');
+  container.innerHTML = '';
+  container.appendChild(todosBtn);
+
+  brands.forEach(function(brand){
+    var btn = document.createElement('button');
+    btn.className = 'pill';
+    btn.dataset.brand = brand;
+    btn.textContent = BRAND_LABELS[brand] || brand;
+    container.appendChild(btn);
+  });
+}
+
 function buildGrid(){
   var grid=document.getElementById('productGrid');
   var empty=document.getElementById('emptyState');
@@ -2179,6 +2235,25 @@ function buildGrid(){
       grid.insertBefore(card,empty);
     }catch(err){console.error('Card build error for product',p.id,err);}
   });
+
+  // ── Build brand pills dynamically from catalogue ──
+  var brandPills = document.getElementById('brandPills');
+  if(brandPills){
+    var brands = [];
+    var seen = {};
+    P.forEach(function(p){ if(p.brand && !seen[p.brand]){ seen[p.brand]=true; brands.push(p.brand); } });
+    brands.sort();
+    var currentBrand = fBrand || 'all';
+    brandPills.innerHTML = '<button class="pill'+(currentBrand==='all'?' active':'')+'" data-brand="all">Todos</button>';
+    brands.forEach(function(b){
+      var btn = document.createElement('button');
+      btn.className = 'pill' + (currentBrand===b?' active':'');
+      btn.dataset.brand = b;
+      btn.textContent = b;
+      brandPills.appendChild(btn);
+    });
+  }
+
   applyFilters();
   injectProductSchema(P);
 
@@ -2217,6 +2292,7 @@ function buildGrid(){
   }
 }
 buildGrid();
+buildBrandPills();
 
 // ════════════════════════════════════════════
 // FILTERS
