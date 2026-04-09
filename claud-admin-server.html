@@ -1180,6 +1180,22 @@ tr:hover td{background:rgba(255,255,255,0.02)}
 
 
 <script>
+function togglePhoneMenu(uid){
+  // Close any other open phone menus first
+  document.querySelectorAll('[id^="ph-"]').forEach(function(el){
+    if(el.id !== uid) el.style.display = 'none';
+  });
+  var el = document.getElementById(uid);
+  if(!el) return;
+  el.style.display = el.style.display === 'none' ? 'block' : 'none';
+}
+// Close phone menus when clicking outside
+document.addEventListener('click', function(e){
+  if(!e.target.closest('[id^="ph-"]') && !e.target.onclick){
+    document.querySelectorAll('[id^="ph-"]').forEach(function(el){ el.style.display='none'; });
+  }
+});
+
 function toggleMobDrawer(){
   var d = document.getElementById('mobDrawer');
   if(!d) return;
@@ -2198,10 +2214,13 @@ function openOrderDetail(orderId){
           '<div style="font-size:0.5rem;letter-spacing:0.2em;text-transform:uppercase;color:var(--muted);margin-bottom:0.3rem">Cliente</div>'+
           '<div style="font-size:0.85rem;color:var(--cream)">'+esc(o.customer)+'</div>'+
           '<a href="mailto:'+esc(o.email)+'" style="font-size:0.7rem;color:var(--gold);text-decoration:none;display:block;margin-top:0.2rem">✉ '+esc(o.email)+'</a>'+
-          (o.phone?(function(){var ph=o.phone.replace(/[^0-9]/g,'');return'<div style="display:flex;gap:0.5rem;margin-top:0.3rem">'+
-            '<a href="tel:'+esc(o.phone)+'" style="font-size:0.62rem;color:var(--gold);text-decoration:none;border:1px solid rgba(184,149,90,0.3);padding:0.2rem 0.5rem">📞 Llamar</a>'+
-            '<a href="sms:'+esc(o.phone)+'" style="font-size:0.62rem;color:var(--gold);text-decoration:none;border:1px solid rgba(184,149,90,0.3);padding:0.2rem 0.5rem">💬 SMS</a>'+
-            '<a href="https://wa.me/'+ph+'" target="_blank" style="font-size:0.62rem;color:var(--gold);text-decoration:none;border:1px solid rgba(184,149,90,0.3);padding:0.2rem 0.5rem">WhatsApp</a>'+
+          (o.phone?(function(){var ph=o.phone.replace(/[^0-9]/g,'');var uid='ph-'+o.id;return'<div style="position:relative;display:inline-block;margin-top:0.3rem">'+
+            '<span onclick="togglePhoneMenu(\''+uid+'\')" style="font-size:0.7rem;color:var(--gold);cursor:pointer;text-decoration:underline;text-decoration-style:dotted">'+esc(o.phone)+'</span>'+
+            '<div id="'+uid+'" style="display:none;position:absolute;left:0;top:100%;margin-top:4px;background:var(--card);border:1px solid var(--border);z-index:50;min-width:160px;box-shadow:0 4px 12px rgba(0,0,0,0.4)">'+
+              '<a href="tel:'+esc(o.phone)+'" style="display:flex;align-items:center;gap:0.6rem;padding:0.6rem 0.9rem;font-size:0.68rem;color:var(--cream);text-decoration:none;border-bottom:1px solid var(--border-light)" onmouseenter="this.style.color=\'var(--gold)\'" onmouseleave="this.style.color=\'var(--cream)\'">📞 Llamar</a>'+
+              '<a href="sms:'+esc(o.phone)+'" style="display:flex;align-items:center;gap:0.6rem;padding:0.6rem 0.9rem;font-size:0.68rem;color:var(--cream);text-decoration:none;border-bottom:1px solid var(--border-light)" onmouseenter="this.style.color=\'var(--gold)\'" onmouseleave="this.style.color=\'var(--cream)\'">💬 SMS</a>'+
+              '<a href="https://wa.me/'+ph+'" target="_blank" style="display:flex;align-items:center;gap:0.6rem;padding:0.6rem 0.9rem;font-size:0.68rem;color:var(--cream);text-decoration:none" onmouseenter="this.style.color=\'var(--gold)\'" onmouseleave="this.style.color=\'var(--cream)\'">📱 WhatsApp</a>'+
+            '</div>'+
           '</div>';})():'')+ 
         '</div>'+
         '<div style="background:var(--card);padding:0.8rem;border:1px solid var(--border-light)">'+
