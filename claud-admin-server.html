@@ -228,14 +228,28 @@ tr:hover td{background:rgba(255,255,255,0.02)}
   .export-btn{padding:0.5rem 1rem;font-size:0.58rem}
 
   /* Mobile bottom tab bar */
-  .mob-tabs{display:flex;background:var(--panel);border-top:1px solid var(--border);overflow-x:auto;scrollbar-width:none;-ms-overflow-style:none;
+  .mob-tabs{display:flex;background:var(--panel);border-top:1px solid var(--border);
     position:fixed;bottom:0;left:0;right:0;z-index:50;height:64px}
-  .mob-tab{flex:0 0 auto;min-width:60px;padding:0.5rem 0.4rem;text-align:center;font-size:0.48rem;
+  .mob-tab{flex:1;padding:0.5rem 0.4rem;text-align:center;font-size:0.48rem;
     letter-spacing:0.06em;text-transform:uppercase;color:var(--muted);
     background:none;border:none;cursor:pointer;font-family:'Jost',sans-serif;
     display:flex;flex-direction:column;align-items:center;justify-content:center;gap:0.2rem}
   .mob-tab.active{color:var(--gold)}
   .mob-icon{font-size:1.2rem}
+  /* Drawer */
+  .mob-drawer-overlay{position:fixed;inset:0;background:rgba(0,0,0,0.6);z-index:60}
+  .mob-drawer{position:fixed;bottom:64px;left:0;right:0;z-index:61;
+    background:var(--panel);border-top:1px solid var(--border);
+    border-radius:12px 12px 0 0;padding:0 0 1rem}
+  .mob-drawer-handle{width:36px;height:3px;background:var(--border);border-radius:2px;margin:0.75rem auto 0.5rem}
+  .mob-drawer-title{font-size:0.5rem;letter-spacing:0.2em;text-transform:uppercase;
+    color:var(--muted);padding:0.5rem 1.5rem 0.75rem;border-bottom:1px solid var(--border-light)}
+  .mob-drawer-item{width:100%;display:flex;align-items:center;gap:1rem;
+    padding:0.9rem 1.5rem;background:none;border:none;color:var(--cream);
+    font-family:'Jost',sans-serif;font-size:0.75rem;letter-spacing:0.08em;
+    text-transform:uppercase;cursor:pointer;transition:color 0.2s}
+  .mob-drawer-item:hover,.mob-drawer-item.active{color:var(--gold)}
+  .mob-drawer-item .mob-icon{font-size:1.1rem;width:24px}
 
   /* Toggle labels — hide text on mobile to save space */
   .tog-lbl{display:none}
@@ -739,13 +753,17 @@ tr:hover td{background:rgba(255,255,255,0.02)}
     <div class="sidebar">
       <div class="sb-section">Gestión</div>
       <div class="sb-nav">
+        <div class="sb-section">Operaciones</div>
         <button class="nav-btn active" data-page="overview"><span class="nav-icon">📊</span>Resumen</button>
+        <button class="nav-btn" data-page="orders"><span class="nav-icon">🧾</span>Pedidos</button>
+        <div class="sb-section">Inventario</div>
         <button class="nav-btn" data-page="inventory"><span class="nav-icon">📦</span>Inventario</button>
         <button class="nav-btn" data-page="pricing"><span class="nav-icon">💲</span>Precios</button>
-        <button class="nav-btn" data-page="orders"><span class="nav-icon">🧾</span>Pedidos</button>
+        <div class="sb-section">Catálogo</div>
         <button class="nav-btn" data-page="catalogo"><span class="nav-icon">🌸</span>Catálogo</button>
-        <button class="nav-btn" data-page="clientes"><span class="nav-icon">👤</span>Clientes</button>
         <button class="nav-btn" data-page="bundles"><span class="nav-icon">🎁</span>Bundles</button>
+        <div class="sb-section">Clientes</div>
+        <button class="nav-btn" data-page="clientes"><span class="nav-icon">👤</span>Clientes</button>
       </div>
       <div class="sb-bottom">
         <a class="sb-link" href="claud-perfumes.html" target="_blank">↗ Ver Tienda</a>
@@ -1017,14 +1035,25 @@ tr:hover td{background:rgba(255,255,255,0.02)}
 
     </div>
   </div>
+  <!-- Mobile bottom nav -->
   <div class="mob-tabs">
     <button class="mob-tab active" data-page="overview"><span class="mob-icon">📊</span>Resumen</button>
-    <button class="mob-tab" data-page="inventory"><span class="mob-icon">📦</span>Inventario</button>
-    <button class="mob-tab" data-page="pricing"><span class="mob-icon">💲</span>Precios</button>
     <button class="mob-tab" data-page="orders"><span class="mob-icon">🧾</span>Pedidos</button>
     <button class="mob-tab" data-page="catalogo"><span class="mob-icon">🌸</span>Catálogo</button>
-    <button class="mob-tab" data-page="clientes"><span class="mob-icon">👤</span>Clientes</button>
-    <button class="mob-tab" data-page="bundles"><span class="mob-icon">🎁</span>Bundles</button>
+    <button class="mob-tab" data-page="inventory"><span class="mob-icon">📦</span>Inventario</button>
+    <button class="mob-tab" id="mobMoreBtn" onclick="toggleMobDrawer()"><span class="mob-icon">•••</span>Más</button>
+  </div>
+
+  <!-- "Más" drawer -->
+  <div id="mobDrawer" style="display:none">
+    <div class="mob-drawer-overlay" onclick="toggleMobDrawer()"></div>
+    <div class="mob-drawer">
+      <div class="mob-drawer-handle"></div>
+      <div class="mob-drawer-title">Más opciones</div>
+      <button class="mob-drawer-item" data-page="pricing" onclick="navToFromDrawer('pricing')"><span class="mob-icon">💲</span>Precios</button>
+      <button class="mob-drawer-item" data-page="bundles" onclick="navToFromDrawer('bundles')"><span class="mob-icon">🎁</span>Bundles</button>
+      <button class="mob-drawer-item" data-page="clientes" onclick="navToFromDrawer('clientes')"><span class="mob-icon">👤</span>Clientes</button>
+    </div>
   </div>
   <!-- BOTTLE MODAL -->
 <div id="bottleModal" style="display:none;position:fixed;inset:0;z-index:9999;background:rgba(0,0,0,0.75);align-items:center;justify-content:center">
@@ -1368,7 +1397,25 @@ function navTo(page){
   // Close quick-view panel
   closeQV();
   document.querySelectorAll('.page').forEach(function(p){p.classList.remove('active');});
-  document.querySelectorAll('.nav-btn,.mob-tab').forEach(function(b){b.classList.remove('active');});
+  function toggleMobDrawer(){
+  var d = document.getElementById('mobDrawer');
+  d.style.display = d.style.display === 'none' ? 'block' : 'none';
+}
+
+function navToFromDrawer(page){
+  toggleMobDrawer();
+  navTo(page);
+  // Mark drawer items active
+  document.querySelectorAll('.mob-drawer-item').forEach(function(b){
+    b.classList.toggle('active', b.dataset.page === page);
+  });
+  // Clear primary tab active states since this is a drawer page
+  document.querySelectorAll('.mob-tab').forEach(function(b){
+    b.classList.remove('active');
+  });
+}
+
+document.querySelectorAll('.nav-btn,.mob-tab').forEach(function(b){b.classList.remove('active');});
   document.getElementById('page-'+page).classList.add('active');
   document.querySelectorAll('[data-page="'+page+'"]').forEach(function(b){b.classList.add('active');});
   document.getElementById('content').scrollTop=0;
@@ -1382,7 +1429,18 @@ function navTo(page){
   if(page==='clientes')  loadClientes();
 }
 document.querySelectorAll('.nav-btn,.mob-tab').forEach(function(b){
-  b.addEventListener('click',function(){navTo(this.dataset.page);});
+  b.addEventListener('click',function(){
+    var page = this.dataset.page;
+    if(!page || this.id === 'mobMoreBtn') return;
+    // Close drawer if open
+    var d = document.getElementById('mobDrawer');
+    if(d) d.style.display = 'none';
+    // Clear all active states
+    document.querySelectorAll('.nav-btn,.mob-tab,.mob-drawer-item').forEach(function(x){x.classList.remove('active');});
+    // Set active on matching elements
+    document.querySelectorAll('[data-page="'+page+'"]').forEach(function(x){x.classList.add('active');});
+    navTo(page);
+  });
 });
 
 
