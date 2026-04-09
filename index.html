@@ -1806,7 +1806,7 @@ footer{background:var(--dark);padding:3.5rem 4rem;text-align:center;border-top:1
     <div class="curated-grid" id="curatedGrid"></div>
 
     <!-- Bundles -->
-    <div class="coll-section-title" id="collBundlesTitle" style="display:none">Bundles de Decants</div>
+    <div class="coll-section-title" id="collBundlesTitle" style="display:none">Bundles</div>
     <div class="bundles-grid" id="collBundlesGrid" style="margin-top:1rem"></div>
   </div>
 </div>
@@ -3424,7 +3424,7 @@ function buildCollections(){
             return '<div class="bsc-item">'+esc(it.name)+(it.size?' <span style="color:var(--muted);font-size:0.6rem">'+esc(it.size)+'</span>':'')+'</div>';
           }).join('');
           return '<div class="bundle-store-card" data-bid="'+b.id+'">'+
-            '<span class="bsc-tag">Bundle · '+b.items.length+' fragancias</span>'+
+            '<span class="bsc-tag">Bundle · '+b.items.length+' producto'+(b.items.length!==1?'s':'')+'</span>'+
             '<div class="bsc-name">'+esc(b.name)+'</div>'+
             (b.description?'<div class="bsc-desc">'+esc(b.description)+'</div>':'')+
             '<div class="bsc-items">'+items+'</div>'+
