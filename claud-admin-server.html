@@ -2012,7 +2012,6 @@ document.addEventListener('click', function(e){
   if(!row) return;
   var oid = row.dataset.oid;
   if(!oid) return;
-  closeQV();
   var o = orders.find(function(x){ return String(x.id) === String(oid); });
   if(o){
     openOrderDetail(o.id);
