@@ -3114,23 +3114,30 @@ function closeBundleDetail(){
 }
 
 function openBundleProdDetail(pid){
-  // Step 1: fade out bundle modal
-  var overlay = document.getElementById('bundleDetailOverlay');
-  overlay.style.transition = 'opacity 0.25s';
-  overlay.style.opacity = '0';
+  var bundleOverlay = document.getElementById('bundleDetailOverlay');
+  var collOverlay   = document.getElementById('collOverlay');
+
+  // Fade both out together
+  bundleOverlay.style.transition = 'opacity 0.35s ease';
+  collOverlay.style.transition   = 'opacity 0.35s ease';
+  bundleOverlay.style.opacity    = '0';
+  collOverlay.style.opacity      = '0';
+
   setTimeout(function(){
-    overlay.classList.remove('open');
-    overlay.style.opacity = '';
-    overlay.style.transition = '';
-    // Step 2: fade out collections
-    var coll = document.getElementById('collOverlay');
-    coll.classList.remove('open');
+    // Hide both cleanly
+    bundleOverlay.classList.remove('open');
+    bundleOverlay.style.opacity    = '';
+    bundleOverlay.style.transition = '';
+    collOverlay.classList.remove('open');
+    collOverlay.style.opacity    = '';
+    collOverlay.style.transition = '';
     document.body.style.overflow = '';
-    // Step 3: open product detail after collections fades
+
+    // Small pause before product modal opens so screen is clear
     setTimeout(function(){
       openDetail(pid);
-    }, 350);
-  }, 220);
+    }, 80);
+  }, 380);
 }
 
 function renderCollBundles(bundles){
