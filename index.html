@@ -3116,28 +3116,42 @@ function closeBundleDetail(){
 function openBundleProdDetail(pid){
   var bundleOverlay = document.getElementById('bundleDetailOverlay');
   var collOverlay   = document.getElementById('collOverlay');
+  var detailOverlay = document.getElementById('detailOverlay');
 
-  // Fade both out together
-  bundleOverlay.style.transition = 'opacity 0.35s ease';
-  collOverlay.style.transition   = 'opacity 0.35s ease';
+  // Pre-load the detail content while modals are still visible
+  openDetail(pid);
+
+  // Force detail to start invisible so we control the fade
+  detailOverlay.style.transition = 'none';
+  detailOverlay.style.opacity    = '0';
+  detailOverlay.classList.add('open');
+
+  // Start fading out both modals
+  bundleOverlay.style.transition = 'opacity 0.45s cubic-bezier(0.4,0,0.2,1)';
+  collOverlay.style.transition   = 'opacity 0.45s cubic-bezier(0.4,0,0.2,1)';
   bundleOverlay.style.opacity    = '0';
   collOverlay.style.opacity      = '0';
 
+  // Cross-fade: start fading in detail while modals are fading out
+  requestAnimationFrame(function(){
+    requestAnimationFrame(function(){
+      detailOverlay.style.transition = 'opacity 0.4s cubic-bezier(0.4,0,0.2,1)';
+      detailOverlay.style.opacity    = '1';
+    });
+  });
+
+  // Clean up after transition completes
   setTimeout(function(){
-    // Hide both cleanly
     bundleOverlay.classList.remove('open');
     bundleOverlay.style.opacity    = '';
     bundleOverlay.style.transition = '';
     collOverlay.classList.remove('open');
     collOverlay.style.opacity    = '';
     collOverlay.style.transition = '';
-    document.body.style.overflow = '';
-
-    // Small pause before product modal opens so screen is clear
-    setTimeout(function(){
-      openDetail(pid);
-    }, 80);
-  }, 380);
+    detailOverlay.style.opacity    = '';
+    detailOverlay.style.transition = '';
+    document.body.style.overflow   = '';
+  }, 500);
 }
 
 function renderCollBundles(bundles){
