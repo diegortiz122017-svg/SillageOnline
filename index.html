@@ -1030,6 +1030,19 @@ footer{background:var(--dark);padding:3.5rem 4rem;text-align:center;border-top:1
 #bundles-section{padding:5rem var(--side);background:var(--bg);border-top:1px solid var(--border)}
 .bundles-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:1.2rem;margin-top:2rem;max-width:1200px;margin-left:auto;margin-right:auto}
 .bundle-store-card{background:rgba(184,149,90,0.04);border:1px solid rgba(184,149,90,0.2);padding:1.8rem;cursor:pointer;transition:all 0.3s;position:relative}
+.bundle-modal-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,0.75);z-index:300;align-items:center;justify-content:center}
+.bundle-modal-overlay.open{display:flex}
+.bundle-modal{background:var(--dark);border:1px solid var(--border);max-width:520px;width:90%;max-height:85vh;overflow-y:auto;position:relative}
+.bundle-modal-hdr{padding:1.5rem;border-bottom:1px solid var(--border);display:flex;justify-content:space-between;align-items:flex-start}
+.bundle-modal-body{padding:1.5rem;display:flex;flex-direction:column;gap:0.8rem}
+.bundle-prod-row{display:flex;align-items:center;gap:1rem;padding:0.8rem;background:rgba(255,255,255,0.02);border:1px solid var(--border-light);cursor:pointer;transition:border-color 0.2s}
+.bundle-prod-row:hover{border-color:var(--gold)}
+.bundle-prod-img{width:50px;height:50px;object-fit:cover;flex-shrink:0;background:rgba(255,255,255,0.03)}
+.bundle-prod-info{flex:1;min-width:0}
+.bundle-prod-brand{font-size:0.5rem;letter-spacing:0.15em;text-transform:uppercase;color:var(--muted)}
+.bundle-prod-name{font-family:'Cormorant Garamond',serif;font-size:1rem;color:var(--cream)}
+.bundle-prod-size{font-size:0.6rem;color:var(--muted)}
+.bundle-modal-footer{padding:1.2rem 1.5rem;border-top:1px solid var(--border);display:flex;align-items:center;justify-content:space-between}
 .bundle-store-card:hover{border-color:var(--gold);background:rgba(184,149,90,0.08)}
 .bsc-tag{font-size:0.52rem;letter-spacing:0.2em;text-transform:uppercase;color:var(--gold);margin-bottom:0.8rem;display:block}
 .bsc-name{font-family:'Cormorant Garamond',serif;font-size:1.3rem;font-weight:300;color:var(--cream);margin-bottom:0.5rem}
@@ -1467,6 +1480,28 @@ footer{background:var(--dark);padding:3.5rem 4rem;text-align:center;border-top:1
     <div class="empty-state" id="emptyState"><h3>No se encontraron fragancias</h3><p>Intenta ajustar los filtros</p></div>
   </div>
 </section>
+
+<!-- Bundle Detail Modal -->
+<div class="bundle-modal-overlay" id="bundleDetailOverlay" onclick="if(event.target===this)closeBundleDetail()">
+  <div class="bundle-modal">
+    <div class="bundle-modal-hdr">
+      <div>
+        <div style="font-size:0.5rem;letter-spacing:0.2em;text-transform:uppercase;color:var(--gold);margin-bottom:0.3rem">Bundle</div>
+        <div id="bundleDetailName" style="font-family:'Cormorant Garamond',serif;font-size:1.4rem;color:var(--cream);font-weight:300"></div>
+        <div id="bundleDetailDesc" style="font-size:0.7rem;color:var(--muted);margin-top:0.3rem"></div>
+      </div>
+      <button onclick="closeBundleDetail()" style="background:none;border:none;color:var(--muted);font-size:1.1rem;cursor:pointer;line-height:1">&#10005;</button>
+    </div>
+    <div class="bundle-modal-body" id="bundleDetailBody"></div>
+    <div class="bundle-modal-footer">
+      <div>
+        <div id="bundleDetailPrice" style="font-family:'Cormorant Garamond',serif;font-size:1.6rem;color:var(--gold)"></div>
+        <div id="bundleDetailSaving" style="font-size:0.6rem;color:var(--success);margin-top:0.1rem"></div>
+      </div>
+      <button id="bundleDetailAddBtn" class="d-add-btn" style="width:auto;padding:0.8rem 1.5rem">Añadir al Carrito</button>
+    </div>
+  </div>
+</div>
 
 <footer>
   <div class="f-logo">Sillage</div>
@@ -3042,6 +3077,42 @@ var currentCustomer = null;
 
 
 // ── Bundles ──────────────────────────────────────────
+function openBundleDetail(b){
+  document.getElementById('bundleDetailName').textContent = b.name;
+  document.getElementById('bundleDetailDesc').textContent = b.description || '';
+  document.getElementById('bundleDetailPrice').textContent = '$'+parseFloat(b.price).toFixed(2);
+  var saving = b.orig_price && parseFloat(b.orig_price) > parseFloat(b.price)
+    ? parseFloat(b.orig_price) - parseFloat(b.price) : 0;
+  document.getElementById('bundleDetailSaving').textContent = saving > 0 ? 'Ahorras $'+saving.toFixed(2) : '';
+
+  var body = document.getElementById('bundleDetailBody');
+  body.innerHTML = (b.items||[]).map(function(it){
+    var prod = (P||[]).find(function(p){ return p.id === it.productId || p.id === +it.productId; });
+    var img = prod && prod.image ? '<img class="bundle-prod-img" src="'+cdnImg(prod.image,80)+'" loading="lazy"/>' :
+      '<div class="bundle-prod-img" style="display:flex;align-items:center;justify-content:center;font-size:1.2rem">🌸</div>';
+    var brand = prod ? esc(prod.brand) : '';
+    var name  = prod ? esc(prod.name)  : esc(it.name||'');
+    var size  = it.size ? '<div class="bundle-prod-size">'+esc(it.size)+'</div>' : '';
+    var pid   = prod ? prod.id : null;
+    return '<div class="bundle-prod-row"'+(pid?' onclick="closeBundleDetail();setTimeout(function(){openDetail('+pid+')},200)"':'')+'>'+
+      img+
+      '<div class="bundle-prod-info">'+
+        '<div class="bundle-prod-brand">'+brand+'</div>'+
+        '<div class="bundle-prod-name">'+name+'</div>'+
+        size+
+      '</div>'+
+      (pid?'<span style="color:var(--muted);font-size:0.8rem">&#8594;</span>':'')+
+    '</div>';
+  }).join('');
+
+  document.getElementById('bundleDetailAddBtn').onclick = function(){ addBundleToCart(b.id, b); closeBundleDetail(); };
+  document.getElementById('bundleDetailOverlay').classList.add('open');
+}
+
+function closeBundleDetail(){
+  document.getElementById('bundleDetailOverlay').classList.remove('open');
+}
+
 var _bundlesLoaded = false;
 function loadBundles(){
   if(_bundlesLoaded) return;
@@ -3439,6 +3510,14 @@ function buildCollections(){
           '</div>';
         }).join('');
         // Wire up add buttons
+        collBundlesGrid.querySelectorAll('.bundle-store-card').forEach(function(card){
+          card.addEventListener('click', function(e){
+            if(e.target.closest('.bsc-add')) return; // let add button handle itself
+            var bid = parseInt(card.dataset.bid);
+            var found = (window._allBundles||[]).find(function(b){ return b.id===bid; });
+            if(found) openBundleDetail(found);
+          });
+        });
         collBundlesGrid.querySelectorAll('.bsc-add').forEach(function(btn){
           btn.addEventListener('click', function(e){
             e.stopPropagation();
