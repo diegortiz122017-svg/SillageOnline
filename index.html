@@ -3094,7 +3094,7 @@ function openBundleDetail(b){
     var name  = prod ? esc(prod.name)  : esc(it.name||'');
     var size  = it.size ? '<div class="bundle-prod-size">'+esc(it.size)+'</div>' : '';
     var pid   = prod ? prod.id : null;
-    return '<div class="bundle-prod-row"'+(pid?' onclick="closeBundleDetail();setTimeout(function(){openDetail('+pid+')},200)"':'')+'>'+
+    return '<div class="bundle-prod-row"'+(pid?' onclick="closeBundleDetail();closeCollections();setTimeout(function(){openDetail('+pid+')},200)"':'')+'>'+
       img+
       '<div class="bundle-prod-info">'+
         '<div class="bundle-prod-brand">'+brand+'</div>'+
