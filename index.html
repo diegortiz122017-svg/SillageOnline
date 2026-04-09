@@ -3509,22 +3509,22 @@ function buildCollections(){
             '</div>'+
           '</div>';
         }).join('');
-        // Wire up add buttons
-        collBundlesGrid.querySelectorAll('.bundle-store-card').forEach(function(card){
-          card.addEventListener('click', function(e){
-            if(e.target.closest('.bsc-add')) return; // let add button handle itself
+        // Wire up via event delegation on parent
+        collBundlesGrid.addEventListener('click', function(e){
+          var addBtn = e.target.closest('.bsc-add');
+          if(addBtn){
+            e.stopPropagation();
+            var bid = parseInt(addBtn.dataset.bid);
+            var found = (window._allBundles||[]).find(function(b){ return b.id===bid; });
+            if(found) addBundleToCart(found.id, found);
+            return;
+          }
+          var card = e.target.closest('.bundle-store-card');
+          if(card){
             var bid = parseInt(card.dataset.bid);
             var found = (window._allBundles||[]).find(function(b){ return b.id===bid; });
             if(found) openBundleDetail(found);
-          });
-        });
-        collBundlesGrid.querySelectorAll('.bsc-add').forEach(function(btn){
-          btn.addEventListener('click', function(e){
-            e.stopPropagation();
-            var bid = parseInt(btn.dataset.bid);
-            var found = (window._allBundles||[]).find(function(b){ return b.id===bid; });
-            if(found) addBundleToCart(found.id, found);
-          });
+          }
         });
       }).catch(function(){ collBundlesTitle.style.display='none'; });
   }
