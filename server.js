@@ -1326,8 +1326,8 @@ app.post('/api/orders', orderLimiter, async (req, res) => {
       } else {
         // Full bottle or bundle split — use full catalogue price
         unitPrice = parseFloat(item.unitPrice || fullPrice);
-        // Clamp: client price must not be lower than 50% of catalogue price (bundle splits are ok)
-        if (unitPrice < fullPrice * 0.10) unitPrice = fullPrice;
+        // Bundle splits: accept any price >= $0.50 per item
+        if (unitPrice < 0.50) unitPrice = fullPrice;
       }
 
       serverTotal += unitPrice * qty;
