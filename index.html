@@ -1813,6 +1813,10 @@ footer{background:var(--dark);padding:3.5rem 4rem;text-align:center;border-top:1
     <!-- Curated -->
     <div class="coll-section-title">Colecciones Curadas</div>
     <div class="curated-grid" id="curatedGrid"></div>
+
+    <!-- Bundles -->
+    <div class="coll-section-title" id="collBundlesTitle" style="display:none">Bundles de Decants</div>
+    <div class="bundles-grid" id="collBundlesGrid" style="margin-top:1rem"></div>
   </div>
 </div>
 
@@ -1850,7 +1854,7 @@ function loadViaREST() {
     if(results[2] && results[2].length > 0) P = results[2];
     setConn(results[0] ? 'live' : 'offline', results[0] ? 'En línea' : 'Sin conexión');
     buildGrid();
-    buildGrid();
+    loadBundles();
     // Open product from shared URL ?producto=ID — only once, then clear param
     var _urlProd = new URLSearchParams(window.location.search).get('producto');
     if(_urlProd){
@@ -1861,7 +1865,6 @@ function loadViaREST() {
     }
   }).catch(function() {
     setConn('offline', 'Sin conexión');
-    buildGrid();
     buildGrid();
   });
 }
@@ -1913,16 +1916,14 @@ function connectWS() {
           adminState.inventory = msg.payload.inventory || {};
           adminState.pricing   = msg.payload.pricing   || {};
           buildGrid();
-          buildGrid();
+          loadBundles();
         }
         if (msg.type === 'inventory') {
           adminState.inventory = msg.payload;
           buildGrid();
-          buildGrid();
         }
         if (msg.type === 'pricing') {
           adminState.pricing = msg.payload;
-          buildGrid();
           buildGrid();
         }
         if (msg.type === 'catalogue') {
@@ -3051,11 +3052,18 @@ var currentCustomer = null;
 
 // ── Bundles ──────────────────────────────────────────
 function loadBundles(){
+  console.log('[Bundles] loadBundles called, API=', API);
   fetch(API+'/bundles')
-    .then(function(r){return r.json();})
+    .then(function(r){
+      console.log('[Bundles] Response status:', r.status);
+      return r.json();
+    })
     .then(function(bundles){
+      console.log('[Bundles] Data received:', bundles);
+      window._allBundles = bundles; // cache for modal reuse
       var section = document.getElementById('bundles-section');
       var grid    = document.getElementById('bundlesGrid');
+      console.log('[Bundles] section el:', section, 'grid el:', grid);
       if(!bundles.length){ section.style.display='none'; return; }
       section.style.display='block';
       grid.innerHTML = bundles.map(function(b){
@@ -3385,6 +3393,7 @@ function buildCollections(){
   // brandCounts already built above
 
   function renderBrandCards(ranked, showAll){
+    if(!brandsGrid) return;
     brandsGrid.innerHTML = '';
     var available = ranked.filter(function(item){ return !!brandCounts[item.brand]; });
     var visible   = showAll ? available : available.slice(0, 7);
@@ -3443,6 +3452,48 @@ function buildCollections(){
       .catch(function(){
         renderBrandCards(Object.keys(brandCounts).sort().map(function(b){ return {brand:b}; }), false);
       });
+  }
+
+  // ── Bundles in modal ──
+  var collBundlesGrid  = document.getElementById('collBundlesGrid');
+  var collBundlesTitle = document.getElementById('collBundlesTitle');
+  if(collBundlesGrid){
+    fetch(API+'/bundles')
+      .then(function(r){ return r.ok ? r.json() : []; })
+      .then(function(bundles){
+        if(!bundles.length){ collBundlesTitle.style.display='none'; collBundlesGrid.innerHTML=''; return; }
+        collBundlesTitle.style.display='block';
+        collBundlesGrid.innerHTML = bundles.map(function(b){
+          var saving = b.orig_price && parseFloat(b.orig_price) > parseFloat(b.price)
+            ? parseFloat(b.orig_price) - parseFloat(b.price) : 0;
+          var items = (b.items||[]).map(function(it){
+            return '<div class="bsc-item">'+esc(it.name)+(it.size?' <span style="color:var(--muted);font-size:0.6rem">'+esc(it.size)+'</span>':'')+'</div>';
+          }).join('');
+          return '<div class="bundle-store-card" data-bid="'+b.id+'">'+
+            '<span class="bsc-tag">Bundle · '+b.items.length+' fragancias</span>'+
+            '<div class="bsc-name">'+esc(b.name)+'</div>'+
+            (b.description?'<div class="bsc-desc">'+esc(b.description)+'</div>':'')+
+            '<div class="bsc-items">'+items+'</div>'+
+            '<div class="bsc-footer">'+
+              '<div>'+
+                '<span class="bsc-price">$'+parseFloat(b.price).toFixed(2)+'</span>'+
+                (b.orig_price&&parseFloat(b.orig_price)>0?'<span class="bsc-orig">$'+parseFloat(b.orig_price).toFixed(2)+'</span>':'')+
+                (saving>0?'<div style="margin-top:0.3rem"><span class="bsc-saving">Ahorras $'+saving.toFixed(2)+'</span></div>':'')+
+              '</div>'+
+              '<button class="bsc-add" data-bid="'+b.id+'" style="margin-left:0.8rem">Añadir</button>'+
+            '</div>'+
+          '</div>';
+        }).join('');
+        // Wire up add buttons
+        collBundlesGrid.querySelectorAll('.bsc-add').forEach(function(btn){
+          btn.addEventListener('click', function(e){
+            e.stopPropagation();
+            var bid = parseInt(btn.dataset.bid);
+            var found = (window._allBundles||[]).find(function(b){ return b.id===bid; });
+            if(found) addBundleToCart(found.id, found);
+          });
+        });
+      }).catch(function(){ collBundlesTitle.style.display='none'; });
   }
 
   // ── Curated cards ──
@@ -4051,6 +4102,8 @@ function toggleSommelier(){
 })();
 
 document.addEventListener('DOMContentLoaded', function(){
+  // Guaranteed bundle load on DOM ready
+  setTimeout(loadBundles, 1500);
   var bg = document.getElementById('somModal');
   if(bg) bg.addEventListener('click', function(e){ if(e.target===this) closeSommelierModal(); });
   // Close on Escape
