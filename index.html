@@ -3094,7 +3094,7 @@ function openBundleDetail(b){
     var name  = prod ? esc(prod.name)  : esc(it.name||'');
     var size  = it.size ? '<div class="bundle-prod-size">'+esc(it.size)+'</div>' : '';
     var pid   = prod ? prod.id : null;
-    return '<div class="bundle-prod-row"'+(pid?' onclick="closeBundleDetail();closeCollections();setTimeout(function(){openDetail('+pid+')},200)"':'')+'>'+
+    return '<div class="bundle-prod-row"'+(pid?' onclick="openBundleProdDetail('+pid+')"':'')+'>'+
       img+
       '<div class="bundle-prod-info">'+
         '<div class="bundle-prod-brand">'+brand+'</div>'+
@@ -3111,6 +3111,26 @@ function openBundleDetail(b){
 
 function closeBundleDetail(){
   document.getElementById('bundleDetailOverlay').classList.remove('open');
+}
+
+function openBundleProdDetail(pid){
+  // Step 1: fade out bundle modal
+  var overlay = document.getElementById('bundleDetailOverlay');
+  overlay.style.transition = 'opacity 0.25s';
+  overlay.style.opacity = '0';
+  setTimeout(function(){
+    overlay.classList.remove('open');
+    overlay.style.opacity = '';
+    overlay.style.transition = '';
+    // Step 2: fade out collections
+    var coll = document.getElementById('collOverlay');
+    coll.classList.remove('open');
+    document.body.style.overflow = '';
+    // Step 3: open product detail after collections fades
+    setTimeout(function(){
+      openDetail(pid);
+    }, 350);
+  }, 220);
 }
 
 function renderCollBundles(bundles){
