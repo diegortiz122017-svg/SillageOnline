@@ -3113,6 +3113,57 @@ function closeBundleDetail(){
   document.getElementById('bundleDetailOverlay').classList.remove('open');
 }
 
+function renderCollBundles(bundles){
+  var collBundlesGrid  = document.getElementById('collBundlesGrid');
+  var collBundlesTitle = document.getElementById('collBundlesTitle');
+  if(!collBundlesGrid) return;
+  if(!bundles || !bundles.length){
+    if(collBundlesTitle) collBundlesTitle.style.display='none';
+    collBundlesGrid.innerHTML='';
+    return;
+  }
+  if(collBundlesTitle) collBundlesTitle.style.display='block';
+  collBundlesGrid.innerHTML = bundles.map(function(b){
+    var saving = b.orig_price && parseFloat(b.orig_price) > parseFloat(b.price)
+      ? parseFloat(b.orig_price) - parseFloat(b.price) : 0;
+    var items = (b.items||[]).map(function(it){
+      return '<div class="bsc-item">'+esc(it.name)+(it.size?' <span style="color:var(--muted);font-size:0.6rem">'+esc(it.size)+'</span>':'')+'</div>';
+    }).join('');
+    return '<div class="bundle-store-card" data-bid="'+b.id+'">'+
+      '<span class="bsc-tag">Bundle · '+b.items.length+' producto'+(b.items.length!==1?'s':'')+'</span>'+
+      '<div class="bsc-name">'+esc(b.name)+'</div>'+
+      (b.description?'<div class="bsc-desc">'+esc(b.description)+'</div>':'')+
+      '<div class="bsc-items">'+items+'</div>'+
+      '<div class="bsc-footer">'+
+        '<div>'+
+          '<span class="bsc-price">$'+parseFloat(b.price).toFixed(2)+'</span>'+
+          (b.orig_price&&parseFloat(b.orig_price)>0?'<span class="bsc-orig">$'+parseFloat(b.orig_price).toFixed(2)+'</span>':'')+
+          (saving>0?'<div style="margin-top:0.3rem"><span class="bsc-saving">Ahorras $'+saving.toFixed(2)+'</span></div>':'')+
+        '</div>'+
+        '<button class="bsc-add" data-bid="'+b.id+'" style="margin-left:0.8rem">Añadir</button>'+
+      '</div>'+
+    '</div>';
+  }).join('');
+
+  // Event delegation — one listener replaces all card/button listeners
+  collBundlesGrid.onclick = function(e){
+    var addBtn = e.target.closest('.bsc-add');
+    if(addBtn){
+      e.stopPropagation();
+      var bid = parseInt(addBtn.dataset.bid);
+      var found = (window._allBundles||[]).find(function(b){ return b.id===bid; });
+      if(found) addBundleToCart(found.id, found);
+      return;
+    }
+    var card = e.target.closest('.bundle-store-card');
+    if(card){
+      var bid = parseInt(card.dataset.bid);
+      var found = (window._allBundles||[]).find(function(b){ return b.id===bid; });
+      if(found) openBundleDetail(found);
+    }
+  };
+}
+
 var _bundlesLoaded = false;
 function loadBundles(){
   if(_bundlesLoaded) return;
@@ -3121,11 +3172,8 @@ function loadBundles(){
     .then(function(r){ return r.json(); })
     .then(function(bundles){
       window._allBundles = bundles;
-      // Bundles only shown in Colecciones modal — no homepage section
-      if(!bundles.length) return;
-      // Trigger modal update if open
-      var collGrid = document.getElementById('collBundlesGrid');
-      if(collGrid && collGrid.innerHTML === '') _renderCollBundles(bundles);
+      // Render into Colecciones modal grid if it exists
+      renderCollBundles(bundles);
     }).catch(function(){ /* bundles unavailable */ });
 }
 
@@ -3483,50 +3531,17 @@ function buildCollections(){
   var collBundlesGrid  = document.getElementById('collBundlesGrid');
   var collBundlesTitle = document.getElementById('collBundlesTitle');
   if(collBundlesGrid){
-    fetch(API+'/bundles')
-      .then(function(r){ return r.ok ? r.json() : []; })
-      .then(function(bundles){
-        if(!bundles.length){ collBundlesTitle.style.display='none'; collBundlesGrid.innerHTML=''; return; }
-        collBundlesTitle.style.display='block';
-        collBundlesGrid.innerHTML = bundles.map(function(b){
-          var saving = b.orig_price && parseFloat(b.orig_price) > parseFloat(b.price)
-            ? parseFloat(b.orig_price) - parseFloat(b.price) : 0;
-          var items = (b.items||[]).map(function(it){
-            return '<div class="bsc-item">'+esc(it.name)+(it.size?' <span style="color:var(--muted);font-size:0.6rem">'+esc(it.size)+'</span>':'')+'</div>';
-          }).join('');
-          return '<div class="bundle-store-card" data-bid="'+b.id+'">'+
-            '<span class="bsc-tag">Bundle · '+b.items.length+' producto'+(b.items.length!==1?'s':'')+'</span>'+
-            '<div class="bsc-name">'+esc(b.name)+'</div>'+
-            (b.description?'<div class="bsc-desc">'+esc(b.description)+'</div>':'')+
-            '<div class="bsc-items">'+items+'</div>'+
-            '<div class="bsc-footer">'+
-              '<div>'+
-                '<span class="bsc-price">$'+parseFloat(b.price).toFixed(2)+'</span>'+
-                (b.orig_price&&parseFloat(b.orig_price)>0?'<span class="bsc-orig">$'+parseFloat(b.orig_price).toFixed(2)+'</span>':'')+
-                (saving>0?'<div style="margin-top:0.3rem"><span class="bsc-saving">Ahorras $'+saving.toFixed(2)+'</span></div>':'')+
-              '</div>'+
-              '<button class="bsc-add" data-bid="'+b.id+'" style="margin-left:0.8rem">Añadir</button>'+
-            '</div>'+
-          '</div>';
-        }).join('');
-        // Wire up via event delegation on parent
-        collBundlesGrid.addEventListener('click', function(e){
-          var addBtn = e.target.closest('.bsc-add');
-          if(addBtn){
-            e.stopPropagation();
-            var bid = parseInt(addBtn.dataset.bid);
-            var found = (window._allBundles||[]).find(function(b){ return b.id===bid; });
-            if(found) addBundleToCart(found.id, found);
-            return;
-          }
-          var card = e.target.closest('.bundle-store-card');
-          if(card){
-            var bid = parseInt(card.dataset.bid);
-            var found = (window._allBundles||[]).find(function(b){ return b.id===bid; });
-            if(found) openBundleDetail(found);
-          }
-        });
-      }).catch(function(){ collBundlesTitle.style.display='none'; });
+    // Use cached bundles if available, otherwise fetch
+    if(window._allBundles && window._allBundles.length){
+      renderCollBundles(window._allBundles);
+    } else {
+      fetch(API+'/bundles')
+        .then(function(r){ return r.ok ? r.json() : []; })
+        .then(function(bundles){
+          window._allBundles = bundles;
+          renderCollBundles(bundles);
+        }).catch(function(){ collBundlesTitle.style.display='none'; });
+    }
   }
 
   // ── Curated cards ──
