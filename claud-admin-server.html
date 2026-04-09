@@ -2007,17 +2007,19 @@ var activeQV = null;
 
 // QV order click delegation
 document.addEventListener('click', function(e){
+  console.log('[QV Click] target:', e.target, 'classes:', e.target.className);
   var row = e.target.closest('[data-oid]');
+  console.log('[QV Click] row found:', row);
   if(!row) return;
   var oid = parseInt(row.dataset.oid);
+  console.log('[QV Click] oid:', oid, 'orders.length:', orders.length);
   if(!oid) return;
   closeQV();
-  // Find the order and open slide panel directly — no need to navigate
   var o = orders.find(function(x){ return x.id === oid; });
+  console.log('[QV Click] order found:', o);
   if(o){
     openOrderDetail(oid);
   } else {
-    // fallback: navigate to orders page then open
     navTo('orders');
     setTimeout(function(){ openOrderDetail(oid); }, 400);
   }
