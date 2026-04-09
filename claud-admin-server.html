@@ -2198,18 +2198,18 @@ function openOrderDetail(orderId){
         '<div style="font-size:0.5rem;letter-spacing:0.2em;text-transform:uppercase;color:var(--muted);margin-bottom:0.6rem">Productos</div>'+
         items+
         '<div style="display:flex;justify-content:flex-end;padding-top:0.8rem">'+
-          '<span style="font-family:'Cormorant Garamond',serif;font-size:1.4rem;color:var(--gold)">$'+parseFloat(o.total||0).toFixed(2)+'</span>'+
+          '<span style="font-family:Cormorant Garamond,serif;font-size:1.4rem;color:var(--gold)">$'+parseFloat(o.total||0).toFixed(2)+'</span>'+
         '</div>'+
       '</div>'+
       '<div style="display:flex;flex-direction:column;gap:0.6rem">'+
         '<div style="font-size:0.5rem;letter-spacing:0.2em;text-transform:uppercase;color:var(--muted)">Estado</div>'+
-        '<select onchange="updateStatus(''+o.id+'',this.value);this.closest('[id=slidePanelBody]').querySelector('.sp-status').textContent=this.value" '+
-          'style="background:var(--card);border:1px solid var(--border);color:var(--cream);font-family:'Jost',sans-serif;font-size:0.72rem;padding:0.5rem;outline:none">'+
+        '<select onchange="updateStatus('+JSON.stringify(o.id)+',this.value);this.closest(\"[id=slidePanelBody]\").querySelector(\".sp-status\").textContent=this.value" '+
+          'style="background:var(--card);border:1px solid var(--border);color:var(--cream);font-family:Jost,sans-serif;font-size:0.72rem;padding:0.5rem;outline:none">'+
           statusOpts+
         '</select>'+
         '<input id="sp-trk-'+o.id+'" placeholder="Número de seguimiento" value="'+(o.tracking_number||'')+'" '+
-          'style="background:var(--card);border:1px solid var(--border);color:var(--cream);font-family:'Jost',sans-serif;font-size:0.72rem;padding:0.5rem;outline:none" '+
-          'onblur="saveTracking(''+o.id+'',this.value)"/>'+
+          'style="background:var(--card);border:1px solid var(--border);color:var(--cream);font-family:Jost,sans-serif;font-size:0.72rem;padding:0.5rem;outline:none" '+
+          'onblur="saveTracking('+JSON.stringify(o.id)+',this.value)"/>'+
       '</div>'+
     '</div>';
   openSlidePanel('Pedido '+orderId, html);
@@ -2225,8 +2225,8 @@ function openCustomerHistory(customerId, customerName){
       customerOrders.map(function(o){
         var t = o.createdAt ? new Date(o.createdAt).toLocaleDateString('es-ES',{day:'numeric',month:'short',year:'numeric'}) : '';
         var statusSlug = (o.status||'').toLowerCase().replace(/[^a-z]/g,'-');
-        return '<div onclick="openOrderDetail(''+o.id+'')" style="background:var(--card);border:1px solid var(--border-light);padding:1rem;cursor:pointer;transition:border-color 0.2s" '+
-          'onmouseenter="this.style.borderColor='var(--gold)'" onmouseleave="this.style.borderColor=''">'+
+        return '<div onclick="openOrderDetail('+o.id+')" style="background:var(--card);border:1px solid var(--border-light);padding:1rem;cursor:pointer;transition:border-color 0.2s" '+
+          'onmouseenter="this.style.borderColor=\'var(--gold)\'" onmouseleave="this.style.borderColor=\'\'">'+
           '<div style="display:flex;justify-content:space-between;margin-bottom:0.4rem">'+
             '<span style="font-size:0.72rem;color:var(--gold);letter-spacing:0.05em">'+esc(o.id)+'</span>'+
             '<span style="font-size:0.72rem;color:var(--gold)">$'+parseFloat(o.total||0).toFixed(2)+'</span>'+
