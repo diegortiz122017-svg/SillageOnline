@@ -2007,7 +2007,6 @@ var activeQV = null;
 
 // QV order click delegation
 document.addEventListener('click', function(e){
-  console.log('[QV Click] target:', e.target, 'classes:', e.target.className);
   var row = e.target.closest('.qv-order-link');
   if(!row) return;
   var oid = row.dataset.oid;
@@ -2198,8 +2197,12 @@ function openOrderDetail(orderId){
         '<div style="background:var(--card);padding:0.8rem;border:1px solid var(--border-light)">'+
           '<div style="font-size:0.5rem;letter-spacing:0.2em;text-transform:uppercase;color:var(--muted);margin-bottom:0.3rem">Cliente</div>'+
           '<div style="font-size:0.85rem;color:var(--cream)">'+esc(o.customer)+'</div>'+
-          '<div style="font-size:0.7rem;color:var(--muted)">'+esc(o.email)+'</div>'+
-          (o.phone?'<div style="font-size:0.7rem;color:var(--muted)">📞 '+esc(o.phone)+'</div>':'')+
+          '<a href="mailto:'+esc(o.email)+'" style="font-size:0.7rem;color:var(--gold);text-decoration:none;display:block;margin-top:0.2rem">✉ '+esc(o.email)+'</a>'+
+          (o.phone?(function(){var ph=o.phone.replace(/[^0-9]/g,'');return'<div style="display:flex;gap:0.5rem;margin-top:0.3rem">'+
+            '<a href="tel:'+esc(o.phone)+'" style="font-size:0.62rem;color:var(--gold);text-decoration:none;border:1px solid rgba(184,149,90,0.3);padding:0.2rem 0.5rem">📞 Llamar</a>'+
+            '<a href="sms:'+esc(o.phone)+'" style="font-size:0.62rem;color:var(--gold);text-decoration:none;border:1px solid rgba(184,149,90,0.3);padding:0.2rem 0.5rem">💬 SMS</a>'+
+            '<a href="https://wa.me/'+ph+'" target="_blank" style="font-size:0.62rem;color:var(--gold);text-decoration:none;border:1px solid rgba(184,149,90,0.3);padding:0.2rem 0.5rem">WhatsApp</a>'+
+          '</div>';})():'')+ 
         '</div>'+
         '<div style="background:var(--card);padding:0.8rem;border:1px solid var(--border-light)">'+
           '<div style="font-size:0.5rem;letter-spacing:0.2em;text-transform:uppercase;color:var(--muted);margin-bottom:0.3rem">Fecha</div>'+
@@ -2243,7 +2246,7 @@ function openCustomerHistory(customerId, customerName){
       customerOrders.map(function(o){
         var t = o.createdAt ? new Date(o.createdAt).toLocaleDateString('es-ES',{day:'numeric',month:'short',year:'numeric'}) : '';
         var statusSlug = (o.status||'').toLowerCase().replace(/[^a-z]/g,'-');
-        return '<div onclick="openOrderDetail('+o.id+')" style="background:var(--card);border:1px solid var(--border-light);padding:1rem;cursor:pointer;transition:border-color 0.2s" '+
+        return '<div onclick="openOrderDetail('+JSON.stringify(o.id)+')" style="background:var(--card);border:1px solid var(--border-light);padding:1rem;cursor:pointer;transition:border-color 0.2s" '+
           'onmouseenter="this.style.borderColor=\'var(--gold)\'" onmouseleave="this.style.borderColor=\'\'">'+
           '<div style="display:flex;justify-content:space-between;margin-bottom:0.4rem">'+
             '<span style="font-size:0.72rem;color:var(--gold);letter-spacing:0.05em">'+esc(o.id)+'</span>'+
