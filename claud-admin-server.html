@@ -2009,16 +2009,13 @@ var activeQV = null;
 document.addEventListener('click', function(e){
   console.log('[QV Click] target:', e.target, 'classes:', e.target.className);
   var row = e.target.closest('.qv-order-link');
-  console.log('[QV Click] row found:', row);
   if(!row) return;
-  var oid = parseInt(row.dataset.oid);
-  console.log('[QV Click] oid:', oid, 'orders.length:', orders.length);
+  var oid = row.dataset.oid;
   if(!oid) return;
   closeQV();
-  var o = orders.find(function(x){ return x.id === oid; });
-  console.log('[QV Click] order found:', o);
+  var o = orders.find(function(x){ return String(x.id) === String(oid); });
   if(o){
-    openOrderDetail(oid);
+    openOrderDetail(o.id);
   } else {
     navTo('orders');
     setTimeout(function(){ openOrderDetail(oid); }, 400);
@@ -2182,7 +2179,7 @@ function closeSlidePanel(){
 }
 
 function openOrderDetail(orderId){
-  var o = orders.find(function(x){ return x.id === orderId; });
+  var o = orders.find(function(x){ return String(x.id) === String(orderId); });
   if(!o) return;
   var t = o.createdAt ? new Date(o.createdAt).toLocaleString('es-ES') : o.time || '';
   var pmLabel = {'wompi':'💳 Wompi','chivo':'⚡ Chivo','cod':'💵 Contra Entrega'}[o.payment_method] || o.payment_method || '';
