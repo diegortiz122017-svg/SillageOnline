@@ -1027,7 +1027,7 @@ footer{background:var(--dark);padding:3.5rem 4rem;text-align:center;border-top:1
 }
 
 /* ── BUNDLES SECTION ── */
-#bundles-section{padding:4rem var(--side);border-bottom:1px solid var(--border)}
+#bundles-section{padding:5rem var(--side);background:var(--bg);border-top:1px solid var(--border)}
 .bundles-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:1.2rem;margin-top:2rem;max-width:1200px;margin-left:auto;margin-right:auto}
 .bundle-store-card{background:rgba(184,149,90,0.04);border:1px solid rgba(184,149,90,0.2);padding:1.8rem;cursor:pointer;transition:all 0.3s;position:relative}
 .bundle-store-card:hover{border-color:var(--gold);background:rgba(184,149,90,0.08)}
@@ -1441,15 +1441,6 @@ footer{background:var(--dark);padding:3.5rem 4rem;text-align:center;border-top:1
   <div class="scroll-indicator"><span>Descubrir</span><div class="scroll-line"></div></div>
 </section>
 
-
-<section id="bundles-section" style="display:none">
-  <div class="section-hdr">
-    <p class="section-eyebrow">Ofertas Exclusivas</p>
-    <h2 class="section-title">Bundles de <em>Decants</em></h2>
-    <p class="section-sub">Prueba antes de invertir — paquetes curados con ahorro real.</p>
-  </div>
-  <div class="bundles-grid" id="bundlesGrid"></div>
-</section>
 
 <section id="shop">
   <div class="section-header">
@@ -3051,61 +3042,24 @@ var currentCustomer = null;
 
 
 // ── Bundles ──────────────────────────────────────────
+var _bundlesLoaded = false;
 function loadBundles(){
-  console.log('[Bundles] loadBundles called, API=', API);
+  if(_bundlesLoaded) return;
+  _bundlesLoaded = true;
   fetch(API+'/bundles')
-    .then(function(r){
-      console.log('[Bundles] Response status:', r.status);
-      return r.json();
-    })
+    .then(function(r){ return r.json(); })
     .then(function(bundles){
-      console.log('[Bundles] Data received:', bundles);
-      window._allBundles = bundles; // cache for modal reuse
-      var section = document.getElementById('bundles-section');
-      var grid    = document.getElementById('bundlesGrid');
-      console.log('[Bundles] section el:', section, 'grid el:', grid);
-      if(!bundles.length){ section.style.display='none'; return; }
-      section.style.display='block';
-      grid.innerHTML = bundles.map(function(b){
-        var saving = b.orig_price && parseFloat(b.orig_price) > parseFloat(b.price)
-          ? parseFloat(b.orig_price) - parseFloat(b.price) : 0;
-        var items = (b.items||[]).map(function(it){
-          return '<div class="bsc-item">'+it.name+(it.size?' <span style="color:var(--muted);font-size:0.6rem">'+it.size+'</span>':'')+'</div>';
-        }).join('');
-        return '<div class="bundle-store-card">'+
-          '<span class="bsc-tag">Bundle · '+b.items.length+' fragancias</span>'+
-          '<div class="bsc-name">'+esc(b.name)+'</div>'+
-          (b.description?'<div class="bsc-desc">'+esc(b.description)+'</div>':'')+
-          '<div class="bsc-items">'+items+'</div>'+
-          '<div class="bsc-footer">'+
-            '<div>'+
-              '<span class="bsc-price">$'+parseFloat(b.price).toFixed(2)+'</span>'+
-              (b.orig_price&&parseFloat(b.orig_price)>0?'<span class="bsc-orig">$'+parseFloat(b.orig_price).toFixed(2)+'</span>':'')+
-              (saving>0?'<div style="margin-top:0.3rem"><span class="bsc-saving">Ahorras $'+saving.toFixed(2)+'</span></div>':'')+
-            '</div>'+
-            '<button class="bsc-add" data-bid="'+b.id+'" style="margin-left:0.8rem">Añadir</button>'+
-          '</div>'+
-        '</div>';
-      }).join('');
-    }).catch(function(){
-      document.getElementById('bundles-section').style.display='none';
-    });
+      window._allBundles = bundles;
+      // Bundles only shown in Colecciones modal — no homepage section
+      if(!bundles.length) return;
+      // Trigger modal update if open
+      var collGrid = document.getElementById('collBundlesGrid');
+      if(collGrid && collGrid.innerHTML === '') _renderCollBundles(bundles);
+    }).catch(function(){ /* bundles unavailable */ });
 }
 
 
-document.getElementById('bundlesGrid').addEventListener('click', function(e){
-  var btn = e.target.closest('.bsc-add');
-  if(!btn) return;
-  var bid = parseInt(btn.dataset.bid);
-  if(!bid) return;
-  // Find bundle from loaded data
-  fetch(API+'/bundles')
-    .then(function(r){return r.json();})
-    .then(function(bundles){
-      var b = bundles.find(function(x){return x.id===bid;});
-      if(b) addBundleToCart(b.id, b);
-    });
-});
+// bundlesGrid removed from homepage
 function addBundleToCart(id, bundle){
   var added = false;
   (bundle.items||[]).forEach(function(it){
@@ -4102,8 +4056,6 @@ function toggleSommelier(){
 })();
 
 document.addEventListener('DOMContentLoaded', function(){
-  // Guaranteed bundle load on DOM ready
-  setTimeout(loadBundles, 1500);
   var bg = document.getElementById('somModal');
   if(bg) bg.addEventListener('click', function(e){ if(e.target===this) closeSommelierModal(); });
   // Close on Escape
