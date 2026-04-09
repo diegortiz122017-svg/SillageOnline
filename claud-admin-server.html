@@ -2981,7 +2981,7 @@ function renderQVOrders(list){
   if(!list.length){body.innerHTML='<div class="qv-empty">No hay pedidos que mostrar</div>';return;}
   body.innerHTML=list.map(function(o){
     var date=o.createdAt?new Date(o.createdAt).toLocaleDateString('es-ES',{day:'numeric',month:'short',year:'numeric'}):'';
-    return'<div class="qv-order">'+
+    return'<div class="qv-order qv-order-link" data-oid="'+o.id+'">'+
       '<div>'+
         '<div class="qv-order-id">'+o.id+'</div>'+
         '<div class="qv-order-name">'+o.customer+'</div>'+
