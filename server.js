@@ -206,6 +206,23 @@ async function initDB() {
 }
 
 // ─── Seed default data ────────────────────────────────
+// Ensure every product in the catalogue has an inventory row
+async function migrateInventoryRows() {
+  try {
+    const catalogue = await getCatalogue();
+    if (!catalogue.length) return;
+    const now = new Date();
+    for (const p of catalogue) {
+      await db.execute(
+        `INSERT IGNORE INTO inventory (product_id, stock, low_stock, out_of_stock, updated_at)
+         VALUES (?, 99, 0, 0, ?)`,
+        [p.id, now]
+      );
+    }
+    console.log(`✅ Inventory rows ensured for ${catalogue.length} products`);
+  } catch(e) { console.warn('migrateInventoryRows:', e.message); }
+}
+
 async function migrateOrders() {
   const cols = [
     "phone          VARCHAR(50)  DEFAULT NULL",
@@ -2893,10 +2910,18 @@ app.post('/api/bottle-inventory/:id/add', requireAdmin, async (req, res) => {
     }
     // else stock already 0 — bottle was already exhausted, just record the ml
   } else {
-    // No inventory row — product not yet tracked in inventory tab.
-    // Don't create a row with stock=0 (would falsely mark as out-of-stock).
-    // Admin should add inventory tracking separately via the Inventory tab.
-    console.log(`Note: no inventory row for product ${pid} — skipping stock deduction`);
+    // No inventory row — admin hasn't set stock for this product yet.
+    // Create a starter row with stock=0, but DON'T mark out_of_stock=1
+    // since that would hide the product from the bottle tracker.
+    // After this, admin should set the correct stock in the Inventory tab.
+    await db.execute(
+      `INSERT IGNORE INTO inventory (product_id, stock, low_stock, out_of_stock, updated_at)
+       VALUES (?, 0, 0, 0, ?)`,
+      [pid, n]
+    );
+    invalidateInventory();
+    broadcast('inventory', await getInventoryMap());
+    console.log(`Created missing inventory row for product ${pid} with stock=0 — admin should update via Inventory tab`);
   }
 
   const catalogue = await getCatalogue();
@@ -3305,6 +3330,7 @@ async function start() {
     await restoreLoginAttempts();
     await auth.restoreRevocations();
     await fixCorruptedInventoryRows();
+    await migrateInventoryRows();
     console.log('\u2705 SILLAGE PARFUMERIE v3.1 - Server Ready | ' + BASE_URL);
   } catch(err) {
     console.error('\u274C DB startup failed:', err.message);
