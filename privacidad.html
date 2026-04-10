@@ -2,381 +2,146 @@
 <html lang="es">
 <head>
 <meta charset="UTF-8"/>
-<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<meta name="viewport" content="width=device-width,initial-scale=1"/>
 <title>Política de Privacidad — Sillage Parfumerie</title>
-<meta name="description" content="Política de privacidad de Sillage Parfumerie. Información sobre cómo recopilamos, usamos y protegemos tus datos personales."/>
-<meta name="robots" content="index, follow"/>
-<link rel="canonical" href="https://sillage-sv.com/privacidad"/>
-<link rel="icon" type="image/svg+xml" href="data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAzMiAzMiI+CiAgPCEtLSBEYXJrIHJvdW5kZWQgYmFja2dyb3VuZCAtLT4KICA8cmVjdCB3aWR0aD0iMzIiIGhlaWdodD0iMzIiIHJ4PSI2IiBmaWxsPSIjMGUwYzBhIi8+CiAgPCEtLSBUaGluIGdvbGQgYm9yZGVyIC0tPgogIDxyZWN0IHg9IjEiIHk9IjEiIHdpZHRoPSIzMCIgaGVpZ2h0PSIzMCIgcng9IjUiIGZpbGw9Im5vbmUiIHN0cm9rZT0iI2I4OTU1YSIgc3Ryb2tlLXdpZHRoPSIwLjYiIG9wYWNpdHk9IjAuNiIvPgogIDwhLS0gSXRhbGljIFMgaW4gQ29ybW9yYW50IHN0eWxlIC0tPgogIDx0ZXh0IHg9IjE2LjUiIHk9IjI0LjUiCiAgICBmb250LWZhbWlseT0iR2VvcmdpYSwnVGltZXMgTmV3IFJvbWFuJyxzZXJpZiIKICAgIGZvbnQtc2l6ZT0iMjMiCiAgICBmb250LXN0eWxlPSJpdGFsaWMiCiAgICBmb250LXdlaWdodD0iNDAwIgogICAgZmlsbD0iI2I4OTU1YSIKICAgIHRleHQtYW5jaG9yPSJtaWRkbGUiPlM8L3RleHQ+Cjwvc3ZnPg=="/>
-<link rel="shortcut icon" href="data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAzMiAzMiI+CiAgPCEtLSBEYXJrIHJvdW5kZWQgYmFja2dyb3VuZCAtLT4KICA8cmVjdCB3aWR0aD0iMzIiIGhlaWdodD0iMzIiIHJ4PSI2IiBmaWxsPSIjMGUwYzBhIi8+CiAgPCEtLSBUaGluIGdvbGQgYm9yZGVyIC0tPgogIDxyZWN0IHg9IjEiIHk9IjEiIHdpZHRoPSIzMCIgaGVpZ2h0PSIzMCIgcng9IjUiIGZpbGw9Im5vbmUiIHN0cm9rZT0iI2I4OTU1YSIgc3Ryb2tlLXdpZHRoPSIwLjYiIG9wYWNpdHk9IjAuNiIvPgogIDwhLS0gSXRhbGljIFMgaW4gQ29ybW9yYW50IHN0eWxlIC0tPgogIDx0ZXh0IHg9IjE2LjUiIHk9IjI0LjUiCiAgICBmb250LWZhbWlseT0iR2VvcmdpYSwnVGltZXMgTmV3IFJvbWFuJyxzZXJpZiIKICAgIGZvbnQtc2l6ZT0iMjMiCiAgICBmb250LXN0eWxlPSJpdGFsaWMiCiAgICBmb250LXdlaWdodD0iNDAwIgogICAgZmlsbD0iI2I4OTU1YSIKICAgIHRleHQtYW5jaG9yPSJtaWRkbGUiPlM8L3RleHQ+Cjwvc3ZnPg=="/>
-<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;0,600;1,300;1,400&family=Jost:wght@200;300;400;500&display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;1,300&family=Jost:wght@300;400&display=swap" rel="stylesheet"/>
 <style>
-*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
-:root{
-  --cream:#f5f0e8;--warm-white:#faf8f4;--gold:#b8955a;--gold-light:#d4af7a;
-  --charcoal:#1a1714;--dark:#0e0c0a;--muted:#8a7f72;
-  --border:rgba(184,149,90,0.25);--border-light:rgba(184,149,90,0.15);
-}
-html{scroll-behavior:smooth}
-body{background:var(--dark);color:var(--cream);font-family:'Jost',sans-serif;font-weight:300;overflow-x:hidden;line-height:1.8}
-
-/* ── HEADER ── */
-header{position:fixed;top:0;width:100%;z-index:100;display:flex;align-items:center;
-  justify-content:space-between;padding:1.4rem 4rem;
-  background:rgba(14,12,10,0.95);backdrop-filter:blur(12px);
-  border-bottom:1px solid var(--border)}
-.logo{font-family:'Cormorant Garamond',serif;font-size:2rem;font-weight:300;
-  letter-spacing:0.35em;color:var(--gold);text-transform:uppercase;text-decoration:none}
-.back-link{font-size:0.65rem;letter-spacing:0.2em;text-transform:uppercase;
-  color:var(--muted);text-decoration:none;transition:color 0.25s;
-  display:flex;align-items:center;gap:0.4rem}
-.back-link:hover{color:var(--gold)}
-
-/* ── HERO ── */
-.hero{padding:10rem 4rem 5rem;text-align:center;border-bottom:1px solid var(--border)}
-.hero-eyebrow{font-size:0.62rem;letter-spacing:0.35em;text-transform:uppercase;
-  color:var(--gold);margin-bottom:1.2rem}
-.hero-title{font-family:'Cormorant Garamond',serif;font-size:clamp(2.5rem,6vw,5rem);
-  font-weight:300;line-height:1;color:var(--cream);margin-bottom:1.5rem}
-.hero-title em{font-style:italic;color:var(--gold)}
-.hero-sub{font-size:0.78rem;letter-spacing:0.1em;color:var(--muted);
-  max-width:520px;margin:0 auto;line-height:1.9}
-.hero-date{font-size:0.58rem;letter-spacing:0.2em;text-transform:uppercase;
-  color:rgba(184,149,90,0.5);margin-top:1.5rem}
-
-/* ── CONTENT ── */
-.content{max-width:780px;margin:0 auto;padding:5rem 2rem 6rem}
-
-/* Table of contents */
-.toc{background:rgba(184,149,90,0.05);border:1px solid var(--border);
-  padding:2rem 2.5rem;margin-bottom:4rem}
-.toc-title{font-size:0.58rem;letter-spacing:0.25em;text-transform:uppercase;
-  color:var(--gold);margin-bottom:1.2rem}
-.toc-list{list-style:none;counter-reset:toc}
-.toc-list li{counter-increment:toc;padding:0.3rem 0;
-  border-bottom:1px solid rgba(184,149,90,0.08)}
-.toc-list li:last-child{border-bottom:none}
-.toc-list a{font-size:0.72rem;color:var(--muted);text-decoration:none;
-  transition:color 0.25s;display:flex;align-items:center;gap:0.6rem}
-.toc-list a::before{content:counter(toc,decimal-leading-zero);
-  font-family:'Cormorant Garamond',serif;font-size:0.85rem;color:var(--gold);
-  min-width:22px}
-.toc-list a:hover{color:var(--gold)}
-
-/* Sections */
-.section{margin-bottom:3.5rem;scroll-margin-top:100px}
-.section-num{font-size:0.55rem;letter-spacing:0.3em;text-transform:uppercase;
-  color:var(--gold);margin-bottom:0.5rem;display:block}
-.section-title{font-family:'Cormorant Garamond',serif;font-size:1.8rem;
-  font-weight:300;color:var(--cream);margin-bottom:1.2rem;line-height:1.2}
-.section-body{font-size:0.8rem;color:rgba(245,240,232,0.8);line-height:1.9}
-.section-body p{margin-bottom:1rem}
-.section-body p:last-child{margin-bottom:0}
-
-/* Data table */
-.data-table{width:100%;border-collapse:collapse;margin:1.2rem 0;font-size:0.75rem}
-.data-table th{text-align:left;font-size:0.55rem;letter-spacing:0.2em;
-  text-transform:uppercase;color:var(--gold);padding:0.7rem 1rem;
-  background:rgba(184,149,90,0.06);border-bottom:1px solid var(--border);
-  font-weight:400}
-.data-table td{padding:0.75rem 1rem;border-bottom:1px solid rgba(184,149,90,0.08);
-  vertical-align:top;color:rgba(245,240,232,0.75)}
-.data-table tr:last-child td{border-bottom:none}
-.data-table tr:hover td{background:rgba(184,149,90,0.03)}
-
-/* Highlight box */
-.highlight{background:rgba(184,149,90,0.06);border-left:2px solid var(--gold);
-  padding:1.2rem 1.5rem;margin:1.5rem 0;font-size:0.78rem;
-  color:rgba(245,240,232,0.85);line-height:1.9}
-.highlight strong{color:var(--gold-light)}
-
-/* Rights list */
-.rights-list{list-style:none;margin:1rem 0}
-.rights-list li{display:flex;gap:0.8rem;padding:0.6rem 0;
-  border-bottom:1px solid rgba(184,149,90,0.08);font-size:0.78rem;
-  color:rgba(245,240,232,0.8)}
-.rights-list li:last-child{border-bottom:none}
-.rights-list .icon{font-size:1rem;flex-shrink:0;margin-top:0.1rem}
-
-/* Contact card */
-.contact-card{background:rgba(184,149,90,0.05);border:1px solid var(--border);
-  padding:1.8rem 2rem;margin-top:1.5rem;text-align:center}
-.contact-card p{font-size:0.75rem;color:var(--muted);line-height:1.9}
-.contact-card a{color:var(--gold);text-decoration:none;transition:color 0.25s}
-.contact-card a:hover{color:var(--gold-light)}
-.contact-card .brand{font-family:'Cormorant Garamond',serif;font-size:1.4rem;
-  color:var(--gold);letter-spacing:0.3em;text-transform:uppercase;
-  display:block;margin-bottom:0.5rem}
-
-/* Divider */
-.section-divider{border:none;border-top:1px solid rgba(184,149,90,0.12);
-  margin:3rem 0}
-
-/* ── FOOTER ── */
-footer{background:rgba(255,255,255,0.02);border-top:1px solid var(--border);
-  padding:2.5rem 4rem;text-align:center}
-.f-logo{font-family:'Cormorant Garamond',serif;font-size:1.5rem;letter-spacing:0.4em;
-  color:var(--gold);text-transform:uppercase;margin-bottom:0.4rem}
-.f-tagline{font-size:0.58rem;letter-spacing:0.2em;color:var(--muted);
-  text-transform:uppercase;margin-bottom:1.2rem}
-.f-copy{font-size:0.6rem;color:rgba(138,127,114,0.5);letter-spacing:0.1em}
-
-/* ── MOBILE ── */
-@media(max-width:680px){
-  header{padding:1.2rem 1.5rem}
-  .hero{padding:8rem 1.5rem 3.5rem}
-  .content{padding:3rem 1.5rem 5rem}
-  .toc{padding:1.5rem}
-  footer{padding:2rem 1.5rem}
-  .data-table{font-size:0.68rem}
-  .data-table th,.data-table td{padding:0.6rem 0.7rem}
-}
+*{box-sizing:border-box;margin:0;padding:0}
+body{background:#0e0c0a;color:#d4c9b8;font-family:'Jost',sans-serif;font-size:14px;line-height:1.9}
+header{border-bottom:1px solid rgba(184,149,90,0.15);padding:1.2rem 2rem;display:flex;align-items:center;justify-content:space-between}
+.logo{font-family:'Cormorant Garamond',serif;font-size:1.3rem;font-weight:300;letter-spacing:0.15em;color:#b8955a;text-decoration:none}
+.logo span{font-style:italic}
+.back{font-size:0.58rem;letter-spacing:0.2em;text-transform:uppercase;color:rgba(184,149,90,0.5);text-decoration:none;transition:color 0.2s}
+.back:hover{color:#b8955a}
+main{max-width:720px;margin:0 auto;padding:4rem 2rem 6rem}
+h1{font-family:'Cormorant Garamond',serif;font-size:2rem;font-weight:300;color:#e8dcc8;margin-bottom:0.5rem;line-height:1.1}
+.updated{font-size:0.6rem;letter-spacing:0.2em;text-transform:uppercase;color:rgba(184,149,90,0.45);margin-bottom:3rem;display:block}
+h2{font-family:'Cormorant Garamond',serif;font-size:1.15rem;font-weight:400;color:#c8b99a;margin:2.5rem 0 0.8rem;padding-bottom:0.4rem;border-bottom:1px solid rgba(184,149,90,0.1)}
+p{margin-bottom:1rem;color:#a89f92}
+ul{margin:0.5rem 0 1rem 1.2rem;color:#a89f92}
+ul li{margin-bottom:0.4rem}
+strong{color:#d4c9b8;font-weight:400}
+a{color:#b8955a;text-decoration:none}
+a:hover{text-decoration:underline}
+.highlight{background:rgba(184,149,90,0.06);border-left:2px solid rgba(184,149,90,0.4);padding:1rem 1.2rem;margin:1.5rem 0;font-size:0.85rem;color:#c8b99a}
+footer{text-align:center;padding:2rem;font-size:0.6rem;letter-spacing:0.1em;color:rgba(138,127,114,0.4);border-top:1px solid rgba(184,149,90,0.08)}
+@media(max-width:600px){main{padding:2.5rem 1.2rem 4rem}h1{font-size:1.6rem}}
 </style>
 </head>
 <body>
 
-<!-- HEADER -->
 <header>
-  <a href="/" class="logo">Sillage</a>
-  <a href="/" class="back-link">&#8592; Volver a la Tienda</a>
+  <a href="/" class="logo">SILLA<span>GE</span></a>
+  <a href="/" class="back">← Volver a la tienda</a>
 </header>
 
-<!-- HERO -->
-<div class="hero">
-  <div class="hero-eyebrow">Sillage Parfumerie</div>
-  <h1 class="hero-title">Política de <em>Privacidad</em></h1>
-  <p class="hero-sub">Tu privacidad es importante para nosotros. Este documento explica qué información recopilamos, cómo la usamos y cómo la protegemos.</p>
-  <div class="hero-date">Última actualización: Marzo 2026</div>
-</div>
+<main>
+  <h1>Política de Privacidad</h1>
+  <span class="updated">Última actualización: Abril 2025</span>
 
-<!-- CONTENT -->
-<div class="content">
-
-  <!-- Table of Contents -->
-  <div class="toc">
-    <div class="toc-title">Contenido</div>
-    <ol class="toc-list">
-      <li><a href="#s1">Información que recopilamos</a></li>
-      <li><a href="#s2">Cómo usamos tu información</a></li>
-      <li><a href="#s3">Cómo protegemos tus datos</a></li>
-      <li><a href="#s4">No vendemos tu información</a></li>
-      <li><a href="#s5">Cookies y almacenamiento local</a></li>
-      <li><a href="#s6">Tus derechos</a></li>
-      <li><a href="#s7">Menores de edad</a></li>
-      <li><a href="#s8">Cambios a esta política</a></li>
-      <li><a href="#s9">Contacto</a></li>
-    </ol>
+  <div class="highlight">
+    Esta política explica cómo Sillage Parfumerie recopila, usa y protege tu información personal. Al realizar una compra o crear una cuenta, aceptas los términos descritos aquí.
   </div>
 
-  <!-- 1 -->
-  <div class="section" id="s1">
-    <span class="section-num">01</span>
-    <h2 class="section-title">Información que recopilamos</h2>
-    <div class="section-body">
-      <p>Recopilamos información cuando creas una cuenta, realizas una compra o interactúas con nuestra tienda. A continuación detallamos qué datos recopilamos y con qué propósito:</p>
-    </div>
-    <table class="data-table">
-      <thead>
-        <tr>
-          <th>Dato</th>
-          <th>Cuándo se recopila</th>
-          <th>Para qué se usa</th>
-        </tr>
-      </thead>
-      <tbody>
-        <tr>
-          <td>Nombre completo</td>
-          <td>Al registrarse o realizar un pedido</td>
-          <td>Identificación y envío del pedido</td>
-        </tr>
-        <tr>
-          <td>Correo electrónico</td>
-          <td>Al registrarse o realizar un pedido</td>
-          <td>Confirmaciones, comunicación sobre pedidos</td>
-        </tr>
-        <tr>
-          <td>Contraseña</td>
-          <td>Al crear una cuenta</td>
-          <td>Autenticación — nunca almacenada en texto plano</td>
-        </tr>
-        <tr>
-          <td>Dirección de envío</td>
-          <td>Al realizar un pedido</td>
-          <td>Entrega del pedido</td>
-        </tr>
-        <tr>
-          <td>Número de teléfono</td>
-          <td>Opcional, al guardar dirección</td>
-          <td>Coordinación de entrega</td>
-        </tr>
-        <tr>
-          <td>Historial de pedidos</td>
-          <td>Al realizar compras</td>
-          <td>Registro de compras, soporte al cliente</td>
-        </tr>
-        <tr>
-          <td>Preferencias de navegación</td>
-          <td>Al guardar preferencias</td>
-          <td>Personalizar la experiencia en la tienda</td>
-        </tr>
-      </tbody>
-    </table>
-    <div class="section-body">
-      <p>No recopilamos información de tarjetas de crédito directamente. Los pagos son procesados por <strong>Wompi</strong> (Banco Agrícola), un servicio externo que tiene sus propias políticas de privacidad y seguridad.</p>
-    </div>
-  </div>
+  <h2>1. Quiénes somos</h2>
+  <p>Sillage Parfumerie es una tienda de perfumería de lujo con sede en El Salvador, accesible en <a href="https://sillage-sv.com">sillage-sv.com</a>. Operamos como comercio electrónico y somos responsables del tratamiento de tus datos personales.</p>
 
-  <hr class="section-divider"/>
+  <h2>2. Qué información recopilamos</h2>
+  <p>Recopilamos la siguiente información cuando interactúas con nuestra tienda:</p>
+  <ul>
+    <li><strong>Datos de cuenta:</strong> nombre, correo electrónico, contraseña (almacenada con hash seguro), número de teléfono</li>
+    <li><strong>Datos de pedido:</strong> dirección de entrega, productos comprados, método de pago, historial de órdenes</li>
+    <li><strong>Perfil olfativo:</strong> preferencias de fragancias que compartes con Nez, nuestro sommelier de IA — familias, notas, ocasiones, presupuesto</li>
+    <li><strong>Datos de navegación:</strong> sessionId anónimo para funcionalidad de la tienda (expira en 60 minutos)</li>
+    <li><strong>Preferencias de comunicación:</strong> si deseas recibir emails de marketing y/o seguimiento</li>
+  </ul>
+  <p><strong>No almacenamos datos de tarjeta de crédito.</strong> Los pagos son procesados de forma segura por Wompi y Chivo.</p>
 
-  <!-- 2 -->
-  <div class="section" id="s2">
-    <span class="section-num">02</span>
-    <h2 class="section-title">Cómo usamos tu información</h2>
-    <div class="section-body">
-      <p>Usamos la información recopilada exclusivamente para los siguientes propósitos:</p>
-    </div>
-    <ul class="rights-list">
-      <li><span class="icon">📦</span><span>Procesar y entregar tus pedidos, y mantenerte informado sobre su estado.</span></li>
-      <li><span class="icon">📧</span><span>Enviar correos de confirmación de compra y comunicaciones relacionadas con tu cuenta.</span></li>
-      <li><span class="icon">🔐</span><span>Gestionar tu cuenta y proteger el acceso a ella.</span></li>
-      <li><span class="icon">🌸</span><span>Personalizar tu experiencia en la tienda según tus preferencias guardadas.</span></li>
-      <li><span class="icon">📊</span><span>Mejorar nuestros productos y servicios mediante el análisis de patrones de compra de forma agregada y anónima.</span></li>
-      <li><span class="icon">⚖️</span><span>Cumplir con obligaciones legales cuando así lo requiera la ley de El Salvador.</span></li>
-    </ul>
-    <div class="highlight">
-      <strong>Nunca usaremos tu información</strong> para enviarte publicidad de terceros, crear perfiles de comportamiento para vender a anunciantes, ni para ningún propósito distinto a los mencionados anteriormente.
-    </div>
-  </div>
+  <h2>3. Cómo usamos tu información</h2>
+  <ul>
+    <li><strong>Procesar y entregar tus pedidos</strong> — incluyendo confirmaciones, actualizaciones de estado y notificaciones de entrega</li>
+    <li><strong>Personalizar recomendaciones de Nez</strong> — el sommelier usa tu perfil olfativo para sugerirte fragancias relevantes</li>
+    <li><strong>Emails de seguimiento</strong> — aproximadamente 2 semanas después de tu entrega, Nez puede enviarte recomendaciones personalizadas basadas en lo que compraste. Puedes desactivar esto en cualquier momento</li>
+    <li><strong>Emails de marketing</strong> — novedades, llegadas y ofertas especiales. Solo si lo tienes habilitado</li>
+    <li><strong>Mejorar nuestro servicio</strong> — análisis interno de ventas y comportamiento de la tienda</li>
+    <li><strong>Seguridad</strong> — prevención de fraude, protección contra abusos</li>
+  </ul>
 
-  <hr class="section-divider"/>
+  <h2>4. Comunicaciones por email</h2>
+  <p>Enviamos dos tipos de emails:</p>
+  <ul>
+    <li><strong>Transaccionales</strong> (no opcionales): confirmación de pedido, notificación de envío, confirmación de entrega. Estos se envían siempre porque son parte del servicio que contrataste</li>
+    <li><strong>Marketing y seguimiento</strong> (opcionales): recomendaciones de Nez, novedades del catálogo, ofertas. Puedes gestionar estas preferencias en cualquier momento</li>
+  </ul>
+  <p>Todo email de marketing o seguimiento incluye un enlace para <strong>gestionar tus preferencias</strong> o cancelar la suscripción con un solo click. También puedes escribirnos a <a href="mailto:hola@sillage-sv.com">hola@sillage-sv.com</a>.</p>
 
-  <!-- 3 -->
-  <div class="section" id="s3">
-    <span class="section-num">03</span>
-    <h2 class="section-title">Cómo protegemos tus datos</h2>
-    <div class="section-body">
-      <p>Tomamos la seguridad de tu información muy en serio. Estas son las medidas que aplicamos:</p>
-    </div>
-    <ul class="rights-list">
-      <li><span class="icon">🔒</span><span><strong>Contraseñas cifradas:</strong> Tu contraseña se almacena usando PBKDF2 con sal aleatoria — un estándar de seguridad que hace imposible recuperar tu contraseña original, incluso para nosotros.</span></li>
-      <li><span class="icon">🌐</span><span><strong>Conexión segura (HTTPS):</strong> Toda la comunicación entre tu navegador y nuestros servidores está cifrada mediante TLS/SSL.</span></li>
-      <li><span class="icon">⏱️</span><span><strong>Sesiones con expiración:</strong> Tu sesión de cuenta expira automáticamente después de 8 horas de inactividad.</span></li>
-      <li><span class="icon">🛡️</span><span><strong>Protección contra fuerza bruta:</strong> El sistema bloquea automáticamente intentos repetidos de acceso no autorizado.</span></li>
-      <li><span class="icon">🗄️</span><span><strong>Base de datos segura:</strong> Tus datos se almacenan en una base de datos MySQL con acceso restringido, alojada en servidores de Railway en infraestructura de nube segura.</span></li>
-    </ul>
-  </div>
+  <h2>5. Compartir información con terceros</h2>
+  <p>No vendemos ni alquilamos tus datos personales. Compartimos información únicamente con:</p>
+  <ul>
+    <li><strong>Wompi / Chivo:</strong> procesadores de pago, solo reciben los datos necesarios para completar la transacción</li>
+    <li><strong>Resend:</strong> plataforma de envío de emails transaccionales</li>
+    <li><strong>OpenAI:</strong> para generar las respuestas de Nez. Las conversaciones pueden incluir tus preferencias de fragancia, pero no incluyen datos de pago ni información de identificación directa más allá de tu nombre si lo mencionas en el chat</li>
+    <li><strong>Cloudinary:</strong> almacenamiento de imágenes del catálogo</li>
+    <li><strong>Railway:</strong> infraestructura de hosting</li>
+  </ul>
 
-  <hr class="section-divider"/>
+  <h2>6. Retención de datos</h2>
+  <ul>
+    <li>Datos de cuenta y pedidos: mientras la cuenta esté activa, y hasta 2 años después de la última actividad</li>
+    <li>Perfil olfativo (Nez): 90 días de inactividad, luego se elimina automáticamente</li>
+    <li>Sesiones anónimas: 60 minutos</li>
+    <li>Tokens de revocación de sesión: hasta el vencimiento natural del token</li>
+  </ul>
 
-  <!-- 4 -->
-  <div class="section" id="s4">
-    <span class="section-num">04</span>
-    <h2 class="section-title">No vendemos tu información</h2>
-    <div class="section-body">
-      <p>Sillage Parfumerie <strong>no vende, alquila ni comparte</strong> tu información personal con terceros con fines comerciales.</p>
-      <p>Podemos compartir información únicamente en los siguientes casos excepcionales:</p>
-    </div>
-    <ul class="rights-list">
-      <li><span class="icon">🚚</span><span><strong>Servicio de entrega:</strong> Compartimos tu nombre y dirección con el servicio de mensajería necesario para entregar tu pedido.</span></li>
-      <li><span class="icon">💳</span><span><strong>Procesador de pagos:</strong> Wompi (Banco Agrícola) recibe la información necesaria para procesar tu pago, bajo sus propias políticas de privacidad.</span></li>
-      <li><span class="icon">⚖️</span><span><strong>Obligación legal:</strong> Si una autoridad competente lo requiere mediante orden judicial o proceso legal válido en El Salvador.</span></li>
-    </ul>
-  </div>
+  <h2>7. Seguridad</h2>
+  <p>Implementamos medidas de seguridad técnicas que incluyen:</p>
+  <ul>
+    <li>Comunicaciones cifradas mediante HTTPS / TLS 1.2+</li>
+    <li>Contraseñas almacenadas con hash PBKDF2 — nunca en texto plano</li>
+    <li>Tokens de sesión firmados con HMAC-SHA256</li>
+    <li>Rate limiting y detección de abuso</li>
+    <li>Sin acceso de terceros a datos de pago completos</li>
+  </ul>
 
-  <hr class="section-divider"/>
+  <h2>8. Tus derechos</h2>
+  <p>Tienes derecho a:</p>
+  <ul>
+    <li><strong>Acceder</strong> a los datos que tenemos sobre ti</li>
+    <li><strong>Corregir</strong> información incorrecta</li>
+    <li><strong>Eliminar</strong> tu cuenta y datos asociados</li>
+    <li><strong>Gestionar</strong> tus preferencias de comunicación en cualquier momento desde el enlace de cada email o desde tu cuenta</li>
+    <li><strong>Portabilidad:</strong> solicitar una copia de tus datos en formato legible</li>
+  </ul>
+  <p>Para ejercer cualquiera de estos derechos, escríbenos a <a href="mailto:hola@sillage-sv.com">hola@sillage-sv.com</a>.</p>
 
-  <!-- 5 -->
-  <div class="section" id="s5">
-    <span class="section-num">05</span>
-    <h2 class="section-title">Cookies y almacenamiento local</h2>
-    <div class="section-body">
-      <p>Nuestra tienda utiliza <strong>localStorage</strong> del navegador (no cookies de rastreo) para guardar:</p>
-    </div>
-    <ul class="rights-list">
-      <li><span class="icon">🔑</span><span>Tu token de sesión, para mantenerte conectado a tu cuenta.</span></li>
-      <li><span class="icon">🌸</span><span>Tu lista de fragancias favoritas.</span></li>
-      <li><span class="icon">📍</span><span>Tus direcciones guardadas.</span></li>
-      <li><span class="icon">⚙️</span><span>Tus preferencias de navegación (por ejemplo, filtro de género).</span></li>
-    </ul>
-    <div class="section-body">
-      <p>Estos datos se almacenan únicamente en tu dispositivo y puedes eliminarlos en cualquier momento borrando el almacenamiento local de tu navegador o eliminando tu cuenta desde tu perfil.</p>
-      <p>No utilizamos cookies de rastreo, cookies de publicidad ni servicios de análisis de terceros como Google Analytics.</p>
-    </div>
-  </div>
+  <h2>9. Cookies y sesiones</h2>
+  <p>No usamos cookies de seguimiento ni publicidad. Usamos <strong>localStorage</strong> del navegador únicamente para:</p>
+  <ul>
+    <li>Mantener tu sesión activa mientras navegas</li>
+    <li>Recordar tu carrito de compras</li>
+    <li>Guardar tu perfil olfativo local para una experiencia más fluida con Nez</li>
+  </ul>
+  <p>No hay pixels de seguimiento de terceros ni publicidad personalizada en nuestra plataforma.</p>
 
-  <hr class="section-divider"/>
+  <h2>10. Menores de edad</h2>
+  <p>Nuestra tienda no está dirigida a menores de 18 años. No recopilamos intencionalmente datos de menores.</p>
 
-  <!-- 6 -->
-  <div class="section" id="s6">
-    <span class="section-num">06</span>
-    <h2 class="section-title">Tus derechos</h2>
-    <div class="section-body">
-      <p>De acuerdo con la <strong>Ley de Protección al Consumidor de El Salvador</strong> y los principios generales de protección de datos, tienes los siguientes derechos sobre tu información:</p>
-    </div>
-    <ul class="rights-list">
-      <li><span class="icon">👁️</span><span><strong>Acceso:</strong> Puedes ver toda tu información desde tu perfil de cuenta en cualquier momento.</span></li>
-      <li><span class="icon">✏️</span><span><strong>Rectificación:</strong> Puedes corregir o actualizar tu nombre, correo, teléfono y dirección desde tu cuenta.</span></li>
-      <li><span class="icon">🗑️</span><span><strong>Eliminación:</strong> Puedes eliminar tu cuenta permanentemente desde la sección "Preferencias" de tu perfil. Esto borra todos tus datos personales de nuestra base de datos.</span></li>
-      <li><span class="icon">📦</span><span><strong>Portabilidad:</strong> Puedes solicitar una copia de tus datos de pedidos escribiéndonos al correo de contacto.</span></li>
-      <li><span class="icon">🚫</span><span><strong>Oposición:</strong> Puedes oponerte al tratamiento de tus datos en cualquier momento contactándonos directamente.</span></li>
-    </ul>
-    <div class="highlight">
-      Para ejercer cualquiera de estos derechos, puedes hacerlo directamente desde tu cuenta o escribiéndonos a nuestro correo de contacto. Respondemos todas las solicitudes en un plazo máximo de <strong>15 días hábiles</strong>.
-    </div>
-  </div>
+  <h2>11. Cambios a esta política</h2>
+  <p>Podemos actualizar esta política ocasionalmente. Si los cambios son significativos, te notificaremos por email si tienes una cuenta registrada. La fecha de "última actualización" al inicio de esta página indica cuándo se realizaron los últimos cambios.</p>
 
-  <hr class="section-divider"/>
+  <h2>12. Contacto</h2>
+  <p>Para cualquier consulta sobre privacidad o el uso de tus datos:</p>
+  <ul>
+    <li>Email: <a href="mailto:hola@sillage-sv.com">hola@sillage-sv.com</a></li>
+    <li>Sitio web: <a href="https://sillage-sv.com">sillage-sv.com</a></li>
+  </ul>
+</main>
 
-  <!-- 7 -->
-  <div class="section" id="s7">
-    <span class="section-num">07</span>
-    <h2 class="section-title">Menores de edad</h2>
-    <div class="section-body">
-      <p>Sillage Parfumerie no está dirigida a menores de 18 años ni recopilamos intencionalmente información personal de menores. Si eres padre o tutor y crees que tu hijo ha proporcionado información personal en nuestra tienda, contáctanos de inmediato para eliminarla.</p>
-    </div>
-  </div>
+<footer>
+  © 2025 Sillage Parfumerie · El Salvador ·
+  <a href="/terminos">Términos</a> ·
+  <a href="/devoluciones">Devoluciones</a>
+</footer>
 
-  <hr class="section-divider"/>
-
-  <!-- 8 -->
-  <div class="section" id="s8">
-    <span class="section-num">08</span>
-    <h2 class="section-title">Inteligencia Artificial — Elara</h2>
-    <div class="section-body">
-      <p>Sillage Parfumerie utiliza un asistente de inteligencia artificial llamado <strong>Elara</strong> para ayudarte a encontrar fragancias. Las conversaciones con Elara son procesadas por un servicio externo de inteligencia artificial para generar respuestas. No compartimos tu nombre ni correo con este servicio — las conversaciones se transmiten de forma anónima.</p>
-      <p>Las preferencias de fragancia que Elara detecta durante tus consultas se almacenan en nuestra base de datos para personalizar tu experiencia futura. Puedes eliminar este perfil en cualquier momento desde tu cuenta, o simplemente no usar el asistente.</p>
-    </div>
-  </div>
-
-  <hr class="section-divider"/>
-
-  <!-- 9 -->
-  <div class="section" id="s9">
-    <span class="section-num">09</span>
-    <h2 class="section-title">Cambios a esta política</h2>
-    <div class="section-body">
-      <p>Podemos actualizar esta Política de Privacidad ocasionalmente para reflejar cambios en nuestras prácticas o por razones legales. Cuando lo hagamos, actualizaremos la fecha de "Última actualización" en la parte superior de esta página.</p>
-      <p>Si realizamos cambios significativos que afecten tus derechos, te notificaremos por correo electrónico a la dirección registrada en tu cuenta. El uso continuado de la tienda después de cualquier cambio constituye tu aceptación de la política actualizada.</p>
-    </div>
-  </div>
-
-  <hr class="section-divider"/>
-
-  <!-- 9 -->
-  <div class="section" id="s10">
-    <span class="section-num">10</span>
-    <h2 class="section-title">Contacto</h2>
-    <div class="section-body">
-      <p>Si tienes preguntas, comentarios o solicitudes relacionadas con esta Política de Privacidad o el tratamiento de tus datos personales, puedes contactarnos:</p>
-    </div>
-    <div class="contact-card">
-      <span class="brand">Sillage</span>
-      <p>
-        <strong style="color:var(--cream)">Sillage Parfumerie</strong><br/>
-        El Salvador<br/>
-        <a href="mailto:contacto@sillage-sv.com" style="color:var(--gold)">contacto@sillage-sv.com</a>
-      </p>
-    </div>
-  </div>
-
-</div><!
+</body>
+</html>
