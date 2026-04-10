@@ -191,6 +191,17 @@ async function initDB() {
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
   `);
 
+  await db.execute(`
+    CREATE TABLE IF NOT EXISTS email_preferences (
+      customer_id       INT PRIMARY KEY,
+      marketing         TINYINT(1) DEFAULT 1,
+      followup          TINYINT(1) DEFAULT 1,
+      unsubscribe_token VARCHAR(64) NOT NULL,
+      updated_at        DATETIME NOT NULL,
+      FOREIGN KEY (customer_id) REFERENCES customers(id) ON DELETE CASCADE
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
+  `);
+
   console.log('✅ Tables ready');
 }
 
@@ -202,7 +213,9 @@ async function migrateOrders() {
     "state_province VARCHAR(100) DEFAULT NULL",
     "country        VARCHAR(100) DEFAULT NULL",
     "payment_method VARCHAR(50)  DEFAULT 'wompi'",
-    "tracking_number VARCHAR(200) DEFAULT NULL"
+    "tracking_number VARCHAR(200) DEFAULT NULL",
+    "followup_scheduled_at DATETIME DEFAULT NULL",
+    "followup_sent_at      DATETIME DEFAULT NULL"
   ];
   for (const col of cols) {
     const colName = col.trim().split(' ')[0];
@@ -521,23 +534,128 @@ async function sendShippedEmail(order) {
 }
 
 async function sendDeliveredEmail(order) {
-  const html = emailTemplate(`
-    <h2 style="font-family:Georgia,serif;font-size:24px;font-weight:300;color:#1a1714;margin:0 0 8px">¡Tu pedido fue entregado! ✨</h2>
-    <p style="font-size:13px;color:#8a7f72;margin:0 0 24px">Hola <strong style="color:#1a1714">${escHtml(order.customer)}</strong>, tu fragancia ha llegado a su destino. ¡Esperamos que la disfrutes!</p>
-    <div style="background:#faf8f4;border:1px solid #e8d8b8;padding:12px 16px;margin-bottom:24px">
-      <span style="font-size:10px;letter-spacing:3px;text-transform:uppercase;color:#8a7f72">Número de Pedido</span><br/>
-      <span style="font-family:Georgia,serif;font-size:18px;color:#b8955a">${escHtml(order.id)}</span>
-    </div>
-    <p style="font-size:12px;color:#8a7f72;line-height:1.8;margin-bottom:16px">Si tienes algún problema con tu pedido, puedes contactarnos dentro de los <strong style="color:#1a1714">8 días hábiles</strong> siguientes a la entrega para gestionar una devolución o cambio.</p>
-    <div style="text-align:center;margin-top:24px">
-      <a href="https://sillage-sv.com/devoluciones" style="display:inline-block;padding:12px 28px;border:1px solid #b8955a;color:#b8955a;font-size:11px;letter-spacing:2px;text-transform:uppercase;text-decoration:none">Política de Devoluciones</a>
-    </div>`);
+  // Nez note + schedule followup + unsubscribe footer
+  const nezNote = await buildNezNote(order.items).catch(() => null);
+  const nezBlock = nezNote
+    ? `<div style="border-left:3px solid #b8955a;padding:12px 16px;margin:20px 0;background:#faf8f4">` +
+      `<p style="font-size:10px;letter-spacing:3px;text-transform:uppercase;color:#b8955a;margin:0 0 8px">Una nota de Nez</p>` +
+      `<p style="font-family:Georgia,serif;font-size:14px;color:#4a3f35;line-height:1.9;margin:0;font-style:italic">${escHtml(nezNote).replace(/\n/g,'<br/>')}</p>` +
+      `</div>`
+    : '';
+
+  const unsubFooter = order.customer_id
+    ? await buildUnsubscribeFooter(order.customer_id).catch(() => '')
+    : '';
+
+  if (order.customer_id) {
+    const followupDate = new Date(Date.now() + 14 * 24 * 60 * 60 * 1000);
+    await db.execute('UPDATE orders SET followup_scheduled_at=? WHERE id=?', [followupDate, order.id]).catch(() => {});
+  }
+
+  const html = emailTemplate(
+    `<h2 style="font-family:Georgia,serif;font-size:24px;font-weight:300;color:#1a1714;margin:0 0 8px">¡Tu pedido fue entregado! ✨</h2>` +
+    `<p style="font-size:13px;color:#8a7f72;margin:0 0 24px">Hola <strong style="color:#1a1714">${escHtml(order.customer)}</strong>, tu fragancia ha llegado a su destino.</p>` +
+    `<div style="background:#faf8f4;border:1px solid #e8d8b8;padding:12px 16px;margin-bottom:24px">` +
+      `<span style="font-size:10px;letter-spacing:3px;text-transform:uppercase;color:#8a7f72">Número de Pedido</span><br/>` +
+      `<span style="font-family:Georgia,serif;font-size:18px;color:#b8955a">${escHtml(order.id)}</span>` +
+    `</div>` +
+    nezBlock +
+    `<p style="font-size:12px;color:#8a7f72;line-height:1.8;margin-bottom:16px">Si tienes algún problema, contáctanos dentro de los <strong style="color:#1a1714">8 días hábiles</strong> siguientes a la entrega.</p>` +
+    `<div style="text-align:center;margin-top:24px">` +
+      `<a href="https://sillage-sv.com/devoluciones" style="display:inline-block;padding:12px 28px;border:1px solid #b8955a;color:#b8955a;font-size:11px;letter-spacing:2px;text-transform:uppercase;text-decoration:none">Política de Devoluciones</a>` +
+    `</div>` +
+    unsubFooter
+  );
   await sendEmail({
     to: order.email,
     subject: `✨ Pedido ${escHtml(order.id)} entregado — Sillage Parfumerie`,
     from: `Sillage Pedidos <${EMAIL_PEDIDOS}>`,
     html
   });
+}
+
+// ─── Email Preferences ───────────────────────────────────
+const crypto_ref = require('crypto');
+
+async function ensureEmailPreferences(customerId) {
+  const [rows] = await db.execute('SELECT * FROM email_preferences WHERE customer_id=?', [customerId]);
+  if (rows.length) return rows[0];
+  const token = crypto_ref.randomBytes(32).toString('hex');
+  await db.execute(
+    'INSERT INTO email_preferences (customer_id, marketing, followup, unsubscribe_token, updated_at) VALUES (?,1,1,?,?)',
+    [customerId, token, new Date()]
+  );
+  return { customer_id: customerId, marketing: 1, followup: 1, unsubscribe_token: token };
+}
+
+async function buildUnsubscribeFooter(customerId) {
+  const prefs = await ensureEmailPreferences(customerId);
+  const BASE  = process.env.BASE_URL || 'https://sillage-sv.com';
+  const url   = `${BASE}/preferencias-email?token=${prefs.unsubscribe_token}`;
+  return `
+    <div style="margin-top:32px;padding-top:16px;border-top:1px solid #e8d8b8;text-align:center">
+      <p style="font-size:10px;color:#b0a898;letter-spacing:0.05em;margin:0 0 6px">
+        Recibiste este email porque realizaste una compra en Sillage Parfumerie.
+      </p>
+      <a href="${url}" style="font-size:10px;color:#b8955a;letter-spacing:1px;text-transform:uppercase;text-decoration:none">
+        Gestionar preferencias de email
+      </a>
+    </div>`;
+}
+
+// ── Nez: generate followup recommendations ────────────────────────────────────
+async function buildFollowupEmail(order) {
+  if (!OPENAI_API_KEY) return null;
+  try {
+    const catalogue = await getCatalogue();
+    const purchased = (order.items || []).map(i => {
+      const match = catalogue.find(p => i.name && i.name.toLowerCase().includes(p.name.toLowerCase()));
+      return match ? `${match.brand} ${match.name}` : i.name;
+    }).filter(Boolean).join(', ');
+
+    // Get 3 in-stock products excluding what they bought
+    const boughtIds = new Set((order.items || []).map(i => i.productId));
+    const available = catalogue
+      .filter(p => !boughtIds.has(p.id))
+      .slice(0, 12)
+      .map(p => `${p.brand} ${p.name} — ${p.tagline || p.desc || ''}`)
+      .join('\n');
+
+    const resp = await fetch('https://api.openai.com/v1/chat/completions', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${OPENAI_API_KEY}` },
+      body: JSON.stringify({
+        model: 'gpt-4o-mini',
+        max_tokens: 300,
+        temperature: 0.7,
+        messages: [{
+          role: 'system',
+          content: `Eres Nez, sommelier de Sillage Parfumerie. Escribe un párrafo corto (3-4 oraciones) de seguimiento para un cliente que compró hace 2 semanas.
+
+VOZ: Directa, cálida, sin presión. No pidas que compren — sugiere con criterio.
+ESTRUCTURA: Comenta algo específico sobre lo que compraron → sugiere 2-3 fragancias que complementarían bien → cierra con una línea simple.
+NO usar: "esperamos que disfrutes", "no dudes en contactarnos", frases de servicio al cliente.
+Termina con: — Nez
+
+Menciona las fragancias sugeridas en **negritas** exactamente como aparecen en el catálogo.`
+        }, {
+          role: 'user',
+          content: `El cliente compró: ${purchased}
+
+Fragancias disponibles en catálogo:
+${available}
+
+Escribe el párrafo de seguimiento.`
+        }]
+      })
+    });
+    if (!resp.ok) return null;
+    const data = await resp.json();
+    return data.choices?.[0]?.message?.content?.trim() || null;
+  } catch(e) {
+    console.warn('Followup email generation failed:', e.message);
+    return null;
+  }
 }
 
 // ── Sommelier tool result cache (30min TTL) ────────────
@@ -1052,6 +1170,7 @@ app.post('/api/customer/register', authLimiter, async (req, res) => {
   const customer = { id: result.insertId, name, email: email.toLowerCase() };
   const token = createSession(customer, 'customer');
   await logActivity(`Nuevo cliente: ${name} (${email})`);
+  await initEmailPreferencesForCustomer(customer.id).catch(() => {});
   try { await sendWelcomeEmail(customer); } catch(e) {}
 
   // Migrate anonymous session data to this new account
@@ -2926,6 +3045,159 @@ app.get('/api/catalogue/top-sellers', requireAdmin, async (req, res) => {
 // Prevent DB errors from crashing the server
 // ── Global Express error handler — NEVER expose internals to client ──────────
 // This catches any error passed to next(err) or unhandled async throws
+// ═══════════════════════════════════════════════════════
+//  EMAIL FOLLOWUP CRON — runs daily, sends 14-day post-delivery emails
+// ═══════════════════════════════════════════════════════
+async function runFollowupCron() {
+  try {
+    const now = new Date();
+    // Find orders due for followup: scheduled_at <= now, not yet sent, customer registered
+    const [orders] = await db.execute(`
+      SELECT o.*, c.email, c.name as customer_name
+      FROM orders o
+      JOIN customers c ON o.customer_id = c.id
+      JOIN email_preferences ep ON ep.customer_id = c.id
+      WHERE o.followup_scheduled_at IS NOT NULL
+        AND o.followup_scheduled_at <= ?
+        AND o.followup_sent_at IS NULL
+        AND ep.followup = 1
+    `, [now]);
+
+    for (const order of orders) {
+      try {
+        order.customer = order.customer_name;
+        order.items = JSON.parse(order.items || '[]');
+        const content = await buildFollowupEmail(order);
+        if (!content) continue;
+
+        const unsubFooter = await buildUnsubscribeFooter(order.customer_id).catch(() => '');
+        const BASE = process.env.BASE_URL || 'https://sillage-sv.com';
+
+        const html = emailTemplate(
+          `<h2 style="font-family:Georgia,serif;font-size:22px;font-weight:300;color:#1a1714;margin:0 0 16px">Hola ${escHtml(order.customer)} 👋</h2>` +
+          `<div style="border-left:3px solid #b8955a;padding:12px 16px;margin:0 0 20px;background:#faf8f4">` +
+            `<p style="font-size:10px;letter-spacing:3px;text-transform:uppercase;color:#b8955a;margin:0 0 8px">Nez te escribe</p>` +
+            `<p style="font-family:Georgia,serif;font-size:14px;color:#4a3f35;line-height:1.9;margin:0;font-style:italic">${escHtml(content).replace(/\n/g,'<br/>')}</p>` +
+          `</div>` +
+          `<div style="text-align:center;margin-top:24px">` +
+            `<a href="${BASE}" style="display:inline-block;padding:12px 28px;border:1px solid #b8955a;color:#b8955a;font-size:11px;letter-spacing:2px;text-transform:uppercase;text-decoration:none">Ver Catálogo</a>` +
+          `</div>` +
+          unsubFooter
+        );
+
+        await sendEmail({
+          to: order.email,
+          subject: `Una recomendación de Nez — Sillage Parfumerie`,
+          from: `Nez · Sillage <${EMAIL_PEDIDOS}>`,
+          html
+        });
+
+        await db.execute('UPDATE orders SET followup_sent_at=? WHERE id=?', [now, order.id]);
+        await logActivity(`Followup email enviado a ${order.customer_name} (pedido ${order.id})`);
+      } catch(e) {
+        console.warn(`Followup failed for order ${order.id}:`, e.message);
+      }
+    }
+    if (orders.length) console.log(`✅ Followup cron: ${orders.length} email(s) sent`);
+  } catch(e) {
+    console.warn('Followup cron error:', e.message);
+  }
+}
+// Run once at startup (catches any missed), then every 6 hours
+setTimeout(runFollowupCron, 30000);
+setInterval(runFollowupCron, 6 * 60 * 60 * 1000);
+
+// ── Unsubscribe / Email preferences page ─────────────────
+app.get('/preferencias-email', async (req, res) => {
+  const { token } = req.query;
+  if (!token) return res.redirect('/');
+  const [rows] = await db.execute(
+    'SELECT ep.*, c.name FROM email_preferences ep JOIN customers c ON ep.customer_id=c.id WHERE ep.unsubscribe_token=?',
+    [token]
+  ).catch(() => [[]]);
+  if (!rows.length) return res.redirect('/');
+  const prefs = rows[0];
+  res.send(`<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1"/>
+<title>Preferencias de Email — Sillage</title>
+<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;1,300&family=Jost:wght@300;400&display=swap" rel="stylesheet"/>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{background:#0e0c0a;color:#e8dcc8;font-family:'Jost',sans-serif;min-height:100vh;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:2rem}
+.card{background:#1a1714;border:1px solid rgba(184,149,90,0.2);border-top:2px solid rgba(184,149,90,0.5);padding:2.5rem;max-width:420px;width:100%}
+.brand{font-family:'Cormorant Garamond',serif;font-size:1.4rem;font-weight:300;letter-spacing:0.1em;color:#b8955a;margin-bottom:0.3rem}
+h1{font-family:'Cormorant Garamond',serif;font-size:1.1rem;font-weight:300;color:#e8dcc8;margin-bottom:0.5rem}
+p{font-size:0.72rem;color:#8a7f72;line-height:1.8;margin-bottom:1.5rem}
+.pref-row{display:flex;justify-content:space-between;align-items:center;padding:0.9rem 0;border-bottom:1px solid rgba(184,149,90,0.1)}
+.pref-row:last-of-type{border-bottom:none}
+.pref-label{font-size:0.72rem;color:#e8dcc8}
+.pref-sub{font-size:0.6rem;color:#8a7f72;margin-top:0.15rem}
+.tog-wrap{position:relative;display:inline-block;width:36px;height:20px}
+.tog-wrap input{opacity:0;width:0;height:0}
+.tog-track{position:absolute;cursor:pointer;inset:0;background:rgba(255,255,255,0.08);border:1px solid rgba(184,149,90,0.2);transition:.3s}
+.tog-wrap input:checked + .tog-track{background:rgba(184,149,90,0.3);border-color:rgba(184,149,90,0.5)}
+.tog-thumb{position:absolute;height:14px;width:14px;left:3px;bottom:3px;background:#8a7f72;transition:.3s;pointer-events:none}
+.tog-wrap input:checked ~ .tog-thumb{transform:translateX(16px);background:#b8955a}
+.save-btn{width:100%;margin-top:1.5rem;background:transparent;border:1px solid rgba(184,149,90,0.4);color:rgba(184,149,90,0.8);font-family:'Jost',sans-serif;font-size:0.62rem;letter-spacing:0.2em;text-transform:uppercase;padding:0.75rem;cursor:pointer;transition:all 0.3s}
+.save-btn:hover{background:rgba(184,149,90,0.08);border-color:rgba(184,149,90,0.7);color:#e8dcc8}
+.msg{display:none;font-size:0.65rem;color:#5a9a6a;text-align:center;margin-top:0.8rem;letter-spacing:0.1em}
+</style>
+</head>
+<body>
+<div class="card">
+  <div class="brand">SILLAGE</div>
+  <h1>Preferencias de Email</h1>
+  <p>Hola ${escHtml(prefs.name)} — gestiona qué emails deseas recibir. Las confirmaciones de pedido siempre se envían.</p>
+  <form id="prefForm">
+    <div class="pref-row">
+      <div><div class="pref-label">Emails de marketing</div><div class="pref-sub">Nuevas llegadas, ofertas y novedades</div></div>
+      <label class="tog-wrap"><input type="checkbox" id="mktg" ${prefs.marketing ? 'checked' : ''}/><span class="tog-track"></span><span class="tog-thumb"></span></label>
+    </div>
+    <div class="pref-row">
+      <div><div class="pref-label">Emails de seguimiento</div><div class="pref-sub">Recomendaciones personalizadas de Nez</div></div>
+      <label class="tog-wrap"><input type="checkbox" id="flwp" ${prefs.followup ? 'checked' : ''}/><span class="tog-track"></span><span class="tog-thumb"></span></label>
+    </div>
+    <button type="button" class="save-btn" onclick="save()">Guardar preferencias</button>
+    <div class="msg" id="msg">✓ PREFERENCIAS GUARDADAS</div>
+  </form>
+</div>
+<script>
+function save(){
+  fetch('/api/email-preferences',{
+    method:'POST',
+    headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({token:'${token}',marketing:document.getElementById('mktg').checked,followup:document.getElementById('flwp').checked})
+  }).then(function(r){return r.json();}).then(function(){
+    var m=document.getElementById('msg');m.style.display='block';setTimeout(function(){m.style.display='none';},3000);
+  }).catch(function(){alert('Error al guardar. Intenta de nuevo.');});
+}
+</script>
+</body>
+</html>`);
+});
+
+app.post('/api/email-preferences', async (req, res) => {
+  const { token, marketing, followup } = req.body;
+  if (!token) return res.status(400).json({ error: 'Token requerido' });
+  try {
+    await db.execute(
+      'UPDATE email_preferences SET marketing=?, followup=?, updated_at=? WHERE unsubscribe_token=?',
+      [marketing ? 1 : 0, followup ? 1 : 0, new Date(), token]
+    );
+    res.json({ ok: true });
+  } catch(e) {
+    res.status(500).json({ error: 'Error al guardar preferencias' });
+  }
+});
+
+// Create email preferences when customer registers
+async function initEmailPreferencesForCustomer(customerId) {
+  await ensureEmailPreferences(customerId).catch(() => {});
+}
+
 app.use(function(err, req, res, next) {
   // Always log the full error internally
   const stackLine = err.stack ? err.stack.split(String.fromCharCode(10))[1] || '' : '';
