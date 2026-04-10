@@ -1249,7 +1249,22 @@ function connectWS(){
         // Now safe to fetch fresh data from REST since session is confirmed
         fetchAllData();
       }
-      if(msg.type==='inventory'){inventory=msg.payload;if(currentPage==='inventory')renderInventory();if(currentPage==='pricing')renderPricing();renderOverview();}
+      if(msg.type==='inventory'){
+        inventory=msg.payload;
+        // Always sync input fields even if not on inventory page —
+        // prevents stale DOM values from overwriting DB on next save
+        Object.keys(inventory).forEach(function(pid){
+          var el=document.getElementById('stk-'+pid);
+          if(el && document.activeElement !== el) el.value=inventory[pid].stock;
+          var low=document.getElementById('low-'+pid);
+          if(low) low.checked=!!inventory[pid].lowStock;
+          var oos=document.getElementById('oos-'+pid);
+          if(oos) oos.checked=!!inventory[pid].outOfStock;
+        });
+        if(currentPage==='inventory')renderInventory();
+        if(currentPage==='pricing')renderPricing();
+        renderOverview();
+      }
       if(msg.type==='bottle_inventory'){if(currentPage==='inventory')loadBottleInventory();}
       if(msg.type==='pricing'){pricing=msg.payload;if(currentPage==='pricing')renderPricing();renderOverview();}
       if(msg.type==='new_order'){
