@@ -2850,22 +2850,29 @@ app.post('/api/bottle-inventory/:id/add', requireAdmin, async (req, res) => {
     WHERE product_id = ?
   `, [mlNum, mlNum, n, pid]);
 
-  // Also deduct 1 unit from physical inventory (opening a bottle = consuming 1 unit)
+  // Deduct 1 unit from physical inventory (opening a bottle = consuming 1 unit of stock)
   const [invRows] = await db.execute('SELECT stock FROM inventory WHERE product_id=?', [pid]);
-  if (invRows.length && invRows[0].stock > 0) {
-    const newStock = invRows[0].stock - 1;
-    const isOos    = newStock === 0;
-    const isLow    = newStock <= 5 && !isOos;
+  if (invRows.length) {
+    const currentStock = parseInt(invRows[0].stock) || 0;
+    if (currentStock > 0) {
+      const newStock = currentStock - 1;
+      const isOos    = newStock === 0;
+      const isLow    = newStock <= 5 && !isOos;
+      await db.execute(
+        `UPDATE inventory SET stock=?, out_of_stock=?, low_stock=?, updated_at=? WHERE product_id=?`,
+        [newStock, isOos ? 1 : 0, isLow ? 1 : 0, n, pid]
+      );
+      broadcast('inventory', await getInventoryMap());
+    }
+    // else stock already 0 — bottle was already exhausted, just record the ml
+  } else {
+    // No inventory row at all — create one at 0 stock (product exists but wasn't tracked)
     await db.execute(
-      `UPDATE inventory SET
-        stock        = ?,
-        out_of_stock = ?,
-        low_stock    = ?,
-        updated_at   = ?
-       WHERE product_id = ?`,
-      [newStock, isOos ? 1 : 0, isLow ? 1 : 0, n, pid]
+      `INSERT INTO inventory (product_id, stock, low_stock, out_of_stock, updated_at)
+       VALUES (?, 0, 0, 1, ?)
+       ON DUPLICATE KEY UPDATE updated_at=VALUES(updated_at)`,
+      [pid, n]
     );
-    // Broadcast inventory update to store
     broadcast('inventory', await getInventoryMap());
   }
 
