@@ -750,10 +750,54 @@ app.use(express.static(__dirname, {
   etag:   true,
   lastModified: true,
 }));
-app.get('/', (req, res) => {
-  const fs = require('fs');
+app.get('/', async (req, res) => {
+  const fs   = require('fs');
   const index = path.join(__dirname, 'index.html');
-  const store  = path.join(__dirname, 'claud-perfumes-server.html');
+  const store = path.join(__dirname, 'claud-perfumes-server.html');
+
+  // ── Dynamic OG tags for ?producto=ID deep links ──────────────────────────
+  // Social crawlers (WhatsApp, Instagram, iMessage, Telegram) send requests
+  // without JS support — they read OG meta tags directly from the HTML.
+  // When a product deep-link is shared, inject product-specific OG tags.
+  const productoId = parseInt(req.query.producto);
+  if (productoId) {
+    try {
+      const catalogue = await getCatalogue();
+      const p = catalogue.find(prod => prod.id === productoId);
+      if (p && fs.existsSync(index)) {
+        const BASE   = process.env.BASE_URL || 'https://sillage-sv.com';
+        const imgUrl = (p.photos && p.photos[0])
+          ? (p.photos[0].startsWith('http') ? p.photos[0] : BASE + p.photos[0])
+          : `${BASE}/og-default.jpg`;
+        const title  = `${p.brand} ${p.name} — Sillage Parfumerie`;
+        const desc   = p.tagline
+          ? `${p.tagline} · ${p.conc || 'Eau de Parfum'} · Desde $${p.price}`
+          : `${p.conc || 'Eau de Parfum'} de ${p.brand}. Disponible en Sillage Parfumerie, El Salvador.`;
+        const url    = `${BASE}/?producto=${productoId}`;
+
+        let html = fs.readFileSync(index, 'utf8');
+        // Replace generic OG tags with product-specific ones
+        html = html
+          .replace(/<meta property="og:title"[^>]*\/>/,
+            `<meta property="og:title" content="${escHtml(title)}"/>`)
+          .replace(/<meta property="og:description"[^>]*\/>/,
+            `<meta property="og:description" content="${escHtml(desc)}"/>`)
+          .replace(/<meta property="og:url"[^>]*\/>/, '')
+          .replace('</head>',
+            `<meta property="og:image" content="${imgUrl}"/>
+<meta property="og:url" content="${url}"/>
+<meta property="og:type" content="product"/>
+<meta name="twitter:card" content="summary_large_image"/>
+<meta name="twitter:image" content="${imgUrl}"/>
+</head>`);
+        return res.send(html);
+      }
+    } catch(e) {
+      console.warn('OG tag generation failed:', e.message);
+      // Fall through to normal sendFile
+    }
+  }
+
   if (fs.existsSync(index)) return res.sendFile(index);
   if (fs.existsSync(store)) return res.sendFile(store);
   res.send('<h2>Store file not found.</h2>');
