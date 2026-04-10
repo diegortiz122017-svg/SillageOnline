@@ -1926,6 +1926,21 @@ document.addEventListener('change', function(e){
     saveTracking(oid, e.target.value);
   }
 });
+// ── Slide panel event delegation ──────────────────────
+document.getElementById('slidePanelBody').addEventListener('change', function(e) {
+  if (e.target.classList.contains('sp-status-sel')) {
+    var oid = e.target.dataset.oid;
+    var status = e.target.value;
+    updateStatus(oid, status);
+  }
+});
+document.getElementById('slidePanelBody').addEventListener('blur', function(e) {
+  if (e.target.classList.contains('sp-trk-inp')) {
+    var oid = e.target.dataset.oid;
+    saveTracking(oid, e.target.value.trim());
+  }
+}, true); // use capture for blur
+
 function updateStatus(oid,status){
   var stepMap={'Pendiente de Pago':0,'Procesando':1,'Empaquetado':2,'Enviado':3,'Entregado':4,'Delivered':5};
   var trackerStep=stepMap[status]||0;
@@ -2245,13 +2260,13 @@ function openOrderDetail(orderId){
       '</div>'+
       '<div style="display:flex;flex-direction:column;gap:0.6rem">'+
         '<div style="font-size:0.5rem;letter-spacing:0.2em;text-transform:uppercase;color:var(--muted)">Estado</div>'+
-        '<select onchange="updateStatus('+JSON.stringify(o.id)+',this.value)" '+
+        '<select id="sp-sel-'+o.id+'" data-oid="'+o.id+'" class="sp-status-sel" '+
           'style="background:var(--card);border:1px solid var(--border);color:var(--cream);font-family:Jost,sans-serif;font-size:0.72rem;padding:0.5rem;outline:none;width:100%">'+
           statusOpts+
         '</select>'+
-        '<input id="sp-trk-'+o.id+'" placeholder="Número de seguimiento" value="'+(o.tracking_number||'')+'" '+
-          'style="background:var(--card);border:1px solid var(--border);color:var(--cream);font-family:Jost,sans-serif;font-size:0.72rem;padding:0.5rem;outline:none" '+
-          'onblur="saveTracking('+JSON.stringify(o.id)+',this.value)"/>'+
+        '<input id="sp-trk-'+o.id+'" data-oid="'+o.id+'" class="sp-trk-inp" placeholder="Número de seguimiento" value="'+(o.tracking_number||'')+'" '+
+          'style="background:var(--card);border:1px solid var(--border);color:var(--cream);font-family:Jost,sans-serif;font-size:0.72rem;padding:0.5rem;outline:none;width:100%" '+
+          '/>'+
       '</div>'+
     '</div>';
   openSlidePanel('Pedido '+orderId, html);
@@ -2267,7 +2282,7 @@ function openCustomerHistory(customerId, customerName){
       customerOrders.map(function(o){
         var t = o.createdAt ? new Date(o.createdAt).toLocaleDateString('es-ES',{day:'numeric',month:'short',year:'numeric'}) : '';
         var statusSlug = (o.status||'').toLowerCase().replace(/[^a-z]/g,'-');
-        return '<div onclick="openOrderDetail('+JSON.stringify(o.id)+')" style="background:var(--card);border:1px solid var(--border-light);padding:1rem;cursor:pointer;transition:border-color 0.2s" '+
+        return '<div data-oid="'+o.id+'" class="qv-order-link" style="background:var(--card);border:1px solid var(--border-light);padding:1rem;cursor:pointer;transition:border-color 0.2s" '+
           'onmouseenter="this.style.borderColor=\'var(--gold)\'" onmouseleave="this.style.borderColor=\'\'">'+
           '<div style="display:flex;justify-content:space-between;margin-bottom:0.4rem">'+
             '<span style="font-size:0.72rem;color:var(--gold);letter-spacing:0.05em">'+esc(o.id)+'</span>'+
