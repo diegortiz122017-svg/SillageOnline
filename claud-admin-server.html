@@ -1256,7 +1256,7 @@ function connectWS(){
         orders.unshift(msg.payload);
         if(currentPage==='orders')renderOrders();
         renderOverview();
-        if(activeQV === 'orders' || activeQV === 'pending') openQV(activeQV);
+        if(activeQV === 'orders' || activeQV === 'pending') refreshQV();
         toast('¡Nuevo Pedido!',msg.payload.id+' de '+msg.payload.customer+' \u2014 $'+msg.payload.total,'ok');
       }
       if(msg.type==='order_update'){
@@ -1268,7 +1268,7 @@ function connectWS(){
         }
         if(currentPage==='orders') renderOrders();
         // Also refresh QV if it's open showing orders
-        if(activeQV === 'orders' || activeQV === 'pending') openQV(activeQV);
+        if(activeQV === 'orders' || activeQV === 'pending') refreshQV();
       }
       if(msg.type==='activity'){
         activity.unshift(msg.payload);
@@ -2030,9 +2030,13 @@ function closeQV(){
   activeQV = null;
 }
 
-function openQV(type){
-  // Toggle off if already open
-  if(activeQV === type){ closeQV(); return; }
+function refreshQV(){
+  // Refresh QV content without toggling — used by WS updates
+  if(activeQV) openQV(activeQV, true);
+}
+function openQV(type, forceRefresh){
+  // Toggle off if already open (unless forcing a refresh)
+  if(!forceRefresh && activeQV === type){ closeQV(); return; }
   activeQV = type;
   // Highlight active card
   document.querySelectorAll('.stat-card').forEach(function(card,i){
@@ -3345,7 +3349,8 @@ function initBottleInventory(){
 }
 
 var _bottleEditPid = null;
-var _bottleAddPid  = null;
+var _bottleAddPid       = null;
+var _bottleInventoryData = [];  // cached bottle records for prefilling modal
 
 function loadBottleInventory(){
   if(!sessionToken) return;
@@ -3354,6 +3359,7 @@ function loadBottleInventory(){
   adminFetch(API+'/bottle-inventory',{})
     .then(function(r){ if(!r)return null; return r.json(); })
     .then(function(data){
+      _bottleInventoryData = data || [];
       if(!data||!data.length){
         grid.innerHTML = '<div style="color:var(--muted);font-size:0.7rem;padding:1rem 0;grid-column:1/-1">No hay botellas registradas. Haz clic en <strong style="color:var(--gold)">+ Registrar Botella</strong> para empezar.</div>';
         return;
@@ -3515,8 +3521,10 @@ function saveBottleConfig(){
 function openBottleAddModal(pid, name){
   _bottleAddPid = pid;
   document.getElementById('bottleAddTitle').textContent = 'Abrir botella — '+name;
-  document.getElementById('bottleAddMl').value = '';
   document.getElementById('bottleAddErr').textContent = '';
+  // Pre-fill with the bottle_size already saved in the rastreador
+  var bottleRec = _bottleInventoryData && _bottleInventoryData.find(function(b){ return b.product_id === pid; });
+  document.getElementById('bottleAddMl').value = (bottleRec && bottleRec.bottle_size) ? bottleRec.bottle_size : '';
   document.getElementById('bottleAddModal').style.display = 'flex';
 }
 
