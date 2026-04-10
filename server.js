@@ -821,6 +821,31 @@ async function persistRevocation(jti, ttlMs) {
 // ─── Rate limiting ────────────────────────────────────
 const loginAttempts = new Map();
 // On startup, restore recent failed attempts from DB so restarts don't reset brute-force protection
+// One-time fix: if bottle_inventory has ml_remaining > 0 but inventory has stock=0 + out_of_stock=1,
+// those rows were incorrectly created by the old bottle-open endpoint.
+// Cross-reference with bottle_inventory and reset them to match actual stock.
+async function fixCorruptedInventoryRows() {
+  try {
+    // Find products where bottle_inventory has ml but inventory says out_of_stock
+    const [rows] = await db.execute(`
+      SELECT i.product_id, i.stock, b.ml_remaining
+      FROM inventory i
+      JOIN bottle_inventory b ON b.product_id = i.product_id
+      WHERE i.out_of_stock = 1 AND i.stock = 0 AND b.ml_remaining > 0
+    `);
+    for (const row of rows) {
+      // The inventory was incorrectly marked OOS — reset to out_of_stock=0
+      // We don't know the real stock so just clear the false OOS flag
+      await db.execute(
+        'UPDATE inventory SET out_of_stock=0, updated_at=? WHERE product_id=? AND stock=0',
+        [new Date(), row.product_id]
+      );
+      console.log(`✅ Fixed corrupted inventory row for product_id ${row.product_id}`);
+    }
+    if (rows.length) console.log(`✅ Fixed ${rows.length} corrupted inventory row(s)`);
+  } catch(e) { console.warn('fixCorruptedInventoryRows error:', e.message); }
+}
+
 async function restoreLoginAttempts() {
   try {
     const [rows] = await db.execute(
@@ -2766,7 +2791,7 @@ app.get('/api/bottle-inventory', requireAdmin, async (req, res) => {
       .map(r => {
         const prod     = catalogue.find(p => p.id === r.product_id);
         const invEntry = invMap[r.product_id] || {};
-        const isOos    = invEntry.out_of_stock || invEntry.stock === 0;
+        const isOos    = parseInt(invEntry.out_of_stock) === 1 || parseInt(invEntry.stock) === 0;
         const decants_remaining = (!isOos && r.decant_size > 0) ? Math.floor(r.ml_remaining / r.decant_size) : 0;
         const samples_remaining = (!isOos && r.sample_size > 0) ? Math.floor(r.ml_remaining / r.sample_size) : 0;
         const low_alert = parseFloat(r.ml_remaining) <= parseFloat(r.alert_ml);
@@ -2866,14 +2891,10 @@ app.post('/api/bottle-inventory/:id/add', requireAdmin, async (req, res) => {
     }
     // else stock already 0 — bottle was already exhausted, just record the ml
   } else {
-    // No inventory row at all — create one at 0 stock (product exists but wasn't tracked)
-    await db.execute(
-      `INSERT INTO inventory (product_id, stock, low_stock, out_of_stock, updated_at)
-       VALUES (?, 0, 0, 1, ?)
-       ON DUPLICATE KEY UPDATE updated_at=VALUES(updated_at)`,
-      [pid, n]
-    );
-    broadcast('inventory', await getInventoryMap());
+    // No inventory row — product not yet tracked in inventory tab.
+    // Don't create a row with stock=0 (would falsely mark as out-of-stock).
+    // Admin should add inventory tracking separately via the Inventory tab.
+    console.log(`Note: no inventory row for product ${pid} — skipping stock deduction`);
   }
 
   const catalogue = await getCatalogue();
@@ -3281,6 +3302,7 @@ async function start() {
     await seedData();
     await restoreLoginAttempts();
     await auth.restoreRevocations();
+    await fixCorruptedInventoryRows();
     console.log('\u2705 SILLAGE PARFUMERIE v3.1 - Server Ready | ' + BASE_URL);
   } catch(err) {
     console.error('\u274C DB startup failed:', err.message);
