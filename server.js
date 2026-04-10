@@ -2834,22 +2834,44 @@ app.post('/api/bottle-inventory', requireAdmin, async (req, res) => {
 
 // POST /api/bottle-inventory/:id/add — admin: register opening a new bottle
 app.post('/api/bottle-inventory/:id/add', requireAdmin, async (req, res) => {
-  const pid = parseInt(req.params.id, 10);
-  const { ml } = req.body; // ml being added (e.g. 100 for a 100ml bottle)
+  const pid   = parseInt(req.params.id, 10);
+  const { ml } = req.body;
   if (!ml || parseFloat(ml) <= 0) return res.status(400).json({ error: 'ml inválido' });
   const mlNum = parseFloat(ml);
-  const n = new Date();
+  const n     = new Date();
+
+  // Update bottle ml tracker
   await db.execute(`
     UPDATE bottle_inventory SET
-      ml_total     = ml_total + ?,
-      ml_remaining = ml_remaining + ?,
+      ml_total      = ml_total + ?,
+      ml_remaining  = ml_remaining + ?,
       bottles_count = bottles_count + 1,
-      updated_at   = ?
+      updated_at    = ?
     WHERE product_id = ?
   `, [mlNum, mlNum, n, pid]);
+
+  // Also deduct 1 unit from physical inventory (opening a bottle = consuming 1 unit)
+  const [invRows] = await db.execute('SELECT stock FROM inventory WHERE product_id=?', [pid]);
+  if (invRows.length && invRows[0].stock > 0) {
+    const newStock = invRows[0].stock - 1;
+    const isOos    = newStock === 0;
+    const isLow    = newStock <= 5 && !isOos;
+    await db.execute(
+      `UPDATE inventory SET
+        stock        = ?,
+        out_of_stock = ?,
+        low_stock    = ?,
+        updated_at   = ?
+       WHERE product_id = ?`,
+      [newStock, isOos ? 1 : 0, isLow ? 1 : 0, n, pid]
+    );
+    // Broadcast inventory update to store
+    broadcast('inventory', await getInventoryMap());
+  }
+
   const catalogue = await getCatalogue();
   const prod = catalogue.find(p => p.id === pid);
-  await logActivity(`Botella registrada: ${prod ? prod.brand+' '+prod.name : 'ID '+pid} (+${mlNum}ml)`);
+  await logActivity(`Botella abierta: ${prod ? prod.brand+' '+prod.name : 'ID '+pid} (+${mlNum}ml, -1 unidad inventario)`);
   res.json({ ok: true });
 });
 
