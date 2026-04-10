@@ -920,6 +920,7 @@ tr:hover td{background:rgba(255,255,255,0.02)}
             </div>
             <div style="display:flex;gap:0.5rem;align-items:center">
               <button onclick="initBottleInventory()" style="background:none;border:1px solid rgba(184,149,90,0.3);color:#8a7f72;font-family:'Jost',sans-serif;font-size:0.55rem;letter-spacing:0.12em;text-transform:uppercase;padding:0.45rem 0.8rem;cursor:pointer" title="Crear registros para todas las fragancias existentes">Inicializar Todo</button>
+              <button onclick="purgeOrphanBottles()" style="background:none;border:1px solid rgba(192,80,80,0.3);color:#8a7f72;font-family:'Jost',sans-serif;font-size:0.55rem;letter-spacing:0.12em;text-transform:uppercase;padding:0.45rem 0.8rem;cursor:pointer" title="Eliminar registros de fragancias que ya no existen">Limpiar Huérfanos</button>
               <button class="add-btn-lg" onclick="openBottleModal(null)" style="font-size:0.58rem;padding:0.5rem 1rem">+ Registrar Botella</button>
             </div>
           </div>
@@ -3346,6 +3347,19 @@ function deleteBundle(id){
 }
 
 // ── BOTTLE INVENTORY ─────────────────────────────────
+function purgeOrphanBottles(){
+  if(!confirm('¿Eliminar registros de fragancias que ya no existen en el catálogo?')) return;
+  adminFetch(API+'/bottle-inventory/orphans',{method:'DELETE'})
+    .then(function(r){ return r ? r.json() : null; })
+    .then(function(res){
+      if(res && res.ok){
+        toast('Registros eliminados', res.deleted+' registro(s) huérfano(s) eliminados', 'ok');
+        loadBottleInventory();
+      }
+    })
+    .catch(function(){ toast('Error','No se pudo limpiar','err'); });
+}
+
 function initBottleInventory(){
   if(!confirm('Esto creará registros en el rastreador para todas las fragancias del catálogo que aún no tengan uno. ¿Continuar?')) return;
   adminFetch(API+'/bottle-inventory/init',{method:'POST'})
