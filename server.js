@@ -2761,35 +2761,54 @@ app.get('/api/bottle-inventory', requireAdmin, async (req, res) => {
     const invMap = {};
     invRows.forEach(r => { invMap[r.product_id] = r; });
     const catalogue = await getCatalogue();
-    const result = rows.map(r => {
-      const prod = catalogue.find(p => p.id === r.product_id);
-      const invEntry = invMap[r.product_id] || {};
-      const isOos = invEntry.out_of_stock || invEntry.stock === 0;
-      // If product is out of stock physically, show 0 available decants/samples
-      const decants_remaining = (!isOos && r.decant_size > 0) ? Math.floor(r.ml_remaining / r.decant_size) : 0;
-      const samples_remaining = (!isOos && r.sample_size > 0) ? Math.floor(r.ml_remaining / r.sample_size) : 0;
-      const low_alert = parseFloat(r.ml_remaining) <= parseFloat(r.alert_ml);
-      const empty = parseFloat(r.ml_remaining) <= 0 || isOos;
-      return {
-        ...r,
-        product_name: prod ? `${prod.brand} ${prod.name}` : `Producto ${r.product_id}`,
-        decants_remaining,
-        samples_remaining,
-        low_alert,
-        empty,
-        ml_remaining:  parseFloat(r.ml_remaining),
-        ml_total:      parseFloat(r.ml_total),
-        ml_reserved:   parseFloat(r.ml_reserved),
-        decant_size:   parseFloat(r.decant_size),
-        sample_size:   parseFloat(r.sample_size),
-        alert_ml:      parseFloat(r.alert_ml),
-        bottle_size:   parseFloat(r.bottle_size),
-      };
-    });
+    const result = rows
+      .filter(r => catalogue.find(p => p.id === r.product_id)) // skip orphaned records
+      .map(r => {
+        const prod     = catalogue.find(p => p.id === r.product_id);
+        const invEntry = invMap[r.product_id] || {};
+        const isOos    = invEntry.out_of_stock || invEntry.stock === 0;
+        const decants_remaining = (!isOos && r.decant_size > 0) ? Math.floor(r.ml_remaining / r.decant_size) : 0;
+        const samples_remaining = (!isOos && r.sample_size > 0) ? Math.floor(r.ml_remaining / r.sample_size) : 0;
+        const low_alert = parseFloat(r.ml_remaining) <= parseFloat(r.alert_ml);
+        const empty     = parseFloat(r.ml_remaining) <= 0 || isOos;
+        return {
+          ...r,
+          product_name: `${prod.brand} ${prod.name}`,
+          decants_remaining,
+          samples_remaining,
+          low_alert,
+          empty,
+          ml_remaining: parseFloat(r.ml_remaining),
+          ml_total:     parseFloat(r.ml_total),
+          ml_reserved:  parseFloat(r.ml_reserved),
+          decant_size:  parseFloat(r.decant_size),
+          sample_size:  parseFloat(r.sample_size),
+          alert_ml:     parseFloat(r.alert_ml),
+          bottle_size:  parseFloat(r.bottle_size),
+        };
+      });
     res.json(result);
   } catch(e) {
     console.error('Bottle inventory GET error:', e.message);
     res.status(500).json({ error: 'Error al cargar inventario de botellas.' });
+  }
+});
+
+// DELETE /api/bottle-inventory/orphans — remove records with no matching catalogue product
+app.delete('/api/bottle-inventory/orphans', requireAdmin, async (req, res) => {
+  try {
+    const catalogue = await getCatalogue();
+    const validIds  = catalogue.map(p => p.id);
+    if (!validIds.length) return res.json({ ok: true, deleted: 0 });
+    const placeholders = validIds.map(() => '?').join(',');
+    const [result] = await db.execute(
+      `DELETE FROM bottle_inventory WHERE product_id NOT IN (${placeholders})`,
+      validIds
+    );
+    await logActivity(`Rastreador: ${result.affectedRows} registro(s) huérfano(s) eliminados`);
+    res.json({ ok: true, deleted: result.affectedRows });
+  } catch(e) {
+    res.status(500).json({ error: e.message });
   }
 });
 
