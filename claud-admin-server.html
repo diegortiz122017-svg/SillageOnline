@@ -1271,7 +1271,7 @@ function connectWS(){
         // Now safe to fetch fresh data from REST since session is confirmed
         fetchAllData();
       }
-      if(msg.type==='inventory'){inventory=msg.payload;if(currentPage==='inventory')renderInventory();renderOverview();}
+      if(msg.type==='inventory'){inventory=msg.payload;if(currentPage==='inventory')renderInventory();if(currentPage==='pricing')renderPricing();renderOverview();}
       if(msg.type==='bottle_inventory'){if(currentPage==='inventory')loadBottleInventory();}
       if(msg.type==='pricing'){pricing=msg.payload;if(currentPage==='pricing')renderPricing();renderOverview();}
       if(msg.type==='new_order'){
@@ -1282,7 +1282,12 @@ function connectWS(){
       }
       if(msg.type==='order_update'){
         var o=orders.find(function(x){return x.id===msg.payload.id;});
-        if(o){o.status=msg.payload.status;o.trackerStep=msg.payload.trackerStep;}
+        if(o){
+          o.status=msg.payload.status;
+          o.trackerStep=msg.payload.trackerStep;
+          if(msg.payload.paymentStatus) o.payment_status=msg.payload.paymentStatus;
+        }
+        if(currentPage==='orders') renderOrders();
         if(currentPage==='orders')renderOrders();
       }
       if(msg.type==='activity'){
@@ -1770,8 +1775,13 @@ function onLow(pid){var cb=document.getElementById('low-'+pid);if(!inventory[pid
 function onOos(pid){var cb=document.getElementById('oos-'+pid);if(!inventory[pid])inventory[pid]={};inventory[pid].outOfStock=cb.checked;if(cb.checked)inventory[pid].lowStock=false;refreshBadge(pid);}
 function refreshBadge(pid){var p=PRODUCTS.find(function(x){return x.id===pid;});var el=document.getElementById('badge-'+pid);if(el&&p)el.innerHTML=badgeHTML(p);}
 function getBadgeKey(p){
-  var inv=inventory[p.id]||{},pr=pricing[p.id]||{};
-  if(inv.outOfStock)return'out';if(pr.onSale)return'sale';if(inv.lowStock)return'low';return p.badge||'none';
+  // Use live inventory map — reflects real-time stock changes
+  var inv=inventory[p.id]||{stock:99,lowStock:false,outOfStock:false};
+  var pr=pricing[p.id]||{};
+  if(inv.outOfStock||inv.stock===0)return'out';
+  if(pr.onSale&&pr.salePrice)return'sale';
+  if(inv.lowStock||inv.stock<=5)return'low';
+  return p.badge||'none';
 }
 function badgeHTML(p){
   var k=getBadgeKey(p);
