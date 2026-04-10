@@ -2638,13 +2638,19 @@ app.post('/api/bottle-inventory/init', requireAdmin, async (req, res) => {
 app.get('/api/bottle-inventory', requireAdmin, async (req, res) => {
   try {
     const [rows] = await db.execute('SELECT * FROM bottle_inventory ORDER BY product_id');
+    const [invRows] = await db.execute('SELECT product_id, stock, out_of_stock FROM inventory');
+    const invMap = {};
+    invRows.forEach(r => { invMap[r.product_id] = r; });
     const catalogue = await getCatalogue();
     const result = rows.map(r => {
       const prod = catalogue.find(p => p.id === r.product_id);
-      const decants_remaining = r.decant_size > 0 ? Math.floor(r.ml_remaining / r.decant_size) : 0;
-      const samples_remaining = r.sample_size > 0 ? Math.floor(r.ml_remaining / r.sample_size) : 0;
+      const invEntry = invMap[r.product_id] || {};
+      const isOos = invEntry.out_of_stock || invEntry.stock === 0;
+      // If product is out of stock physically, show 0 available decants/samples
+      const decants_remaining = (!isOos && r.decant_size > 0) ? Math.floor(r.ml_remaining / r.decant_size) : 0;
+      const samples_remaining = (!isOos && r.sample_size > 0) ? Math.floor(r.ml_remaining / r.sample_size) : 0;
       const low_alert = parseFloat(r.ml_remaining) <= parseFloat(r.alert_ml);
-      const empty = parseFloat(r.ml_remaining) <= 0;
+      const empty = parseFloat(r.ml_remaining) <= 0 || isOos;
       return {
         ...r,
         product_name: prod ? `${prod.brand} ${prod.name}` : `Producto ${r.product_id}`,
