@@ -26,7 +26,7 @@ const security     = require('./middleware/security');
 const auth         = require('./middleware/auth');
 
 // ─── Aliases for backwards compatibility within this file ──────────────────
-const { getCatalogue, saveCatalogue, getInventoryMap, getPricingMap, getActivity, getSetting, setSetting, getBrandHierarchy } = catalogueSvc;
+const { getCatalogue, saveCatalogue, getInventoryMap, invalidateInventory, getPricingMap, getActivity, getSetting, setSetting, getBrandHierarchy } = catalogueSvc;
 
 // logActivity also broadcasts to admin WebSocket clients
 async function logActivity(msg) {
@@ -1680,6 +1680,7 @@ app.post('/api/inventory', requireAdmin, async (req, res) => {
     }
   }
 
+  invalidateInventory(); // clear cache before broadcasting
   broadcast('inventory', await getInventoryMap());
   await logActivity('Inventario actualizado');
   res.json({ ok: true });
@@ -2887,6 +2888,7 @@ app.post('/api/bottle-inventory/:id/add', requireAdmin, async (req, res) => {
         `UPDATE inventory SET stock=?, out_of_stock=?, low_stock=?, updated_at=? WHERE product_id=?`,
         [newStock, isOos ? 1 : 0, isLow ? 1 : 0, n, pid]
       );
+      invalidateInventory(); // clear cache so getInventoryMap returns fresh data
       broadcast('inventory', await getInventoryMap());
     }
     // else stock already 0 — bottle was already exhausted, just record the ml
