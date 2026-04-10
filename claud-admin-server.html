@@ -1223,32 +1223,9 @@ var WS_URL = (window.location.protocol === 'https:' ? 'wss://' : 'ws://') + wind
 var ws = null, wsReconnectTimer = null;
 var inventory = {}, pricing = {}, orders = [], activity = [];
 
-var PRODUCTS=[
-  {id:1,brand:'Chanel',name:'N\u00b05',price:185,size:'100ml',badge:'bestseller'},
-  {id:2,brand:'Chanel',name:'Bleu de Chanel',price:145,size:'100ml',badge:'bestseller'},
-  {id:3,brand:'Chanel',name:'Chance Eau Tendre',price:165,size:'100ml',badge:'new'},
-  {id:4,brand:'Chanel',name:'Coco Mademoiselle',price:175,size:'100ml',badge:null},
-  {id:5,brand:'Dior',name:'Sauvage',price:135,size:'100ml',badge:'bestseller'},
-  {id:6,brand:'Dior',name:'Miss Dior',price:155,size:'100ml',badge:null},
-  {id:7,brand:'Dior',name:"J'adore",price:168,size:'100ml',badge:'bestseller'},
-  {id:8,brand:'Dior',name:'Dior Homme',price:140,size:'100ml',badge:null},
-  {id:9,brand:'Hermes',name:"Terre d'Hermes",price:175,size:'100ml',badge:null},
-  {id:10,brand:'Hermes',name:"Twilly d'Hermes",price:185,size:'50ml',badge:'new'},
-  {id:11,brand:'Hermes',name:'H24',price:160,size:'100ml',badge:'new'},
-  {id:12,brand:'Tom Ford',name:'Black Orchid',price:195,size:'100ml',badge:'limited'},
-  {id:13,brand:'Tom Ford',name:'Oud Wood',price:285,size:'100ml',badge:'limited'},
-  {id:14,brand:'Tom Ford',name:'Rose Prick',price:265,size:'100ml',badge:null},
-  {id:15,brand:'Tom Ford',name:'Tobacco Vanille',price:275,size:'50ml',badge:'bestseller'},
-  {id:16,brand:'Maison Margiela',name:'Replica - Beach Walk',price:175,size:'100ml',badge:null},
-  {id:17,brand:'Maison Margiela',name:'Replica - Jazz Club',price:185,size:'100ml',badge:'bestseller'},
-  {id:18,brand:'Maison Margiela',name:'Replica - Flower Market',price:175,size:'100ml',badge:null},
-  {id:19,brand:'Jo Malone',name:'Peony & Blush Suede',price:155,size:'100ml',badge:null},
-  {id:20,brand:'Jo Malone',name:'Wood Sage & Sea Salt',price:155,size:'100ml',badge:null},
-  {id:21,brand:'Jo Malone',name:'Pomegranate Noir',price:155,size:'100ml',badge:'new'},
-  {id:22,brand:'Creed',name:'Aventus',price:420,size:'100ml',badge:'bestseller'},
-  {id:23,brand:'Creed',name:'Silver Mountain Water',price:395,size:'100ml',badge:null},
-  {id:24,brand:'Creed',name:'Love in White',price:385,size:'100ml',badge:'limited'}
-];
+// PRODUCTS is loaded dynamically from /api/catalogue — never hardcoded.
+// This ensures inventory, pricing, and catalogue pages always reflect the live DB.
+var PRODUCTS = [];
 
 // ── WebSocket ──────────────────────────────────────
 function connectWS(){
@@ -1322,15 +1299,21 @@ function fetchAllData(){
   if(!sessionToken) return;
   var h={'x-session-token':sessionToken};
   Promise.all([
-    fetch(API+'/orders',  {headers:h}).then(function(r){return r.ok?r.json():null;}),
-    fetch(API+'/activity',{headers:h}).then(function(r){return r.ok?r.json():null;}),
+    fetch(API+'/orders',   {headers:h}).then(function(r){return r.ok?r.json():null;}),
+    fetch(API+'/activity', {headers:h}).then(function(r){return r.ok?r.json():null;}),
     fetch(API+'/inventory').then(function(r){return r.ok?r.json():null;}),
-    fetch(API+'/pricing'  ).then(function(r){return r.ok?r.json():null;})
+    fetch(API+'/pricing'  ).then(function(r){return r.ok?r.json():null;}),
+    fetch(API+'/catalogue').then(function(r){return r.ok?r.json():null;})
   ]).then(function(results){
     if(results[0]){orders=results[0];}
     if(results[1]){activity=results[1];}
     if(results[2]){inventory=results[2];}
     if(results[3]){pricing=results[3];}
+    if(results[4]){
+      // Keep PRODUCTS and catalogFragrances in sync — always the same source of truth
+      PRODUCTS = results[4];
+      catalogFragrances = results[4];
+    }
     renderOverview();
     if(currentPage==='orders')    renderOrders();
     if(currentPage==='inventory') renderInventory();
@@ -2825,7 +2808,14 @@ var fragPhotos=[];
 function loadCatalogue(){
   adminFetch(API+'/catalogue',{})
     .then(function(r){ if(!r)return null; return r.json(); })
-    .then(function(data){catalogFragrances=data||[];renderCatalogue();})
+    .then(function(data){
+      catalogFragrances=data||[];
+      PRODUCTS=catalogFragrances; // keep in sync
+      renderCatalogue();
+      // Refresh inventory/pricing if open — they now reflect new catalogue
+      if(currentPage==='inventory') renderInventory();
+      if(currentPage==='pricing')   renderPricing();
+    })
     .catch(function(){renderCatalogue();});
 }
 
