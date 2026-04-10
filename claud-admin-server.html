@@ -1929,12 +1929,20 @@ document.addEventListener('change', function(e){
 function updateStatus(oid,status){
   var stepMap={'Pendiente de Pago':0,'Procesando':1,'Empaquetado':2,'Enviado':3,'Entregado':4,'Delivered':5};
   var trackerStep=stepMap[status]||0;
-  var trackingEl=document.getElementById('trk-'+oid);
+  // Check both orders tab (trk-ID) and slide panel (sp-trk-ID)
+  var trackingEl=document.getElementById('trk-'+oid)||document.getElementById('sp-trk-'+oid);
   var trackingNumber=trackingEl?trackingEl.value.trim():null;
   adminFetch(API+'/orders/'+oid,{method:'PATCH',headers:{'Content-Type':'application/json'},body:JSON.stringify({status:status,trackerStep:trackerStep,trackingNumber:trackingNumber||null})})
     .then(function(r){ if(!r)return null; return r.json(); })
-    .then(function(){toast('Actualizado','Pedido '+oid+' \u2192 '+status,'ok');})
-    .catch(function(){toast('Error','Could not update order','err');});
+    .then(function(res){
+      if(res&&res.ok){
+        var o=orders.find(function(x){return String(x.id)===String(oid);});
+        if(o){o.status=status;o.trackerStep=trackerStep;}
+        toast('Actualizado','Pedido '+oid+' → '+status,'ok');
+        if(currentPage==='orders') renderOrders();
+      }
+    })
+    .catch(function(){toast('Error','No se pudo actualizar','err');});
 }
 
 
@@ -2237,8 +2245,8 @@ function openOrderDetail(orderId){
       '</div>'+
       '<div style="display:flex;flex-direction:column;gap:0.6rem">'+
         '<div style="font-size:0.5rem;letter-spacing:0.2em;text-transform:uppercase;color:var(--muted)">Estado</div>'+
-        '<select onchange="updateStatus('+JSON.stringify(o.id)+',this.value);this.closest(\"[id=slidePanelBody]\").querySelector(\".sp-status\").textContent=this.value" '+
-          'style="background:var(--card);border:1px solid var(--border);color:var(--cream);font-family:Jost,sans-serif;font-size:0.72rem;padding:0.5rem;outline:none">'+
+        '<select onchange="updateStatus('+JSON.stringify(o.id)+',this.value)" '+
+          'style="background:var(--card);border:1px solid var(--border);color:var(--cream);font-family:Jost,sans-serif;font-size:0.72rem;padding:0.5rem;outline:none;width:100%">'+
           statusOpts+
         '</select>'+
         '<input id="sp-trk-'+o.id+'" placeholder="Número de seguimiento" value="'+(o.tracking_number||'')+'" '+
