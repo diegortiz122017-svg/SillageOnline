@@ -1830,34 +1830,7 @@ document.getElementById('savePriceBtn').addEventListener('click',function(){
 function renderOrders(){ renderOrdersList(orders, null); }
 
 // Event delegation for status selects and tracking inputs
-document.getElementById('ordersContainer').addEventListener('change', function(e){
-  var sel = e.target.closest ? e.target.closest('.status-sel') : null;
-  var trk = e.target.closest ? e.target.closest('.tracking-input') : null;
-  if(e.target.classList.contains('status-sel')) sel = e.target;
-  if(e.target.classList.contains('tracking-input')) trk = e.target;
-  if(sel){
-    var oid = sel.dataset.oid;
-    var status = sel.value;
-    var card = sel.parentElement;
-    while(card && !card.classList.contains('order-card')) card = card.parentElement;
-    var trkEl = card ? card.querySelector('.tracking-input') : null;
-    var trackingNumber = trkEl ? trkEl.value.trim() : null;
-    var stepMap={'Pendiente de Pago':0,'Procesando':1,'Empaquetado':2,'Enviado':3,'Entregado':4};
-    var trackerStep = stepMap[status] !== undefined ? stepMap[status] : 0;
-    adminFetch(API+'/orders/'+oid,{method:'PATCH',headers:{'Content-Type':'application/json'},body:JSON.stringify({status:status,trackerStep:trackerStep,trackingNumber:trackingNumber||null})})
-      .then(function(r){ if(!r)return null; return r.json(); })
-      .then(function(res){if(res.ok)toast('Estado','Actualizado a '+status,'ok');})
-      .catch(function(){toast('Error','No se pudo actualizar','err');});
-  }
-  if(trk){
-    var oid = trk.dataset.oid;
-    if(!oid) return;
-    adminFetch(API+'/orders/'+oid,{method:'PATCH',headers:{'Content-Type':'application/json'},body:JSON.stringify({trackingNumber:trk.value.trim()})})
-      .then(function(r){ if(!r)return null; return r.json(); })
-      .then(function(res){if(res.ok)toast('Guardado','N\u00b0 seguimiento guardado','ok');})
-      .catch(function(){toast('Error','No se pudo guardar','err');});
-  }
-});
+// Status/tracking handled by unified document listener below
 
 function renderOrdersList(list, banner){
   // Update export link with session token
@@ -1899,7 +1872,7 @@ function renderOrdersList(list, banner){
         '<select class="status-sel" data-oid="'+o.id+'">'+
           [['Pendiente de Pago','Pendiente de Pago'],['Procesando','Procesando'],['Empaquetado','Empaquetado'],['Enviado','Enviado'],['Entregado','Entregado']].map(function(s){return'<option value="'+s[0]+'"'+(o.status===s[0]?' selected':'')+'>'+s[1]+'</option>';}).join('')+
         '</select>'+
-        '<input class="tracking-input" id="trk-'+o.id+'" placeholder="N° seguimiento" value="'+(o.tracking_number||'')+'" data-trk="1" title="Número de seguimiento — se incluye en el email de envío"/>'+
+        '<input class="tracking-input" id="trk-'+o.id+'" placeholder="N° seguimiento" value="'+(o.tracking_number||'')+'" data-oid="'+o.id+'" title="Número de seguimiento — se incluye en el email de envío"/>'+
         '<span class="sc '+scls+'">'+o.status+'</span>'+
         '<span class="pay-chip pay-'+(o.paymentStatus==='Pagado'?'ok':o.paymentStatus==='Fallido'?'err':'pend')+'">'+pmLabel+'</span>'+
         '<span class="oc-total">$'+parseFloat(o.total||0).toFixed(2)+'</span>'+
@@ -1914,32 +1887,28 @@ function saveTracking(oid,val){
     .catch(function(){toast('Error','No se pudo guardar','err');});
 }
 
-// ── Order card event delegation ──────────────────────
-document.addEventListener('change', function(e){
-  // Status select
-  if(e.target.classList.contains('status-sel') && e.target.dataset.oid){
+// ── UNIFIED event delegation — handles both orders tab AND slide panel ──────
+// Uses the same classes: status-sel / sp-status-sel for selects,
+//                        tracking-input / sp-trk-inp for tracking inputs.
+document.addEventListener('change', function(e) {
+  // Status select — orders tab (class: status-sel, data-oid)
+  if (e.target.classList.contains('status-sel') && e.target.dataset.oid) {
     updateStatus(e.target.dataset.oid, e.target.value);
   }
-  // Tracking input
-  if(e.target.classList.contains('tracking-input') && e.target.dataset.trk){
-    var oid = e.target.id.replace('trk-','');
-    saveTracking(oid, e.target.value);
+  // Status select — slide panel (class: sp-status-sel, data-oid)
+  if (e.target.classList.contains('sp-status-sel') && e.target.dataset.oid) {
+    updateStatus(e.target.dataset.oid, e.target.value);
   }
 });
-// ── Slide panel event delegation ──────────────────────
-document.getElementById('slidePanelBody').addEventListener('change', function(e) {
-  if (e.target.classList.contains('sp-status-sel')) {
-    var oid = e.target.dataset.oid;
-    var status = e.target.value;
-    updateStatus(oid, status);
+// Tracking blur — use capture so it fires even without focus leaving the document
+document.addEventListener('blur', function(e) {
+  if (e.target.classList.contains('tracking-input') && e.target.dataset.oid) {
+    saveTracking(e.target.dataset.oid, e.target.value.trim());
   }
-});
-document.getElementById('slidePanelBody').addEventListener('blur', function(e) {
-  if (e.target.classList.contains('sp-trk-inp')) {
-    var oid = e.target.dataset.oid;
-    saveTracking(oid, e.target.value.trim());
+  if (e.target.classList.contains('sp-trk-inp') && e.target.dataset.oid) {
+    saveTracking(e.target.dataset.oid, e.target.value.trim());
   }
-}, true); // use capture for blur
+}, true);
 
 function updateStatus(oid,status){
   var stepMap={'Pendiente de Pago':0,'Procesando':1,'Empaquetado':2,'Enviado':3,'Entregado':4,'Delivered':5};
