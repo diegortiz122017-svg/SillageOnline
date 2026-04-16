@@ -353,37 +353,166 @@ nav a:hover{color:var(--gold)}
 .saved-addr-btn:hover{background:#b8955a;color:#fff}
 .saved-addr-btn:disabled{background:rgba(90,154,106,0.12);border-color:#5a9a6a;color:#5a9a6a;cursor:default}
 
+/* ── BTCPay Custom UI Modal ─────────────────────────── */
 .btcpay-modal-bg{
   position:fixed;inset:0;z-index:1000;
-  background:rgba(0,0,0,0.85);backdrop-filter:blur(8px);
+  background:rgba(0,0,0,0.88);backdrop-filter:blur(10px);
   display:none;align-items:center;justify-content:center;
   padding:1rem;
 }
 .btcpay-modal-bg.open{display:flex}
 .btcpay-modal-inner{
-  position:relative;width:100%;max-width:480px;
-  background:#0e0c0a;border:1px solid rgba(184,149,90,0.2);
-  border-top:2px solid rgba(184,149,90,0.6);
-  box-shadow:0 40px 100px rgba(0,0,0,0.8);
+  position:relative;width:100%;max-width:440px;
+  background:#0e0c0a;
+  border:1px solid rgba(184,149,90,0.18);
+  border-top:2px solid rgba(184,149,90,0.55);
+  box-shadow:0 40px 100px rgba(0,0,0,0.85);
+  font-family:'Jost',sans-serif;
 }
 .btcpay-modal-hdr{
   display:flex;align-items:center;justify-content:space-between;
-  padding:1rem 1.2rem;border-bottom:1px solid rgba(184,149,90,0.1);
+  padding:1rem 1.3rem;border-bottom:1px solid rgba(184,149,90,0.1);
 }
 .btcpay-modal-title{
-  font-family:'Cormorant Garamond',serif;font-size:1.1rem;
-  font-weight:300;font-style:italic;color:#e8dcc8;
+  font-family:'Cormorant Garamond',serif;font-size:1.05rem;
+  font-weight:300;font-style:italic;color:#e8dcc8;letter-spacing:0.04em;
 }
 .btcpay-modal-close{
-  background:none;border:none;color:rgba(138,127,114,0.5);
-  cursor:pointer;font-size:0.8rem;padding:0.2rem;transition:color 0.2s;
+  background:none;border:none;color:rgba(138,127,114,0.45);
+  cursor:pointer;font-size:0.75rem;padding:0.3rem;transition:color 0.2s;line-height:1;
 }
 .btcpay-modal-close:hover{color:#e8dcc8}
-.btcpay-modal-frame{
-  width:100%;height:600px;border:none;
-  display:block;background:#0e0c0a;
+/* Body of the custom UI */
+.btcpay-body{padding:1.4rem 1.3rem 1.6rem}
+/* Loading state */
+.btcpay-loading{
+  display:flex;flex-direction:column;align-items:center;
+  gap:1rem;padding:2rem 0;
 }
-@media(max-height:700px){.btcpay-modal-frame{height:85vh}}
+.btcpay-spinner{
+  width:32px;height:32px;border:2px solid rgba(184,149,90,0.15);
+  border-top-color:#b8955a;border-radius:50%;
+  animation:btcSpin 0.8s linear infinite;
+}
+@keyframes btcSpin{to{transform:rotate(360deg)}}
+.btcpay-loading-msg{
+  font-size:0.65rem;letter-spacing:0.2em;text-transform:uppercase;
+  color:rgba(138,127,114,0.7);
+}
+/* Tabs: Lightning / On-chain */
+.btcpay-tabs{
+  display:flex;gap:0;margin-bottom:1.2rem;
+  border-bottom:1px solid rgba(184,149,90,0.12);
+}
+.btcpay-tab{
+  flex:1;background:none;border:none;
+  padding:0.55rem 0;
+  font-family:'Jost',sans-serif;font-size:0.62rem;
+  letter-spacing:0.18em;text-transform:uppercase;
+  color:rgba(138,127,114,0.6);cursor:pointer;
+  border-bottom:2px solid transparent;margin-bottom:-1px;
+  transition:all 0.2s;
+}
+.btcpay-tab:hover{color:#b8955a}
+.btcpay-tab.active{color:#b8955a;border-bottom-color:#b8955a;}
+/* QR container */
+.btcpay-qr-wrap{
+  display:flex;justify-content:center;
+  margin-bottom:1.1rem;
+}
+.btcpay-qr-box{
+  background:#fff;padding:10px;border-radius:2px;
+  width:180px;height:180px;display:flex;align-items:center;justify-content:center;
+  position:relative;overflow:hidden;
+}
+.btcpay-qr-box img{width:160px;height:160px;display:block;image-rendering:pixelated;}
+/* Amount row */
+.btcpay-amount{
+  text-align:center;margin-bottom:1rem;
+}
+.btcpay-amount-val{
+  font-family:'Cormorant Garamond',serif;
+  font-size:1.4rem;font-weight:300;color:#e8dcc8;letter-spacing:0.02em;
+}
+.btcpay-amount-unit{
+  font-size:0.6rem;letter-spacing:0.2em;text-transform:uppercase;
+  color:rgba(138,127,114,0.6);margin-left:0.3em;
+}
+/* Address / invoice field */
+.btcpay-addr-label{
+  font-size:0.58rem;letter-spacing:0.18em;text-transform:uppercase;
+  color:rgba(138,127,114,0.55);margin-bottom:0.35rem;
+}
+.btcpay-addr-row{
+  display:flex;gap:0.4rem;align-items:center;margin-bottom:0.9rem;
+}
+.btcpay-addr-val{
+  flex:1;background:rgba(255,255,255,0.04);
+  border:1px solid rgba(184,149,90,0.12);
+  padding:0.5rem 0.65rem;
+  font-size:0.62rem;color:rgba(232,220,200,0.6);
+  font-family:'Jost',sans-serif;letter-spacing:0.04em;
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
+}
+.btcpay-copy-btn{
+  background:none;border:1px solid rgba(184,149,90,0.25);
+  color:#b8955a;padding:0.5rem 0.7rem;
+  font-size:0.58rem;letter-spacing:0.12em;text-transform:uppercase;
+  cursor:pointer;transition:all 0.2s;white-space:nowrap;font-family:'Jost',sans-serif;
+}
+.btcpay-copy-btn:hover{background:rgba(184,149,90,0.1);border-color:#b8955a;}
+.btcpay-copy-btn.copied{color:#6ab88a;border-color:#6ab88a;}
+/* Open wallet button */
+.btcpay-wallet-btn{
+  display:block;width:100%;
+  padding:0.85rem;text-align:center;
+  background:transparent;
+  border:1px solid rgba(184,149,90,0.4);
+  color:#b8955a;
+  font-family:'Jost',sans-serif;font-size:0.65rem;
+  letter-spacing:0.2em;text-transform:uppercase;
+  text-decoration:none;cursor:pointer;
+  transition:all 0.3s;position:relative;overflow:hidden;
+}
+.btcpay-wallet-btn::before{
+  content:'';position:absolute;inset:0;
+  background:#b8955a;transform:translateX(-101%);transition:transform 0.35s;
+}
+.btcpay-wallet-btn:hover::before{transform:translateX(0)}
+.btcpay-wallet-btn span{position:relative;z-index:1;transition:color 0.3s;}
+.btcpay-wallet-btn:hover span{color:#0e0c0a;}
+/* Polling status bar */
+.btcpay-status-row{
+  display:flex;align-items:center;gap:0.5rem;
+  margin-top:1rem;padding-top:0.8rem;
+  border-top:1px solid rgba(184,149,90,0.08);
+}
+.btcpay-status-dot{
+  width:6px;height:6px;border-radius:50%;
+  background:#b8955a;flex-shrink:0;
+  animation:btcPulse 1.5s ease-in-out infinite;
+}
+@keyframes btcPulse{
+  0%,100%{opacity:1;transform:scale(1)}
+  50%{opacity:0.4;transform:scale(0.7)}
+}
+.btcpay-status-dot.paid{background:#6ab88a;animation:none;}
+.btcpay-status-dot.expired{background:#c0614a;animation:none;}
+.btcpay-status-txt{
+  font-size:0.6rem;letter-spacing:0.15em;text-transform:uppercase;
+  color:rgba(138,127,114,0.6);
+}
+/* Disclaimer */
+.btcpay-note{
+  font-size:0.58rem;color:rgba(138,127,114,0.4);
+  line-height:1.6;margin-top:0.7rem;text-align:center;
+}
+/* Error state */
+.btcpay-error{
+  text-align:center;padding:1.5rem 0;
+  font-size:0.65rem;letter-spacing:0.1em;
+  color:rgba(192,97,74,0.8);
+}
 .modal-bg{position:fixed;inset:0;background:rgba(14,12,10,0.88);z-index:600;opacity:0;pointer-events:none;transition:opacity 0.3s;display:flex;align-items:center;justify-content:center;backdrop-filter:blur(5px)}
 .modal-bg.open{opacity:1;pointer-events:all}
 .modal-box{background:var(--warm-white);color:var(--charcoal);width:540px;max-width:95vw;max-height:90vh;overflow-y:auto;transform:translateY(20px);transition:transform 0.35s;position:relative}
@@ -3088,17 +3217,12 @@ function placeOrder(){
           }
         }catch(e){}
       }
-      if(selectedPayMethod==='btcpay'&&res.btcpayUrl){
-        // Show BTCPay checkout in embedded modal (no redirect)
-        try{
-          var u=new URL(res.btcpayUrl);
-          if(u.hostname==='btcpay.davidcoen.it'||u.hostname.endsWith('btcpay.davidcoen.it')){
-            placeBtn.textContent='Realizar Pedido';
-            placeBtn.disabled=false;
-            openBTCPayModal(res.btcpayUrl, res.order.id);
-            return;
-          }
-        }catch(e){}
+      if(selectedPayMethod==='btcpay'&&res.btcpayInvoiceId){
+        // Show custom BTCPay UI — no iframe, no redirect
+        placeBtn.textContent='Realizar Pedido';
+        placeBtn.disabled=false;
+        openBTCPayModal(res.btcpayInvoiceId, res.order.id);
+        return;
       }
       document.getElementById('successOid').textContent='Pedido '+order.id;
       document.getElementById('notifyEmail').textContent=email;
@@ -3559,39 +3683,190 @@ function doReset() {
     });
 }
 
-// ── BTCPay embedded modal ────────────────────────────
-function openBTCPayModal(url, orderId) {
-  var frame = document.getElementById('btcpayFrame');
-  var bg    = document.getElementById('btcpayModalBg');
-  if (!frame || !bg) return;
-  frame.src = url;
+// ── BTCPay Custom UI Modal ────────────────────────────
+var _btcPayPollTimer = null;
+var _btcPayInvoiceId = null;
+var _btcPayOrderId   = null;
+var _btcPayTab       = 'lightning'; // default tab
+
+function openBTCPayModal(invoiceId, orderId) {
+  _btcPayInvoiceId = invoiceId;
+  _btcPayOrderId   = orderId;
+  _btcPayTab       = 'lightning';
+
+  var bg = document.getElementById('btcpayModalBg');
+  if (!bg) return;
   bg.classList.add('open');
   document.body.style.overflow = 'hidden';
 
-  // Listen for payment completion message from BTCPay iframe
-  function onBTCPayMessage(e) {
-    // BTCPay posts messages when payment status changes
-    if (!e.data || typeof e.data !== 'object') return;
-    var status = e.data.status || e.data.invoiceStatus;
-    if (status === 'complete' || status === 'paid' || status === 'settled') {
-      window.removeEventListener('message', onBTCPayMessage);
-      closeBTCPayModal();
-      // Show success step
-      cart=[];renderCart();saveCart();
-      document.getElementById('successOid').textContent = 'Pedido ' + (orderId||'');
-      goStep(4);
-      resetTracker();
-    }
-  }
-  window.addEventListener('message', onBTCPayMessage);
+  _btcPayRenderLoading();
+  _btcPayFetchAndRender();
 }
 
 function closeBTCPayModal() {
-  var frame = document.getElementById('btcpayFrame');
-  var bg    = document.getElementById('btcpayModalBg');
-  if (frame) frame.src = '';
+  var bg = document.getElementById('btcpayModalBg');
   if (bg) bg.classList.remove('open');
   document.body.style.overflow = '';
+  if (_btcPayPollTimer) { clearInterval(_btcPayPollTimer); _btcPayPollTimer = null; }
+  _btcPayInvoiceId = null;
+  _btcPayOrderId   = null;
+}
+
+function _btcPayRenderLoading() {
+  var body = document.getElementById('btcpayBody');
+  if (!body) return;
+  body.innerHTML =
+    '<div class="btcpay-loading">' +
+      '<div class="btcpay-spinner"></div>' +
+      '<span class="btcpay-loading-msg">Preparando pago&hellip;</span>' +
+    '</div>' +
+    '<p class="btcpay-note">Esto puede tomar unos segundos mientras se genera tu dirección de pago.</p>';
+}
+
+function _btcPayFetchAndRender() {
+  if (!_btcPayInvoiceId) return;
+  fetch('/api/btcpay/invoice/' + encodeURIComponent(_btcPayInvoiceId) + '/payment-methods')
+    .then(function(r){ return r.json(); })
+    .then(function(data){
+      if (data.error) { _btcPayRenderError(data.error); return; }
+      _btcPayRenderUI(data);
+      _btcPayStartPolling();
+    })
+    .catch(function(){ _btcPayRenderError('No se pudo cargar el pago. Intenta de nuevo.'); });
+}
+
+function _btcPayRenderError(msg) {
+  var body = document.getElementById('btcpayBody');
+  if (!body) return;
+  body.innerHTML = '<div class="btcpay-error">' + msg + '</div>';
+}
+
+function _btcPayRenderUI(data) {
+  // Pick active tab based on what's available
+  if (!data.lightning && data.btc) _btcPayTab = 'btc';
+  if (!data.btc && data.lightning) _btcPayTab = 'lightning';
+
+  var body = document.getElementById('btcpayBody');
+  if (!body) return;
+
+  var hasBoth = data.lightning && data.btc;
+  var tabs = '';
+  if (hasBoth) {
+    tabs =
+      '<div class="btcpay-tabs">' +
+        '<button class="btcpay-tab' + (_btcPayTab==='lightning'?' active':'') + '" onclick="_btcPaySwitchTab(\'lightning\',this)">' +
+          '&#9889; Lightning' +
+        '</button>' +
+        '<button class="btcpay-tab' + (_btcPayTab==='btc'?' active':'') + '" onclick="_btcPaySwitchTab(\'btc\',this)">' +
+          '&#8383; On-chain' +
+        '</button>' +
+      '</div>';
+  }
+
+  var cur = _btcPayTab === 'lightning' ? data.lightning : (data.btc || data.lightning);
+  var label = _btcPayTab === 'lightning' ? 'Lightning Invoice' : 'Dirección Bitcoin';
+  var truncated = (cur.invoice || cur.address || '').substring(0, 36) + '…';
+  var fullAddr  = cur.invoice || cur.address || '';
+  var payLink   = cur.paymentLink || '';
+  var qrSrc     = cur.qr || '';
+  var amount    = cur.amount ? (parseFloat(cur.amount).toFixed(8) + '') : '';
+  var unit      = _btcPayTab === 'lightning' ? 'sats' : 'BTC';
+  // sats conversion for Lightning
+  if (_btcPayTab === 'lightning' && cur.amount) {
+    var sats = Math.round(parseFloat(cur.amount) * 100000000);
+    amount = sats.toLocaleString();
+  }
+
+  body.innerHTML =
+    tabs +
+    '<div id="btcpayTabContent">' +
+      '<div class="btcpay-qr-wrap">' +
+        '<div class="btcpay-qr-box">' +
+          (qrSrc ? '<img src="' + qrSrc + '" alt="QR Code" onerror="this.parentNode.innerHTML=\'<span style=font-size:0.6rem;color:#8a7f72;letter-spacing:0.1em>QR no disponible</span>\'">' : '') +
+        '</div>' +
+      '</div>' +
+      (amount ?
+        '<div class="btcpay-amount">' +
+          '<span class="btcpay-amount-val">' + amount + '</span>' +
+          '<span class="btcpay-amount-unit">' + unit + '</span>' +
+        '</div>' : '') +
+      '<div class="btcpay-addr-label">' + label + '</div>' +
+      '<div class="btcpay-addr-row">' +
+        '<div class="btcpay-addr-val" title="' + fullAddr + '">' + truncated + '</div>' +
+        '<button class="btcpay-copy-btn" onclick="_btcPayCopy(this,\'' + fullAddr.replace(/'/g,"\\'") + '\')" id="btcCopyBtn">Copiar</button>' +
+      '</div>' +
+      (payLink ?
+        '<a href="' + payLink + '" class="btcpay-wallet-btn"><span>Abrir en wallet</span></a>' : '') +
+      '<div class="btcpay-status-row">' +
+        '<div class="btcpay-status-dot" id="btcStatusDot"></div>' +
+        '<span class="btcpay-status-txt" id="btcStatusTxt">Esperando pago&hellip;</span>' +
+      '</div>' +
+      '<p class="btcpay-note">Envía el monto exacto a esta dirección. El pedido se confirma automáticamente.</p>' +
+    '</div>';
+
+  // Store data on window for tab switching
+  window._btcPayData = data;
+}
+
+function _btcPaySwitchTab(tab, btn) {
+  _btcPayTab = tab;
+  // Update tab active state
+  var tabs = document.querySelectorAll('.btcpay-tab');
+  tabs.forEach(function(t){ t.classList.remove('active'); });
+  if (btn) btn.classList.add('active');
+  // Re-render just the content
+  if (window._btcPayData) _btcPayRenderUI(window._btcPayData);
+}
+
+function _btcPayCopy(btn, text) {
+  navigator.clipboard.writeText(text).then(function(){
+    btn.textContent = '¡Copiado!';
+    btn.classList.add('copied');
+    setTimeout(function(){ btn.textContent = 'Copiar'; btn.classList.remove('copied'); }, 2000);
+  }).catch(function(){
+    // Fallback for older browsers
+    var ta = document.createElement('textarea');
+    ta.value = text; ta.style.position='fixed'; ta.style.opacity='0';
+    document.body.appendChild(ta); ta.select();
+    document.execCommand('copy');
+    document.body.removeChild(ta);
+    btn.textContent = '¡Copiado!'; btn.classList.add('copied');
+    setTimeout(function(){ btn.textContent = 'Copiar'; btn.classList.remove('copied'); }, 2000);
+  });
+}
+
+function _btcPayStartPolling() {
+  if (_btcPayPollTimer) clearInterval(_btcPayPollTimer);
+  _btcPayPollTimer = setInterval(function(){
+    if (!_btcPayInvoiceId) { clearInterval(_btcPayPollTimer); return; }
+    fetch('/api/btcpay/invoice/' + encodeURIComponent(_btcPayInvoiceId) + '/status')
+      .then(function(r){ return r.json(); })
+      .then(function(d){
+        var dot = document.getElementById('btcStatusDot');
+        var txt = document.getElementById('btcStatusTxt');
+        if (!dot || !txt) return;
+        var s = (d.status || '').toLowerCase();
+        if (s === 'settled' || s === 'complete' || s === 'paid') {
+          dot.className = 'btcpay-status-dot paid';
+          txt.textContent = 'Pago confirmado ✓';
+          clearInterval(_btcPayPollTimer); _btcPayPollTimer = null;
+          setTimeout(function(){
+            closeBTCPayModal();
+            cart=[]; renderCart(); saveCart();
+            var oid = _btcPayOrderId || d.orderId || '';
+            document.getElementById('successOid').textContent = 'Pedido ' + oid;
+            goStep(4); resetTracker();
+          }, 1800);
+        } else if (s === 'expired' || s === 'invalid') {
+          dot.className = 'btcpay-status-dot expired';
+          txt.textContent = 'Invoice expirado — cierra y vuelve a intentar.';
+          clearInterval(_btcPayPollTimer); _btcPayPollTimer = null;
+        } else if (s === 'processing') {
+          txt.textContent = 'Pago detectado — confirmando en blockchain…';
+        }
+      })
+      .catch(function(){/* silently ignore poll errors */});
+  }, 5000); // poll every 5 seconds
 }
 
 // ── Check URL for reset token on load ────────────────
@@ -5379,10 +5654,12 @@ document.addEventListener('DOMContentLoaded', function(){
 <div id="btcpayModalBg" class="btcpay-modal-bg">
   <div class="btcpay-modal-inner">
     <div class="btcpay-modal-hdr">
-      <span class="btcpay-modal-title">Pago Bitcoin / Lightning</span>
+      <span class="btcpay-modal-title">Bitcoin &amp; Lightning</span>
       <button class="btcpay-modal-close" onclick="closeBTCPayModal()" aria-label="Cerrar">&#10005;</button>
     </div>
-    <iframe id="btcpayFrame" class="btcpay-modal-frame" src="" title="BTCPay Checkout" allow="payment"></iframe>
+    <div class="btcpay-body" id="btcpayBody">
+      <!-- populated by openBTCPayModal() -->
+    </div>
   </div>
 </div>
 
