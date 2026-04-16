@@ -108,12 +108,32 @@ function getIp(req) {
     : req.socket.remoteAddress;
 }
 
+// Customer auth limiter — keyed by EMAIL not IP.
+// Prevents shared IPs (Cloudflare, offices) from triggering 429 for other users.
+const _customerRlStore = new Map();
+function customerAuthLimiter(req, res, next) {
+  const email  = String((req.body && req.body.email) || '').toLowerCase().trim();
+  const key    = email || 'anon';
+  const MAX    = 10;
+  const WINDOW = 15 * 60 * 1000;
+  const now    = Date.now();
+  const entry  = _customerRlStore.get(key) || { count: 0, start: now };
+  if (now - entry.start > WINDOW) { entry.count = 0; entry.start = now; }
+  entry.count++;
+  _customerRlStore.set(key, entry);
+  if (entry.count > MAX) {
+    return res.status(429).json({ error: 'Demasiados intentos. Espera 15 minutos.' });
+  }
+  next();
+}
+
 module.exports = {
   cors,
   securityHeaders,
   httpsRedirect,
   rateLimit,
   authLimiter,
+  customerAuthLimiter,
   bodyLimit,
   getIp,
 };
