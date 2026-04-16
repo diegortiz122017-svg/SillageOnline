@@ -3827,7 +3827,9 @@ function _btcPayRenderUI(data) {
         '<button class="btcpay-copy-btn" onclick="_btcPayCopy(this,\'' + fullAddr.replace(/'/g,"\\'") + '\')" id="btcCopyBtn">Copiar</button>' +
       '</div>' +
       (payLink ?
-        '<a href="' + payLink + '" class="btcpay-wallet-btn"><span>Abrir en wallet</span></a>' : '') +
+        '<a href="' + payLink + '" class="btcpay-wallet-btn" onclick="_btcPayWalletClick(event,this)"><span>' +
+          (_btcPayTab === 'lightning' ? '&#9889; Abrir en wallet Lightning' : '&#8383; Abrir en wallet Bitcoin') +
+        '</span></a>' : '') +
       '<div class="btcpay-status-row">' +
         '<div class="btcpay-status-dot" id="btcStatusDot"></div>' +
         '<span class="btcpay-status-txt" id="btcStatusTxt">Esperando pago&hellip;</span>' +
@@ -3847,6 +3849,23 @@ function _btcPaySwitchTab(tab, btn) {
   if (btn) btn.classList.add('active');
   // Re-render just the content
   if (window._btcPayData) _btcPayRenderUI(window._btcPayData);
+}
+
+function _btcPayWalletClick(e, el) {
+  // On desktop, lightning:/bitcoin: URIs have no handler — prevent the error
+  // and show a hint instead. On mobile, let it through normally.
+  var isMobile = /Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
+  if (!isMobile) {
+    e.preventDefault();
+    var hint = el.parentNode.querySelector('.btcpay-desktop-hint');
+    if (!hint) {
+      hint = document.createElement('p');
+      hint.className = 'btcpay-note btcpay-desktop-hint';
+      hint.style.marginTop = '0.5rem';
+      hint.textContent = 'Escanea el QR con tu wallet móvil o copia la dirección arriba.';
+      el.parentNode.insertBefore(hint, el.nextSibling);
+    }
+  }
 }
 
 function _btcPayCopy(btn, text) {
