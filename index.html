@@ -425,7 +425,7 @@ nav a:hover{color:var(--gold)}
   width:180px;height:180px;display:flex;align-items:center;justify-content:center;
   position:relative;overflow:hidden;
 }
-.btcpay-qr-box img{width:160px;height:160px;display:block;image-rendering:pixelated;}
+.btcpay-qr-box img,.btcpay-qr-box canvas{width:160px!important;height:160px!important;display:block;}
 /* Amount row */
 .btcpay-amount{
   text-align:center;margin-bottom:1rem;
@@ -1596,6 +1596,8 @@ footer{background:var(--dark);padding:3.5rem 4rem;text-align:center;border-top:1
   }
 }
 </script>
+  <!-- QR code generation (client-side, no server dependency) -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js" integrity="sha512-CNgIRecGo7nphbeZ04Sc13ka07paqdeTu0WR1IM4kNcpmBAUSHSe2HkjftiYP8vPe18gQGkUbNXQIVzjfzm9g==" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
 </head>
 <body>
 
@@ -3799,7 +3801,7 @@ function _btcPayRenderUI(data) {
   var truncated = (cur.invoice || cur.address || '').substring(0, 36) + '…';
   var fullAddr  = cur.invoice || cur.address || '';
   var payLink   = cur.paymentLink || '';
-  var qrSrc     = cur.qr || '';
+  var qrData    = cur.qrData || fullAddr;
   var amount    = cur.amount ? (parseFloat(cur.amount).toFixed(8) + '') : '';
   var unit      = _btcPayTab === 'lightning' ? 'sats' : 'BTC';
   // sats conversion for Lightning
@@ -3812,9 +3814,7 @@ function _btcPayRenderUI(data) {
     tabs +
     '<div id="btcpayTabContent">' +
       '<div class="btcpay-qr-wrap">' +
-        '<div class="btcpay-qr-box">' +
-          (qrSrc ? '<img src="' + qrSrc + '" alt="QR Code" onerror="this.parentNode.innerHTML=\'<span style=font-size:0.6rem;color:#8a7f72;letter-spacing:0.1em>QR no disponible</span>\'">' : '') +
-        '</div>' +
+        '<div class="btcpay-qr-box" id="btcpayQrBox"></div>' +
       '</div>' +
       (amount ?
         '<div class="btcpay-amount">' +
@@ -3836,6 +3836,23 @@ function _btcPayRenderUI(data) {
       '</div>' +
       '<p class="btcpay-note">Envía el monto exacto a esta dirección. El pedido se confirma automáticamente.</p>' +
     '</div>';
+
+  // Generate QR code into the box element (client-side, no server dependency)
+  var qrBox = document.getElementById('btcpayQrBox');
+  if (qrBox && qrData) {
+    try {
+      new QRCode(qrBox, {
+        text:           qrData,
+        width:          160,
+        height:         160,
+        colorDark:      '#000000',
+        colorLight:     '#ffffff',
+        correctLevel:   QRCode.CorrectLevel.M,
+      });
+    } catch(e) {
+      qrBox.innerHTML = '<span style="font-size:0.6rem;color:#8a7f72;letter-spacing:0.1em">QR no disponible</span>';
+    }
+  }
 
   // Store data on window for tab switching
   window._btcPayData = data;
