@@ -28,11 +28,12 @@ function securityHeaders(req, res, next) {
     "script-src 'self' 'unsafe-inline' https://fonts.googleapis.com https://cdnjs.cloudflare.com https://static.cloudflareinsights.com; " +
     "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com https://fonts.gstatic.com; " +
     "font-src 'self' https://fonts.gstatic.com; " +
-    "img-src 'self' data: https://res.cloudinary.com; " +
-    "connect-src 'self' wss: https://api.wompi.sv https://id.wompi.sv https://cloudflareinsights.com https://api.openai.com; " +
+    "img-src 'self' data: https://res.cloudinary.com https://btcpay.davidcoen.it; " +
+    "connect-src 'self' wss://sillage-sv.com wss: https://api.wompi.sv https://id.wompi.sv https://cloudflareinsights.com https://api.openai.com; " +
+    "frame-src https://btcpay.davidcoen.it; " +
     "frame-ancestors 'none'; " +
     "base-uri 'self'; " +
-    "form-action 'self' https://checkout.wompi.sv; " +
+    "form-action 'self' https://checkout.wompi.sv https://btcpay.davidcoen.it; " +
     "upgrade-insecure-requests;"
   );
   res.setHeader('X-Content-Type-Options', 'nosniff');
@@ -85,28 +86,8 @@ function rateLimit({ max = cfg.RATE_LIMIT_MAX, window = cfg.RATE_LIMIT_WINDOW } 
   };
 }
 
-// Aggressive rate limiter for admin auth
+// Aggressive rate limiter for auth endpoints
 const authLimiter = rateLimit({ max: 10, window: 15 * 60 * 1000 });
-
-// Customer auth limiter — keyed by EMAIL, not IP.
-// Shared IPs (Cloudflare, mobile carriers, offices) won't block each other.
-// 10 attempts per email per 15 minutes.
-const _customerRlStore = new Map();
-function customerAuthLimiter(req, res, next) {
-  const email  = String((req.body && req.body.email) || '').toLowerCase().trim();
-  const key    = email || 'anon';
-  const MAX    = 10;
-  const WINDOW = 15 * 60 * 1000;
-  const now    = Date.now();
-  const entry  = _customerRlStore.get(key) || { count: 0, start: now };
-  if (now - entry.start > WINDOW) { entry.count = 0; entry.start = now; }
-  entry.count++;
-  _customerRlStore.set(key, entry);
-  if (entry.count > MAX) {
-    return res.status(429).json({ error: 'Demasiados intentos. Espera 15 minutos.' });
-  }
-  next();
-}
 
 // Cleanup RL store every 10 minutes
 setInterval(() => {
@@ -133,7 +114,6 @@ module.exports = {
   httpsRedirect,
   rateLimit,
   authLimiter,
-  customerAuthLimiter,
   bodyLimit,
   getIp,
 };
