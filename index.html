@@ -2047,7 +2047,13 @@ function connectWS() {
       clearTimeout(wsTimeout);
       if (wsReconnectTimer) { clearTimeout(wsReconnectTimer); wsReconnectTimer = null; }
       stopPolling(); // WS is working, don't need polling
-      ws.send(JSON.stringify({ type: 'store_connect' }));
+      // Send sessionId so server can validate the connection
+      var _wsCustToken = localStorage.getItem('sillage_customer_token') || null;
+      ws.send(JSON.stringify({
+        type:          'store_connect',
+        sessionId:     _somSession     || null,
+        customerToken: _wsCustToken    || null
+      }));
     };
 
     ws.onmessage = function(e) {
@@ -2115,11 +2121,9 @@ function connectWS() {
   }
 }
 
-// Always load data immediately via REST first so the store
-// shows products instantly without waiting for WS handshake
+// Load data via REST immediately so store shows products without waiting for WS
 loadViaREST();
-// Then also try WebSocket for real-time updates
-connectWS();
+// WebSocket is initiated by initSession() below, after sessionId is confirmed
 
 function setConn(state, label) {
   var dot = document.getElementById('connDot');
@@ -4460,12 +4464,15 @@ function getBFScore(){
         _somSession = d.sessionId;
         localStorage.setItem('sillage_session_id', d.sessionId);
       }
+      // Connect WS after session confirmed — sessionId will be ready for store_connect
+      connectWS();
     })
     .catch(function(){
-      // Fallback: keep existing or generate temp (will be rejected by server if invalid)
       if(!_somSession){
         _somSession = 'tmp-' + Date.now().toString(36);
       }
+      // Try WS anyway with whatever session we have
+      connectWS();
     });
 })();
 
