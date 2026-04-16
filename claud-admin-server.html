@@ -1739,7 +1739,7 @@ function renderAnalytics(d){
   // Payment methods
   var pm=document.getElementById('an-pm');
   if(pm) pm.innerHTML=(d.paymentMethods||[]).map(function(m){
-    var label={'cod':'Contra Entrega','wompi':'Wompi','chivo':'Chivo'}[m.method]||m.method;
+    var label={'cod':'Contra Entrega','wompi':'Wompi','btcpay':'BTCPay'}[m.method]||m.method;
     return '<div style="display:flex;justify-content:space-between;margin-bottom:0.3rem;font-size:0.68rem"><span style="color:var(--muted)">'+label+'</span><span>'+m.count+' pedidos · '+fmtRev(m.revenue)+'</span></div>';
   }).join('')||'<div style="color:var(--muted);font-size:0.68rem">Sin datos aún</div>';
 }
@@ -1867,7 +1867,7 @@ function renderOrdersList(list, banner){
     var t=o.createdAt?new Date(o.createdAt).toLocaleString():o.time||'';
     var addrParts = [o.address, o.city, o.state_province, o.country].filter(Boolean);
     var addrLine  = addrParts.length ? addrParts.join(', ') : (o.address || '—');
-    var pmLabel   = {'wompi':'💳 Wompi','chivo':'⚡ Chivo','cod':'💵 Contra Entrega'}[o.payment_method] || ('💳 '+(o.payment_method||''));
+    var pmLabel   = {'wompi':'💳 Wompi','btcpay':'⚡ BTCPay','cod':'💵 Contra Entrega'}[o.payment_method] || ('💳 '+(o.payment_method||''));
     div.style.cursor = 'pointer';
     div.addEventListener('click', function(e){
       // Don't intercept select/input/button interactions
@@ -2203,7 +2203,7 @@ function openOrderDetail(orderId){
   var o = orders.find(function(x){ return String(x.id) === String(orderId); });
   if(!o) return;
   var t = o.createdAt ? new Date(o.createdAt).toLocaleString('es-ES') : o.time || '';
-  var pmLabel = {'wompi':'💳 Wompi','chivo':'⚡ Chivo','cod':'💵 Contra Entrega'}[o.payment_method] || o.payment_method || '';
+  var pmLabel = {'wompi':'💳 Wompi','btcpay':'⚡ BTCPay','cod':'💵 Contra Entrega'}[o.payment_method] || o.payment_method || '';
   var statusOpts = ['Pendiente de Pago','Procesando','Empaquetado','Enviado','Entregado'].map(function(s){
     return '<option value="'+s+'"'+(o.status===s?' selected':'')+'>'+s+'</option>';
   }).join('');
