@@ -15,6 +15,7 @@ const WebSocket   = require('ws');
 const crypto      = require('crypto');
 const path        = require('path');
 const compression = require('compression');
+const QRCode      = require('qrcode');
 
 // ─── Internal modules ─────────────────────────────────
 const cfg          = require('./config');
@@ -2158,22 +2159,23 @@ app.get('/api/btcpay/invoice/:invoiceId/payment-methods', async (req, res) => {
     const ln    = methods.find(isLN);
     const btc   = methods.find(isBTC);
 
-    // QR codes are generated client-side — just pass the raw payment data
+    // Generate QR via our own /api/btcpay/qr endpoint (no CDN, no external deps)
+    const lnQrData  = ln  ? encodeURIComponent((ln.paymentLink  || ln.destination).toUpperCase())  : null;
+    const btcQrData = btc ? encodeURIComponent(btc.paymentLink  || btc.destination) : null;
+
     const out = {
       btc: btc ? {
         address:     btc.destination,
         paymentLink: btc.paymentLink,
         amount:      btc.amount,
         rate:        btc.rate,
-        // qrData: what to encode in QR (uppercase for denser QR encoding on BTC URIs)
-        qrData:      (btc.paymentLink || btc.destination),
+        qr:          btcQrData ? `/api/btcpay/qr?data=${btcQrData}` : null,
       } : null,
       lightning: ln ? {
         invoice:     ln.destination,
         paymentLink: ln.paymentLink,
         amount:      ln.amount,
-        // Lightning invoices uppercase = alphanumeric QR mode = smaller/faster
-        qrData:      (ln.paymentLink || ln.destination).toUpperCase(),
+        qr:          lnQrData  ? `/api/btcpay/qr?data=${lnQrData}`  : null,
       } : null,
       _raw: (!btc && !ln) ? methods : undefined,
     };
@@ -2181,6 +2183,31 @@ app.get('/api/btcpay/invoice/:invoiceId/payment-methods', async (req, res) => {
   } catch(e) {
     console.error('BTCPay payment-methods fetch error:', e.message);
     res.status(502).json({ error: 'BTCPay unavailable' });
+  }
+});
+
+// ── BTCPay: server-side QR generation ───────────────────────────────────────
+// GET /api/btcpay/qr?data=<encoded_string>
+// Generates a QR code PNG and returns it as image/png.
+// Used by the frontend to avoid CDN dependencies.
+app.get('/api/btcpay/qr', async (req, res) => {
+  const data = req.query.data;
+  if (!data || data.length > 2000) {
+    return res.status(400).send('Invalid data');
+  }
+  try {
+    const png = await QRCode.toBuffer(data, {
+      errorCorrectionLevel: 'M',
+      margin: 1,
+      width: 300,
+      color: { dark: '#000000', light: '#ffffff' },
+    });
+    res.set('Content-Type', 'image/png');
+    res.set('Cache-Control', 'public, max-age=3600');
+    res.send(png);
+  } catch(e) {
+    console.error('QR generation error:', e.message);
+    res.status(500).send('QR generation failed');
   }
 });
 
