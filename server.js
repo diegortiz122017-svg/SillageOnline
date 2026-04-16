@@ -15,7 +15,6 @@ const WebSocket   = require('ws');
 const crypto      = require('crypto');
 const path        = require('path');
 const compression = require('compression');
-const QRCode      = require('qrcode');
 
 // ─── Internal modules ─────────────────────────────────
 const cfg          = require('./config');
@@ -2186,28 +2185,23 @@ app.get('/api/btcpay/invoice/:invoiceId/payment-methods', async (req, res) => {
   }
 });
 
-// ── BTCPay: server-side QR generation ───────────────────────────────────────
+// ── BTCPay: QR generation proxy ─────────────────────────────────────────────
 // GET /api/btcpay/qr?data=<encoded_string>
-// Generates a QR code PNG and returns it as image/png.
-// Used by the frontend to avoid CDN dependencies.
+// Fetches QR from Google Charts and streams it — no npm dependency needed.
 app.get('/api/btcpay/qr', async (req, res) => {
   const data = req.query.data;
-  if (!data || data.length > 2000) {
-    return res.status(400).send('Invalid data');
-  }
+  if (!data || data.length > 2000) return res.status(400).send('Invalid data');
   try {
-    const png = await QRCode.toBuffer(data, {
-      errorCorrectionLevel: 'M',
-      margin: 1,
-      width: 300,
-      color: { dark: '#000000', light: '#ffffff' },
-    });
+    const url = `https://chart.googleapis.com/chart?cht=qr&chs=300x300&chld=M|1&chl=${encodeURIComponent(decodeURIComponent(data))}`;
+    const r = await fetch(url);
+    if (!r.ok) return res.status(502).send('QR unavailable');
     res.set('Content-Type', 'image/png');
     res.set('Cache-Control', 'public, max-age=3600');
-    res.send(png);
+    const buf = Buffer.from(await r.arrayBuffer());
+    res.send(buf);
   } catch(e) {
-    console.error('QR generation error:', e.message);
-    res.status(500).send('QR generation failed');
+    console.error('QR proxy error:', e.message);
+    res.status(502).send('QR unavailable');
   }
 });
 
