@@ -36,7 +36,7 @@ async function logActivity(msg) {
   }
 }
 const { requireAdmin, requireCustomer, optionalCustomer, createSession, validateSession, destroySession } = auth;
-const { authLimiter, getIp } = security;
+const { authLimiter, customerAuthLimiter, getIp } = security;
 const { ADMIN_USER, ADMIN_PASS, PORT, BASE_URL, OPENAI_API_KEY, WOMPI_CLIENT_ID, WOMPI_CLIENT_SECRET, EMAIL_HOLA, EMAIL_PEDIDOS, SESSION_TTL_CUSTOMER, SESSION_TTL_ADMIN, RESEND_API_KEY, NODE_ENV, IS_PROD, ANON_SESSION_TTL, ANON_WS_LIMIT, ANON_SOMMELIER_MAX, REG_SOMMELIER_LIMIT, ANON_SOMMELIER_LIMIT, CACHE_TTL_TOOL, CACHE_TTL_REPLY } = cfg;
 
 // ── BTCPay Server ─────────────────────────────────────
@@ -1398,7 +1398,7 @@ app.get('/api/auth/verify', (req, res) => {
 // ═══════════════════════════════════════════════════════
 //  CUSTOMER AUTH
 // ═══════════════════════════════════════════════════════
-app.post('/api/customer/register', authLimiter, async (req, res) => {
+app.post('/api/customer/register', customerAuthLimiter, async (req, res) => {
   const { name, email, password } = req.body;
   if (!name || !email || !password) return res.status(400).json({ error: 'Nombre, correo y contraseña son requeridos.' });
   if (password.length < 6) return res.status(400).json({ error: 'La contraseña debe tener al menos 6 caracteres.' });
@@ -1435,7 +1435,7 @@ app.post('/api/customer/register', authLimiter, async (req, res) => {
   res.json({ ok: true, token, customer: { id: customer.id, name, email: customer.email } });
 });
 
-app.post('/api/customer/login', authLimiter, async (req, res) => {
+app.post('/api/customer/login', customerAuthLimiter, async (req, res) => {
   const ip = req.headers['x-forwarded-for'] || req.socket.remoteAddress || 'unknown';
   if (!checkRateLimit(ip)) return res.status(429).json({ error: 'Demasiados intentos. Espera 15 minutos.' });
   const { email, password } = req.body;
@@ -1450,6 +1450,83 @@ app.post('/api/customer/login', authLimiter, async (req, res) => {
   await db.execute('UPDATE customers SET last_login=? WHERE id=?', [new Date(), customer.id]);
   const token = createSession({ id: customer.id, name: customer.name, email: customer.email }, 'customer');
   res.json({ ok: true, token, customer: { id: customer.id, name: customer.name, email: customer.email } });
+});
+
+
+// ── Password reset ────────────────────────────────────────────────────────────
+// Tokens stored in settings table: key=reset:{token}, value=customerId, TTL 1h
+
+app.post('/api/customer/forgot-password', customerAuthLimiter, async (req, res) => {
+  const email = String(req.body.email || '').toLowerCase().trim();
+  // Always return 200 — never reveal if email exists (prevents enumeration)
+  res.json({ ok: true });
+  if (!email) return;
+  try {
+    const [rows] = await db.execute('SELECT id, name FROM customers WHERE email=?', [email]);
+    if (!rows.length) return; // silent — user sees success either way
+    const customer  = rows[0];
+    const token     = crypto.randomBytes(32).toString('hex');
+    const expiresAt = new Date(Date.now() + 60 * 60 * 1000); // 1 hour
+    await db.execute(
+      `INSERT INTO settings (key_name, value, updated_at) VALUES (?,?,?)
+       ON DUPLICATE KEY UPDATE value=VALUES(value), updated_at=VALUES(updated_at)`,
+      [`reset:${token}`, String(customer.id), new Date()]
+    );
+    const BASE     = BASE_URL || 'https://sillage-sv.com';
+    const resetUrl = `${BASE}/?reset_token=${token}`;
+    await sendEmail({
+      to:      email,
+      subject: 'Restablecer tu contraseña — Sillage Parfumerie',
+      html: `
+        <div style="font-family:Georgia,serif;max-width:480px;margin:0 auto;padding:2rem;background:#0e0c0a;color:#e8dcc8">
+          <div style="font-size:0.6rem;letter-spacing:0.3em;text-transform:uppercase;color:#b8955a;margin-bottom:1.5rem">Sillage Parfumerie</div>
+          <h2 style="font-weight:300;font-size:1.4rem;margin:0 0 1rem">Hola, ${escHtml(customer.name)}</h2>
+          <p style="font-size:0.85rem;line-height:1.8;color:#a09080;margin:0 0 1.5rem">
+            Recibimos una solicitud para restablecer la contraseña de tu cuenta.
+            Si no fuiste tú, puedes ignorar este correo.
+          </p>
+          <a href="${resetUrl}" style="display:inline-block;padding:0.8rem 2rem;border:1px solid #b8955a;color:#b8955a;text-decoration:none;font-size:0.65rem;letter-spacing:0.2em;text-transform:uppercase">
+            Restablecer Contraseña
+          </a>
+          <p style="font-size:0.7rem;color:#5a5050;margin-top:1.5rem">Este enlace expira en 1 hora.</p>
+        </div>
+      `,
+    });
+    await logActivity(`Solicitud de recuperación de contraseña: ${escHtml(email)}`);
+  } catch(e) {
+    console.error('Forgot password error:', e.message);
+  }
+});
+
+app.post('/api/customer/reset-password', customerAuthLimiter, async (req, res) => {
+  const { token, password } = req.body;
+  if (!token || !password || password.length < 8) {
+    return res.status(400).json({ error: 'Datos inválidos.' });
+  }
+  try {
+    const [rows] = await db.execute(
+      "SELECT key_name, value, updated_at FROM settings WHERE key_name=?",
+      [`reset:${token}`]
+    );
+    if (!rows.length) return res.status(400).json({ error: 'El enlace es inválido o ya fue usado.' });
+
+    const row       = rows[0];
+    const issuedAt  = new Date(row.updated_at).getTime();
+    if (Date.now() - issuedAt > 60 * 60 * 1000) {
+      await db.execute('DELETE FROM settings WHERE key_name=?', [`reset:${token}`]);
+      return res.status(400).json({ error: 'El enlace ha expirado. Solicita uno nuevo.' });
+    }
+
+    const customerId = parseInt(row.value);
+    const newHash    = hashPassword(password);
+    await db.execute('UPDATE customers SET password_hash=? WHERE id=?', [newHash, customerId]);
+    await db.execute('DELETE FROM settings WHERE key_name=?', [`reset:${token}`]);
+    await logActivity(`Contraseña restablecida para cliente ID ${customerId}`);
+    res.json({ ok: true });
+  } catch(e) {
+    console.error('Reset password error:', e.message);
+    res.status(500).json({ error: 'Error interno.' });
+  }
 });
 
 app.post('/api/customer/logout', (req, res) => {
