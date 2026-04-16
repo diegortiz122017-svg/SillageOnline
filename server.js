@@ -2146,24 +2146,35 @@ app.get('/api/btcpay/invoice/:invoiceId/payment-methods', async (req, res) => {
       return res.status(502).json({ error: 'BTCPay unavailable' });
     }
     const methods = await r.json();
-    // Shape: [{paymentMethod, destination, paymentLink, rate, amount, ...}]
-    const btc = methods.find(m => m.paymentMethod === 'BTC-OnChain' || m.paymentMethod === 'BTC');
-    const ln  = methods.find(m => m.paymentMethod === 'BTC-LightningNetwork');
+    // Log raw for debugging — remove once confirmed working
+    console.log('BTCPay payment-methods raw:', JSON.stringify(methods));
+
+    // BTCPay Greenfield uses different paymentMethod strings per store config.
+    // Normalize by substring matching instead of exact string comparison.
+    const isLN  = m => /lightning/i.test(m.paymentMethod);
+    const isBTC = m => !isLN(m) && /btc/i.test(m.paymentMethod);
+    const ln    = methods.find(isLN);
+    const btc   = methods.find(isBTC);
+
+    // Use exact paymentMethod string returned by BTCPay in QR URL
+    const lnPM  = ln  ? encodeURIComponent(ln.paymentMethod)  : null;
+    const btcPM = btc ? encodeURIComponent(btc.paymentMethod) : null;
 
     const out = {
       btc: btc ? {
         address:     btc.destination,
-        paymentLink: btc.paymentLink, // bitcoin: URI
+        paymentLink: btc.paymentLink,
         amount:      btc.amount,
         rate:        btc.rate,
-        qr: `${BTCPAY_URL}/api/v1/stores/${BTCPAY_STORE_ID}/invoices/${invoiceId}/qr?paymentMethod=BTC-OnChain`,
+        qr: `${BTCPAY_URL}/api/v1/stores/${BTCPAY_STORE_ID}/invoices/${invoiceId}/qr?paymentMethod=${btcPM}`,
       } : null,
       lightning: ln ? {
         invoice:     ln.destination,
-        paymentLink: ln.paymentLink, // lightning: URI
+        paymentLink: ln.paymentLink,
         amount:      ln.amount,
-        qr: `${BTCPAY_URL}/api/v1/stores/${BTCPAY_STORE_ID}/invoices/${invoiceId}/qr?paymentMethod=BTC-LightningNetwork`,
+        qr: `${BTCPAY_URL}/api/v1/stores/${BTCPAY_STORE_ID}/invoices/${invoiceId}/qr?paymentMethod=${lnPM}`,
       } : null,
+      _raw: (!btc && !ln) ? methods : undefined,
     };
     res.json(out);
   } catch(e) {
