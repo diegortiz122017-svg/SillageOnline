@@ -1917,7 +1917,8 @@ app.post('/api/orders', orderLimiter, async (req, res) => {
   let btcpayUrl = null;
   if (paymentMethod === 'btcpay' && BTCPAY_STORE_ID && BTCPAY_API_KEY) {
     try {
-      btcpayUrl = await createBTCPayInvoice(order);
+      const btcpayResult = await createBTCPayInvoice(order);
+      btcpayUrl = btcpayResult.checkoutLink;
     } catch(e) {
       console.error('BTCPay invoice creation error:', e.message);
     }
@@ -1973,7 +1974,7 @@ async function createBTCPayInvoice(order) {
     throw new Error(`BTCPay invoice creation failed: ${err}`);
   }
   const invoice = await resp.json();
-  return invoice.checkoutLink; // redirect user here to pay
+  return { checkoutLink: invoice.checkoutLink, invoiceId: invoice.id };
 }
 
 // POST /api/btcpay/webhook — receives payment events from BTCPay
