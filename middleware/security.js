@@ -85,8 +85,12 @@ function rateLimit({ max = cfg.RATE_LIMIT_MAX, window = cfg.RATE_LIMIT_WINDOW } 
   };
 }
 
-// Aggressive rate limiter for auth endpoints
+// Aggressive rate limiter for admin auth
 const authLimiter = rateLimit({ max: 10, window: 15 * 60 * 1000 });
+
+// Softer limiter for customer login — 20 requests per 15 min
+// (counts all requests including successful ones, so must be generous)
+const customerAuthLimiter = rateLimit({ max: 20, window: 15 * 60 * 1000 });
 
 // Cleanup RL store every 10 minutes
 setInterval(() => {
@@ -113,6 +117,7 @@ module.exports = {
   httpsRedirect,
   rateLimit,
   authLimiter,
+  customerAuthLimiter,
   bodyLimit,
   getIp,
 };
