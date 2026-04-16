@@ -3201,6 +3201,14 @@ function placeOrder(){
   placeBtn.textContent='Procesando...';
   placeBtn.disabled=true;
 
+  // For BTC: open modal with loading state immediately — don't make user stare at the button
+  if(selectedPayMethod==='btcpay'){
+    _btcPayPendingOpen=true;
+    var bg=document.getElementById('btcpayModalBg');
+    if(bg){bg.classList.add('open');document.body.style.overflow='hidden';}
+    _btcPayRenderLoading();
+  }
+
   var _headers={'Content-Type':'application/json'};
   if(typeof customerToken!=='undefined'&&customerToken)_headers['x-customer-token']=customerToken;
   fetch(API+'/orders',{method:'POST',headers:_headers,body:JSON.stringify(orderData)})
@@ -3218,11 +3226,19 @@ function placeOrder(){
         }catch(e){}
       }
       if(selectedPayMethod==='btcpay'&&res.btcpayInvoiceId){
-        // Show custom BTCPay UI — no iframe, no redirect
+        // Modal already open — just load the invoice data into it
+        _btcPayPendingOpen=false;
         placeBtn.textContent='Realizar Pedido';
         placeBtn.disabled=false;
-        openBTCPayModal(res.btcpayInvoiceId, res.order.id);
+        _btcPayInvoiceId=res.btcpayInvoiceId;
+        _btcPayOrderId=res.order.id;
+        _btcPayFetchAndRender();
+        _btcPayStartPolling();
         return;
+      }
+      if(selectedPayMethod==='btcpay'){
+        // btcpay selected but no invoiceId returned — close modal and show error
+        closeBTCPayModal();
       }
       document.getElementById('successOid').textContent='Pedido '+order.id;
       document.getElementById('notifyEmail').textContent=email;
@@ -3684,23 +3700,29 @@ function doReset() {
 }
 
 // ── BTCPay Custom UI Modal ────────────────────────────
-var _btcPayPollTimer = null;
-var _btcPayInvoiceId = null;
-var _btcPayOrderId   = null;
-var _btcPayTab       = 'lightning'; // default tab
+var _btcPayPollTimer   = null;
+var _btcPayInvoiceId   = null;
+var _btcPayOrderId     = null;
+var _btcPayTab         = 'lightning'; // default tab
+var _btcPayPendingOpen = false; // modal pre-opened before server responds
 
 function openBTCPayModal(invoiceId, orderId) {
-  _btcPayInvoiceId = invoiceId;
-  _btcPayOrderId   = orderId;
-  _btcPayTab       = 'lightning';
+  _btcPayInvoiceId   = invoiceId;
+  _btcPayOrderId     = orderId;
+  _btcPayTab         = 'lightning';
+  _btcPayPendingOpen = false;
 
   var bg = document.getElementById('btcpayModalBg');
   if (!bg) return;
-  bg.classList.add('open');
-  document.body.style.overflow = 'hidden';
+  // May already be open (pre-opened for faster UX) — just load data
+  if (!bg.classList.contains('open')) {
+    bg.classList.add('open');
+    document.body.style.overflow = 'hidden';
+    _btcPayRenderLoading();
+  }
 
-  _btcPayRenderLoading();
   _btcPayFetchAndRender();
+  _btcPayStartPolling();
 }
 
 function closeBTCPayModal() {
@@ -3728,11 +3750,20 @@ function _btcPayFetchAndRender() {
   fetch('/api/btcpay/invoice/' + encodeURIComponent(_btcPayInvoiceId) + '/payment-methods')
     .then(function(r){ return r.json(); })
     .then(function(data){
-      if (data.error) { _btcPayRenderError(data.error); return; }
+      if (data.error) {
+        // Log raw response if both methods null — helps debug paymentMethod string
+        if (data._raw) console.warn('BTCPay payment-methods _raw:', JSON.stringify(data._raw));
+        _btcPayRenderError(data.error);
+        return;
+      }
+      if (!data.btc && !data.lightning) {
+        if (data._raw) console.warn('BTCPay payment-methods _raw (no match):', JSON.stringify(data._raw));
+        _btcPayRenderError('No se recibieron métodos de pago. Revisa los logs del servidor.');
+        return;
+      }
       _btcPayRenderUI(data);
-      _btcPayStartPolling();
     })
-    .catch(function(){ _btcPayRenderError('No se pudo cargar el pago. Intenta de nuevo.'); });
+    .catch(function(e){ _btcPayRenderError('No se pudo cargar el pago. Intenta de nuevo.'); });
 }
 
 function _btcPayRenderError(msg) {
