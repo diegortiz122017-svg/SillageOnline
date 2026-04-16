@@ -1596,8 +1596,6 @@ footer{background:var(--dark);padding:3.5rem 4rem;text-align:center;border-top:1
   }
 }
 </script>
-  <!-- QR code generation (client-side, no server dependency) -->
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js" integrity="sha512-hG6tLc9q8bFM5OQASDTJTJJg/wn8PP0PcayE3I2H1972/F7ktiSvWutAuQIkt4QUTIhiaFEnkrKea7XHUv1ugg==" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
 </head>
 <body>
 
@@ -3801,7 +3799,7 @@ function _btcPayRenderUI(data) {
   var truncated = (cur.invoice || cur.address || '').substring(0, 36) + '…';
   var fullAddr  = cur.invoice || cur.address || '';
   var payLink   = cur.paymentLink || '';
-  var qrData    = cur.qrData || fullAddr;
+  var qrSrc     = cur.qr || '';
   var amount    = cur.amount ? (parseFloat(cur.amount).toFixed(8) + '') : '';
   var unit      = _btcPayTab === 'lightning' ? 'sats' : 'BTC';
   // sats conversion for Lightning
@@ -3814,7 +3812,9 @@ function _btcPayRenderUI(data) {
     tabs +
     '<div id="btcpayTabContent">' +
       '<div class="btcpay-qr-wrap">' +
-        '<div class="btcpay-qr-box" id="btcpayQrBox"></div>' +
+        '<div class="btcpay-qr-box">' +
+          (qrSrc ? '<img src="' + qrSrc + '" alt="QR" onerror="this.style.display=\'none\'">' : '<span style="font-size:0.6rem;color:#8a7f72">QR no disponible</span>') +
+        '</div>' +
       '</div>' +
       (amount ?
         '<div class="btcpay-amount">' +
@@ -3837,22 +3837,6 @@ function _btcPayRenderUI(data) {
       '<p class="btcpay-note">Envía el monto exacto a esta dirección. El pedido se confirma automáticamente.</p>' +
     '</div>';
 
-  // Generate QR code into the box element (client-side, no server dependency)
-  var qrBox = document.getElementById('btcpayQrBox');
-  if (qrBox && qrData) {
-    try {
-      new QRCode(qrBox, {
-        text:           qrData,
-        width:          160,
-        height:         160,
-        colorDark:      '#000000',
-        colorLight:     '#ffffff',
-        correctLevel:   QRCode.CorrectLevel.M,
-      });
-    } catch(e) {
-      qrBox.innerHTML = '<span style="font-size:0.6rem;color:#8a7f72;letter-spacing:0.1em">QR no disponible</span>';
-    }
-  }
 
   // Store data on window for tab switching
   window._btcPayData = data;
