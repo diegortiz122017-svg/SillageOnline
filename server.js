@@ -15,7 +15,6 @@ const WebSocket   = require('ws');
 const crypto      = require('crypto');
 const path        = require('path');
 const compression = require('compression');
-const QRCode      = require('qrcode');
 
 // ─── Internal modules ─────────────────────────────────
 const cfg          = require('./config');
@@ -2159,28 +2158,22 @@ app.get('/api/btcpay/invoice/:invoiceId/payment-methods', async (req, res) => {
     const ln    = methods.find(isLN);
     const btc   = methods.find(isBTC);
 
-    // Generate QR codes server-side as data URLs (BTCPay /qr endpoint is not available)
-    const qrOpts = { errorCorrectionLevel: 'M', margin: 1, width: 300,
-                     color: { dark: '#000000', light: '#ffffff' } };
-
-    const [lnQr, btcQr] = await Promise.all([
-      ln  ? QRCode.toDataURL((ln.paymentLink  || ln.destination).toUpperCase(),  qrOpts).catch(() => null) : Promise.resolve(null),
-      btc ? QRCode.toDataURL((btc.paymentLink || btc.destination), qrOpts).catch(() => null) : Promise.resolve(null),
-    ]);
-
+    // QR codes are generated client-side — just pass the raw payment data
     const out = {
       btc: btc ? {
         address:     btc.destination,
         paymentLink: btc.paymentLink,
         amount:      btc.amount,
         rate:        btc.rate,
-        qr:          btcQr,
+        // qrData: what to encode in QR (uppercase for denser QR encoding on BTC URIs)
+        qrData:      (btc.paymentLink || btc.destination),
       } : null,
       lightning: ln ? {
         invoice:     ln.destination,
         paymentLink: ln.paymentLink,
         amount:      ln.amount,
-        qr:          lnQr,
+        // Lightning invoices uppercase = alphanumeric QR mode = smaller/faster
+        qrData:      (ln.paymentLink || ln.destination).toUpperCase(),
       } : null,
       _raw: (!btc && !ln) ? methods : undefined,
     };
