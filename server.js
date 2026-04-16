@@ -15,6 +15,7 @@ const WebSocket   = require('ws');
 const crypto      = require('crypto');
 const path        = require('path');
 const compression = require('compression');
+const QRCode      = require('qrcode');
 
 // ─── Internal modules ─────────────────────────────────
 const cfg          = require('./config');
@@ -2158,9 +2159,14 @@ app.get('/api/btcpay/invoice/:invoiceId/payment-methods', async (req, res) => {
     const ln    = methods.find(isLN);
     const btc   = methods.find(isBTC);
 
-    // QR endpoint requires the paymentMethodId exactly as BTCPay returns it
-    const lnPM  = ln  ? encodeURIComponent(getId(ln))  : null;
-    const btcPM = btc ? encodeURIComponent(getId(btc)) : null;
+    // Generate QR codes server-side as data URLs (BTCPay /qr endpoint is not available)
+    const qrOpts = { errorCorrectionLevel: 'M', margin: 1, width: 300,
+                     color: { dark: '#000000', light: '#ffffff' } };
+
+    const [lnQr, btcQr] = await Promise.all([
+      ln  ? QRCode.toDataURL((ln.paymentLink  || ln.destination).toUpperCase(),  qrOpts).catch(() => null) : Promise.resolve(null),
+      btc ? QRCode.toDataURL((btc.paymentLink || btc.destination), qrOpts).catch(() => null) : Promise.resolve(null),
+    ]);
 
     const out = {
       btc: btc ? {
@@ -2168,13 +2174,13 @@ app.get('/api/btcpay/invoice/:invoiceId/payment-methods', async (req, res) => {
         paymentLink: btc.paymentLink,
         amount:      btc.amount,
         rate:        btc.rate,
-        qr: `${BTCPAY_URL}/api/v1/stores/${BTCPAY_STORE_ID}/invoices/${invoiceId}/qr?paymentMethod=${btcPM}`,
+        qr:          btcQr,
       } : null,
       lightning: ln ? {
         invoice:     ln.destination,
         paymentLink: ln.paymentLink,
         amount:      ln.amount,
-        qr: `${BTCPAY_URL}/api/v1/stores/${BTCPAY_STORE_ID}/invoices/${invoiceId}/qr?paymentMethod=${lnPM}`,
+        qr:          lnQr,
       } : null,
       _raw: (!btc && !ln) ? methods : undefined,
     };
