@@ -597,6 +597,14 @@ footer{background:var(--dark);padding:3.5rem 4rem;text-align:center;border-top:1
 .auth-submit{width:100%;padding:0.9rem;background:var(--gold);border:none;color:var(--dark);font-family:'Jost',sans-serif;font-size:0.68rem;letter-spacing:0.22em;text-transform:uppercase;cursor:pointer;transition:background 0.3s;font-weight:500;margin-top:0.5rem}
 .auth-submit:hover{background:var(--gold-light)}
 .auth-submit:disabled{opacity:0.5;cursor:not-allowed}
+.auth-pass-wrap{position:relative}
+.auth-pass-wrap input{width:100%;box-sizing:border-box;padding-right:2.8rem}
+.auth-pass-toggle{position:absolute;right:0.8rem;top:50%;transform:translateY(-50%);background:none;border:none;cursor:pointer;color:var(--muted);font-size:0.9rem;padding:0.2rem;transition:color 0.2s;line-height:1}
+.auth-pass-toggle:hover{color:var(--gold)}
+.auth-forgot{display:block;text-align:right;font-size:0.58rem;color:var(--muted);letter-spacing:0.08em;text-decoration:none;margin-top:-0.5rem;margin-bottom:1rem;cursor:pointer;transition:color 0.2s;background:none;border:none;font-family:'Jost',sans-serif;width:100%}
+.auth-forgot:hover{color:var(--gold)}
+.auth-back{background:none;border:none;font-family:'Jost',sans-serif;font-size:0.6rem;letter-spacing:0.12em;text-transform:uppercase;color:var(--muted);cursor:pointer;margin-top:0.8rem;display:block;width:100%;text-align:center;transition:color 0.2s}
+.auth-back:hover{color:var(--gold)}
 
 /* Order history modal */
 .history-modal{position:fixed;inset:0;background:rgba(14,12,10,0.9);z-index:700;display:flex;align-items:center;justify-content:center;opacity:0;pointer-events:none;transition:opacity 0.3s;backdrop-filter:blur(6px)}
@@ -1837,9 +1845,40 @@ footer{background:var(--dark);padding:3.5rem 4rem;text-align:center;border-top:1
       <div class="auth-title">Bienvenido <em>de vuelta</em></div>
       <div class="auth-sub">Inicia sesión para ver tu historial de pedidos</div>
       <div class="auth-field"><label>Correo Electrónico</label><input type="email" id="loginEmail" placeholder="tu@correo.com"/></div>
-      <div class="auth-field"><label>Contraseña</label><input type="password" id="loginPass" placeholder="••••••••"/></div>
+      <div class="auth-field">
+        <label>Contraseña</label>
+        <div class="auth-pass-wrap">
+          <input type="password" id="loginPass" placeholder="••••••••"/>
+          <button type="button" class="auth-pass-toggle" onclick="togglePass('loginPass',this)" tabindex="-1" aria-label="Mostrar contraseña">👁</button>
+        </div>
+      </div>
+      <button type="button" class="auth-forgot" onclick="showForgot()">¿Olvidaste tu contraseña?</button>
       <div class="auth-err" id="loginErr"></div>
       <button class="auth-submit" id="loginSubmit" onclick="doLogin()">Iniciar Sesión</button>
+    </div>
+    <!-- Forgot password -->
+    <div id="authForgot" style="display:none">
+      <div class="auth-title">Recuperar <em>Contraseña</em></div>
+      <div class="auth-sub">Te enviaremos un enlace para restablecer tu contraseña</div>
+      <div class="auth-field"><label>Correo Electrónico</label><input type="email" id="forgotEmail" placeholder="tu@correo.com"/></div>
+      <div class="auth-err" id="forgotErr"></div>
+      <div id="forgotOk" style="display:none;font-size:0.7rem;color:#5a9a6a;margin-bottom:0.8rem;line-height:1.6">Si existe una cuenta con ese correo, recibirás un enlace en los próximos minutos.</div>
+      <button class="auth-submit" id="forgotSubmit" onclick="doForgot()">Enviar Enlace</button>
+      <button type="button" class="auth-back" onclick="showLogin()">← Volver al inicio de sesión</button>
+    </div>
+    <!-- Reset password (shown when ?reset_token=xxx in URL) -->
+    <div id="authReset" style="display:none">
+      <div class="auth-title">Nueva <em>Contraseña</em></div>
+      <div class="auth-sub">Elige una contraseña segura</div>
+      <div class="auth-field">
+        <label>Nueva Contraseña</label>
+        <div class="auth-pass-wrap">
+          <input type="password" id="resetPass" placeholder="Mínimo 8 caracteres"/>
+          <button type="button" class="auth-pass-toggle" onclick="togglePass('resetPass',this)" tabindex="-1" aria-label="Mostrar contraseña">👁</button>
+        </div>
+      </div>
+      <div class="auth-err" id="resetErr"></div>
+      <button class="auth-submit" id="resetSubmit" onclick="doReset()">Cambiar Contraseña</button>
     </div>
     <!-- Register -->
     <div id="authRegister" style="display:none">
@@ -1847,7 +1886,13 @@ footer{background:var(--dark);padding:3.5rem 4rem;text-align:center;border-top:1
       <div class="auth-sub">Guarda tus pedidos y agiliza tus compras</div>
       <div class="auth-field"><label>Nombre Completo</label><input type="text" id="regName" placeholder="Alexandra Beaumont"/></div>
       <div class="auth-field"><label>Correo Electrónico</label><input type="email" id="regEmail" placeholder="tu@correo.com"/></div>
-      <div class="auth-field"><label>Contraseña</label><input type="password" id="regPass" placeholder="Mínimo 6 caracteres"/></div>
+      <div class="auth-field">
+        <label>Contraseña</label>
+        <div class="auth-pass-wrap">
+          <input type="password" id="regPass" placeholder="Mínimo 6 caracteres"/>
+          <button type="button" class="auth-pass-toggle" onclick="togglePass('regPass',this)" tabindex="-1" aria-label="Mostrar contraseña">👁</button>
+        </div>
+      </div>
       <div class="auth-err" id="regErr"></div>
       <button class="auth-submit" id="regSubmit" onclick="doRegister()">Crear Cuenta</button>
     </div>
@@ -3366,6 +3411,129 @@ function switchAuthTab(tab){
 // Enter key support
 document.getElementById('loginPass').addEventListener('keydown',function(e){if(e.key==='Enter')doLogin();});
 document.getElementById('regPass').addEventListener('keydown',function(e){if(e.key==='Enter')doRegister();});
+
+// ── Password visibility toggle ────────────────────────
+function togglePass(inputId, btn) {
+  var inp = document.getElementById(inputId);
+  if (!inp) return;
+  if (inp.type === 'password') {
+    inp.type = 'text';
+    btn.textContent = '🙈';
+  } else {
+    inp.type = 'password';
+    btn.textContent = '👁';
+  }
+}
+
+// ── Auth view switching ───────────────────────────────
+function showForgot() {
+  document.getElementById('authLogin').style.display  = 'none';
+  document.getElementById('authForgot').style.display = 'block';
+  document.getElementById('authRegister').style.display = 'none';
+  document.getElementById('forgotErr').textContent = '';
+  document.getElementById('forgotOk').style.display = 'none';
+  var el = document.getElementById('forgotEmail');
+  // Pre-fill with whatever they typed in login
+  if (el) {
+    var loginEmail = document.getElementById('loginEmail');
+    if (loginEmail && loginEmail.value) el.value = loginEmail.value;
+    el.focus();
+  }
+}
+
+function showLogin() {
+  document.getElementById('authLogin').style.display    = 'block';
+  document.getElementById('authForgot').style.display   = 'none';
+  document.getElementById('authReset').style.display    = 'none';
+  document.getElementById('authRegister').style.display = 'none';
+}
+
+// ── Forgot password ───────────────────────────────────
+function doForgot() {
+  var email = document.getElementById('forgotEmail').value.trim();
+  var err   = document.getElementById('forgotErr');
+  var ok    = document.getElementById('forgotOk');
+  var btn   = document.getElementById('forgotSubmit');
+  err.textContent = '';
+  if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(email)) {
+    err.textContent = 'Ingresa un correo válido.';
+    return;
+  }
+  btn.disabled = true;
+  btn.textContent = 'Enviando...';
+  fetch(API + '/customer/forgot-password', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ email: email })
+  })
+    .then(function(r) { return r.json(); })
+    .then(function() {
+      // Always show success — never reveal if email exists
+      ok.style.display = 'block';
+      btn.style.display = 'none';
+    })
+    .catch(function() {
+      ok.style.display = 'block';
+      btn.style.display = 'none';
+    });
+}
+
+// ── Reset password ────────────────────────────────────
+var _resetToken = null;
+
+function doReset() {
+  var pass  = document.getElementById('resetPass').value;
+  var err   = document.getElementById('resetErr');
+  var btn   = document.getElementById('resetSubmit');
+  err.textContent = '';
+  if (!pass || pass.length < 8) {
+    err.textContent = 'La contraseña debe tener al menos 8 caracteres.';
+    return;
+  }
+  if (!_resetToken) { err.textContent = 'Token inválido.'; return; }
+  btn.disabled = true;
+  btn.textContent = 'Guardando...';
+  fetch(API + '/customer/reset-password', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ token: _resetToken, password: pass })
+  })
+    .then(function(r) { return r.json(); })
+    .then(function(res) {
+      if (res.ok) {
+        err.style.color = '#5a9a6a';
+        err.textContent = '¡Contraseña actualizada! Ya puedes iniciar sesión.';
+        btn.style.display = 'none';
+        // Clean URL
+        history.replaceState({}, '', '/');
+        setTimeout(showLogin, 2000);
+      } else {
+        err.textContent = res.error || 'El enlace expiró. Solicita uno nuevo.';
+        btn.disabled = false;
+        btn.textContent = 'Cambiar Contraseña';
+      }
+    })
+    .catch(function() {
+      err.textContent = 'Error de conexión. Intenta de nuevo.';
+      btn.disabled = false;
+      btn.textContent = 'Cambiar Contraseña';
+    });
+}
+
+// ── Check URL for reset token on load ────────────────
+(function checkResetToken() {
+  var params = new URLSearchParams(window.location.search);
+  var token  = params.get('reset_token');
+  if (!token) return;
+  _resetToken = token;
+  // Open auth modal in reset view
+  document.getElementById('authModal').classList.add('open');
+  document.body.style.overflow = 'hidden';
+  document.getElementById('authLogin').style.display    = 'none';
+  document.getElementById('authRegister').style.display = 'none';
+  document.getElementById('authForgot').style.display   = 'none';
+  document.getElementById('authReset').style.display    = 'block';
+})();
 
 function doLogin(){
   var email=document.getElementById('loginEmail').value.trim();
