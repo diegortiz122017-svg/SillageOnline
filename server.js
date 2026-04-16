@@ -15,6 +15,7 @@ const WebSocket   = require('ws');
 const crypto      = require('crypto');
 const path        = require('path');
 const compression = require('compression');
+require('./lib/qr'); // self-contained QR bundle (no npm dep)
 
 // ─── Internal modules ─────────────────────────────────
 const cfg          = require('./config');
@@ -2185,24 +2186,24 @@ app.get('/api/btcpay/invoice/:invoiceId/payment-methods', async (req, res) => {
   }
 });
 
-// ── BTCPay: QR generation proxy ─────────────────────────────────────────────
+// ── BTCPay: QR generation (self-contained, no external calls) ───────────────
 // GET /api/btcpay/qr?data=<encoded_string>
-// Fetches QR from Google Charts and streams it — no npm dependency needed.
-app.get('/api/btcpay/qr', async (req, res) => {
+// Uses bundled qrcode library — zero npm dependencies, zero external requests.
+app.get('/api/btcpay/qr', (req, res) => {
   const data = req.query.data;
-  if (!data || data.length > 2000) return res.status(400).send('Invalid data');
-  try {
-    const url = `https://chart.googleapis.com/chart?cht=qr&chs=300x300&chld=M|1&chl=${encodeURIComponent(decodeURIComponent(data))}`;
-    const r = await fetch(url);
-    if (!r.ok) return res.status(502).send('QR unavailable');
+  if (!data || data.length > 2000) return res.status(400).send('Invalid');
+  const decoded = (() => { try { return decodeURIComponent(data); } catch(e) { return data; } })();
+  global._QRCode.toBuffer(decoded, {
+    errorCorrectionLevel: 'M',
+    margin: 1,
+    width: 300,
+    color: { dark: '#000000', light: '#ffffff' },
+  }, (err, buf) => {
+    if (err) { console.error('QR error:', err.message); return res.status(500).send('QR failed'); }
     res.set('Content-Type', 'image/png');
     res.set('Cache-Control', 'public, max-age=3600');
-    const buf = Buffer.from(await r.arrayBuffer());
     res.send(buf);
-  } catch(e) {
-    console.error('QR proxy error:', e.message);
-    res.status(502).send('QR unavailable');
-  }
+  });
 });
 
 // ── BTCPay: invoice status polling ───────────────────────────────────────────
