@@ -88,9 +88,25 @@ function rateLimit({ max = cfg.RATE_LIMIT_MAX, window = cfg.RATE_LIMIT_WINDOW } 
 // Aggressive rate limiter for admin auth
 const authLimiter = rateLimit({ max: 10, window: 15 * 60 * 1000 });
 
-// Softer limiter for customer login — 20 requests per 15 min
-// (counts all requests including successful ones, so must be generous)
-const customerAuthLimiter = rateLimit({ max: 20, window: 15 * 60 * 1000 });
+// Customer auth limiter — keyed by EMAIL, not IP.
+// Shared IPs (Cloudflare, mobile carriers, offices) won't block each other.
+// 10 attempts per email per 15 minutes.
+const _customerRlStore = new Map();
+function customerAuthLimiter(req, res, next) {
+  const email  = String((req.body && req.body.email) || '').toLowerCase().trim();
+  const key    = email || 'anon';
+  const MAX    = 10;
+  const WINDOW = 15 * 60 * 1000;
+  const now    = Date.now();
+  const entry  = _customerRlStore.get(key) || { count: 0, start: now };
+  if (now - entry.start > WINDOW) { entry.count = 0; entry.start = now; }
+  entry.count++;
+  _customerRlStore.set(key, entry);
+  if (entry.count > MAX) {
+    return res.status(429).json({ error: 'Demasiados intentos. Espera 15 minutos.' });
+  }
+  next();
+}
 
 // Cleanup RL store every 10 minutes
 setInterval(() => {
