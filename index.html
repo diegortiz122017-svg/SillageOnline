@@ -4468,11 +4468,10 @@ function getBFScore(){
       connectWS();
     })
     .catch(function(){
-      if(!_somSession){
-        _somSession = 'tmp-' + Date.now().toString(36);
-      }
-      // Try WS anyway with whatever session we have
-      connectWS();
+      // Session init failed — fall back to REST polling, skip WS
+      // (WS requires a valid server-issued sessionId starting with 'ss-')
+      console.warn('Session init failed — using REST polling');
+      startPolling();
     });
 })();
 
