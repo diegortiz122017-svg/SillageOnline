@@ -39,6 +39,12 @@ const { requireAdmin, requireCustomer, optionalCustomer, createSession, validate
 const { authLimiter, getIp } = security;
 const { ADMIN_USER, ADMIN_PASS, PORT, BASE_URL, OPENAI_API_KEY, WOMPI_CLIENT_ID, WOMPI_CLIENT_SECRET, EMAIL_HOLA, EMAIL_PEDIDOS, SESSION_TTL_CUSTOMER, SESSION_TTL_ADMIN, RESEND_API_KEY, NODE_ENV, IS_PROD, ANON_SESSION_TTL, ANON_WS_LIMIT, ANON_SOMMELIER_MAX, REG_SOMMELIER_LIMIT, ANON_SOMMELIER_LIMIT, CACHE_TTL_TOOL, CACHE_TTL_REPLY } = cfg;
 
+// ── BTCPay Server ─────────────────────────────────────
+const BTCPAY_URL            = process.env.BTCPAY_URL || 'https://btcpay.davidcoen.it';
+const BTCPAY_STORE_ID       = process.env.BTCPAY_STORE_ID;
+const BTCPAY_API_KEY        = process.env.BTCPAY_API_KEY;
+const BTCPAY_WEBHOOK_SECRET = process.env.BTCPAY_WEBHOOK_SECRET;
+
 const app    = express();
 const server = http.createServer(app);
 const wss    = new WebSocket.Server({ server });
@@ -950,6 +956,36 @@ app.get('/', async (req, res) => {
 <meta name="twitter:card" content="summary_large_image"/>
 <meta name="twitter:image" content="${imgUrl}"/>
 </head>`);
+        // Inject Schema.org JSON-LD for product structured data
+        // LLMs and search engines use this to understand the product
+        const schema = {
+          '@context': 'https://schema.org',
+          '@type': 'Product',
+          name: `${p.brand} ${p.name}`,
+          brand: { '@type': 'Brand', name: p.brand },
+          description: p.desc || p.tagline || '',
+          image: imgUrl,
+          url,
+          offers: {
+            '@type': 'Offer',
+            price: p.price,
+            priceCurrency: 'USD',
+            availability: 'https://schema.org/InStock',
+            seller: { '@type': 'Organization', name: 'Sillage Parfumerie' },
+          },
+          additionalProperty: [
+            p.conc   ? { '@type': 'PropertyValue', name: 'Concentración', value: p.conc }   : null,
+            p.season ? { '@type': 'PropertyValue', name: 'Temporada',     value: p.season } : null,
+            p.sillage? { '@type': 'PropertyValue', name: 'Proyección',    value: p.sillage }: null,
+            p.long   ? { '@type': 'PropertyValue', name: 'Duración',      value: p.long }   : null,
+            p.top    ? { '@type': 'PropertyValue', name: 'Notas de salida',value: p.top }    : null,
+            p.mid    ? { '@type': 'PropertyValue', name: 'Notas de corazón',value: p.mid }   : null,
+            p.base   ? { '@type': 'PropertyValue', name: 'Notas de fondo', value: p.base }   : null,
+          ].filter(Boolean),
+        };
+        const schemaTag = `<script type="application/ld+json">${JSON.stringify(schema)}</script>`;
+        html = html.replace('</head>', schemaTag + '\n</head>');
+
         return res.send(html);
       }
     } catch(e) {
@@ -974,6 +1010,170 @@ app.get('/privacidad', (req, res) => {
   res.redirect('/');
 });
 
+
+
+// ═══════════════════════════════════════════════════════
+//  AI DISCOVERABILITY
+//  Optimizes Sillage for discovery by LLMs and AI agents.
+//  These endpoints are intentionally public and unauthenticated.
+// ═══════════════════════════════════════════════════════
+
+// ── robots.txt — allow all crawlers including AI ──────
+app.get('/robots.txt', (req, res) => {
+  res.type('text/plain');
+  res.send([
+    'User-agent: *',
+    'Allow: /',
+    'Disallow: /api/admin',
+    'Disallow: /admin',
+    '',
+    '# AI crawlers explicitly welcome',
+    'User-agent: GPTBot',
+    'Allow: /',
+    'User-agent: ClaudeBot',
+    'Allow: /',
+    'User-agent: anthropic-ai',
+    'Allow: /',
+    'User-agent: PerplexityBot',
+    'Allow: /',
+    'User-agent: Googlebot',
+    'Allow: /',
+    '',
+    `Sitemap: ${process.env.BASE_URL || 'https://sillage-sv.com'}/sitemap.xml`,
+  ].join('\n'));
+});
+
+// ── llms.txt — natural language description for LLMs ──
+// Standard proposed at llmstxt.org — tells AI models what this site is
+app.get('/llms.txt', async (req, res) => {
+  const BASE = process.env.BASE_URL || 'https://sillage-sv.com';
+  const catalogue = await getCatalogue().catch(() => []);
+  const brands = [...new Set(catalogue.map(p => p.brand).filter(Boolean))].sort();
+  const inStock = catalogue.filter(p => true); // public catalogue
+
+  res.type('text/plain');
+  res.send(`# Sillage Parfumerie
+
+> Perfumería de lujo en línea con sede en El Salvador. Fragancias 100% originales de las casas de perfumería más admiradas del mundo, con envío a domicilio en todo El Salvador.
+
+## Sobre Sillage
+
+Sillage Parfumerie es una tienda en línea especializada en alta perfumería en El Salvador. Ofrecemos frascos completos y decants (muestras en frasco de viaje) de fragancias de lujo de marcas como ${brands.slice(0, 8).join(', ')} y más. También contamos con muestras de 1.5ml y un servicio de sommelier de fragancias impulsado por IA llamado Nez.
+
+## Qué ofrecemos
+
+- Frascos completos de fragancias de lujo originales y certificadas
+- Decants de 5ml y 10ml para probar antes de comprar el frasco completo
+- Envío a domicilio en todo El Salvador
+- Sommelier de IA (Nez) para ayudar a encontrar la fragancia perfecta
+- Métodos de pago: Wompi (tarjeta), Bitcoin / Lightning Network (BTCPay), Contra Entrega
+
+## Catálogo
+
+Tenemos ${inStock.length} fragancias disponibles de las siguientes marcas: ${brands.join(', ')}.
+
+Catálogo completo en formato JSON: ${BASE}/api/catalogo.json
+
+## Contacto y ubicación
+
+- Sitio web: ${BASE}
+- País: El Salvador
+- Envíos: todo El Salvador
+
+## Páginas importantes
+
+- [Colección completa](${BASE}/#shop)
+- [Sobre nosotros](${BASE}/nosotros)
+- [Política de envíos](${BASE}/envios)
+- [Devoluciones](${BASE}/devoluciones)
+- [Catálogo JSON para IA](${BASE}/api/catalogo.json)
+`);
+});
+
+// ── /api/catalogo.json — public catalogue for AI agents ──
+// Structured product data that AI models can read directly
+app.get('/api/catalogo.json', async (req, res) => {
+  try {
+    const BASE     = process.env.BASE_URL || 'https://sillage-sv.com';
+    const catalogue = await getCatalogue();
+    const [invRows] = await db.execute('SELECT product_id, stock, out_of_stock FROM inventory').catch(() => [[]]);
+    const invMap = {};
+    (invRows || []).forEach(r => { invMap[r.product_id] = r; });
+
+    const products = catalogue.map(p => {
+      const inv = invMap[p.id] || {};
+      const available = !inv.out_of_stock && (inv.stock === undefined || inv.stock > 0);
+      return {
+        id:          p.id,
+        brand:       p.brand,
+        name:        p.name,
+        full_name:   `${p.brand} ${p.name}`,
+        gender:      p.g === 'M' ? 'Masculino' : p.g === 'F' ? 'Femenino' : 'Unisex',
+        price_usd:   p.price,
+        size:        p.size,
+        concentration: p.conc,
+        family:      p.family || null,
+        top_notes:   p.top || null,
+        mid_notes:   p.mid || null,
+        base_notes:  p.base || null,
+        tagline:     p.tagline || null,
+        season:      p.season || null,
+        sillage:     p.sillage || null,
+        longevity:   p.long || null,
+        available,
+        decant_available: available,
+        url:         `${BASE}/?producto=${p.id}`,
+        image:       (p.photos && p.photos[0]) || null,
+      };
+    });
+
+    res.json({
+      store:       'Sillage Parfumerie',
+      country:     'El Salvador',
+      currency:    'USD',
+      description: 'Fragancias de lujo 100% originales con envío en El Salvador. Decants disponibles.',
+      url:         BASE,
+      total:       products.length,
+      in_stock:    products.filter(p => p.available).length,
+      last_updated: new Date().toISOString(),
+      products,
+    });
+  } catch(e) {
+    res.status(500).json({ error: 'Could not load catalogue' });
+  }
+});
+
+// ── sitemap.xml — for crawlers and search engines ─────
+app.get('/sitemap.xml', async (req, res) => {
+  const BASE = process.env.BASE_URL || 'https://sillage-sv.com';
+  const catalogue = await getCatalogue().catch(() => []);
+  const today = new Date().toISOString().slice(0, 10);
+
+  const staticPages = [
+    { url: BASE,               priority: '1.0', freq: 'daily'   },
+    { url: `${BASE}/nosotros`, priority: '0.6', freq: 'monthly' },
+    { url: `${BASE}/envios`,   priority: '0.5', freq: 'monthly' },
+    { url: `${BASE}/terminos`, priority: '0.3', freq: 'yearly'  },
+  ];
+
+  const productPages = catalogue.map(p => ({
+    url:      `${BASE}/?producto=${p.id}`,
+    priority: '0.8',
+    freq:     'weekly',
+  }));
+
+  const allPages = [...staticPages, ...productPages];
+
+  res.type('application/xml');
+  res.send([
+    '<?xml version="1.0" encoding="UTF-8"?>',
+    '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">',
+    ...allPages.map(p =>
+      `  <url>\n    <loc>${p.url}</loc>\n    <lastmod>${today}</lastmod>\n    <changefreq>${p.freq}</changefreq>\n    <priority>${p.priority}</priority>\n  </url>`
+    ),
+    '</urlset>',
+  ].join('\n'));
+});
 
 // ═══════════════════════════════════════════════════════
 //  ABUSE DETECTION SYSTEM
@@ -1630,13 +1830,150 @@ app.post('/api/orders', orderLimiter, async (req, res) => {
   await logActivity(`Nuevo pedido ${escHtml(order.id)} de ${escHtml(order.customer)} — $${parseFloat(order.total||0).toFixed(2)}`);
   try { await sendOrderConfirmation(order); } catch(e) {}
 
-  // Wompi: create payment link and return URL
+  // Wompi: create payment link
   let wompiUrl = null;
   if (paymentMethod === 'wompi' && WOMPI_CLIENT_ID) {
     wompiUrl = await createWompiLink(order);
   }
 
-  res.json({ ok: true, order, wompiUrl });
+  // BTCPay: create invoice and return checkout URL
+  let btcpayUrl = null;
+  if (paymentMethod === 'btcpay' && BTCPAY_STORE_ID && BTCPAY_API_KEY) {
+    try {
+      btcpayUrl = await createBTCPayInvoice(order);
+    } catch(e) {
+      console.error('BTCPay invoice creation error:', e.message);
+    }
+  }
+
+  res.json({ ok: true, order, wompiUrl, btcpayUrl });
+});
+
+
+// ═══════════════════════════════════════════════════════
+//  BTCPAY SERVER INTEGRATION
+//  Replaces Chivo Wallet. Uses BTCPay Greenfield API.
+//  Supports Bitcoin on-chain and Lightning Network.
+//  Compatible with Chivo Wallet (Lightning) and any BTC wallet.
+// ═══════════════════════════════════════════════════════
+
+async function createBTCPayInvoice(order) {
+  if (!BTCPAY_STORE_ID || !BTCPAY_API_KEY) {
+    throw new Error('BTCPay not configured');
+  }
+  const BASE = BASE_URL || 'https://sillage-sv.com';
+  const body = {
+    amount:       String(parseFloat(order.total).toFixed(2)),
+    currency:     'USD',
+    orderId:      order.id,
+    buyerEmail:   order.email,
+    buyerName:    order.customer,
+    metadata: {
+      orderId:    order.id,
+      buyerName:  order.customer,
+      buyerEmail: order.email,
+    },
+    checkout: {
+      speedPolicy:        'MediumSpeed', // 1 confirmation for on-chain
+      paymentMethods:     ['BTC', 'BTC-LightningNetwork'],
+      defaultPaymentMethod: 'BTC-LightningNetwork', // prefer Lightning
+      redirectURL:        `${BASE}/?btcpay_order=${order.id}`,
+      redirectAutomatically: true,
+    },
+  };
+
+  const resp = await fetch(`${BTCPAY_URL}/api/v1/stores/${BTCPAY_STORE_ID}/invoices`, {
+    method:  'POST',
+    headers: {
+      'Content-Type':  'application/json',
+      'Authorization': `token ${BTCPAY_API_KEY}`,
+    },
+    body: JSON.stringify(body),
+  });
+
+  if (!resp.ok) {
+    const err = await resp.text();
+    throw new Error(`BTCPay invoice creation failed: ${err}`);
+  }
+  const invoice = await resp.json();
+  return invoice.checkoutLink; // redirect user here to pay
+}
+
+// POST /api/btcpay/webhook — receives payment events from BTCPay
+app.post('/api/btcpay/webhook', express.raw({ type: '*/*' }), async (req, res) => {
+  // Verify HMAC signature
+  const sig = req.headers['btcpay-sig'];
+  if (!BTCPAY_WEBHOOK_SECRET) {
+    console.error('BTCPay webhook received but BTCPAY_WEBHOOK_SECRET not configured');
+    return res.sendStatus(200); // ack to avoid BTCPay retries
+  }
+  if (!sig) {
+    console.warn('BTCPay webhook without signature — rejected');
+    return res.sendStatus(400);
+  }
+
+  const crypto = require('crypto');
+  const expected = 'sha256=' + crypto
+    .createHmac('sha256', BTCPAY_WEBHOOK_SECRET)
+    .update(req.body)
+    .digest('hex');
+
+  let sigBuf, expBuf;
+  try {
+    sigBuf = Buffer.from(sig);
+    expBuf = Buffer.from(expected);
+    if (sigBuf.length !== expBuf.length || !crypto.timingSafeEqual(sigBuf, expBuf)) {
+      console.warn('BTCPay webhook signature mismatch — rejected');
+      return res.sendStatus(400);
+    }
+  } catch(e) {
+    return res.sendStatus(400);
+  }
+
+  let event;
+  try { event = JSON.parse(req.body.toString()); }
+  catch(e) { return res.sendStatus(400); }
+
+  res.sendStatus(200); // ack immediately
+
+  const { type, invoiceId, metadata } = event;
+  const orderId = metadata?.orderId || event.orderId;
+  if (!orderId) return;
+
+  // Only process settled/confirmed payment events
+  const paidEvents = ['InvoiceSettled', 'InvoicePaymentSettled', 'InvoiceProcessing'];
+  if (!paidEvents.includes(type)) return;
+
+  try {
+    const [rows] = await db.execute('SELECT * FROM orders WHERE id=?', [orderId]);
+    if (!rows.length) return;
+    const order = rows[0];
+    if (order.payment_status === 'Pagado') return; // already processed
+
+    const items = JSON.parse(order.items || '[]');
+
+    await db.execute(
+      'UPDATE orders SET payment_status=?, status=?, updated_at=? WHERE id=?',
+      ['Pagado', 'Procesando', new Date(), orderId]
+    );
+
+    await deductInventory(items);
+    await deductBottleInventory(items);
+
+    // Reset registered user's daily consult limit on confirmed purchase
+    if (order.customer_id) {
+      await db.execute(
+        'UPDATE consult_counts SET count=0, last_reset=? WHERE customer_id=?',
+        [new Date().toISOString().slice(0,10), order.customer_id]
+      ).catch(() => {});
+    }
+
+    broadcastAdmin('order_update', { id: orderId, status: 'Procesando', paymentStatus: 'Pagado' });
+    await logActivity(`Pago BTCPay confirmado (${type}) para pedido ${orderId}`);
+    console.log(`BTCPay payment confirmed for order ${orderId} — event: ${type}`);
+  } catch(e) {
+    console.error('BTCPay webhook processing error:', e.message);
+  }
 });
 
 // ═══════════════════════════════════════════════════════
@@ -1764,14 +2101,15 @@ app.patch('/api/orders/:id', requireAdmin, async (req, res) => {
       await logActivity(`ml deducidos (COD confirmado) para pedido ${escHtml(order.id)}`);
     }
 
-    // Chivo → Procesando: admin manually verified Chivo QR payment, deduct ml
-    if (isChivo && status === 'Procesando') {
+    // BTCPay: webhook auto-confirms. If admin manually moves to Procesando
+    // (e.g. on-chain payment still pending), also deduct inventory.
+    const isBTCPay = order.payment_method === 'btcpay';
+    if (isBTCPay && status === 'Procesando' && order.payment_status !== 'Pagado') {
       await deductBottleInventory(order.items);
-      // Also mark as paid
       await db.execute('UPDATE orders SET payment_status=?, updated_at=? WHERE id=?', ['Pagado', new Date(), req.params.id]);
       order.payment_status = 'Pagado';
       broadcastAdmin('order_update', { id: order.id, status: order.status, paymentStatus: 'Pagado', trackerStep: order.tracker_step });
-      await logActivity(`Pago Chivo confirmado para pedido ${escHtml(order.id)}`);
+      await logActivity(`Pago BTCPay confirmado manualmente para pedido ${escHtml(order.id)}`);
     }
 
     // COD → Entregado: mark as Pagado (payment collected on delivery)
