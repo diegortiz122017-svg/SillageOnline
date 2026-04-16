@@ -30,10 +30,9 @@ function securityHeaders(req, res, next) {
     "font-src 'self' https://fonts.gstatic.com; " +
     "img-src 'self' data: https://res.cloudinary.com https://btcpay.davidcoen.it; " +
     "connect-src 'self' wss://sillage-sv.com wss: https://api.wompi.sv https://id.wompi.sv https://cloudflareinsights.com https://api.openai.com; " +
-    "frame-src https://btcpay.davidcoen.it; " +
     "frame-ancestors 'none'; " +
     "base-uri 'self'; " +
-    "form-action 'self' https://checkout.wompi.sv https://btcpay.davidcoen.it; " +
+    "form-action 'self' https://checkout.wompi.sv; " +
     "upgrade-insecure-requests;"
   );
   res.setHeader('X-Content-Type-Options', 'nosniff');
