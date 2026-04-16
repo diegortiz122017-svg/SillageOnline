@@ -336,6 +336,21 @@ nav a:hover{color:var(--gold)}
 .checkout-btn{width:100%;padding:0.95rem;background:var(--gold);border:none;color:var(--dark);font-family:'Jost',sans-serif;font-size:0.68rem;letter-spacing:0.22em;text-transform:uppercase;cursor:pointer;transition:background 0.3s;font-weight:500}
 .checkout-btn:hover:not(:disabled){background:var(--gold-light)}
 .checkout-btn:disabled{opacity:0.45;cursor:not-allowed}
+.saved-addr-block{
+  display:none;margin-bottom:1rem;
+  border:1px solid rgba(184,149,90,0.25);
+  background:rgba(184,149,90,0.04);
+  padding:0.8rem 1rem;
+}
+.saved-addr-label{font-size:0.5rem;letter-spacing:0.2em;text-transform:uppercase;color:rgba(184,149,90,0.6);margin-bottom:0.4rem;font-family:'Jost',sans-serif}
+.saved-addr-text{font-size:0.72rem;color:var(--cream);line-height:1.6;margin-bottom:0.6rem}
+.saved-addr-btn{
+  background:transparent;border:1px solid rgba(184,149,90,0.4);
+  color:rgba(184,149,90,0.8);font-family:'Jost',sans-serif;
+  font-size:0.55rem;letter-spacing:0.15em;text-transform:uppercase;
+  padding:0.35rem 0.9rem;cursor:pointer;transition:all 0.2s;
+}
+.saved-addr-btn:hover{background:rgba(184,149,90,0.1);border-color:var(--gold);color:var(--gold)}
 
 .modal-bg{position:fixed;inset:0;background:rgba(14,12,10,0.88);z-index:600;opacity:0;pointer-events:none;transition:opacity 0.3s;display:flex;align-items:center;justify-content:center;backdrop-filter:blur(5px)}
 .modal-bg.open{opacity:1;pointer-events:all}
@@ -1392,6 +1407,26 @@ footer{background:var(--dark);padding:3.5rem 4rem;text-align:center;border-top:1
   .hero-spacer{max-height:0.8rem}
 }
 </style>
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "Store",
+  "name": "Sillage Parfumerie",
+  "description": "Perfumería de lujo en línea en El Salvador. Fragancias 100% originales con envío a domicilio.",
+  "url": "https://sillage-sv.com",
+  "areaServed": "El Salvador",
+  "currenciesAccepted": "USD",
+  "paymentAccepted": "Credit Card, Bitcoin Lightning, Cash on Delivery",
+  "priceRange": "$$",
+  "hasMap": "https://sillage-sv.com",
+  "sameAs": [],
+  "potentialAction": {
+    "@type": "SearchAction",
+    "target": "https://sillage-sv.com/?producto={product_id}",
+    "query-input": "required name=product_id"
+  }
+}
+</script>
 </head>
 <body>
 
@@ -1574,6 +1609,12 @@ footer{background:var(--dark);padding:3.5rem 4rem;text-align:center;border-top:1
     </div>
     <div class="m-body">
       <div class="m-section active" id="ms1">
+        <!-- Saved address quick-fill — shown only for logged-in users with a saved address -->
+        <div class="saved-addr-block" id="savedAddrBlock">
+          <div class="saved-addr-label">Dirección guardada</div>
+          <div class="saved-addr-text" id="savedAddrText"></div>
+          <button class="saved-addr-btn" onclick="fillSavedAddress()">Usar esta dirección</button>
+        </div>
         <div class="f-row full"><div class="f-field"><label>Nombre Completo</label><input type="text" id="fn" placeholder="Alexandra Beaumont"/><div class="f-hint" id="en"></div></div></div>
         <div class="f-row full"><div class="f-field"><label>Correo Electrónico</label><input type="email" id="fe" placeholder="alex@example.com"/><div class="f-hint" id="ee"></div></div></div>
         <div class="f-row full"><div class="f-field"><label>Teléfono <span style="font-size:0.55rem;color:var(--muted)">(opcional)</span></label><input type="tel" id="fph" placeholder="+503 7000-0000"/></div></div>
@@ -1591,11 +1632,11 @@ footer{background:var(--dark);padding:3.5rem 4rem;text-align:center;border-top:1
         <p class="f-label-top">Selecciona tu método de pago</p>
         <div class="pay-methods">
           <button class="pay-method active" id="pmWompi" onclick="selectPayMethod('wompi')"><span class="pm-icon">&#128179;</span><div><span class="pm-name">Tarjeta de Crédito / Débito</span><span class="pm-sub">Visa, Mastercard — via Wompi</span></div></button>
-          <button class="pay-method" id="pmChivo" onclick="selectPayMethod('chivo')"><span class="pm-icon">&#9889;</span><div><span class="pm-name">Chivo Wallet</span><span class="pm-sub">Pago con Bitcoin / USD</span></div></button>
+          <button class="pay-method" id="pmBtcpay" onclick="selectPayMethod('btcpay')"><span class="pm-icon">&#9889;</span><div><span class="pm-name">Bitcoin / Lightning</span><span class="pm-sub">Paga con cualquier wallet BTC</span></div></button>
           <button class="pay-method" id="pmCod" onclick="selectPayMethod('cod')"><span class="pm-icon">&#128181;</span><div><span class="pm-name">Pago contra Entrega</span><span class="pm-sub">Paga en efectivo al recibir</span></div></button>
         </div>
         <div id="pmInfoWompi" class="pm-info"><div class="sec-row"><span class="sec-badge">&#128274; SSL</span><span class="sec-badge">Wompi</span><span class="sec-badge">&#10003; Seguro</span></div><p style="font-size:0.68rem;color:var(--muted);line-height:1.7;margin-top:0.8rem">Serás redirigido a la pasarela segura de Wompi.</p></div>
-        <div id="pmInfoChivo" class="pm-info" style="display:none"><p style="font-size:0.68rem;color:var(--muted);margin-bottom:0.8rem">Escanea el código QR con tu Chivo Wallet.</p><div class="chivo-qr-wrap"><div class="chivo-qr-placeholder"><svg width="100" height="100" viewBox="0 0 100 100"><rect width="100" height="100" fill="#1a1814"/><text x="50" y="45" text-anchor="middle" fill="#b8955a" font-size="10">QR Chivo</text><text x="50" y="62" text-anchor="middle" fill="#b8955a" font-size="8">Próximamente</text></svg></div><div class="chivo-addr"><span class="chivo-lbl">Dirección</span><span class="chivo-val">Configura en el admin</span></div></div></div>
+        <div id="pmInfoBtcpay" class="pm-info" style="display:none"><p style="font-size:0.68rem;color:var(--muted);line-height:1.7">Serás redirigido a una página de pago segura donde podrás pagar con <strong style="color:var(--gold)">Bitcoin on-chain o Lightning Network</strong>.<br><span style="font-size:0.62rem">Compatible con Chivo Wallet, Phoenix, Muun, y cualquier wallet Bitcoin.</span></p></div>
         <div id="pmInfoCod" class="pm-info" style="display:none"><p style="font-size:0.68rem;color:var(--muted);line-height:1.7">Pagarás en efectivo cuando recibas tu pedido.</p></div>
         <div class="m-actions"><button class="m-btn-s" id="s2back" onclick="goStep(1)">&#8592; Volver</button><button class="m-btn-p" id="s2next">Revisar Pedido &#8594;</button></div>
       </div>
@@ -2810,31 +2851,66 @@ function openCheckout(){
   closeCart();goStep(1);
   document.getElementById('modalBg').classList.add('open');
   document.body.style.overflow='hidden';
-  // Pre-fill from customer profile if logged in
+
+  var hasSavedAddr = false;
   if(typeof currentCustomer!=='undefined'&&currentCustomer){
+    // Always pre-fill name and email
     var fn=document.getElementById('fn');
     var fe=document.getElementById('fe');
     var fph=document.getElementById('fph');
-    var fa=document.getElementById('fa');
-    var fc=document.getElementById('fc');
-    var fs=document.getElementById('fs');
-    var fco=document.getElementById('fco');
     if(fn&&!fn.value)fn.value=currentCustomer.name||'';
     if(fe&&!fe.value)fe.value=currentCustomer.email||'';
     if(fph&&!fph.value&&currentCustomer.phone)fph.value=currentCustomer.phone;
-    if(fa&&!fa.value&&currentCustomer.address)fa.value=currentCustomer.address;
-    if(fc&&!fc.value&&currentCustomer.city)fc.value=currentCustomer.city;
-    if(fs&&!fs.value&&currentCustomer.state)fs.value=currentCustomer.state;
-    if(fco&&!fco.value&&currentCustomer.country){
-      for(var i=0;i<fco.options.length;i++){
-        if(fco.options[i].text===currentCustomer.country||fco.options[i].value===currentCustomer.country){
-          fco.selectedIndex=i;break;
-        }
+
+    // Show saved address block if they have one
+    if(currentCustomer.address){
+      hasSavedAddr = true;
+      var parts=[currentCustomer.address,currentCustomer.city,currentCustomer.state,currentCustomer.country].filter(Boolean);
+      var block=document.getElementById('savedAddrBlock');
+      var text=document.getElementById('savedAddrText');
+      if(block&&text){
+        text.textContent=parts.join(', ');
+        block.style.display='block';
       }
     }
   }
+
+  // Hide saved block if no saved address
+  if(!hasSavedAddr){
+    var block=document.getElementById('savedAddrBlock');
+    if(block) block.style.display='none';
+  }
 }
-function closeCheckout(){document.getElementById('modalBg').classList.remove('open');document.body.style.overflow='';}
+
+function fillSavedAddress(){
+  if(typeof currentCustomer==='undefined'||!currentCustomer) return;
+  var fa=document.getElementById('fa');
+  var fc=document.getElementById('fc');
+  var fs=document.getElementById('fs');
+  var fco=document.getElementById('fco');
+  if(fa) fa.value=currentCustomer.address||'';
+  if(fc) fc.value=currentCustomer.city||'';
+  if(fs) fs.value=currentCustomer.state||'';
+  if(fco&&currentCustomer.country){
+    for(var i=0;i<fco.options.length;i++){
+      if(fco.options[i].text===currentCustomer.country||fco.options[i].value===currentCustomer.country){
+        fco.selectedIndex=i;break;
+      }
+    }
+  }
+  // Visual feedback
+  var btn=document.querySelector('.saved-addr-btn');
+  if(btn){btn.textContent='✓ Dirección aplicada';btn.style.color='var(--gold)';btn.disabled=true;}
+  // Clear field errors if any
+  ['fa','fc','fco'].forEach(function(id){sfe(id,false);});
+}
+function closeCheckout(){
+  document.getElementById('modalBg').classList.remove('open');
+  document.body.style.overflow='';
+  // Reset saved address button for next open
+  var btn=document.querySelector('.saved-addr-btn');
+  if(btn){btn.textContent='Usar esta dirección';btn.style.color='';btn.disabled=false;}
+}
 document.getElementById('checkoutBtn').addEventListener('click',openCheckout);
 document.getElementById('mClose').addEventListener('click',closeCheckout);
 (function(){var bg=document.getElementById('modalBg'),_md=null;bg.addEventListener('mousedown',function(e){_md=e.target;});bg.addEventListener('click',function(e){if(e.target===this&&_md===this)closeCheckout();_md=null;});})();
@@ -2877,7 +2953,7 @@ function fillReview(){
   document.getElementById('mDelivery').textContent=gv('fn')+' \u00b7 '+gv('fa')+', '+gv('fc')+(gv('fs')?' '+gv('fs'):'')+', '+gv('fco');
   var pmLabels={
     'wompi':  'Tarjeta de Crédito / Débito — Wompi',
-    'chivo':  'Chivo Wallet (Bitcoin / USD)',
+    'btcpay': 'Bitcoin / Lightning Network',
     'cod':    'Pago contra Entrega'
   };
   document.getElementById('mPayment').textContent = pmLabels[selectedPayMethod] || selectedPayMethod;
@@ -2928,6 +3004,15 @@ function placeOrder(){
           var u=new URL(res.wompiUrl);
           if(u.hostname.endsWith('wompi.sv')||u.hostname.endsWith('wompi.com')){
             window.location.href=res.wompiUrl;return;
+          }
+        }catch(e){}
+      }
+      if(selectedPayMethod==='btcpay'&&res.btcpayUrl){
+        // Validate redirect URL is from BTCPay host only
+        try{
+          var u=new URL(res.btcpayUrl);
+          if(u.hostname===new URL('https://btcpay.davidcoen.it').hostname||u.hostname.endsWith('btcpay.davidcoen.it')){
+            window.location.href=res.btcpayUrl;return;
           }
         }catch(e){}
       }
