@@ -1913,18 +1913,20 @@ app.post('/api/orders', orderLimiter, async (req, res) => {
     wompiUrl = await createWompiLink(order);
   }
 
-  // BTCPay: create invoice and return checkout URL
-  let btcpayUrl = null;
+  // BTCPay: create invoice and return invoiceId for custom UI
+  let btcpayUrl        = null;
+  let btcpayInvoiceId  = null;
   if (paymentMethod === 'btcpay' && BTCPAY_STORE_ID && BTCPAY_API_KEY) {
     try {
       const btcpayResult = await createBTCPayInvoice(order);
-      btcpayUrl = btcpayResult.checkoutLink;
+      btcpayUrl       = btcpayResult.checkoutLink;
+      btcpayInvoiceId = btcpayResult.invoiceId;
     } catch(e) {
       console.error('BTCPay invoice creation error:', e.message);
     }
   }
 
-  res.json({ ok: true, order, wompiUrl, btcpayUrl });
+  res.json({ ok: true, order, wompiUrl, btcpayUrl, btcpayInvoiceId });
 });
 
 
@@ -2118,6 +2120,86 @@ app.post('/api/btcpay/webhook', express.raw({ type: '*/*' }), async (req, res) =
     console.log(`BTCPay payment confirmed for order ${orderId} — event: ${type}`);
   } catch(e) {
     console.error('BTCPay webhook processing error:', e.message);
+  }
+});
+
+// ── BTCPay: payment methods (BTC address + Lightning invoice + QR) ──────────
+// GET /api/btcpay/invoice/:invoiceId/payment-methods
+// Returns on-chain BTC address, Lightning invoice, and QR code URLs.
+// Keeps the BTCPay API key server-side only.
+app.get('/api/btcpay/invoice/:invoiceId/payment-methods', async (req, res) => {
+  const { invoiceId } = req.params;
+  if (!invoiceId || !/^[A-Za-z0-9_-]+$/.test(invoiceId)) {
+    return res.status(400).json({ error: 'Invalid invoiceId' });
+  }
+  if (!BTCPAY_URL || !BTCPAY_STORE_ID || !BTCPAY_API_KEY) {
+    return res.status(503).json({ error: 'BTCPay not configured' });
+  }
+  try {
+    const r = await fetch(
+      `${BTCPAY_URL}/api/v1/stores/${BTCPAY_STORE_ID}/invoices/${invoiceId}/payment-methods`,
+      { headers: { 'Authorization': `token ${BTCPAY_API_KEY}` } }
+    );
+    if (!r.ok) {
+      const txt = await r.text();
+      console.error('BTCPay payment-methods error:', txt);
+      return res.status(502).json({ error: 'BTCPay unavailable' });
+    }
+    const methods = await r.json();
+    // Shape: [{paymentMethod, destination, paymentLink, rate, amount, ...}]
+    const btc = methods.find(m => m.paymentMethod === 'BTC-OnChain' || m.paymentMethod === 'BTC');
+    const ln  = methods.find(m => m.paymentMethod === 'BTC-LightningNetwork');
+
+    const out = {
+      btc: btc ? {
+        address:     btc.destination,
+        paymentLink: btc.paymentLink, // bitcoin: URI
+        amount:      btc.amount,
+        rate:        btc.rate,
+        qr: `${BTCPAY_URL}/api/v1/stores/${BTCPAY_STORE_ID}/invoices/${invoiceId}/qr?paymentMethod=BTC-OnChain`,
+      } : null,
+      lightning: ln ? {
+        invoice:     ln.destination,
+        paymentLink: ln.paymentLink, // lightning: URI
+        amount:      ln.amount,
+        qr: `${BTCPAY_URL}/api/v1/stores/${BTCPAY_STORE_ID}/invoices/${invoiceId}/qr?paymentMethod=BTC-LightningNetwork`,
+      } : null,
+    };
+    res.json(out);
+  } catch(e) {
+    console.error('BTCPay payment-methods fetch error:', e.message);
+    res.status(502).json({ error: 'BTCPay unavailable' });
+  }
+});
+
+// ── BTCPay: invoice status polling ───────────────────────────────────────────
+// GET /api/btcpay/invoice/:invoiceId/status
+// Returns {status, orderId} — frontend polls this until paid.
+app.get('/api/btcpay/invoice/:invoiceId/status', async (req, res) => {
+  const { invoiceId } = req.params;
+  if (!invoiceId || !/^[A-Za-z0-9_-]+$/.test(invoiceId)) {
+    return res.status(400).json({ error: 'Invalid invoiceId' });
+  }
+  if (!BTCPAY_URL || !BTCPAY_STORE_ID || !BTCPAY_API_KEY) {
+    return res.status(503).json({ error: 'BTCPay not configured' });
+  }
+  try {
+    const r = await fetch(
+      `${BTCPAY_URL}/api/v1/stores/${BTCPAY_STORE_ID}/invoices/${invoiceId}`,
+      { headers: { 'Authorization': `token ${BTCPAY_API_KEY}` } }
+    );
+    if (!r.ok) return res.status(502).json({ error: 'BTCPay unavailable' });
+    const invoice = await r.json();
+    // status: New | Processing | Settled | Invalid | Expired
+    res.json({
+      status:   invoice.status,
+      orderId:  invoice.metadata?.orderId || invoice.orderId || null,
+      currency: invoice.currency,
+      amount:   invoice.amount,
+    });
+  } catch(e) {
+    console.error('BTCPay status fetch error:', e.message);
+    res.status(502).json({ error: 'BTCPay unavailable' });
   }
 });
 
