@@ -2149,16 +2149,18 @@ app.get('/api/btcpay/invoice/:invoiceId/payment-methods', async (req, res) => {
     // Log raw for debugging — remove once confirmed working
     console.log('BTCPay payment-methods raw:', JSON.stringify(methods));
 
-    // BTCPay Greenfield uses different paymentMethod strings per store config.
-    // Normalize by substring matching instead of exact string comparison.
-    const isLN  = m => /lightning/i.test(m.paymentMethod);
-    const isBTC = m => !isLN(m) && /btc/i.test(m.paymentMethod);
+    // BTCPay Greenfield API v1 uses paymentMethodId (not paymentMethod) as the key field.
+    // Known values: "BTC-LN" (Lightning), "BTC-CHAIN" (on-chain).
+    // Match by substring to handle any future variants.
+    const getId = m => m.paymentMethodId || m.paymentMethod || '';
+    const isLN  = m => /LN$/i.test(getId(m))  || /lightning/i.test(getId(m));
+    const isBTC = m => /CHAIN$/i.test(getId(m)) || (!isLN(m) && /btc/i.test(getId(m)));
     const ln    = methods.find(isLN);
     const btc   = methods.find(isBTC);
 
-    // Use exact paymentMethod string returned by BTCPay in QR URL
-    const lnPM  = ln  ? encodeURIComponent(ln.paymentMethod)  : null;
-    const btcPM = btc ? encodeURIComponent(btc.paymentMethod) : null;
+    // QR endpoint requires the paymentMethodId exactly as BTCPay returns it
+    const lnPM  = ln  ? encodeURIComponent(getId(ln))  : null;
+    const btcPM = btc ? encodeURIComponent(getId(btc)) : null;
 
     const out = {
       btc: btc ? {
