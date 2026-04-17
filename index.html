@@ -1605,6 +1605,8 @@ footer{background:var(--dark);padding:3.5rem 4rem;text-align:center;border-top:1
   }
 }
 </script>
+  <!-- Wompi embedded payment widget -->
+  <script src="https://checkout.wompi.sv/widget.js"></script>
 </head>
 <body>
 
@@ -3290,14 +3292,11 @@ function placeOrder(){
     .then(function(res){
       if(!res.ok){throw new Error('Server error');}
       var order=res.order;
-      if(selectedPayMethod==='wompi'&&res.wompiUrl){
-        // Validate redirect URL is from Wompi domain only
-        try{
-          var u=new URL(res.wompiUrl);
-          if(u.hostname.endsWith('wompi.sv')||u.hostname.endsWith('wompi.com')){
-            window.location.href=res.wompiUrl;return;
-          }
-        }catch(e){}
+      if(selectedPayMethod==='wompi'&&res.wompiRef){
+        placeBtn.textContent='Realizar Pedido';
+        placeBtn.disabled=false;
+        openWompiWidget(res.wompiRef, res.amountCents, res.order, res.wompiUrl);
+        return;
       }
       if(selectedPayMethod==='btcpay'&&res.btcpayInvoiceId){
         // Modal already open — just load the invoice data into it
@@ -3773,6 +3772,123 @@ function doReset() {
       btn.textContent = 'Cambiar Contraseña';
     });
 }
+
+// ── Wompi Embedded Widget ────────────────────────────
+var _wompiPublicKey = null;
+
+// Pre-fetch the public key on page load so the widget opens instantly
+(function fetchWompiKey(){
+  fetch('/api/wompi/public-key')
+    .then(function(r){ return r.json(); })
+    .then(function(d){ if(d.publicKey) _wompiPublicKey = d.publicKey; })
+    .catch(function(){});
+})();
+
+function openWompiWidget(reference, amountCents, order, fallbackUrl) {
+  if (!_wompiPublicKey) {
+    // Key not loaded yet — fall back to redirect
+    if (fallbackUrl) window.location.href = fallbackUrl;
+    return;
+  }
+
+  // Close the checkout modal so it doesn't show behind the widget
+  document.getElementById('modalBg').classList.remove('open');
+  document.body.style.overflow = '';
+
+  var checkout = new WidgetCheckout({
+    currency:       'USD',
+    amountInCents:  amountCents,
+    reference:      reference,
+    publicKey:      _wompiPublicKey,
+    redirectUrl:    (window.location.origin + '/?wompi_ref=' + reference),
+    taxInCents: {
+      vatDevolutionBase: 0,
+      vat:               0,
+    },
+    customerData: {
+      email:     order.email  || '',
+      fullName:  order.customer || '',
+      phoneNumber:     order.phone || '',
+      phoneNumberPrefix: '+503',
+    },
+  });
+
+  checkout.open(function(result) {
+    var tx = result.transaction;
+    if (!tx) { _wompiHandleCancel(order); return; }
+    var status = (tx.status || '').toUpperCase();
+    if (status === 'APPROVED') {
+      // Payment confirmed by widget callback — show success immediately
+      // Webhook will create the real order in the background
+      _wompiHandleSuccess(order);
+    } else if (status === 'DECLINED' || status === 'ERROR' || status === 'VOIDED') {
+      toast('Pago rechazado', 'Tu tarjeta fue rechazada. Intenta con otra tarjeta o método de pago.', '');
+      // Re-open checkout so they can try again
+      document.getElementById('modalBg').classList.add('open');
+      document.body.style.overflow = 'hidden';
+    } else {
+      // PENDING or unknown — webhook will handle it
+      _wompiHandleSuccess(order);
+    }
+  });
+}
+
+function _wompiHandleSuccess(order) {
+  // Clear cart and show success screen
+  cart = []; renderCart(); saveCart();
+  document.getElementById('successOid').textContent = 'Pedido ' + (order.id || '');
+  document.getElementById('notifyEmail').textContent = order.email || '';
+  // Build items summary
+  var orderItems = order.items || [];
+  var shipping   = getShipping();
+  var total      = parseFloat(order.total || 0);
+  document.getElementById('successItems').innerHTML =
+    '<div class="ms-title">Tu Pedido</div>' +
+    orderItems.map(function(i){
+      return '<div class="ms-row"><span>' + esc(i.name) + ' ×' + i.qty + '</span>' +
+             '<span class="ms-price">$' + parseFloat(i.total||0).toFixed(2) + '</span></div>';
+    }).join('') +
+    (shipping > 0 ? '<div class="ms-shipping"><span>Envío</span><span>$' + shipping.toFixed(2) + '</span></div>' : '') +
+    '<div class="ms-div"></div>' +
+    '<div class="ms-total"><span class="ms-total-lbl">Total</span><span class="ms-total-val">$' + total.toFixed(2) + '</span></div>';
+  // Open checkout modal to show step 4
+  document.getElementById('modalBg').classList.add('open');
+  document.body.style.overflow = 'hidden';
+  resetTracker();
+  goStep(4);
+}
+
+function _wompiHandleCancel(order) {
+  // User closed the widget without paying — re-open checkout at payment step
+  toast('Pago cancelado', 'Puedes intentarlo de nuevo cuando quieras.', '');
+  document.getElementById('modalBg').classList.add('open');
+  document.body.style.overflow = 'hidden';
+  goStep(2);
+}
+
+// Handle ?wompi_ref= in URL (fallback redirect flow)
+(function checkWompiRedirect() {
+  var params = new URLSearchParams(window.location.search);
+  var ref    = params.get('wompi_ref');
+  if (!ref) return;
+  window.history.replaceState({}, '', window.location.pathname);
+  // Poll the server briefly to check if webhook already confirmed
+  var attempts = 0;
+  var interval = setInterval(function() {
+    attempts++;
+    fetch('/api/wompi/status?ref=' + encodeURIComponent(ref))
+      .then(function(r){ return r.json(); })
+      .then(function(d){
+        if (d.status === 'paid') {
+          clearInterval(interval);
+          toast('Pago confirmado', 'Tu pedido ha sido procesado.', 'ok');
+        } else if (attempts >= 6) {
+          clearInterval(interval);
+        }
+      })
+      .catch(function(){ clearInterval(interval); });
+  }, 3000);
+})();
 
 // ── BTCPay Custom UI Modal ────────────────────────────
 var _btcPayPollTimer   = null;
