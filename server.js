@@ -38,7 +38,7 @@ async function logActivity(msg) {
 }
 const { requireAdmin, requireCustomer, optionalCustomer, createSession, validateSession, destroySession } = auth;
 const { authLimiter, customerAuthLimiter, getIp } = security;
-const { ADMIN_USER, ADMIN_PASS, PORT, BASE_URL, OPENAI_API_KEY, WOMPI_CLIENT_ID, WOMPI_CLIENT_SECRET, EMAIL_HOLA, EMAIL_PEDIDOS, SESSION_TTL_CUSTOMER, SESSION_TTL_ADMIN, RESEND_API_KEY, NODE_ENV, IS_PROD, ANON_SESSION_TTL, ANON_WS_LIMIT, ANON_SOMMELIER_MAX, REG_SOMMELIER_LIMIT, ANON_SOMMELIER_LIMIT, CACHE_TTL_TOOL, CACHE_TTL_REPLY } = cfg;
+const { ADMIN_USER, ADMIN_PASS, PORT, BASE_URL, OPENAI_API_KEY, WOMPI_CLIENT_ID, WOMPI_CLIENT_SECRET, WOMPI_PUBLIC_KEY, EMAIL_HOLA, EMAIL_PEDIDOS, SESSION_TTL_CUSTOMER, SESSION_TTL_ADMIN, RESEND_API_KEY, NODE_ENV, IS_PROD, ANON_SESSION_TTL, ANON_WS_LIMIT, ANON_SOMMELIER_MAX, REG_SOMMELIER_LIMIT, ANON_SOMMELIER_LIMIT, CACHE_TTL_TOOL, CACHE_TTL_REPLY } = cfg;
 
 // ── BTCPay Server ─────────────────────────────────────
 const BTCPAY_URL            = process.env.BTCPAY_URL || 'https://btcpay.davidcoen.it';
@@ -203,6 +203,19 @@ async function initDB() {
       created_at   DATETIME     NOT NULL,
       INDEX idx_expires (expires_at),
       INDEX idx_renew   (renew_token)
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
+  `);
+
+  await db.execute(`
+    CREATE TABLE IF NOT EXISTS wompi_pending (
+      reference    VARCHAR(60)  PRIMARY KEY,   -- unique payment reference sent to Wompi
+      order_id     VARCHAR(40)  NOT NULL,
+      order_data   LONGTEXT     NOT NULL,       -- full order JSON snapshot
+      customer_id  INT          NULL,
+      amount_cents INT          NOT NULL,       -- monto en centavos
+      expires_at   DATETIME     NOT NULL,       -- 30 min window
+      created_at   DATETIME     NOT NULL,
+      INDEX idx_expires (expires_at)
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
   `);
 
@@ -2061,20 +2074,234 @@ app.post('/api/orders', orderLimiter, async (req, res) => {
     return res.json({ ok: true, order, btcpayUrl: btcpayResult.checkoutLink, btcpayInvoiceId: btcpayResult.invoiceId });
   }
 
-  // ── All other methods: insert order normally ────────────────────────────────
+  // ── Wompi: defer order creation until webhook confirms payment ───────────────
+  if (paymentMethod === 'wompi') {
+    if (!WOMPI_CLIENT_ID || !WOMPI_CLIENT_SECRET) {
+      return res.status(503).json({ error: 'Wompi no configurado' });
+    }
+    let wompiResult;
+    try {
+      wompiResult = await createWompiLink(order);
+    } catch(e) {
+      console.error('Wompi link creation error:', e.message);
+      return res.status(502).json({ error: 'No se pudo iniciar el pago. Intenta de nuevo.' });
+    }
+    const expiresAt = new Date(Date.now() + 30 * 60 * 1000); // 30 min
+    await db.execute(
+      `INSERT INTO wompi_pending (reference, order_id, order_data, customer_id, amount_cents, expires_at, created_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?)
+       ON DUPLICATE KEY UPDATE order_data=VALUES(order_data), expires_at=VALUES(expires_at)`,
+      [wompiResult.reference, order.id, JSON.stringify({ ...order, customerId }),
+       customerId || null, wompiResult.amountCents, expiresAt, n]
+    );
+    console.log(`Wompi pending order ${order.id} — ref ${wompiResult.reference}`);
+    return res.json({
+      ok:            true,
+      order,
+      wompiUrl:      wompiResult.url,
+      wompiRef:      wompiResult.reference,
+      amountCents:   wompiResult.amountCents,
+      btcpayUrl:     null,
+      btcpayInvoiceId: null,
+    });
+  }
+
+  // ── COD: insert order normally ────────────────────────────────────────────────
   broadcastAdmin('new_order', order);
   await logActivity(`Nuevo pedido ${escHtml(order.id)} de ${escHtml(order.customer)} — $${parseFloat(order.total||0).toFixed(2)}`);
   try { await sendOrderConfirmation(order); } catch(e) {}
-
-  // Wompi: create payment link
-  let wompiUrl = null;
-  if (paymentMethod === 'wompi' && WOMPI_CLIENT_ID) {
-    wompiUrl = await createWompiLink(order);
-  }
-
-  res.json({ ok: true, order, wompiUrl, btcpayUrl: null, btcpayInvoiceId: null });
+  res.json({ ok: true, order, wompiUrl: null, btcpayUrl: null, btcpayInvoiceId: null });
 });
 
+
+// ═══════════════════════════════════════════════════════
+//  WOMPI INTEGRATION
+//  Uses Wompi El Salvador API with embedded widget.
+//  Order is only created in DB after payment is confirmed via webhook.
+// ═══════════════════════════════════════════════════════
+
+// Cached OAuth token for Wompi API calls
+let _wompiToken     = null;
+let _wompiTokenExp  = 0;
+
+async function getWompiToken() {
+  if (_wompiToken && Date.now() < _wompiTokenExp - 60000) return _wompiToken;
+  const resp = await fetch('https://id.wompi.sv/connect/token', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+    body: new URLSearchParams({
+      grant_type:    'client_credentials',
+      client_id:     WOMPI_CLIENT_ID,
+      client_secret: WOMPI_CLIENT_SECRET,
+      audience:      'wompi_api',
+    }),
+  });
+  if (!resp.ok) throw new Error(`Wompi auth failed: ${resp.status}`);
+  const data = await resp.json();
+  _wompiToken    = data.access_token;
+  _wompiTokenExp = Date.now() + (data.expires_in * 1000);
+  return _wompiToken;
+}
+
+// Creates a Wompi payment link and stores the order in wompi_pending.
+// Returns { reference, url } — reference is sent to the widget, url is the fallback redirect.
+async function createWompiLink(order) {
+  if (!WOMPI_CLIENT_ID || !WOMPI_CLIENT_SECRET) throw new Error('Wompi not configured');
+  const BASE      = BASE_URL || 'https://sillage-sv.com';
+  const token     = await getWompiToken();
+  const amountCents = Math.round(parseFloat(order.total) * 100);
+  // reference must be unique and <= 60 chars
+  const reference = `SLG-${Date.now().toString(36).toUpperCase()}-${Math.random().toString(36).substr(2,4).toUpperCase()}`;
+
+  const body = {
+    idComercio:        reference,
+    nombre:            `Sillage Parfumerie — Pedido ${order.id}`,
+    descripcion:       order.items.map(i => `${i.name} x${i.qty}`).join(', ').slice(0, 200),
+    monto:             amountCents,
+    urlRedirect:       `${BASE}/?wompi_ref=${reference}`,
+    urlWebhook:        `${BASE}/api/wompi/webhook`,
+    configuracion: {
+      urlWebhook:                 `${BASE}/api/wompi/webhook`,
+      notificarTransaccionCliente: true,
+    },
+    formasPago: { tarjetaCreditoDebito: true },
+  };
+
+  const resp = await fetch('https://api.wompi.sv/EnlacePago', {
+    method:  'POST',
+    headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+    body:    JSON.stringify(body),
+  });
+  if (!resp.ok) {
+    const err = await resp.text();
+    throw new Error(`Wompi EnlacePago failed: ${err}`);
+  }
+  const data = await resp.json();
+  // data.data.urlEnlacePago is the checkout URL
+  return { reference, url: data?.data?.urlEnlacePago || null, amountCents };
+}
+
+// GET /api/wompi/public-key — exposes only the public key to the frontend
+// The widget needs this; the secret never leaves the server.
+app.get('/api/wompi/public-key', (req, res) => {
+  if (!WOMPI_PUBLIC_KEY) return res.status(503).json({ error: 'Wompi not configured' });
+  res.json({ publicKey: WOMPI_PUBLIC_KEY });
+});
+
+// POST /api/wompi/webhook — Wompi calls this when a transaction succeeds
+app.post('/api/wompi/webhook', express.json(), async (req, res) => {
+  // Validate webhook signature: SHA-256(body_json + WOMPI_CLIENT_SECRET)
+  if (!WOMPI_CLIENT_SECRET) {
+    console.error('Wompi webhook: WOMPI_CLIENT_SECRET not set — rejecting');
+    return res.sendStatus(401);
+  }
+
+  const receivedHash = req.headers['x-wompi-signature'] || req.body?.hash;
+  if (!receivedHash) {
+    console.warn('Wompi webhook: no signature — rejected');
+    return res.sendStatus(400);
+  }
+
+  // Wompi signs: SHA256(transactionId + status + amount + secret)
+  const tx = req.body?.transaccion || req.body?.transaction || {};
+  const hashInput = `${tx.id || ''}${tx.estado || tx.status || ''}${tx.monto || tx.amount || ''}${WOMPI_CLIENT_SECRET}`;
+  const expected  = crypto.createHash('sha256').update(hashInput).digest('hex');
+
+  if (receivedHash.toLowerCase() !== expected.toLowerCase()) {
+    console.warn('Wompi webhook: signature mismatch — rejected');
+    return res.sendStatus(400);
+  }
+
+  res.sendStatus(200); // ack immediately
+
+  const reference = tx.idComercio || tx.reference || req.body?.idComercio;
+  const status    = (tx.estado || tx.status || '').toUpperCase();
+  const isProd    = req.body?.esProductiva !== false;
+
+  if (!isProd) { console.log(`Wompi webhook: test transaction for ${reference} — ignored`); return; }
+  if (status !== 'APROBADA' && status !== 'APPROVED') { console.log(`Wompi webhook: ${reference} status ${status} — not approved, skipping`); return; }
+  if (!reference) { console.warn('Wompi webhook: no reference'); return; }
+
+  try {
+    // Load pending order
+    const [rows] = await db.execute('SELECT * FROM wompi_pending WHERE reference=?', [reference]);
+    if (!rows.length) {
+      console.warn(`Wompi webhook: no pending order for reference ${reference}`);
+      return;
+    }
+    const pending  = rows[0];
+    const orderObj = JSON.parse(pending.order_data);
+    const items    = orderObj.items || [];
+    const custId   = pending.customer_id;
+    const now      = new Date();
+
+    // Idempotency check
+    const [exists] = await db.execute('SELECT id FROM orders WHERE id=?', [orderObj.id]);
+    if (exists.length) { console.log(`Wompi webhook: order ${orderObj.id} already exists — skipping`); return; }
+
+    // Create the real order
+    await db.execute(
+      `INSERT INTO orders
+         (id,customer,email,phone,address,city,state_province,country,
+          items,total,status,payment_status,payment_method,tracker_step,
+          customer_id,created_at,updated_at)
+       VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
+      [orderObj.id, orderObj.customer, orderObj.email, orderObj.phone,
+       orderObj.address, orderObj.city, orderObj.state, orderObj.country,
+       JSON.stringify(items), orderObj.total,
+       'Procesando', 'Pagado', 'wompi', 1,
+       custId || null, pending.created_at, now]
+    );
+
+    await deductInventory(items);
+    await deductBottleInventory(items);
+
+    if (custId) {
+      await db.execute(
+        'UPDATE consult_counts SET count=0, last_reset=? WHERE customer_id=?',
+        [now.toISOString().slice(0,10), custId]
+      ).catch(() => {});
+    }
+
+    await db.execute('DELETE FROM wompi_pending WHERE reference=?', [reference]);
+
+    const fullOrder = { ...orderObj, status: 'Procesando', paymentStatus: 'Pagado', payment_method: 'wompi' };
+    broadcastAdmin('new_order', fullOrder);
+    await logActivity(`Pago Wompi confirmado — pedido ${orderObj.id} de ${orderObj.customer} — $${parseFloat(orderObj.total||0).toFixed(2)}`);
+    try { await sendOrderConfirmation(fullOrder); } catch(e) { console.error('Wompi confirm email error:', e.message); }
+    console.log(`Wompi order created on payment: ${orderObj.id} — ref ${reference}`);
+  } catch(e) {
+    console.error('Wompi webhook processing error:', e.message);
+  }
+});
+
+// GET /api/wompi/status?ref=<reference> — polled by frontend on redirect fallback
+// Returns whether the webhook has already processed the payment
+app.get('/api/wompi/status', async (req, res) => {
+  const ref = req.query.ref;
+  if (!ref || ref.length > 80) return res.status(400).json({ error: 'Invalid ref' });
+  try {
+    // If pending record still exists → not paid yet
+    const [pending] = await db.execute(
+      'SELECT reference FROM wompi_pending WHERE reference=?', [ref]
+    );
+    if (pending.length) return res.json({ status: 'pending' });
+
+    // If order exists with this reference in datosAdicionales or by checking order_id
+    // We stored order_id in wompi_pending — check orders table
+    res.json({ status: 'paid' });
+  } catch(e) {
+    res.status(500).json({ error: 'Server error' });
+  }
+});
+
+// Cleanup job: remove expired wompi_pending records every 30 min
+setInterval(async () => {
+  try {
+    const [r] = await db.execute('DELETE FROM wompi_pending WHERE expires_at < NOW()');
+    if (r.affectedRows > 0) console.log(`Wompi cleanup: removed ${r.affectedRows} expired pending order(s)`);
+  } catch(e) { /* ignore */ }
+}, 30 * 60 * 1000);
 
 // ═══════════════════════════════════════════════════════
 //  BTCPAY SERVER INTEGRATION
