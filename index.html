@@ -338,9 +338,18 @@ nav a:hover{color:var(--gold)}
 .checkout-btn:disabled{opacity:0.45;cursor:not-allowed}
 .saved-addr-block{
   display:none;margin-bottom:1.2rem;
-  border:1px solid rgba(184,149,90,0.5);
-  background:rgba(184,149,90,0.07);
-  padding:0.9rem 1rem;
+}
+.saved-addr-option{
+  border:1px solid rgba(184,149,90,0.25);
+  background:rgba(184,149,90,0.05);
+  padding:0.75rem 1rem;
+  margin-bottom:0.5rem;
+  cursor:pointer;
+  transition:all 0.2s;
+}
+.saved-addr-option:hover{
+  border-color:rgba(184,149,90,0.6);
+  background:rgba(184,149,90,0.1);
 }
 .saved-addr-label{font-size:0.5rem;letter-spacing:0.2em;text-transform:uppercase;color:#b8955a;margin-bottom:0.4rem;font-family:'Jost',sans-serif;font-weight:500}
 .saved-addr-text{font-size:0.74rem;color:#2a2520;line-height:1.6;margin-bottom:0.7rem}
@@ -1778,11 +1787,10 @@ footer{background:var(--dark);padding:3.5rem 4rem;text-align:center;border-top:1
     </div>
     <div class="m-body">
       <div class="m-section active" id="ms1">
-        <!-- Saved address quick-fill — shown only for logged-in users with a saved address -->
-        <div class="saved-addr-block" id="savedAddrBlock">
-          <div class="saved-addr-label">Dirección guardada</div>
-          <div class="saved-addr-text" id="savedAddrText"></div>
-          <button class="saved-addr-btn" onclick="fillSavedAddress()">Usar esta dirección</button>
+        <!-- Saved addresses selector — shown only for logged-in users -->
+        <div id="savedAddrBlock" style="display:none;margin-bottom:1.2rem">
+          <div class="saved-addr-label">Direcciones guardadas</div>
+          <div id="savedAddrList"></div>
         </div>
         <div class="f-row full"><div class="f-field"><label>Nombre Completo</label><input type="text" id="fn" placeholder="Alexandra Beaumont"/><div class="f-hint" id="en"></div></div></div>
         <div class="f-row full"><div class="f-field"><label>Correo Electrónico</label><input type="email" id="fe" placeholder="alex@example.com"/><div class="f-hint" id="ee"></div></div></div>
@@ -1795,6 +1803,28 @@ footer{background:var(--dark);padding:3.5rem 4rem;text-align:center;border-top:1
         <div class="f-row full"><div class="f-field"><label>País</label>
           <select id="fco"><option value="">Seleccionar país...</option><option>El Salvador</option><option>Guatemala</option><option>Honduras</option><option>Nicaragua</option><option>Costa Rica</option><option>Panamá</option><option>Belice</option></select>
           <div class="f-hint" id="eco"></div></div></div>
+        <!-- Save address prompt — shown to logged-in users after filling form -->
+        <div id="saveAddrPrompt" style="display:none;margin:0.8rem 0 0.4rem;padding:0.8rem 1rem;background:rgba(184,149,90,0.06);border:1px solid rgba(184,149,90,0.18)">
+          <label style="display:flex;align-items:center;gap:0.6rem;cursor:pointer;font-size:0.68rem;letter-spacing:0.08em;color:var(--muted)">
+            <input type="checkbox" id="saveAddrCheck" style="accent-color:var(--gold);width:14px;height:14px;flex-shrink:0"/>
+            <span>Guardar esta dirección para mis próximas compras</span>
+          </label>
+          <div style="margin-top:0.5rem">
+            <input type="text" id="saveAddrLabel" placeholder="Ej: Casa, Oficina, Mamá..." maxlength="60"
+              style="width:100%;padding:0.4rem 0.6rem;font-size:0.68rem;font-family:'Jost',sans-serif;
+                     background:transparent;border:1px solid rgba(184,149,90,0.25);color:var(--cream);
+                     letter-spacing:0.06em;box-sizing:border-box"/>
+          </div>
+        </div>
+        <!-- Guest save-address invite -->
+        <div id="saveAddrGuestPrompt" style="display:none;margin:0.8rem 0 0.4rem;padding:0.8rem 1rem;background:rgba(184,149,90,0.06);border:1px solid rgba(184,149,90,0.18)">
+          <p style="font-size:0.65rem;color:var(--muted);letter-spacing:0.06em;line-height:1.7;margin:0">
+            ¿Quieres guardar esta dirección?
+            <a href="#" onclick="openAuthModal();return false;" style="color:var(--gold);text-decoration:none">Crea una cuenta</a>
+            o <a href="#" onclick="openAuthModal();return false;" style="color:var(--gold);text-decoration:none">inicia sesión</a>
+            para no tener que volver a escribirla.
+          </p>
+        </div>
         <div class="m-actions"><button class="m-btn-p" id="s1next">Continuar al Pago</button></div>
       </div>
       <div class="m-section" id="ms2">
@@ -3072,54 +3102,70 @@ function openCheckout(){
     if(fe&&!fe.value)fe.value=currentCustomer.email||'';
     if(fph&&!fph.value&&currentCustomer.phone)fph.value=currentCustomer.phone;
 
-    // Show saved address block if they have one
-    if(currentCustomer.address){
-      hasSavedAddr = true;
-      var parts=[currentCustomer.address,currentCustomer.city,currentCustomer.state,currentCustomer.country].filter(Boolean);
-      var block=document.getElementById('savedAddrBlock');
-      var text=document.getElementById('savedAddrText');
-      if(block&&text){
-        text.textContent=parts.join(', ');
-        block.style.display='block';
-      }
-    }
-  }
+    // Load saved addresses from DB and render as selectable options
+    loadAddresses(function(addrs){
+      var block = document.getElementById('savedAddrBlock');
+      var list  = document.getElementById('savedAddrList');
+      if(!block || !list) return;
+      if(!addrs.length){ block.style.display='none'; return; }
 
-  // Hide saved block if no saved address
-  if(!hasSavedAddr){
-    var block=document.getElementById('savedAddrBlock');
-    if(block) block.style.display='none';
+      block.style.display = 'block';
+      list.innerHTML = addrs.map(function(a){
+        var parts = [a.line, a.city, a.state, a.country].filter(Boolean).join(', ');
+        return '<div class="saved-addr-option" onclick="fillSavedAddress('+JSON.stringify(a).replace(/"/g,'&quot;')+')">'+
+          '<div style="font-size:0.62rem;letter-spacing:0.12em;text-transform:uppercase;color:var(--gold);margin-bottom:0.2rem">'+esc(a.label)+'</div>'+
+          '<div style="font-size:0.7rem;color:var(--cream);line-height:1.5">'+esc(parts)+'</div>'+
+          '<div style="font-size:0.6rem;color:var(--gold);letter-spacing:0.1em;text-transform:uppercase;margin-top:0.4rem">Usar esta dirección →</div>'+
+        '</div>';
+      }).join('');
+
+      // Show save prompt — logged in, has addresses already
+      var prompt = document.getElementById('saveAddrPrompt');
+      if(prompt) prompt.style.display = 'block';
+    });
+    // Show save prompt for logged in users
+    var savePrompt = document.getElementById('saveAddrPrompt');
+    if(savePrompt) savePrompt.style.display = 'block';
+    var guestPrompt = document.getElementById('saveAddrGuestPrompt');
+    if(guestPrompt) guestPrompt.style.display = 'none';
+  } else {
+    // Guest — show invite to create account
+    var block = document.getElementById('savedAddrBlock');
+    if(block) block.style.display = 'none';
+    var guestPrompt = document.getElementById('saveAddrGuestPrompt');
+    if(guestPrompt) guestPrompt.style.display = 'block';
+    var savePrompt = document.getElementById('saveAddrPrompt');
+    if(savePrompt) savePrompt.style.display = 'none';
   }
 }
 
-function fillSavedAddress(){
-  if(typeof currentCustomer==='undefined'||!currentCustomer) return;
-  var fa=document.getElementById('fa');
-  var fc=document.getElementById('fc');
-  var fs=document.getElementById('fs');
-  var fco=document.getElementById('fco');
-  if(fa) fa.value=currentCustomer.address||'';
-  if(fc) fc.value=currentCustomer.city||'';
-  if(fs) fs.value=currentCustomer.state||'';
-  if(fco&&currentCustomer.country){
-    for(var i=0;i<fco.options.length;i++){
-      if(fco.options[i].text===currentCustomer.country||fco.options[i].value===currentCustomer.country){
-        fco.selectedIndex=i;break;
+function fillSavedAddress(a){
+  if(!a) return;
+  var fields = {fa:a.line, fc:a.city, fs:a.state||'', fco:a.country, fph:a.phone||''};
+  Object.keys(fields).forEach(function(id){
+    var el = document.getElementById(id);
+    if(!el) return;
+    if(id==='fco'){
+      for(var i=0;i<el.options.length;i++){
+        if(el.options[i].text===fields[id]||el.options[i].value===fields[id]){el.selectedIndex=i;break;}
       }
-    }
-  }
-  // Visual feedback
-  var btn=document.querySelector('.saved-addr-btn');
-  if(btn){btn.textContent='✓ Dirección aplicada';btn.style.color='var(--gold)';btn.disabled=true;}
-  // Clear field errors if any
+    } else { el.value = fields[id]||''; }
+  });
+  // Clear field errors
   ['fa','fc','fco'].forEach(function(id){sfe(id,false);});
+  // Uncheck save-address since we just loaded one
+  var chk = document.getElementById('saveAddrCheck');
+  if(chk) chk.checked = false;
+  toast('Dirección aplicada','','ok');
 }
 function closeCheckout(){
   document.getElementById('modalBg').classList.remove('open');
   document.body.style.overflow='';
-  // Reset saved address button for next open
-  var btn=document.querySelector('.saved-addr-btn');
-  if(btn){btn.textContent='Usar esta dirección';btn.style.color='';btn.disabled=false;}
+  // Reset save-address checkbox for next open
+  var chk = document.getElementById('saveAddrCheck');
+  if(chk) chk.checked = false;
+  var lbl = document.getElementById('saveAddrLabel');
+  if(lbl) lbl.value = '';
 }
 document.getElementById('checkoutBtn').addEventListener('click',openCheckout);
 document.getElementById('mClose').addEventListener('click',closeCheckout);
@@ -3168,7 +3214,35 @@ function fillReview(){
   };
   document.getElementById('mPayment').textContent = pmLabels[selectedPayMethod] || selectedPayMethod;
 }
-document.getElementById('s1next').addEventListener('click',function(){if(v1())goStep(2);});
+document.getElementById('s1next').addEventListener('click',function(){
+  if(!v1()) return;
+  // If logged in and checkbox is checked, save the address to DB before advancing
+  var chk = document.getElementById('saveAddrCheck');
+  if(chk && chk.checked && typeof customerToken !== 'undefined' && customerToken) {
+    var label = (document.getElementById('saveAddrLabel').value.trim()) || 'Mi dirección';
+    customerFetch(API+'/customer/addresses', {
+      method: 'POST',
+      headers: {'Content-Type':'application/json'},
+      body: JSON.stringify({
+        label:   label,
+        line:    gv('fa'),
+        city:    gv('fc'),
+        state:   gv('fs'),
+        country: gv('fco'),
+        phone:   gv('fph'),
+      })
+    })
+    .then(function(r){ return r.json(); })
+    .then(function(data){
+      _cachedAddresses = null; // invalidate cache
+      if(data.ok) toast('Dirección guardada','','ok');
+    })
+    .catch(function(){}) // non-blocking — don't stop checkout
+    .finally(function(){ goStep(2); });
+  } else {
+    goStep(2);
+  }
+});
 document.getElementById('s2back').addEventListener('click',function(){goStep(1);});
 document.getElementById('s2next').addEventListener('click',function(){if(v2()){fillReview();goStep(3);}});
 document.getElementById('s3back').addEventListener('click',function(){goStep(2);});
@@ -3369,7 +3443,8 @@ var currentCustomer = null;
           }catch(e){ localStorage.removeItem('sillage_scent_profile'); }
         }
         renderCustomerArea();
-        // Load full profile with saved address
+        migrateLocalAddresses(); // migrate any pre-login localStorage addresses
+        // Load full profile
         return customerFetch(API+'/customer/profile',{});
       } else {
         // Token expired/invalid — full cleanup
@@ -3921,6 +3996,39 @@ function _btcPayStartPolling() {
 }
 
 // ── Check URL for reset token on load ────────────────
+// ── Migrate localStorage addresses to DB (one-time, on login) ───────────────
+function migrateLocalAddresses() {
+  if(!customerToken) return;
+  var raw = localStorage.getItem('sillage_addresses');
+  if(!raw) return;
+  var addrs;
+  try { addrs = JSON.parse(raw); } catch(e) { return; }
+  if(!addrs || !addrs.length) { localStorage.removeItem('sillage_addresses'); return; }
+
+  // Migrate each address to DB, then clear localStorage
+  var promises = addrs.map(function(a) {
+    return customerFetch(API+'/customer/addresses', {
+      method: 'POST',
+      headers: {'Content-Type':'application/json'},
+      body: JSON.stringify({
+        label:      a.name || a.label || 'Mi dirección',
+        line:       a.line || a.address || '',
+        city:       a.city || '',
+        state:      a.state || '',
+        country:    a.country || 'El Salvador',
+        phone:      a.phone || '',
+        is_default: a.isDefault ? 1 : 0,
+      })
+    }).catch(function(){});
+  });
+
+  Promise.all(promises).then(function() {
+    localStorage.removeItem('sillage_addresses');
+    _cachedAddresses = null;
+    console.log('Migrated ' + addrs.length + ' address(es) from localStorage to DB');
+  });
+}
+
 // ── Check URL for BTCPay renewal link ────────────────
 (function checkBtcpayRenew() {
   var params = new URLSearchParams(window.location.search);
@@ -3986,11 +4094,13 @@ function doLogin(){
         localStorage.setItem('sillage_token_ts', Date.now());
         localStorage.setItem('sillage_customer_name', currentCustomer.name||'');
         clearSommelierConsultLimit();
-        // Load full profile including saved address
+        // Load full profile
         customerFetch(API+'/customer/profile',{})
           .then(function(r){return r.json();})
           .then(function(profile){if(profile&&profile.id)currentCustomer=Object.assign(currentCustomer,profile);})
           .catch(function(){});
+        // Migrate any addresses saved locally before login
+        migrateLocalAddresses();
         closeAuth();
         renderCustomerArea();
         toast('¡Bienvenido!','Hola '+esc(currentCustomer.name),'ok');
@@ -4379,9 +4489,19 @@ function toggleFav(e, pid){
   btn.textContent = isFav(pid) ? '\u2665' : '\u2661';
 }
 
-// ── Addresses (localStorage — synced to profile) ──
-function getAddresses(){ try{return JSON.parse(localStorage.getItem('sillage_addresses')||'[]');}catch(e){return[];} }
-function saveAddresses(arr){ localStorage.setItem('sillage_addresses', JSON.stringify(arr)); }
+// ── Addresses (DB-backed via /api/customer/addresses) ────────────────────────
+var _cachedAddresses = null; // in-memory cache, cleared on save/delete
+
+function loadAddresses(cb) {
+  if(!customerToken) { cb([]); return; }
+  customerFetch(API+'/customer/addresses', {})
+    .then(function(r){ return r.json(); })
+    .then(function(addrs){
+      _cachedAddresses = addrs;
+      cb(addrs);
+    })
+    .catch(function(){ cb([]); });
+}
 
 // ── Preferences ───────────────────────────────
 function getPrefs(){ try{return JSON.parse(localStorage.getItem('sillage_prefs')||'{}');}catch(e){return{};} }
@@ -4501,30 +4621,32 @@ function loadAcctOrders(){
 // ── DIRECCIONES ───────────────────────────────
 function renderAddresses(){
   var container = document.getElementById('acctAddrList');
-  var addrs = getAddresses();
-  if(!addrs.length){
-    container.innerHTML='<p style="color:var(--muted);font-size:0.7rem;margin-bottom:1rem">No tienes direcciones guardadas.</p>';
-    return;
-  }
-  container.innerHTML = addrs.map(function(a, i){
-    return '<div class="ap-addr-card'+(a.isDefault?' default':'')+'">'+
-      (a.isDefault?'<span class="ap-addr-default-tag">Predeterminada</span><br/>':'')+
-      '<div class="ap-addr-text">'+
-        '<strong>'+a.name+'</strong><br/>'+
-        a.line+'<br/>'+a.city+(a.state?', '+a.state:'')+', '+a.country+
-        (a.phone?'<br/>'+a.phone:'')+
-      '</div>'+
-      '<div class="ap-addr-actions">'+
-        (!a.isDefault?'<button class="ap-addr-btn" onclick="setDefaultAddr('+i+')">Predeterminar</button>':'')+
-        '<button class="ap-addr-btn" onclick="useAddress('+i+')">Usar ahora</button>'+
-        '<button class="ap-addr-btn danger" onclick="deleteAddr('+i+')">&#10005;</button>'+
-      '</div>'+
-    '</div>';
-  }).join('');
+  container.innerHTML = '<p style="color:var(--muted);font-size:0.7rem">Cargando...</p>';
+  loadAddresses(function(addrs){
+    if(!addrs.length){
+      container.innerHTML = '<p style="color:var(--muted);font-size:0.7rem;margin-bottom:1rem">No tienes direcciones guardadas.</p>';
+      return;
+    }
+    container.innerHTML = addrs.map(function(a){
+      return '<div class="ap-addr-card'+(a.is_default?' default':'')+'">'+
+        (a.is_default?'<span class="ap-addr-default-tag">Predeterminada</span><br/>':'')+
+        '<div class="ap-addr-text">'+
+          '<strong>'+esc(a.label)+'</strong><br/>'+
+          esc(a.line)+'<br/>'+esc(a.city)+(a.state?', '+esc(a.state):'')+', '+esc(a.country)+
+          (a.phone?'<br/>'+esc(a.phone):'')+
+        '</div>'+
+        '<div class="ap-addr-actions">'+
+          (!a.is_default?'<button class="ap-addr-btn" onclick="setDefaultAddr('+a.id+')">Predeterminar</button>':'')+
+          '<button class="ap-addr-btn" onclick="useAddressObj('+JSON.stringify(a).replace(/"/g,'&quot;')+')">Usar ahora</button>'+
+          '<button class="ap-addr-btn danger" onclick="deleteAddr('+a.id+')">&#10005;</button>'+
+        '</div>'+
+      '</div>';
+    }).join('');
+  });
 }
 
 function saveAddress(){
-  var name    = document.getElementById('addrName').value.trim();
+  var label   = document.getElementById('addrName').value.trim();
   var line    = document.getElementById('addrLine').value.trim();
   var city    = document.getElementById('addrCity').value.trim();
   var state   = document.getElementById('addrState').value.trim();
@@ -4533,40 +4655,53 @@ function saveAddress(){
   var err     = document.getElementById('addrErr');
   if(!line||!city){err.textContent='Dirección y ciudad son requeridas.';return;}
   err.textContent='';
-  var addrs = getAddresses();
-  addrs.push({name:name||'Mi dirección',line:line,city:city,state:state,
-              zip:'',country:country||'El Salvador',phone:phone,isDefault:addrs.length===0});
-  saveAddresses(addrs);
-  // Clear form
-  ['addrName','addrLine','addrCity','addrState','addrCountry','addrPhone']
-    .forEach(function(id){var el=document.getElementById(id);if(el)el.value='';}); 
-  renderAddresses();
-  toast('Dirección guardada','','ok');
+  customerFetch(API+'/customer/addresses', {
+    method:'POST',
+    headers:{'Content-Type':'application/json'},
+    body: JSON.stringify({label:label||'Mi dirección',line:line,city:city,state:state,
+                          country:country||'El Salvador',phone:phone})
+  })
+  .then(function(r){return r.json();})
+  .then(function(data){
+    if(!data.ok){err.textContent=data.error||'Error al guardar.';return;}
+    _cachedAddresses = null;
+    ['addrName','addrLine','addrCity','addrState','addrCountry','addrPhone']
+      .forEach(function(id){var el=document.getElementById(id);if(el)el.value='';});
+    renderAddresses();
+    toast('Dirección guardada','','ok');
+  })
+  .catch(function(){err.textContent='Error de conexión.';});
 }
 
-function setDefaultAddr(idx){
-  var addrs = getAddresses();
-  addrs.forEach(function(a,i){ a.isDefault = (i===idx); });
-  saveAddresses(addrs); renderAddresses();
+function setDefaultAddr(addrId){
+  customerFetch(API+'/customer/addresses/'+addrId+'/default', {method:'PATCH'})
+    .then(function(){_cachedAddresses=null; renderAddresses();})
+    .catch(function(){toast('Error','No se pudo actualizar','');});
 }
 
-function deleteAddr(idx){
-  var addrs = getAddresses();
-  addrs.splice(idx,1);
-  if(addrs.length && !addrs.find(function(a){return a.isDefault;})) addrs[0].isDefault=true;
-  saveAddresses(addrs); renderAddresses();
+function deleteAddr(addrId){
+  customerFetch(API+'/customer/addresses/'+addrId, {method:'DELETE'})
+    .then(function(r){return r.json();})
+    .then(function(data){
+      if(data.ok){_cachedAddresses=null; renderAddresses();}
+      else toast('Error',data.error||'No se pudo eliminar','');
+    })
+    .catch(function(){toast('Error','Error de conexión','');});
 }
 
-function useAddress(idx){
-  var a = getAddresses()[idx];
+function useAddressObj(a){
   if(!a) return;
-  var fields = {fa:a.line,fc:a.city,fs:a.state,fz:a.zip,fco:a.country,fph:a.phone};
+  var fields = {fa:a.line, fc:a.city, fs:a.state||'', fco:a.country, fph:a.phone||''};
   Object.keys(fields).forEach(function(id){
     var el = document.getElementById(id);
-    if(el && fields[id]) el.value = fields[id];
+    if(!el) return;
+    if(id==='fco'){
+      for(var i=0;i<el.options.length;i++){
+        if(el.options[i].text===fields[id]||el.options[i].value===fields[id]){el.selectedIndex=i;break;}
+      }
+    } else { el.value = fields[id]||''; }
   });
   closeAccount();
-  // Open checkout if cart has items
   if(cart.length > 0) openCheckout();
   toast('Dirección aplicada','','ok');
 }
