@@ -135,6 +135,23 @@ async function initDB() {
   `);
 
   await db.execute(`
+    CREATE TABLE IF NOT EXISTS customer_addresses (
+      id          INT AUTO_INCREMENT PRIMARY KEY,
+      customer_id INT NOT NULL,
+      label       VARCHAR(100) NOT NULL DEFAULT 'Mi dirección',
+      line        VARCHAR(500) NOT NULL,
+      city        VARCHAR(100) NOT NULL,
+      state       VARCHAR(100) DEFAULT NULL,
+      postcode    VARCHAR(20)  DEFAULT NULL,
+      country     VARCHAR(100) NOT NULL DEFAULT 'El Salvador',
+      phone       VARCHAR(50)  DEFAULT NULL,
+      is_default  TINYINT      NOT NULL DEFAULT 0,
+      created_at  DATETIME     NOT NULL,
+      INDEX idx_customer (customer_id)
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
+  `);
+
+  await db.execute(`
     CREATE TABLE IF NOT EXISTS catalogue (
       id         INT AUTO_INCREMENT PRIMARY KEY,
       data       LONGTEXT NOT NULL,
@@ -1635,6 +1652,93 @@ app.delete('/api/customers/:id', requireAdmin, async (req, res) => {
 app.get('/api/customer/orders', requireCustomer, async (req, res) => {
   const orders = await getCustomerOrders(req.customer.user.id);
   res.json(orders);
+});
+
+// ── Customer addresses CRUD ──────────────────────────────────────────────────
+
+// GET /api/customer/addresses — list all addresses for the logged-in customer
+app.get('/api/customer/addresses', requireCustomer, async (req, res) => {
+  const id = req.customer.user.id;
+  const [rows] = await db.execute(
+    'SELECT id,label,line,city,state,postcode,country,phone,is_default FROM customer_addresses WHERE customer_id=? ORDER BY is_default DESC, id ASC',
+    [id]
+  );
+  res.json(rows);
+});
+
+// POST /api/customer/addresses — add a new address
+app.post('/api/customer/addresses', requireCustomer, async (req, res) => {
+  const id      = req.customer.user.id;
+  const { label, line, city, state, postcode, country, phone, is_default } = req.body;
+  if (!line || !city) return res.status(400).json({ error: 'Dirección y ciudad son requeridas.' });
+
+  const n = new Date();
+  // If new address is default, unset all others first
+  if (is_default) {
+    await db.execute('UPDATE customer_addresses SET is_default=0 WHERE customer_id=?', [id]);
+  }
+  // If this is the first address, make it default automatically
+  const [existing] = await db.execute('SELECT COUNT(*) as cnt FROM customer_addresses WHERE customer_id=?', [id]);
+  const makeDefault = is_default || existing[0].cnt === 0 ? 1 : 0;
+
+  const [result] = await db.execute(
+    `INSERT INTO customer_addresses (customer_id,label,line,city,state,postcode,country,phone,is_default,created_at)
+     VALUES (?,?,?,?,?,?,?,?,?,?)`,
+    [id,
+     String(label||'Mi dirección').slice(0,100),
+     String(line).slice(0,500),
+     String(city).slice(0,100),
+     state  ? String(state).slice(0,100)  : null,
+     postcode ? String(postcode).slice(0,20) : null,
+     String(country||'El Salvador').slice(0,100),
+     phone  ? String(phone).slice(0,50)   : null,
+     makeDefault, n]
+  );
+  const [addr] = await db.execute(
+    'SELECT id,label,line,city,state,postcode,country,phone,is_default FROM customer_addresses WHERE id=?',
+    [result.insertId]
+  );
+  res.json({ ok: true, address: addr[0] });
+});
+
+// DELETE /api/customer/addresses/:addrId — delete an address
+app.delete('/api/customer/addresses/:addrId', requireCustomer, async (req, res) => {
+  const customerId = req.customer.user.id;
+  const addrId     = parseInt(req.params.addrId);
+  if (!addrId) return res.status(400).json({ error: 'ID inválido' });
+
+  const [rows] = await db.execute(
+    'SELECT id, is_default FROM customer_addresses WHERE id=? AND customer_id=?',
+    [addrId, customerId]
+  );
+  if (!rows.length) return res.status(404).json({ error: 'Dirección no encontrada' });
+
+  await db.execute('DELETE FROM customer_addresses WHERE id=?', [addrId]);
+
+  // If deleted address was default, promote the oldest remaining one
+  if (rows[0].is_default) {
+    await db.execute(
+      'UPDATE customer_addresses SET is_default=1 WHERE customer_id=? ORDER BY id ASC LIMIT 1',
+      [customerId]
+    );
+  }
+  res.json({ ok: true });
+});
+
+// PATCH /api/customer/addresses/:addrId/default — set as default
+app.patch('/api/customer/addresses/:addrId/default', requireCustomer, async (req, res) => {
+  const customerId = req.customer.user.id;
+  const addrId     = parseInt(req.params.addrId);
+  if (!addrId) return res.status(400).json({ error: 'ID inválido' });
+
+  const [rows] = await db.execute(
+    'SELECT id FROM customer_addresses WHERE id=? AND customer_id=?', [addrId, customerId]
+  );
+  if (!rows.length) return res.status(404).json({ error: 'Dirección no encontrada' });
+
+  await db.execute('UPDATE customer_addresses SET is_default=0 WHERE customer_id=?', [customerId]);
+  await db.execute('UPDATE customer_addresses SET is_default=1 WHERE id=?', [addrId]);
+  res.json({ ok: true });
 });
 
 // ═══════════════════════════════════════════════════════
