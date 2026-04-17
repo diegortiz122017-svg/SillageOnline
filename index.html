@@ -314,6 +314,15 @@ nav a:hover{color:var(--gold)}
 .cart-list::-webkit-scrollbar-thumb{background:var(--border)}
 .cart-empty-msg{text-align:center;padding:4rem 1rem;color:var(--muted);font-size:0.72rem;line-height:1.8}
 .cart-row{display:flex;gap:0.8rem;align-items:flex-start;padding-bottom:1rem;border-bottom:1px solid var(--border-light)}
+/* Bundle group styles */
+.cart-bundle-group{display:block;padding-bottom:1rem;border-bottom:1px solid var(--border-light)}
+.cart-bundle-hdr{display:flex;align-items:center;gap:0.6rem;margin-bottom:0.5rem}
+.cr-bundle-badge{font-size:0.48rem;letter-spacing:0.18em;text-transform:uppercase;color:#0e0c0a;background:var(--gold);padding:0.15rem 0.4rem;flex-shrink:0}
+.cr-bundle-name{font-family:'Cormorant Garamond',serif;font-size:0.95rem;color:var(--cream);flex:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.cart-bundle-qty{display:flex;align-items:center;gap:0.5rem;margin-bottom:0.6rem;padding-left:0.1rem}
+.cart-bundle-items{display:flex;flex-direction:column;gap:0.5rem;padding-left:0.1rem}
+.cart-bundle-item{display:flex;align-items:center;gap:0.6rem}
+.cr-bundle-item-info{display:flex;flex-direction:column;gap:0.1rem;min-width:0}
 .cart-thumb{width:48px;height:64px;background:linear-gradient(135deg,#2a2418,#1a1510);display:flex;align-items:center;justify-content:center;flex-shrink:0;border:1px solid var(--border)}
 .cart-row-info{flex:1;min-width:0}
 .cr-brand{font-size:0.52rem;letter-spacing:0.18em;text-transform:uppercase;color:var(--gold)}
@@ -2965,7 +2974,24 @@ fetch(API+'/settings/shipping')
 
 function updateDetailCartBtn(){var qty=cartQty();var el=document.getElementById('detailCartCount');if(!el)return;el.textContent=qty;el.classList.toggle('show',qty>0);var btn=document.getElementById('detailCartBtn');if(btn){btn.classList.remove('flash');void btn.offsetWidth;btn.classList.add('flash');}}
 function cartQty(){return cart.reduce(function(s,i){return s+i.qty;},0);}
-function cartSum(){return cart.reduce(function(s,i){var up=i.unitPrice!==undefined?i.unitPrice:effectivePrice(i.p);return s+up*i.qty;},0);}
+function cartSum(){
+  var sum = 0;
+  // Track which bundleIds we've already counted to avoid double-counting
+  var countedBundles = {};
+  cart.forEach(function(i){
+    if(i.bundleId){
+      // Bundle item — add bundlePrice once per bundleId
+      if(!countedBundles[i.bundleId]){
+        countedBundles[i.bundleId] = true;
+        sum += i.bundlePrice * i.qty;
+      }
+    } else {
+      var up = i.unitPrice !== undefined ? i.unitPrice : effectivePrice(i.p);
+      sum += up * i.qty;
+    }
+  });
+  return sum;
+}
 function getShipping(){
   var sub = cartSum();
   return sub >= shippingThreshold ? 0 : shippingCost;
@@ -2993,10 +3019,26 @@ function addToCartWithOptions(pid, label, price, size, type){
 function removeFromCart(pid){cart=cart.filter(function(i){return i.p.id!==pid;});renderCart();saveCart();}
 function changeQty(pid,d){var it=cart.find(function(i){return i.p.id===pid;});if(!it)return;it.qty=Math.max(1,it.qty+d);renderCart();saveCart();}
 function removeFromCartKey(key){
+  // Bundle items use key 'bundleId:xxx' — remove all items of that bundle
+  if(key.indexOf('bundleid:') === 0){
+    var bid = key.slice('bundleid:'.length);
+    cart = cart.filter(function(i){ return i.bundleId !== bid; });
+    renderCart(); saveCart();
+    return;
+  }
   var parts=key.split('_');var pid=parseInt(parts[0]);var type=parts[1]||'full';
   cart=cart.filter(function(i){return!(i.p.id===pid&&(i.type||'full')===type);});renderCart();saveCart();
 }
 function changeQtyKey(key,d){
+  // Bundle qty — sync all items of same bundleId
+  if(key.indexOf('bundleid:') === 0){
+    var bid = key.slice('bundleid:'.length);
+    cart.forEach(function(i){
+      if(i.bundleId === bid) i.qty = Math.max(1, i.qty + d);
+    });
+    renderCart(); saveCart();
+    return;
+  }
   var parts=key.split('_');var pid=parseInt(parts[0]);var type=parts[1]||'full';
   var it=cart.find(function(i){return i.p.id===pid&&(i.type||'full')===type;});
   if(!it)return;it.qty=Math.max(1,it.qty+d);renderCart();saveCart();
@@ -3042,16 +3084,73 @@ function renderCart(){
 
   // Cart item rows
   var list=document.getElementById('cartList');
-  list.querySelectorAll('.cart-row').forEach(function(r){r.remove();});
+  list.querySelectorAll('.cart-row, .cart-bundle-group').forEach(function(r){r.remove();});
   document.getElementById('cartEmpty').style.display=cart.length?'none':'block';
+  // Group bundle items together, render standalone items normally
+  var renderedBundles = {};
   cart.forEach(function(item){
-    var p=item.p,q=item.qty,ep=effectivePrice(p);
-    var row=document.createElement('div');row.className='cart-row';
+    var p=item.p,q=item.qty;
+    var row=document.createElement('div');
+
+    if(item.bundleId){
+      // Already rendered this bundle's header
+      if(renderedBundles[item.bundleId]){
+        // Add sub-item row inside the existing bundle group
+        var group = renderedBundles[item.bundleId];
+        var subRow = document.createElement('div');
+        subRow.className = 'cart-bundle-item';
+        subRow.innerHTML =
+          '<div class="cart-thumb" style="width:32px;height:32px">'+svg(p.c,p.s,'sm')+'</div>'+
+          '<div class="cr-bundle-item-info">'+
+            '<span class="cr-brand" style="font-size:0.58rem">'+esc(p.brand)+'</span>'+
+            '<span class="cr-name" style="font-size:0.72rem">'+esc(item.label)+'</span>'+
+            '<span class="cr-size" style="font-size:0.6rem">'+esc(item.size)+'</span>'+
+          '</div>';
+        group.querySelector('.cart-bundle-items').appendChild(subRow);
+        return;
+      }
+      // First item of this bundle — render bundle header
+      var bundleKey = 'bundleid:' + item.bundleId;
+      row.className = 'cart-row cart-bundle-group';
+      row.innerHTML =
+        '<div class="cart-bundle-hdr">'+
+          '<div class="cr-bundle-badge">Bundle</div>'+
+          '<div class="cr-bundle-name">'+esc(item.bundleName)+'</div>'+
+          '<div class="cart-row-right" style="margin-left:auto">'+
+            '<button class="cr-remove" data-rm="'+bundleKey+'">×</button>'+
+            '<span class="cr-total">$'+(item.bundlePrice*q).toFixed(2)+'</span>'+
+          '</div>'+
+        '</div>'+
+        '<div class="cart-bundle-qty">'+
+          '<button class="q-btn q-minus" data-key="'+bundleKey+'">−</button>'+
+          '<span class="q-num">'+q+'</span>'+
+          '<button class="q-btn q-plus" data-key="'+bundleKey+'">+</button>'+
+        '</div>'+
+        '<div class="cart-bundle-items"></div>';
+      list.appendChild(row);
+      renderedBundles[item.bundleId] = row;
+      // Now add this first item as a sub-item
+      var subRow = document.createElement('div');
+      subRow.className = 'cart-bundle-item';
+      subRow.innerHTML =
+        '<div class="cart-thumb" style="width:32px;height:32px">'+svg(p.c,p.s,'sm')+'</div>'+
+        '<div class="cr-bundle-item-info">'+
+          '<span class="cr-brand" style="font-size:0.58rem">'+esc(p.brand)+'</span>'+
+          '<span class="cr-name" style="font-size:0.72rem">'+esc(item.label)+'</span>'+
+          '<span class="cr-size" style="font-size:0.6rem">'+esc(item.size)+'</span>'+
+        '</div>';
+      row.querySelector('.cart-bundle-items').appendChild(subRow);
+      return;
+    }
+
+    // Standalone item
+    var ep            = effectivePrice(p);
     var itemLabel     = item.label     || (p.brand+' '+p.name);
     var itemUnitPrice = item.unitPrice !== undefined ? item.unitPrice : ep;
     var itemSize      = item.size      || p.size;
     var itemType      = item.type      || 'full';
     var cartKey       = p.id + '_' + itemType;
+    row.className     = 'cart-row';
     row.innerHTML=
       '<div class="cart-thumb">'+svg(p.c,p.s,'sm')+'</div>'+
       '<div class="cart-row-info"><div class="cr-brand">'+p.brand+'</div>'+
@@ -3253,9 +3352,26 @@ document.getElementById('s3place').addEventListener('click',placeOrder);
 
 function placeOrder(){
   var email=gv('fe');
+  // Build order items — bundle items share bundlePrice split across them for line-item display
+  var _bundlePriceAssigned = {};
   var orderItems=cart.map(function(it){
-    var up=it.unitPrice!==undefined?it.unitPrice:effectivePrice(it.p);
     var nm=it.label||(it.p.brand+' '+it.p.name);
+    if(it.bundleId){
+      // Distribute bundle price evenly across items for server-side line items
+      var perItem = parseFloat((it.bundlePrice / it.bundleCount).toFixed(2));
+      return{
+        productId:  it.p.id,
+        name:       nm + ' (Bundle: '+it.bundleName+')',
+        qty:        it.qty,
+        price:      perItem,
+        total:      parseFloat((perItem*it.qty).toFixed(2)),
+        type:       it.type||'decant',
+        size:       it.size||it.p.size,
+        bundleId:   it.bundleId,
+        bundleName: it.bundleName,
+      };
+    }
+    var up=it.unitPrice!==undefined?it.unitPrice:effectivePrice(it.p);
     return{productId:it.p.id,name:nm,qty:it.qty,price:up,total:up*it.qty,type:it.type||'full',size:it.size||it.p.size};
   });
   var total=orderTotal();
@@ -3605,15 +3721,32 @@ function loadBundles(){
 
 // bundlesGrid removed from homepage
 function addBundleToCart(id, bundle){
+  // Check if this exact bundle is already in the cart
+  var alreadyInCart = cart.some(function(i){ return i.bundleId === id; });
+  if(alreadyInCart){
+    toast('Ya en el carrito', bundle.name+' ya está en tu carrito', '');
+    return;
+  }
+
   var added = false;
+  var bundleId = 'bundle_' + id + '_' + Date.now();
   (bundle.items||[]).forEach(function(it){
     var p = P.find(function(x){ return x.id === it.productId || x.id === +it.productId; });
     if(p){
-      var price = bundle.price / bundle.items.length; // split price evenly
-      var label = it.name + (it.size?' ('+it.size+')':'') + ' — Bundle';
-      var ex = cart.find(function(i){ return i.p.id===p.id && i.type==='decant' && i.label===label; });
-      if(ex){ ex.qty++; }
-      else{ cart.push({p:p, qty:1, type:'decant', label:label, unitPrice:parseFloat(price.toFixed(2)), size:it.size||'Decant'}); }
+      var label = it.name + (it.size?' ('+it.size+')':'');
+      cart.push({
+        p:           p,
+        qty:         1,
+        type:        'decant',
+        label:       label,
+        size:        it.size || 'Decant',
+        bundleId:    bundleId,       // links all items of this bundle
+        bundleDefId: id,             // the bundle definition id (for dupe check)
+        bundleName:  bundle.name,    // display name of the bundle
+        bundlePrice: parseFloat(bundle.price), // total bundle price
+        bundleCount: bundle.items.length,      // how many items in bundle
+        unitPrice:   0,              // set to 0 — price is on the bundle, not the item
+      });
       added = true;
     }
   });
