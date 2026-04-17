@@ -946,6 +946,52 @@ function recordFailed(ip) {
 }
 function clearAttempts(ip) { loginAttempts.delete(ip); }
 
+// ─── Admin password verification ─────────────────────
+// Supports two formats for ADMIN_PASS env variable:
+//   pbkdf2:<iterations>:<salt_hex>:<hash_hex>  → hashed (recommended)
+//   anything else                              → plain text (legacy, logs a warning)
+//
+// To generate a hashed password, run in Node:
+//   node -e "
+//     const c=require('crypto'), salt=c.randomBytes(16).toString('hex');
+//     const h=c.pbkdf2Sync('YOUR_PASSWORD',salt,310000,32,'sha256').toString('hex');
+//     console.log('pbkdf2:310000:'+salt+':'+h);
+//   "
+// Then set ADMIN_PASS to the output in Railway.
+
+function verifyAdminPassword(candidate, stored) {
+  if (!candidate || !stored) return false;
+  if (stored.startsWith('pbkdf2:')) {
+    // Format: pbkdf2:<iterations>:<salt_hex>:<hash_hex>
+    const parts = stored.split(':');
+    if (parts.length !== 4) return false;
+    const [, iters, saltHex, storedHash] = parts;
+    const iterations = parseInt(iters, 10);
+    if (!iterations || iterations < 100000) return false; // reject weak configs
+    try {
+      const candidateHash = crypto.pbkdf2Sync(
+        candidate, saltHex, iterations, 32, 'sha256'
+      ).toString('hex');
+      const a = Buffer.from(candidateHash, 'hex');
+      const b = Buffer.from(storedHash,    'hex');
+      if (a.length !== b.length) return false;
+      return crypto.timingSafeEqual(a, b);
+    } catch(e) { return false; }
+  } else {
+    // Legacy plain text — warn once and fall back to timingSafeEqual
+    if (!verifyAdminPassword._warnedPlain) {
+      console.warn('⚠️  ADMIN_PASS is stored as plain text. Generate a hashed version with the instructions in server.js.');
+      verifyAdminPassword._warnedPlain = true;
+    }
+    try {
+      return crypto.timingSafeEqual(
+        Buffer.from(candidate.padEnd(200)),
+        Buffer.from(stored.padEnd(200))
+      );
+    } catch(e) { return false; }
+  }
+}
+
 // ─── Auth middleware ──────────────────────────────────
 // requireAdmin → middleware/auth.js
 // requireCustomer → middleware/auth.js
@@ -1405,9 +1451,14 @@ app.post('/api/auth/login', authLimiter, async (req, res) => {
   const { username, password } = req.body;
   let ok = false;
   try {
-    ok = !!(username && ADMIN_USER && password && ADMIN_PASS &&
-      crypto.timingSafeEqual(Buffer.from(username.padEnd(100)), Buffer.from(ADMIN_USER.padEnd(100))) &&
-      crypto.timingSafeEqual(Buffer.from(password.padEnd(100)), Buffer.from(ADMIN_PASS.padEnd(100))));
+    // Username comparison stays timing-safe plain text (not a secret worth hashing)
+    const userOk = !!(username && ADMIN_USER &&
+      crypto.timingSafeEqual(
+        Buffer.from(username.padEnd(200)),
+        Buffer.from(ADMIN_USER.padEnd(200))
+      ));
+    // Password: supports pbkdf2 hash or legacy plain text
+    ok = userOk && verifyAdminPassword(password, ADMIN_PASS);
   } catch(e) {}
 
   if (!ok) {
