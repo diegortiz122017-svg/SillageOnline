@@ -175,6 +175,21 @@ async function initDB() {
   `);
 
   await db.execute(`
+    CREATE TABLE IF NOT EXISTS btcpay_pending (
+      invoice_id   VARCHAR(100) PRIMARY KEY,
+      order_id     VARCHAR(40)  NOT NULL,
+      order_data   LONGTEXT     NOT NULL,  -- JSON snapshot of the full order object
+      customer_id  INT          NULL,
+      renew_token  VARCHAR(128) NULL,      -- HMAC token for the "renew payment" email link
+      renew_email_sent TINYINT  DEFAULT 0, -- 1 once the expiry email has been sent
+      expires_at   DATETIME     NOT NULL,  -- BTCPay invoice expiry (typ. 15 min)
+      created_at   DATETIME     NOT NULL,
+      INDEX idx_expires (expires_at),
+      INDEX idx_renew   (renew_token)
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
+  `);
+
+  await db.execute(`
     CREATE TABLE IF NOT EXISTS settings (
       key_name   VARCHAR(100) PRIMARY KEY,
       value      TEXT NOT NULL,
@@ -1671,6 +1686,16 @@ setInterval(() => {
     if (rec.start < cutoff) _sessionInitTracker.delete(ip);
 }, 60 * 60 * 1000);
 
+// ── BTCPay pending cleanup ────────────────────────────
+// Delete expired pending orders every 30 min (invoice expired, user never paid)
+setInterval(async () => {
+  try {
+    const [r] = await db.execute('DELETE FROM btcpay_pending WHERE expires_at < NOW()');
+    if (r.affectedRows > 0)
+      console.log(`BTCPay cleanup: removed ${r.affectedRows} expired pending order(s)`);
+  } catch(e) { /* ignore */ }
+}, 30 * 60 * 1000);
+
 app.get('/api/catalogue', async (req, res) => res.json(await getCatalogue()));
 
 // ── Helper: deduct inventory and broadcast ────────────
@@ -1904,6 +1929,35 @@ app.post('/api/orders', orderLimiter, async (req, res) => {
     }
   }
 
+  // ── BTCPay: defer order creation until payment confirmed ──────────────────
+  // Don't insert into orders, don't email, don't notify admin yet.
+  // Store everything in btcpay_pending — webhook will create the real order.
+  if (paymentMethod === 'btcpay') {
+    if (!BTCPAY_STORE_ID || !BTCPAY_API_KEY) {
+      return res.status(503).json({ error: 'BTCPay no configurado' });
+    }
+    let btcpayResult;
+    try {
+      btcpayResult = await createBTCPayInvoice(order);
+    } catch(e) {
+      console.error('BTCPay invoice creation error:', e.message);
+      return res.status(502).json({ error: 'No se pudo crear el invoice de Bitcoin. Intenta de nuevo.' });
+    }
+
+    // Store pending order — expires 20 min from now (BTCPay default is 15 min)
+    const expiresAt = new Date(Date.now() + 20 * 60 * 1000);
+    await db.execute(
+      `INSERT INTO btcpay_pending (invoice_id, order_id, order_data, customer_id, expires_at, created_at)
+       VALUES (?, ?, ?, ?, ?, ?)
+       ON DUPLICATE KEY UPDATE order_data=VALUES(order_data), expires_at=VALUES(expires_at)`,
+      [btcpayResult.invoiceId, order.id, JSON.stringify({ ...order, customerId }), customerId || null, expiresAt, n]
+    );
+
+    console.log(`BTCPay pending order ${order.id} — invoice ${btcpayResult.invoiceId}`);
+    return res.json({ ok: true, order, btcpayUrl: btcpayResult.checkoutLink, btcpayInvoiceId: btcpayResult.invoiceId });
+  }
+
+  // ── All other methods: insert order normally ────────────────────────────────
   broadcastAdmin('new_order', order);
   await logActivity(`Nuevo pedido ${escHtml(order.id)} de ${escHtml(order.customer)} — $${parseFloat(order.total||0).toFixed(2)}`);
   try { await sendOrderConfirmation(order); } catch(e) {}
@@ -1914,20 +1968,7 @@ app.post('/api/orders', orderLimiter, async (req, res) => {
     wompiUrl = await createWompiLink(order);
   }
 
-  // BTCPay: create invoice and return invoiceId for custom UI
-  let btcpayUrl        = null;
-  let btcpayInvoiceId  = null;
-  if (paymentMethod === 'btcpay' && BTCPAY_STORE_ID && BTCPAY_API_KEY) {
-    try {
-      const btcpayResult = await createBTCPayInvoice(order);
-      btcpayUrl       = btcpayResult.checkoutLink;
-      btcpayInvoiceId = btcpayResult.invoiceId;
-    } catch(e) {
-      console.error('BTCPay invoice creation error:', e.message);
-    }
-  }
-
-  res.json({ ok: true, order, wompiUrl, btcpayUrl, btcpayInvoiceId });
+  res.json({ ok: true, order, wompiUrl, btcpayUrl: null, btcpayInvoiceId: null });
 });
 
 
@@ -2085,40 +2126,177 @@ app.post('/api/btcpay/webhook', express.raw({ type: '*/*' }), async (req, res) =
   res.sendStatus(200); // ack immediately
 
   const { type, invoiceId, metadata } = event;
-  const orderId = metadata?.orderId || event.orderId;
-  if (!orderId) return;
+  if (!invoiceId) return;
+
+  // ── InvoiceExpired: send renewal email if pending order exists ───────────────
+  if (type === 'InvoiceExpired') {
+    try {
+      const [rows] = await db.execute(
+        'SELECT * FROM btcpay_pending WHERE invoice_id=? AND renew_email_sent=0', [invoiceId]
+      );
+      if (!rows.length) return; // already sent or no pending order
+      const pending  = rows[0];
+      const orderObj = JSON.parse(pending.order_data);
+
+      // Generate a signed renew token: HMAC-SHA256(invoiceId + orderId + secret)
+      const BASE          = BASE_URL || 'https://sillage-sv.com';
+      const SESSION_SECRET = process.env.SESSION_SECRET || 'fallback-secret';
+      const renewToken    = crypto
+        .createHmac('sha256', SESSION_SECRET)
+        .update(`btcpay-renew:${invoiceId}:${pending.order_id}`)
+        .digest('hex');
+
+      // Extend the pending record TTL by 48h so it survives until user clicks
+      const newExpiry = new Date(Date.now() + 48 * 60 * 60 * 1000);
+      await db.execute(
+        'UPDATE btcpay_pending SET renew_token=?, renew_email_sent=1, expires_at=? WHERE invoice_id=?',
+        [renewToken, newExpiry, invoiceId]
+      );
+
+      const renewUrl  = `${BASE}/?btcpay_renew=${renewToken}`;
+      const itemsHtml = orderObj.items.map(i =>
+        `<tr>
+          <td style="padding:7px 12px;border-bottom:1px solid #f0e6d0;color:#1a1714">${escHtml(i.name)}</td>
+          <td style="padding:7px 12px;border-bottom:1px solid #f0e6d0;color:#1a1714;text-align:center">×${i.qty}</td>
+          <td style="padding:7px 12px;border-bottom:1px solid #f0e6d0;color:#1a1714;text-align:right">$${i.total}</td>
+        </tr>`
+      ).join('');
+
+      const html = emailTemplate(`
+        <h2 style="font-family:Georgia,serif;font-size:22px;font-weight:300;color:#1a1714;margin:0 0 8px">Tu pago expiró</h2>
+        <p style="font-size:13px;color:#8a7f72;margin:0 0 24px">
+          Hola <strong style="color:#1a1714">${escHtml(orderObj.customer)}</strong>,
+          el tiempo para completar tu pago Bitcoin venció, pero tu pedido sigue reservado.
+          Puedes retomar el pago cuando estés listo — el link es válido por 48 horas.
+        </p>
+        <div style="background:#faf8f4;border:1px solid #e8d8b8;padding:12px 16px;margin-bottom:20px">
+          <span style="font-size:10px;letter-spacing:3px;text-transform:uppercase;color:#8a7f72">Pedido</span><br/>
+          <span style="font-family:Georgia,serif;font-size:16px;color:#b8955a">${escHtml(pending.order_id)}</span>
+        </div>
+        <table style="width:100%;border-collapse:collapse;margin-bottom:20px">
+          <thead><tr style="background:#faf8f4">
+            <th style="padding:7px 12px;text-align:left;font-size:10px;color:#8a7f72;font-weight:400">Producto</th>
+            <th style="padding:7px 12px;text-align:center;font-size:10px;color:#8a7f72;font-weight:400">Cant.</th>
+            <th style="padding:7px 12px;text-align:right;font-size:10px;color:#8a7f72;font-weight:400">Precio</th>
+          </tr></thead>
+          <tbody>${itemsHtml}</tbody>
+        </table>
+        <div style="padding:12px;background:#faf8f4;border:1px solid #e8d8b8;margin-bottom:28px">
+          <span style="font-size:11px;text-transform:uppercase;color:#8a7f72">Total</span>
+          <span style="font-family:Georgia,serif;font-size:20px;color:#1a1714;float:right">$${parseFloat(orderObj.total||0).toFixed(2)}</span>
+        </div>
+        <a href="${renewUrl}"
+           style="display:block;text-align:center;padding:14px 24px;background:#0e0c0a;
+                  color:#b8955a;text-decoration:none;font-size:11px;letter-spacing:3px;
+                  text-transform:uppercase;border:1px solid #b8955a">
+          Completar mi pago →
+        </a>
+        <p style="font-size:11px;color:#8a7f72;margin-top:16px;line-height:1.7;text-align:center">
+          Este link expira en 48 horas.<br/>
+          Si tienes problemas, responde este correo y te ayudamos.
+        </p>`);
+
+      await sendEmail({
+        to:      orderObj.email,
+        subject: `Tu pago está pendiente — ${escHtml(pending.order_id)} | Sillage`,
+        from:    `Sillage Pedidos <${EMAIL_PEDIDOS}>`,
+        html,
+      });
+
+      console.log(`BTCPay renewal email sent for order ${pending.order_id} (invoice ${invoiceId})`);
+    } catch(e) {
+      console.error('BTCPay expiry email error:', e.message);
+    }
+    return;
+  }
 
   // Only process settled/confirmed payment events
   const paidEvents = ['InvoiceSettled', 'InvoicePaymentSettled', 'InvoiceProcessing'];
   if (!paidEvents.includes(type)) return;
 
   try {
-    const [rows] = await db.execute('SELECT * FROM orders WHERE id=?', [orderId]);
-    if (!rows.length) return;
-    const order = rows[0];
-    if (order.payment_status === 'Pagado') return; // already processed
-
-    const items = JSON.parse(order.items || '[]');
-
-    await db.execute(
-      'UPDATE orders SET payment_status=?, status=?, updated_at=? WHERE id=?',
-      ['Pagado', 'Procesando', new Date(), orderId]
+    // ── Check if this invoice has already been processed (idempotency) ────────
+    const [existing] = await db.execute(
+      'SELECT id, payment_status FROM orders WHERE id = (SELECT order_id FROM btcpay_pending WHERE invoice_id=? LIMIT 1) OR id = ?',
+      [invoiceId, metadata?.orderId || event.orderId || '']
     );
-
-    await deductInventory(items);
-    await deductBottleInventory(items);
-
-    // Reset registered user's daily consult limit on confirmed purchase
-    if (order.customer_id) {
-      await db.execute(
-        'UPDATE consult_counts SET count=0, last_reset=? WHERE customer_id=?',
-        [new Date().toISOString().slice(0,10), order.customer_id]
-      ).catch(() => {});
+    if (existing.length && existing[0].payment_status === 'Pagado') {
+      console.log(`BTCPay webhook: invoice ${invoiceId} already processed — skipping`);
+      return;
     }
 
-    broadcastAdmin('order_update', { id: orderId, status: 'Procesando', paymentStatus: 'Pagado' });
-    await logActivity(`Pago BTCPay confirmado (${type}) para pedido ${orderId}`);
-    console.log(`BTCPay payment confirmed for order ${orderId} — event: ${type}`);
+    // ── Load from btcpay_pending ───────────────────────────────────────────────
+    const [pendingRows] = await db.execute(
+      'SELECT * FROM btcpay_pending WHERE invoice_id=?', [invoiceId]
+    );
+
+    const now = new Date();
+
+    if (pendingRows.length) {
+      // ── Happy path: pending order found — create the real order ──────────────
+      const pending  = pendingRows[0];
+      const orderObj = JSON.parse(pending.order_data);
+      const items    = orderObj.items || [];
+      const custId   = pending.customer_id;
+
+      await db.execute(
+        `INSERT INTO orders
+           (id,customer,email,phone,address,city,state_province,country,
+            items,total,status,payment_status,payment_method,tracker_step,
+            customer_id,created_at,updated_at)
+         VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
+        [orderObj.id, orderObj.customer, orderObj.email, orderObj.phone,
+         orderObj.address, orderObj.city, orderObj.state, orderObj.country,
+         JSON.stringify(items), orderObj.total,
+         'Procesando', 'Pagado', 'btcpay', 1,
+         custId || null, pending.created_at, now]
+      );
+
+      await deductInventory(items);
+      await deductBottleInventory(items);
+
+      // Reset daily consult limit for registered users
+      if (custId) {
+        await db.execute(
+          'UPDATE consult_counts SET count=0, last_reset=? WHERE customer_id=?',
+          [now.toISOString().slice(0,10), custId]
+        ).catch(() => {});
+      }
+
+      // Clean up pending record
+      await db.execute('DELETE FROM btcpay_pending WHERE invoice_id=?', [invoiceId]);
+
+      // Notify admin + send confirmation email
+      const fullOrder = { ...orderObj, status: 'Procesando', paymentStatus: 'Pagado', payment_method: 'btcpay' };
+      broadcastAdmin('new_order', fullOrder);
+      await logActivity(`Pago BTCPay confirmado (${type}) — pedido ${orderObj.id} de ${orderObj.customer} — $${parseFloat(orderObj.total||0).toFixed(2)}`);
+      try { await sendOrderConfirmation(fullOrder); } catch(e) { console.error('BTCPay confirmation email error:', e.message); }
+      console.log(`BTCPay order created on payment: ${orderObj.id} — invoice ${invoiceId}`);
+
+    } else {
+      // ── Fallback: pending record missing (expired or duplicate webhook) ──────
+      // Check if order already exists in orders table (e.g. from a previous webhook)
+      const orderId = metadata?.orderId || event.orderId;
+      if (!orderId) { console.warn(`BTCPay webhook: no pending record and no orderId for invoice ${invoiceId}`); return; }
+
+      const [orderRows] = await db.execute('SELECT * FROM orders WHERE id=?', [orderId]);
+      if (orderRows.length) {
+        // Order exists but may not be marked paid yet
+        if (orderRows[0].payment_status !== 'Pagado') {
+          await db.execute(
+            'UPDATE orders SET payment_status=?, status=?, updated_at=? WHERE id=?',
+            ['Pagado', 'Procesando', now, orderId]
+          );
+          const items = JSON.parse(orderRows[0].items || '[]');
+          await deductInventory(items);
+          await deductBottleInventory(items);
+          broadcastAdmin('order_update', { id: orderId, status: 'Procesando', paymentStatus: 'Pagado' });
+          await logActivity(`Pago BTCPay confirmado (fallback) para pedido ${orderId}`);
+        }
+      } else {
+        console.warn(`BTCPay webhook: invoice ${invoiceId} settled but no pending record found — possible expiry`);
+      }
+    }
   } catch(e) {
     console.error('BTCPay webhook processing error:', e.message);
   }
@@ -2204,6 +2382,60 @@ app.get('/api/btcpay/qr', (req, res) => {
     res.set('Cache-Control', 'public, max-age=3600');
     res.send(buf);
   });
+});
+
+// ── BTCPay: renew expired invoice ────────────────────────────────────────────
+// GET /api/btcpay/renew?token=<renew_token>
+// Validates the token, creates a new invoice for the same order, returns invoiceId.
+app.get('/api/btcpay/renew', async (req, res) => {
+  const { token } = req.query;
+  if (!token || !/^[a-f0-9]{64}$/.test(token)) {
+    return res.status(400).json({ error: 'Token inválido' });
+  }
+
+  const [rows] = await db.execute(
+    'SELECT * FROM btcpay_pending WHERE renew_token=? LIMIT 1', [token]
+  ).catch(() => [[]]);
+
+  if (!rows.length) {
+    return res.status(404).json({ error: 'El link de pago ya no es válido o expiró.' });
+  }
+
+  const pending  = rows[0];
+  const orderObj = JSON.parse(pending.order_data);
+
+  // Check the 48h window hasn't passed
+  if (new Date(pending.expires_at) < new Date()) {
+    return res.status(410).json({ error: 'Este link ya expiró. Realiza tu pedido nuevamente.' });
+  }
+
+  if (!BTCPAY_STORE_ID || !BTCPAY_API_KEY) {
+    return res.status(503).json({ error: 'BTCPay no configurado' });
+  }
+
+  try {
+    // Create a fresh invoice for the same order
+    const btcpayResult = await createBTCPayInvoice(orderObj);
+
+    // Update btcpay_pending with new invoiceId and new 15-min expiry
+    const newExpiry = new Date(Date.now() + 20 * 60 * 1000);
+    await db.execute(
+      `UPDATE btcpay_pending
+          SET invoice_id=?, renew_token=NULL, renew_email_sent=0, expires_at=?
+        WHERE renew_token=?`,
+      [btcpayResult.invoiceId, newExpiry, token]
+    );
+
+    console.log(`BTCPay invoice renewed: ${pending.invoice_id} → ${btcpayResult.invoiceId} for order ${pending.order_id}`);
+    res.json({
+      ok:             true,
+      btcpayInvoiceId: btcpayResult.invoiceId,
+      orderId:         pending.order_id,
+    });
+  } catch(e) {
+    console.error('BTCPay renew error:', e.message);
+    res.status(502).json({ error: 'No se pudo generar un nuevo invoice. Intenta de nuevo.' });
+  }
 });
 
 // ── BTCPay: invoice status polling ───────────────────────────────────────────
