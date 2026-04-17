@@ -45,6 +45,7 @@ const EMAIL_PEDIDOS  = process.env.EMAIL_PEDIDOS || 'pedidos@sillage-sv.com';
 // ─── Payments ─────────────────────────────────────────────────────────────────
 const WOMPI_CLIENT_ID     = process.env.WOMPI_CLIENT_ID     || null;
 const WOMPI_CLIENT_SECRET = process.env.WOMPI_CLIENT_SECRET || null;
+const WOMPI_PUBLIC_KEY    = process.env.WOMPI_PUBLIC_KEY    || null; // pub_... from Wompi panel
 
 // ─── AI ───────────────────────────────────────────────────────────────────────
 const OPENAI_API_KEY = process.env.OPENAI_API_KEY || null;
@@ -86,7 +87,7 @@ module.exports = {
   SESSION_SECRET, SESSION_TTL_ADMIN, SESSION_TTL_CUSTOMER,
   DB,
   RESEND_API_KEY, FROM_EMAIL, EMAIL_HOLA, EMAIL_PEDIDOS,
-  WOMPI_CLIENT_ID, WOMPI_CLIENT_SECRET,
+  WOMPI_CLIENT_ID, WOMPI_CLIENT_SECRET, WOMPI_PUBLIC_KEY,
   OPENAI_API_KEY,
   ADMIN_USER, ADMIN_PASS,
   CACHE_TTL_CATALOGUE, CACHE_TTL_INVENTORY, CACHE_TTL_PRICING,
