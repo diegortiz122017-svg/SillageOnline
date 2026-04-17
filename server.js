@@ -1737,6 +1737,24 @@ app.post('/api/customer/addresses', requireCustomer, async (req, res) => {
   if (!line || !city) return res.status(400).json({ error: 'Dirección y ciudad son requeridas.' });
 
   const n = new Date();
+
+  // Duplicate check — same line + city + country (case-insensitive) for this customer
+  const normLine    = String(line).trim().toLowerCase();
+  const normCity    = String(city).trim().toLowerCase();
+  const normCountry = String(country || 'El Salvador').trim().toLowerCase();
+  const [dupes] = await db.execute(
+    `SELECT id FROM customer_addresses
+     WHERE customer_id=?
+       AND LOWER(TRIM(line))=?
+       AND LOWER(TRIM(city))=?
+       AND LOWER(TRIM(country))=?
+     LIMIT 1`,
+    [id, normLine, normCity, normCountry]
+  );
+  if (dupes.length) {
+    return res.status(409).json({ error: 'Ya tienes una dirección guardada en esa ubicación.' });
+  }
+
   // If new address is default, unset all others first
   if (is_default) {
     await db.execute('UPDATE customer_addresses SET is_default=0 WHERE customer_id=?', [id]);
