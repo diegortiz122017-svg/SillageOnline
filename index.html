@@ -3238,6 +3238,7 @@ document.getElementById('s1next').addEventListener('click',function(){
     .then(function(data){
       _cachedAddresses = null; // invalidate cache
       if(data.ok) toast('Dirección guardada','','ok');
+      else if(data.error) toast('', data.error, ''); // e.g. duplicate
     })
     .catch(function(){}) // non-blocking — don't stop checkout
     .finally(function(){ goStep(2); });
