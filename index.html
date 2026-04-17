@@ -3921,6 +3921,39 @@ function _btcPayStartPolling() {
 }
 
 // ── Check URL for reset token on load ────────────────
+// ── Check URL for BTCPay renewal link ────────────────
+(function checkBtcpayRenew() {
+  var params = new URLSearchParams(window.location.search);
+  var token  = params.get('btcpay_renew');
+  if (!token) return;
+
+  // Clean URL immediately so refresh doesn't retrigger
+  var cleanUrl = window.location.pathname;
+  window.history.replaceState({}, '', cleanUrl);
+
+  // Show modal in loading state right away
+  var bg = document.getElementById('btcpayModalBg');
+  if (bg) { bg.classList.add('open'); document.body.style.overflow = 'hidden'; }
+  _btcPayRenderLoading();
+
+  // Fetch a fresh invoice for this pending order
+  fetch('/api/btcpay/renew?token=' + encodeURIComponent(token))
+    .then(function(r) { return r.json(); })
+    .then(function(data) {
+      if (!data.ok || !data.btcpayInvoiceId) {
+        _btcPayRenderError(data.error || 'El link de pago no es válido o ya expiró.');
+        return;
+      }
+      _btcPayInvoiceId = data.btcpayInvoiceId;
+      _btcPayOrderId   = data.orderId;
+      _btcPayFetchAndRender();
+      _btcPayStartPolling();
+    })
+    .catch(function() {
+      _btcPayRenderError('No se pudo cargar el pago. Intenta de nuevo.');
+    });
+})();
+
 (function checkResetToken() {
   var params = new URLSearchParams(window.location.search);
   var token  = params.get('reset_token');
