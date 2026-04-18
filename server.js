@@ -2702,6 +2702,13 @@ app.post('/api/btcpay/webhook', express.raw({ type: '*/*' }), async (req, res) =
   }
 });
 
+// In-memory cache for QR data — keyed by invoiceId, expires after 30 min
+const _btcQrCache = new Map();
+setInterval(() => {
+  const cutoff = Date.now() - 30 * 60 * 1000;
+  for (const [k, v] of _btcQrCache) if (v.cachedAt < cutoff) _btcQrCache.delete(k);
+}, 10 * 60 * 1000);
+
 // ── BTCPay: payment methods (BTC address + Lightning invoice + QR) ──────────
 // GET /api/btcpay/invoice/:invoiceId/payment-methods
 // Returns on-chain BTC address, Lightning invoice, and QR code URLs.
@@ -2737,26 +2744,25 @@ app.get('/api/btcpay/invoice/:invoiceId/payment-methods', async (req, res) => {
     const ln    = methods.find(isLN);
     const btc   = methods.find(isBTC);
 
-    // Generate QR via our own /api/btcpay/qr endpoint (no CDN, no external deps)
-    const lnQrData  = ln  ? encodeURIComponent((ln.paymentLink  || ln.destination).toUpperCase())  : null;
-    const btcQrData = btc ? encodeURIComponent(btc.paymentLink  || btc.destination) : null;
-
+    // QR served by invoiceId + method — avoids long query strings on mobile
     const out = {
       btc: btc ? {
         address:     btc.destination,
         paymentLink: btc.paymentLink,
         amount:      btc.amount,
         rate:        btc.rate,
-        qr:          btcQrData ? `/api/btcpay/qr?data=${btcQrData}` : null,
+        qr:          `/api/btcpay/qr/${encodeURIComponent(invoiceId)}?method=btc`,
       } : null,
       lightning: ln ? {
         invoice:     ln.destination,
         paymentLink: ln.paymentLink,
         amount:      ln.amount,
-        qr:          lnQrData  ? `/api/btcpay/qr?data=${lnQrData}`  : null,
+        qr:          `/api/btcpay/qr/${encodeURIComponent(invoiceId)}?method=lightning`,
       } : null,
       _raw: (!btc && !ln) ? methods : undefined,
     };
+    // Cache payment data for QR endpoint (keyed by invoiceId)
+    _btcQrCache.set(invoiceId, { btc, ln, cachedAt: Date.now() });
     res.json(out);
   } catch(e) {
     console.error('BTCPay payment-methods fetch error:', e.message);
@@ -2765,13 +2771,29 @@ app.get('/api/btcpay/invoice/:invoiceId/payment-methods', async (req, res) => {
 });
 
 // ── BTCPay: QR generation (self-contained, no external calls) ───────────────
-// GET /api/btcpay/qr?data=<encoded_string>
-// Uses bundled qrcode library — zero npm dependencies, zero external requests.
-app.get('/api/btcpay/qr', (req, res) => {
-  const data = req.query.data;
-  if (!data || data.length > 2000) return res.status(400).send('Invalid');
-  const decoded = (() => { try { return decodeURIComponent(data); } catch(e) { return data; } })();
-  global._QRCode.toBuffer(decoded, {
+// GET /api/btcpay/qr/:invoiceId?method=lightning|btc
+// Generates QR PNG from cached payment data — short URL, no mobile encoding issues.
+app.get('/api/btcpay/qr/:invoiceId', (req, res) => {
+  const { invoiceId } = req.params;
+  const method = req.query.method || 'lightning';
+  if (!invoiceId || !/^[A-Za-z0-9_-]+$/.test(invoiceId)) {
+    return res.status(400).send('Invalid invoiceId');
+  }
+
+  const cached = _btcQrCache.get(invoiceId);
+  if (!cached) return res.status(404).send('Invoice not found or expired');
+
+  const entry = method === 'btc' ? cached.btc : cached.ln;
+  if (!entry) return res.status(404).send('Payment method not available');
+
+  // Lightning: uppercase for alphanumeric QR mode (denser, faster scan)
+  const qrData = method === 'lightning'
+    ? (entry.paymentLink || entry.destination).toUpperCase()
+    : (entry.paymentLink || entry.destination);
+
+  if (!global._QRCode) return res.status(503).send('QR generator not ready');
+
+  global._QRCode.toBuffer(qrData, {
     errorCorrectionLevel: 'M',
     margin: 1,
     width: 300,
@@ -4536,6 +4558,7 @@ app.use(function(err, req, res, next) {
 
 process.on('unhandledRejection', (reason, promise) => {
   console.error('⚠️  Unhandled Rejection:', reason?.message || reason);
+  console.error('⚠️  Rejection Stack:', reason?.stack || '(no stack)');
 });
 process.on('uncaughtException', (err) => {
   console.error('⚠️  Uncaught Exception:', err.message);
