@@ -349,17 +349,39 @@ nav a:hover{color:var(--gold)}
   display:none;margin-bottom:1.2rem;
 }
 .saved-addr-option{
-  border:1px solid rgba(184,149,90,0.25);
-  background:rgba(184,149,90,0.05);
-  padding:0.75rem 1rem;
-  margin-bottom:0.5rem;
+  border:1px solid rgba(184,149,90,0.3);
+  background:#faf8f4;
+  padding:0.7rem 1rem;
+  margin-bottom:0.4rem;
   cursor:pointer;
   transition:all 0.2s;
 }
 .saved-addr-option:hover{
-  border-color:rgba(184,149,90,0.6);
-  background:rgba(184,149,90,0.1);
+  border-color:#b8955a;
+  background:#f5ede0;
 }
+/* Drawer toggle */
+.saved-addr-toggle{
+  display:flex;align-items:center;justify-content:space-between;
+  cursor:pointer;padding:0.5rem 0;margin-bottom:0.6rem;
+  border-bottom:1px solid rgba(184,149,90,0.2);
+  user-select:none;
+}
+.saved-addr-toggle-label{
+  font-size:0.55rem;letter-spacing:0.2em;text-transform:uppercase;
+  color:#b8955a;font-family:'Jost',sans-serif;font-weight:500;
+}
+.saved-addr-toggle-arrow{
+  font-size:0.6rem;color:#b8955a;
+  transition:transform 0.2s;display:inline-block;
+}
+.saved-addr-toggle-arrow.open{transform:rotate(180deg);}
+.saved-addr-drawer{
+  overflow:hidden;
+  max-height:0;
+  transition:max-height 0.3s ease;
+}
+.saved-addr-drawer.open{max-height:400px;}
 .saved-addr-label{font-size:0.5rem;letter-spacing:0.2em;text-transform:uppercase;color:#b8955a;margin-bottom:0.4rem;font-family:'Jost',sans-serif;font-weight:500}
 .saved-addr-text{font-size:0.74rem;color:#2a2520;line-height:1.6;margin-bottom:0.7rem}
 .saved-addr-btn{
@@ -525,6 +547,14 @@ nav a:hover{color:var(--gold)}
   font-size:0.58rem;color:rgba(138,127,114,0.4);
   line-height:1.6;margin-top:0.7rem;text-align:center;
 }
+.btcpay-onchain-notice{
+  font-size:0.62rem;color:rgba(232,220,200,0.7);
+  line-height:1.6;margin:0.6rem 0 0.3rem;
+  padding:0.6rem 0.8rem;
+  background:rgba(184,149,90,0.07);
+  border-left:2px solid rgba(184,149,90,0.4);
+}
+.btcpay-onchain-notice strong{color:#b8955a;}
 /* Error state */
 .btcpay-error{
   text-align:center;padding:1.5rem 0;
@@ -1799,9 +1829,14 @@ footer{background:var(--dark);padding:3.5rem 4rem;text-align:center;border-top:1
     <div class="m-body">
       <div class="m-section active" id="ms1">
         <!-- Saved addresses selector — shown only for logged-in users -->
-        <div id="savedAddrBlock" style="display:none;margin-bottom:1.2rem">
-          <div class="saved-addr-label">Direcciones guardadas</div>
-          <div id="savedAddrList"></div>
+        <div id="savedAddrBlock" style="display:none;margin-bottom:1rem">
+          <div class="saved-addr-toggle" onclick="toggleAddrDrawer(this)">
+            <span class="saved-addr-toggle-label">Direcciones guardadas</span>
+            <span class="saved-addr-toggle-arrow">&#9650;</span>
+          </div>
+          <div class="saved-addr-drawer open" id="savedAddrDrawer">
+            <div id="savedAddrList"></div>
+          </div>
         </div>
         <div class="f-row full"><div class="f-field"><label>Nombre Completo</label><input type="text" id="fn" placeholder="Alexandra Beaumont"/><div class="f-hint" id="en"></div></div></div>
         <div class="f-row full"><div class="f-field"><label>Correo Electrónico</label><input type="email" id="fe" placeholder="alex@example.com"/><div class="f-hint" id="ee"></div></div></div>
@@ -3214,9 +3249,9 @@ function openCheckout(){
       list.innerHTML = addrs.map(function(a){
         var parts = [a.line, a.city, a.state, a.country].filter(Boolean).join(', ');
         return '<div class="saved-addr-option" onclick="fillSavedAddress('+JSON.stringify(a).replace(/"/g,'&quot;')+')">'+
-          '<div style="font-size:0.62rem;letter-spacing:0.12em;text-transform:uppercase;color:var(--gold);margin-bottom:0.2rem">'+esc(a.label)+'</div>'+
-          '<div style="font-size:0.7rem;color:var(--cream);line-height:1.5">'+esc(parts)+'</div>'+
-          '<div style="font-size:0.6rem;color:var(--gold);letter-spacing:0.1em;text-transform:uppercase;margin-top:0.4rem">Usar esta dirección →</div>'+
+          '<div style="font-size:0.58rem;letter-spacing:0.14em;text-transform:uppercase;color:#b8955a;margin-bottom:0.2rem;font-weight:500">'+esc(a.label)+'</div>'+
+          '<div style="font-size:0.68rem;color:#1a1714;line-height:1.5">'+esc(parts)+'</div>'+
+          '<div style="font-size:0.58rem;color:#b8955a;letter-spacing:0.1em;text-transform:uppercase;margin-top:0.35rem">Usar esta dirección →</div>'+
         '</div>';
       }).join('');
 
@@ -3238,6 +3273,15 @@ function openCheckout(){
     var savePrompt = document.getElementById('saveAddrPrompt');
     if(savePrompt) savePrompt.style.display = 'none';
   }
+}
+
+function toggleAddrDrawer(toggle) {
+  var drawer = document.getElementById('savedAddrDrawer');
+  var arrow  = toggle.querySelector('.saved-addr-toggle-arrow');
+  if (!drawer) return;
+  var isOpen = drawer.classList.contains('open');
+  drawer.classList.toggle('open', !isOpen);
+  if (arrow) arrow.classList.toggle('open', !isOpen);
 }
 
 function fillSavedAddress(a){
@@ -4125,12 +4169,17 @@ function _btcPayRenderUI(data) {
   var fullAddr  = cur.invoice || cur.address || '';
   var payLink   = cur.paymentLink || '';
   var qrSrc     = cur.qr || '';
+  var ONCHAIN_SURCHARGE = 1.015; // 1.5% surcharge for on-chain
   var amount    = cur.amount ? (parseFloat(cur.amount).toFixed(8) + '') : '';
   var unit      = _btcPayTab === 'lightning' ? 'sats' : 'BTC';
-  // sats conversion for Lightning
   if (_btcPayTab === 'lightning' && cur.amount) {
+    // Lightning: show in sats, no surcharge
     var sats = Math.round(parseFloat(cur.amount) * 100000000);
     amount = sats.toLocaleString();
+  } else if (_btcPayTab === 'btc' && cur.amount) {
+    // On-chain: apply 1.5% surcharge to BTC amount
+    var adjustedBtc = parseFloat(cur.amount) * ONCHAIN_SURCHARGE;
+    amount = adjustedBtc.toFixed(8);
   }
 
   body.innerHTML =
@@ -4159,7 +4208,17 @@ function _btcPayRenderUI(data) {
         '<div class="btcpay-status-dot" id="btcStatusDot"></div>' +
         '<span class="btcpay-status-txt" id="btcStatusTxt">Esperando pago&hellip;</span>' +
       '</div>' +
-      '<p class="btcpay-note">Envía el monto exacto a esta dirección. El pedido se confirma automáticamente.</p>' +
+      (_btcPayTab === 'btc' ?
+        '<div class="btcpay-onchain-notice">' +
+          '<span style="color:#b8955a;font-size:0.7rem">&#9888;</span> ' +
+          'Los pagos on-chain pueden tardar <strong>10–20 minutos</strong> en confirmarse. ' +
+          'Se aplica un recargo del <strong>1.5%</strong> por riesgo de volatilidad.' +
+        '</div>' : '') +
+      '<p class="btcpay-note">' +
+        (_btcPayTab === 'btc'
+          ? 'Envía el monto exacto. El pedido se confirma al recibir 1 confirmación de bloque.'
+          : 'Envía el monto exacto a esta dirección. El pedido se confirma automáticamente.') +
+      '</p>' +
     '</div>';
 
 
