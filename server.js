@@ -1990,7 +1990,44 @@ app.post('/api/orders', orderLimiter, async (req, res) => {
     const invMap     = await getInventoryMap();
     const priceMap   = await getPricingMap();
     let   serverTotal = 0;
+    // Group bundle items to validate bundle price as a unit
+    const bundleGroups = {}; // bundleId → { items, bundleName }
+    const standaloneItems = [];
     for (const item of rawItems) {
+      if (item.bundleId) {
+        if (!bundleGroups[item.bundleId]) bundleGroups[item.bundleId] = { items: [], bundleName: item.bundleName };
+        bundleGroups[item.bundleId].items.push(item);
+      } else {
+        standaloneItems.push(item);
+      }
+    }
+
+    // Validate bundle totals against DB bundle prices
+    for (const [bundleId, group] of Object.entries(bundleGroups)) {
+      const firstItem = group.items[0];
+      const qty = parseInt(firstItem.qty, 10) || 1;
+      // Sum client prices for this bundle group
+      const clientBundleTotal = group.items.reduce((s, i) => s + parseFloat(i.price || 0) * parseInt(i.qty, 10), 0);
+      // Validate against DB bundle price
+      const bundleDefId = firstItem.bundleId?.split('_')[1]; // bundleId format: bundle_<defId>_<ts>
+      if (bundleDefId) {
+        const [bRows] = await db.execute('SELECT price FROM bundles WHERE id=? AND active=1', [parseInt(bundleDefId)]);
+        if (bRows.length) {
+          const dbBundlePrice = parseFloat(bRows[0].price) * qty;
+          if (Math.abs(clientBundleTotal - dbBundlePrice) > 0.02) {
+            console.warn(`Bundle price mismatch — client:$${clientBundleTotal} db:$${dbBundlePrice}`);
+            return res.status(400).json({ error: 'El precio del bundle no coincide. Por favor recarga la página.' });
+          }
+          serverTotal += dbBundlePrice;
+          continue;
+        }
+      }
+      // Bundle not found in DB — fall back to accepting client price with abuse tracking
+      serverTotal += clientBundleTotal;
+    }
+
+    // Validate standalone items
+    for (const item of standaloneItems) {
       const pid  = parseInt(item.productId, 10);
       const qty  = parseInt(item.qty, 10) || 1;
       const type = (item.type || 'full').toLowerCase(); // 'full' | 'decant' | 'bottle' | 'sample'
@@ -2002,15 +2039,11 @@ app.post('/api/orders', orderLimiter, async (req, res) => {
 
       let unitPrice;
       if (type === 'decant' || type === 'sample') {
-        // Determine valid decant prices based on size
         const sizeStr = String(item.size || '');
         const is5ml   = sizeStr.includes('5ml') || sizeStr === '5';
-        // 10ml price: catalogue decantPrice or 30% of full
         const price10 = prod.decantPrice ? parseFloat(prod.decantPrice) : Math.round(fullPrice * 0.30);
-        // 5ml price: catalogue decantPrice5 or ~55% of 10ml price (mirrors frontend)
         const price5  = prod.decantPrice5 ? parseFloat(prod.decantPrice5) : Math.round(price10 * 0.55);
         const catalogDecantPrice = is5ml ? price5 : price10;
-        // Accept client unitPrice if within ±$1 tolerance (slightly wider for rounding)
         const clientUnitPrice = parseFloat(item.unitPrice || 0);
         if (clientUnitPrice > 0 && Math.abs(clientUnitPrice - catalogDecantPrice) <= 1.00) {
           unitPrice = clientUnitPrice;
@@ -2018,9 +2051,7 @@ app.post('/api/orders', orderLimiter, async (req, res) => {
           unitPrice = catalogDecantPrice;
         }
       } else {
-        // Full bottle or bundle split — use full catalogue price
         unitPrice = parseFloat(item.unitPrice || fullPrice);
-        // Bundle splits: accept any price >= $0.50 per item
         if (unitPrice < 0.50) unitPrice = fullPrice;
       }
 
@@ -2502,9 +2533,14 @@ app.post('/api/btcpay/webhook', express.raw({ type: '*/*' }), async (req, res) =
   }
 
   const crypto = require('crypto');
+  // req.body may be a Buffer (express.raw) or an Object (if global express.json ran first)
+  // HMAC requires a string or Buffer — normalize accordingly
+  const rawBody = Buffer.isBuffer(req.body)
+    ? req.body
+    : Buffer.from(typeof req.body === 'string' ? req.body : JSON.stringify(req.body));
   const expected = 'sha256=' + crypto
     .createHmac('sha256', BTCPAY_WEBHOOK_SECRET)
-    .update(req.body)
+    .update(rawBody)
     .digest('hex');
 
   let sigBuf, expBuf;
