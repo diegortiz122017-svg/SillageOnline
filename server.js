@@ -2660,17 +2660,7 @@ app.post('/api/btcpay/webhook', async (req, res) => {
   if (!paidEvents.includes(type)) return;
 
   try {
-    // ── Check if this invoice has already been processed (idempotency) ────────
-    const [existing] = await db.execute(
-      'SELECT id, payment_status FROM orders WHERE id = (SELECT order_id FROM btcpay_pending WHERE invoice_id=? LIMIT 1) OR id = ?',
-      [invoiceId, metadata?.orderId || event.orderId || '']
-    );
-    if (existing.length && existing[0].payment_status === 'Pagado') {
-      console.log(`BTCPay webhook: invoice ${invoiceId} already processed — skipping`);
-      return;
-    }
-
-    // ── Load from btcpay_pending ───────────────────────────────────────────────
+    // ── Load from btcpay_pending first ────────────────────────────────────────
     const [pendingRows] = await db.execute(
       'SELECT * FROM btcpay_pending WHERE invoice_id=?', [invoiceId]
     );
@@ -2684,8 +2674,19 @@ app.post('/api/btcpay/webhook', async (req, res) => {
       const items    = orderObj.items || [];
       const custId   = pending.customer_id;
 
-      await db.execute(
-        `INSERT INTO orders
+      // Idempotency: check if order already exists before inserting
+      const [existingOrder] = await db.execute(
+        'SELECT id FROM orders WHERE id=?', [orderObj.id]
+      );
+      if (existingOrder.length) {
+        console.log(`BTCPay webhook: order ${orderObj.id} already exists — cleaning up pending and skipping`);
+        await db.execute('DELETE FROM btcpay_pending WHERE invoice_id=?', [invoiceId]);
+        return;
+      }
+
+      // Use INSERT IGNORE as final safety net against race conditions
+      const [insertResult] = await db.execute(
+        `INSERT IGNORE INTO orders
            (id,customer,email,phone,address,city,state_province,country,
             items,total,status,payment_status,payment_method,tracker_step,
             customer_id,created_at,updated_at)
@@ -2696,6 +2697,13 @@ app.post('/api/btcpay/webhook', async (req, res) => {
          'Procesando', 'Pagado', 'btcpay', 1,
          custId || null, pending.created_at, now]
       );
+
+      // If INSERT IGNORE skipped (duplicate), clean up and bail
+      if (insertResult.affectedRows === 0) {
+        console.log(`BTCPay webhook: INSERT IGNORE skipped duplicate order ${orderObj.id}`);
+        await db.execute('DELETE FROM btcpay_pending WHERE invoice_id=?', [invoiceId]);
+        return;
+      }
 
       await deductInventory(items);
       await deductBottleInventory(items);
