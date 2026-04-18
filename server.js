@@ -1000,7 +1000,14 @@ function verifyAdminPassword(candidate, stored) {
 app.use(security.httpsRedirect);
 app.use(security.cors);
 app.use(compression({ level: 6, threshold: 1024 }));  // gzip all responses > 1KB
-app.use(express.json({ limit: security.bodyLimit }));
+app.use(express.json({
+  limit: security.bodyLimit,
+  verify: (req, res, buf) => {
+    // Capture raw body bytes for webhook signature verification
+    // (BTCPay and others sign the exact raw bytes, not the parsed JSON)
+    req.rawBody = buf;
+  }
+}));
 app.use(security.securityHeaders);
 app.use(security.rateLimit());                         // global rate limit
 app.use(express.static(__dirname, {
@@ -2520,7 +2527,7 @@ app.post('/api/btcpay/create-invoice', async (req, res) => {
 });
 
 // POST /api/btcpay/webhook — receives payment events from BTCPay
-app.post('/api/btcpay/webhook', express.raw({ type: '*/*' }), async (req, res) => {
+app.post('/api/btcpay/webhook', async (req, res) => {
   // Verify HMAC signature
   const sig = req.headers['btcpay-sig'];
   if (!BTCPAY_WEBHOOK_SECRET) {
@@ -2533,11 +2540,13 @@ app.post('/api/btcpay/webhook', express.raw({ type: '*/*' }), async (req, res) =
   }
 
   const crypto = require('crypto');
-  // req.body may be a Buffer (express.raw) or an Object (if global express.json ran first)
-  // HMAC requires a string or Buffer — normalize accordingly
-  const rawBody = Buffer.isBuffer(req.body)
-    ? req.body
-    : Buffer.from(typeof req.body === 'string' ? req.body : JSON.stringify(req.body));
+  // Use raw body bytes for HMAC — req.rawBody is captured by the global express.json verify callback
+  // This ensures we sign exactly what BTCPay sent, not a re-serialized version
+  const rawBody = req.rawBody;
+  if (!rawBody) {
+    console.error('BTCPay webhook: raw body not available — check express.json verify callback');
+    return res.sendStatus(500);
+  }
   const expected = 'sha256=' + crypto
     .createHmac('sha256', BTCPAY_WEBHOOK_SECRET)
     .update(rawBody)
@@ -2555,9 +2564,9 @@ app.post('/api/btcpay/webhook', express.raw({ type: '*/*' }), async (req, res) =
     return res.sendStatus(400);
   }
 
-  let event;
-  try { event = JSON.parse(req.body.toString()); }
-  catch(e) { return res.sendStatus(400); }
+  // req.body is already parsed by global express.json
+  const event = req.body;
+  if (!event || typeof event !== 'object') return res.sendStatus(400);
 
   res.sendStatus(200); // ack immediately
 
