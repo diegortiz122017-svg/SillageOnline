@@ -27,7 +27,7 @@ const security     = require('./middleware/security');
 const auth         = require('./middleware/auth');
 
 // ─── Aliases for backwards compatibility within this file ──────────────────
-const { getCatalogue, saveCatalogue, addProduct, updateProduct, deleteProduct, getProductById, getInventoryMap, invalidateInventory, getPricingMap, getActivity, getSetting, setSetting, getBrandHierarchy } = catalogueSvc;
+const { getCatalogue, addProduct, updateProduct, deleteProduct, getProductById, getInventoryMap, invalidateInventory, getPricingMap, getActivity, getSetting, setSetting, getBrandHierarchy } = catalogueSvc;
 const { calcIntensity } = require('./services/noteIntensity');
 
 // logActivity also broadcasts to admin WebSocket clients
@@ -1676,7 +1676,11 @@ app.post('/api/auth/login', authLimiter, async (req, res) => {
   res.json({ ok: true, token });
 });
 app.post('/api/auth/logout', async (req, res) => {
-  destroySession(req.headers['x-session-token']);
+  const token = req.headers['x-session-token'];
+  const session = validateSession(token);
+  destroySession(token);
+  // Persist revocation to DB so it survives server restarts
+  if (session?.jti) persistRevocation(session.jti, session.ttl || 3600000).catch(() => {});
   res.json({ ok: true });
 });
 app.get('/api/auth/verify', (req, res) => {
@@ -2904,6 +2908,8 @@ app.post('/api/btcpay/webhook', async (req, res) => {
 
       // Clean up pending record
       await db.execute('DELETE FROM btcpay_pending WHERE invoice_id=?', [invoiceId]);
+      // Invalidate the anon session that placed this order (prevents replay)
+      if (orderObj.sessionId) invalidateAnonSession(orderObj.sessionId);
 
       // Notify admin + send confirmation email
       const fullOrder = { ...orderObj, status: 'Procesando', paymentStatus: 'Pagado', payment_method: 'btcpay' };
