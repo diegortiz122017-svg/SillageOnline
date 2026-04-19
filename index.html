@@ -2734,9 +2734,9 @@ function openDetail(pid){
     '</div>'+
     '<p class="d-desc">'+p.desc+'</p>'+
     '<div class="d-profile">'+
-      '<div><div class="d-prof-lbl">Concentración</div><div class="d-prof-val">'+p.conc+'</div></div>'+
-      '<div><div class="d-prof-lbl">Temporada</div><div class="d-prof-val">'+p.season+'</div></div>'+
-      '<div><div class="d-prof-lbl">Sillage</div><div class="d-prof-val">'+p.sillage+'</div></div>'+
+      '<div><div class="d-prof-lbl">Concentración</div><div class="d-prof-val">'+translateConc(p.conc)+'</div></div>'+
+      '<div><div class="d-prof-lbl">Temporada</div><div class="d-prof-val">'+translateSeason(p.season)+'</div></div>'+
+      '<div><div class="d-prof-lbl">Sillage</div><div class="d-prof-val">'+translateSillage(p.sillage)+'</div></div>'+
       '<div><div class="d-prof-lbl">Duración</div><div class="d-prof-val">'+p.long+'</div></div>'+
     '</div>'+
     '<div class="size-selector" id="sizeSel">'+
@@ -2993,6 +2993,62 @@ var cart=(function(){
   try{return JSON.parse(localStorage.getItem('sillage_cart')||'[]');}
   catch(e){return[];}
 })();
+// ── Translation maps for product detail values ──────────────────────────────
+function translateSeason(s){
+  if(!s) return s;
+  var map = {
+    'All Seasons':    'Todas las temporadas',
+    'All seasons':    'Todas las temporadas',
+    'all seasons':    'Todas las temporadas',
+    'Spring / Summer':'Primavera / Verano',
+    'Spring/Summer':  'Primavera / Verano',
+    'Spring':         'Primavera',
+    'Summer':         'Verano',
+    'Fall / Winter':  'Otoño / Invierno',
+    'Fall/Winter':    'Otoño / Invierno',
+    'Fall':           'Otoño',
+    'Autumn':         'Otoño',
+    'Winter':         'Invierno',
+    'Spring / Fall':  'Primavera / Otoño',
+    'Spring / Autumn':'Primavera / Otoño',
+  };
+  return map[s] || s;
+}
+
+function translateSillage(s){
+  if(!s) return s;
+  var map = {
+    'Very Strong':      'Muy fuerte',
+    'very strong':      'Muy fuerte',
+    'Strong':           'Fuerte',
+    'strong':           'Fuerte',
+    'Moderate':         'Moderado',
+    'moderate':         'Moderado',
+    'Light to Moderate':'Ligero a moderado',
+    'light to moderate':'Ligero a moderado',
+    'Light':            'Ligero',
+    'light':            'Ligero',
+    'Soft':             'Suave',
+    'Intimate':         'Íntimo',
+  };
+  return map[s] || s;
+}
+
+function translateConc(s){
+  if(!s) return s;
+  var map = {
+    'Eau de Parfum':  'Eau de Parfum',
+    'Eau de Toilette':'Eau de Toilette',
+    'Eau de Cologne': 'Eau de Cologne',
+    'Cologne':        'Cologne',
+    'Parfum':         'Parfum',
+    'Extrait':        'Extrait de Parfum',
+    'Extrait de Parfum': 'Extrait de Parfum',
+    'Solid Perfume':  'Perfume sólido',
+  };
+  return map[s] || s;
+}
+
 function saveCart(){
   try{localStorage.setItem('sillage_cart',JSON.stringify(cart));}catch(e){}
 }
