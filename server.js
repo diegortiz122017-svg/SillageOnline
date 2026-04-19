@@ -300,6 +300,27 @@ async function initDB() {
 
 // ─── Seed default data ────────────────────────────────
 // Ensure every product in the catalogue has an inventory row
+async function migrateSettings() {
+  // Ensure settings table has the right schema — old deployments may have a different structure
+  try {
+    await db.execute(`
+      CREATE TABLE IF NOT EXISTS settings (
+        key_name   VARCHAR(100) PRIMARY KEY,
+        value      TEXT NOT NULL,
+        updated_at DATETIME NOT NULL
+      ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
+    `);
+    // Test that we can write and read a setting
+    await db.execute(
+      `INSERT INTO settings (key_name, value, updated_at) VALUES ('_health_check', '1', ?)
+       ON DUPLICATE KEY UPDATE value='1', updated_at=VALUES(updated_at)`,
+      [new Date()]
+    );
+  } catch(e) {
+    console.warn('migrateSettings:', e.message);
+  }
+}
+
 async function migrateProductsColumns() {
   // Ensures all columns exist on the products table regardless of when it was created
   const cols = [
@@ -4297,15 +4318,20 @@ app.get('/api/settings/shipping', async (req, res) => {
 });
 
 app.post('/api/settings/shipping', requireAdmin, async (req, res) => {
-  const { cost, threshold, freeMsg, paidMsg } = req.body;
-  if (cost      !== undefined) await setSetting('shipping_cost',      parseFloat(cost));
-  if (threshold !== undefined) await setSetting('shipping_threshold', parseFloat(threshold));
-  if (freeMsg   !== undefined) await setSetting('shipping_free_msg',  freeMsg);
-  if (paidMsg   !== undefined) await setSetting('shipping_paid_msg',  paidMsg);
-  // Broadcast to ALL clients (store + admin) so cart updates instantly
-  broadcast('shipping_update', { cost: parseFloat(cost), threshold: parseFloat(threshold) });
-  await logActivity(`Configuración de envío actualizada — $${cost} para pedidos < $${threshold}`);
-  res.json({ ok: true });
+  try {
+    const { cost, threshold, freeMsg, paidMsg } = req.body;
+    if (cost      !== undefined) await setSetting('shipping_cost',      parseFloat(cost));
+    if (threshold !== undefined) await setSetting('shipping_threshold', parseFloat(threshold));
+    if (freeMsg   !== undefined) await setSetting('shipping_free_msg',  freeMsg);
+    if (paidMsg   !== undefined) await setSetting('shipping_paid_msg',  paidMsg);
+    // Broadcast to ALL clients (store + admin) so cart updates instantly
+    broadcast('shipping_update', { cost: parseFloat(cost), threshold: parseFloat(threshold) });
+    await logActivity(`Configuración de envío actualizada — $${cost} para pedidos < $${threshold}`);
+    res.json({ ok: true });
+  } catch(e) {
+    console.error('Save shipping error:', e.message);
+    res.status(500).json({ error: 'No se pudo guardar: ' + e.message });
+  }
 });
 // ── Top sellers — count units sold per product from orders ──
 
@@ -4866,6 +4892,7 @@ async function start() {
     await migrateOrders();
     await migrateConsultCounts();
     await migrateCustomers();
+    await migrateSettings();
     await migrateProductsColumns();
     await migrateToProductsTable();
     await seedData();
