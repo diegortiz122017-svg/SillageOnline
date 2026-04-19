@@ -299,10 +299,59 @@ async function initDB() {
 
 // ─── Seed default data ────────────────────────────────
 // Ensure every product in the catalogue has an inventory row
+async function migrateProductsColumns() {
+  // Ensures all columns exist on the products table regardless of when it was created
+  const cols = [
+    "brand           VARCHAR(100)  NOT NULL DEFAULT ''",
+    "name            VARCHAR(100)  NOT NULL DEFAULT ''",
+    "gender          CHAR(1)       DEFAULT 'U'",
+    "price           DECIMAL(10,2) NOT NULL DEFAULT 0",
+    "decant_price    DECIMAL(10,2) DEFAULT NULL",
+    "decant_price_5  DECIMAL(10,2) DEFAULT NULL",
+    "size            VARCHAR(30)   DEFAULT NULL",
+    "badge           VARCHAR(30)   DEFAULT NULL",
+    "luxury          TINYINT(1)    DEFAULT 0",
+    "notes           TEXT          DEFAULT NULL",
+    "top_notes       TEXT          DEFAULT NULL",
+    "mid_notes       TEXT          DEFAULT NULL",
+    "base_notes      TEXT          DEFAULT NULL",
+    "top_intensity   TINYINT       DEFAULT 30",
+    "mid_intensity   TINYINT       DEFAULT 30",
+    "base_intensity  TINYINT       DEFAULT 30",
+    "tagline         VARCHAR(255)  DEFAULT NULL",
+    "description     TEXT          DEFAULT NULL",
+    "concentration   VARCHAR(50)   DEFAULT NULL",
+    "season          VARCHAR(50)   DEFAULT NULL",
+    "sillage         VARCHAR(50)   DEFAULT NULL",
+    "longevity       VARCHAR(50)   DEFAULT NULL",
+    "colors          JSON          DEFAULT NULL",
+    "shape           VARCHAR(20)   DEFAULT NULL",
+    "photos          JSON          DEFAULT NULL",
+    "sort_order      INT           DEFAULT 0",
+    "active          TINYINT(1)    DEFAULT 1",
+    "created_at      DATETIME      DEFAULT NULL",
+    "updated_at      DATETIME      DEFAULT NULL",
+  ];
+  for (const col of cols) {
+    const colName = col.trim().split(/\s+/)[0];
+    try {
+      await db.execute(`ALTER TABLE products ADD COLUMN ${col}`);
+      console.log(`✅ products: added column ${colName}`);
+    } catch(e) {
+      if (e.code !== 'ER_DUP_FIELDNAME') console.warn(`products col ${colName}:`, e.message);
+    }
+  }
+  // Add indexes if missing
+  try { await db.execute('ALTER TABLE products ADD INDEX idx_brand (brand)'); } catch(e) {}
+  try { await db.execute('ALTER TABLE products ADD INDEX idx_gender (gender)'); } catch(e) {}
+  try { await db.execute('ALTER TABLE products ADD INDEX idx_price (price)'); } catch(e) {}
+  try { await db.execute('ALTER TABLE products ADD INDEX idx_sort (sort_order)'); } catch(e) {}
+}
+
 async function migrateToProductsTable() {
   try {
-    // Check if products table is empty — only run if not yet migrated
-    const [existing] = await db.execute('SELECT COUNT(*) AS cnt FROM products');
+    // Check if products table is already migrated (has brand data)
+    const [existing] = await db.execute("SELECT COUNT(*) AS cnt FROM products WHERE brand != ''");
     if (existing[0].cnt > 0) {
       console.log(`✅ Products table already has ${existing[0].cnt} rows — skipping migration`);
       return;
@@ -1380,11 +1429,16 @@ app.get('/sitemap.xml', async (req, res) => {
   const catalogue = await getCatalogue().catch(() => []);
   const today = new Date().toISOString().slice(0, 10);
 
+  // No-cache so Cloudflare always serves the latest version
+  res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
+
   const staticPages = [
-    { url: BASE,               priority: '1.0', freq: 'daily'   },
-    { url: `${BASE}/nosotros`, priority: '0.6', freq: 'monthly' },
-    { url: `${BASE}/envios`,   priority: '0.5', freq: 'monthly' },
-    { url: `${BASE}/terminos`, priority: '0.3', freq: 'yearly'  },
+    { url: BASE,                    priority: '1.0', freq: 'daily'   },
+    { url: `${BASE}/nosotros`,      priority: '0.6', freq: 'monthly' },
+    { url: `${BASE}/envios`,        priority: '0.5', freq: 'monthly' },
+    { url: `${BASE}/terminos`,      priority: '0.3', freq: 'yearly'  },
+    { url: `${BASE}/devoluciones`,  priority: '0.3', freq: 'yearly'  },
+    { url: `${BASE}/privacidad`,    priority: '0.3', freq: 'yearly'  },
   ];
 
   const productPages = catalogue.map(p => ({
@@ -4796,6 +4850,7 @@ async function start() {
     await migrateOrders();
     await migrateConsultCounts();
     await migrateCustomers();
+    await migrateProductsColumns();
     await migrateToProductsTable();
     await seedData();
     await restoreLoginAttempts();
