@@ -6288,39 +6288,7 @@ document.addEventListener('DOMContentLoaded', function(){
     }
   })();
 
-  // ────────────────────────────────────────────────────────────────────────────
-  // 2. MAGNETIC CTA BUTTON
-  // ────────────────────────────────────────────────────────────────────────────
-  (function initMagneticCTA() {
-    var cta = document.querySelector('.hero-cta');
-    if (!cta) return;
 
-    var strength = 0.35;
-
-    cta.addEventListener('mousemove', function (e) {
-      var rect     = cta.getBoundingClientRect();
-      var centerX  = rect.left + rect.width  / 2;
-      var centerY  = rect.top  + rect.height / 2;
-      var deltaX   = (e.clientX - centerX) * strength;
-      var deltaY   = (e.clientY - centerY) * strength;
-
-      gsap.to(cta, {
-        x: deltaX,
-        y: deltaY,
-        duration: 0.4,
-        ease: 'power2.out',
-      });
-    });
-
-    cta.addEventListener('mouseleave', function () {
-      gsap.to(cta, {
-        x: 0,
-        y: 0,
-        duration: 0.6,
-        ease: EASE_BACK,
-      });
-    });
-  })();
 
   // ────────────────────────────────────────────────────────────────────────────
   // 3. SHOP SECTION — eyebrow + title reveal on scroll
