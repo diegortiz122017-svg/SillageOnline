@@ -16,6 +16,7 @@ function rowToProduct(r) {
     price:         parseFloat(r.price),
     decantPrice:   r.decant_price  != null ? parseFloat(r.decant_price)  : undefined,
     decantPrice5:  r.decant_price_5 != null ? parseFloat(r.decant_price_5) : undefined,
+    decantSizeMl:  r.decant_size_ml  != null ? parseFloat(r.decant_size_ml)  : undefined,
     size:          r.size,
     badge:         r.badge,
     luxury:        !!r.luxury,
@@ -47,7 +48,8 @@ function productToRow(p, now) {
     p.g            || 'U',
     parseFloat(p.price)        || 0,
     p.decantPrice  != null ? parseFloat(p.decantPrice)  : null,
-    p.decantPrice5 != null ? parseFloat(p.decantPrice5) : null,
+    p.decantPrice5  != null ? parseFloat(p.decantPrice5)  : null,
+    p.decantSizeMl  != null ? parseFloat(p.decantSizeMl)  : null,
     p.size         || null,
     p.badge        || null,
     p.luxury       ? 1 : 0,
@@ -94,18 +96,18 @@ async function saveCatalogue(data) {
     if (!p.id) continue;
     await db.execute(`
       INSERT INTO products
-        (id, brand, name, gender, price, decant_price, decant_price_5,
+        (id, brand, name, gender, price, decant_price, decant_price_5, decant_size_ml,
          size, badge, luxury, notes, top_notes, mid_notes, base_notes,
          top_intensity, mid_intensity, base_intensity,
          tagline, description, concentration, season, sillage, longevity,
          colors, shape, photos, sort_order, active, created_at, updated_at)
-      VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,1,?,?)
+      VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,1,?,?)
       ON DUPLICATE KEY UPDATE
         brand=VALUES(brand), name=VALUES(name), gender=VALUES(gender),
         price=VALUES(price), decant_price=VALUES(decant_price),
-        decant_price_5=VALUES(decant_price_5), size=VALUES(size),
-        badge=VALUES(badge), luxury=VALUES(luxury), notes=VALUES(notes),
-        top_notes=VALUES(top_notes), mid_notes=VALUES(mid_notes),
+        decant_price_5=VALUES(decant_price_5), decant_size_ml=VALUES(decant_size_ml),
+        size=VALUES(size), badge=VALUES(badge), luxury=VALUES(luxury),
+        notes=VALUES(notes), top_notes=VALUES(top_notes), mid_notes=VALUES(mid_notes),
         base_notes=VALUES(base_notes), top_intensity=VALUES(top_intensity),
         mid_intensity=VALUES(mid_intensity), base_intensity=VALUES(base_intensity),
         tagline=VALUES(tagline), description=VALUES(description),
@@ -128,12 +130,12 @@ async function addProduct(p) {
   const id = maxRow[0].next_id;
   await db.execute(`
     INSERT INTO products
-      (id, brand, name, gender, price, decant_price, decant_price_5,
+      (id, brand, name, gender, price, decant_price, decant_price_5, decant_size_ml,
        size, badge, luxury, notes, top_notes, mid_notes, base_notes,
        top_intensity, mid_intensity, base_intensity,
        tagline, description, concentration, season, sillage, longevity,
        colors, shape, photos, sort_order, active, created_at, updated_at)
-    VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,1,?,?)`,
+    VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,1,?,?)`,
     [id, ...productToRow(p, now), now]
   );
   cache.catalogueCache.delete('catalogue');
@@ -144,7 +146,7 @@ async function updateProduct(id, p) {
   const now = new Date();
   await db.execute(`
     UPDATE products SET
-      brand=?, name=?, gender=?, price=?, decant_price=?, decant_price_5=?,
+      brand=?, name=?, gender=?, price=?, decant_price=?, decant_price_5=?, decant_size_ml=?,
       size=?, badge=?, luxury=?, notes=?, top_notes=?, mid_notes=?, base_notes=?,
       top_intensity=?, mid_intensity=?, base_intensity=?,
       tagline=?, description=?, concentration=?, season=?, sillage=?, longevity=?,
