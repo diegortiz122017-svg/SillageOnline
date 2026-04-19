@@ -4319,6 +4319,7 @@ app.get('/api/settings/shipping', async (req, res) => {
 
 app.post('/api/settings/shipping', requireAdmin, async (req, res) => {
   try {
+    console.log('POST /api/settings/shipping — body:', JSON.stringify(req.body), '— token:', req.headers['x-session-token'] ? 'present' : 'MISSING');
     const { cost, threshold, freeMsg, paidMsg } = req.body;
     if (cost      !== undefined) await setSetting('shipping_cost',      parseFloat(cost));
     if (threshold !== undefined) await setSetting('shipping_threshold', parseFloat(threshold));
