@@ -28,6 +28,7 @@ const auth         = require('./middleware/auth');
 
 // ─── Aliases for backwards compatibility within this file ──────────────────
 const { getCatalogue, saveCatalogue, getInventoryMap, invalidateInventory, getPricingMap, getActivity, getSetting, setSetting, getBrandHierarchy } = catalogueSvc;
+const { calcIntensity } = require('./services/noteIntensity');
 
 // logActivity also broadcasts to admin WebSocket clients
 async function logActivity(msg) {
@@ -4005,7 +4006,7 @@ app.delete('/api/bundles/:id', requireAdmin, async (req, res) => {
 app.post('/api/catalogue', requireAdmin, async (req, res) => {
   const catalogue = await getCatalogue();
   const maxId = catalogue.reduce((m, p) => Math.max(m, p.id || 0), 0);
-  const newFrag = { ...req.body, id: maxId + 1 };
+  const newFrag = { ...req.body, id: maxId + 1, ...calcIntensity(req.body) };
   catalogue.push(newFrag);
   await saveCatalogue(catalogue);
   broadcast('catalogue', catalogue);
@@ -4031,7 +4032,7 @@ app.put('/api/catalogue/:id', requireAdmin, async (req, res) => {
   const catalogue = await getCatalogue();
   const idx = catalogue.findIndex(p => p.id === id);
   if (idx === -1) return res.status(404).json({ error: 'Fragancia no encontrada' });
-  catalogue[idx] = { ...req.body, id };
+  catalogue[idx] = { ...req.body, id, ...calcIntensity(req.body) };
   await saveCatalogue(catalogue);
   broadcast('catalogue', catalogue);
   await logActivity(`Fragancia actualizada: ${catalogue[idx].brand} ${catalogue[idx].name}`);
@@ -4048,6 +4049,34 @@ app.delete('/api/catalogue/:id', requireAdmin, async (req, res) => {
   broadcast('catalogue', catalogue);
   await logActivity(`Fragancia eliminada: ${frag.brand} ${frag.name}`);
   res.json({ ok: true });
+});
+
+// ── One-time migration: score all existing products ───────────────────────────
+// POST /api/admin/migrate-note-intensity
+// Runs calcIntensity on every product and saves updated catalogue.
+// Safe to run multiple times — just recalculates and overwrites scores.
+app.post('/api/admin/migrate-note-intensity', requireAdmin, async (req, res) => {
+  try {
+    const catalogue = await getCatalogue();
+    let updated = 0;
+    const scored = catalogue.map(p => {
+      const scores = calcIntensity(p);
+      updated++;
+      return { ...p, ...scores };
+    });
+    await saveCatalogue(scored);
+    broadcast('catalogue', scored);
+    await logActivity(`Note intensity migration: scored ${updated} products`);
+    res.json({ ok: true, updated, sample: scored.slice(0, 3).map(p => ({
+      id: p.id, name: p.name,
+      top_intensity: p.top_intensity,
+      mid_intensity: p.mid_intensity,
+      base_intensity: p.base_intensity,
+    }))});
+  } catch(e) {
+    console.error('Note intensity migration error:', e.message);
+    res.status(500).json({ error: e.message });
+  }
 });
 
 
