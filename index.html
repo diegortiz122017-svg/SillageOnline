@@ -2728,9 +2728,9 @@ function openDetail(pid){
     '<div class="d-tagline">'+esc(p.tagline||'')+'</div>'+
     '<div class="d-price-row"><span class="d-price">'+dPrice+'</span><span class="d-size-lbl">'+p.size+'</span></div>'+
     '<div class="notes-section"><div class="d-section-lbl">Notas de Fragancia</div>'+
-      '<div class="note-row"><span class="note-lbl">Top</span><div class="note-bar"><div class="note-fill" style="width:90%"></div></div><span class="note-text">'+p.top+'</span></div>'+
-      '<div class="note-row"><span class="note-lbl">Corazón</span><div class="note-bar"><div class="note-fill" style="width:70%"></div></div><span class="note-text">'+p.mid+'</span></div>'+
-      '<div class="note-row"><span class="note-lbl">Fondo</span><div class="note-bar"><div class="note-fill" style="width:50%"></div></div><span class="note-text">'+p.base+'</span></div>'+
+      '<div class="note-row"><span class="note-lbl">Top</span><div class="note-bar"><div class="note-fill" style="width:'+(p.top_intensity||90)+'%"></div></div><span class="note-text">'+p.top+'</span></div>'+
+      '<div class="note-row"><span class="note-lbl">Corazón</span><div class="note-bar"><div class="note-fill" style="width:'+(p.mid_intensity||70)+'%"></div></div><span class="note-text">'+p.mid+'</span></div>'+
+      '<div class="note-row"><span class="note-lbl">Fondo</span><div class="note-bar"><div class="note-fill" style="width:'+(p.base_intensity||50)+'%"></div></div><span class="note-text">'+p.base+'</span></div>'+
     '</div>'+
     '<p class="d-desc">'+p.desc+'</p>'+
     '<div class="d-profile">'+
