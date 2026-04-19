@@ -4275,6 +4275,8 @@ function _btcPayRenderUI(data) {
           ? 'Envía el monto exacto. El pedido se confirma al recibir 1 confirmación de bloque.'
           : 'Envía el monto exacto a esta dirección. El pedido se confirma automáticamente.') +
       '</p>' +
+      (_btcPayTab === 'lightning' ?
+        '<p style="font-size:0.58rem;color:#8a7f72;text-align:center;margin-top:0.5rem">¿Problemas pagando? Prueba con <strong style="color:#b8955a">Strike</strong> o <strong style="color:#b8955a">Phoenix</strong></p>' : '') +
     '</div>';
 
 
