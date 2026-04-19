@@ -1012,9 +1012,22 @@ app.use(security.securityHeaders);
 app.use(security.rateLimit());                         // global rate limit
 // Explicit route for JS files that must not fall through to index.html
 app.get('/gsap-animations.js', (req, res) => {
+  const gsapFile = path.resolve(process.cwd(), 'gsap-animations.js');
+  const fs = require('fs');
+  console.log('gsap-animations.js requested — looking at:', gsapFile, '— exists:', fs.existsSync(gsapFile));
+  if (!fs.existsSync(gsapFile)) {
+    // Fallback: try __dirname
+    const alt = path.join(__dirname, 'gsap-animations.js');
+    console.log('Trying __dirname fallback:', alt, '— exists:', fs.existsSync(alt));
+    if (fs.existsSync(alt)) {
+      res.setHeader('Content-Type', 'application/javascript');
+      return res.sendFile(alt);
+    }
+    return res.status(404).send('gsap-animations.js not found');
+  }
   res.setHeader('Content-Type', 'application/javascript');
   res.setHeader('Cache-Control', 'public, max-age=3600');
-  res.sendFile(path.join(__dirname, 'gsap-animations.js'));
+  res.sendFile(gsapFile);
 });
 
 app.use(express.static(__dirname, {
