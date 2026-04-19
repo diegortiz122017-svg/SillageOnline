@@ -169,6 +169,7 @@ async function initDB() {
       price           DECIMAL(10,2) NOT NULL DEFAULT 0,
       decant_price    DECIMAL(10,2) DEFAULT NULL,
       decant_price_5  DECIMAL(10,2) DEFAULT NULL,
+      decant_size_ml  DECIMAL(10,2) DEFAULT NULL,
       size            VARCHAR(30)   DEFAULT NULL,
       badge           VARCHAR(30)   DEFAULT NULL,
       luxury          TINYINT(1)    DEFAULT 0,
@@ -308,6 +309,7 @@ async function migrateProductsColumns() {
     "price           DECIMAL(10,2) NOT NULL DEFAULT 0",
     "decant_price    DECIMAL(10,2) DEFAULT NULL",
     "decant_price_5  DECIMAL(10,2) DEFAULT NULL",
+    "decant_size_ml  DECIMAL(10,2) DEFAULT NULL",
     "size            VARCHAR(30)   DEFAULT NULL",
     "badge           VARCHAR(30)   DEFAULT NULL",
     "luxury          TINYINT(1)    DEFAULT 0",
@@ -373,39 +375,40 @@ async function migrateToProductsTable() {
       const scores = calcIntensity(p);
       await db.execute(`
         INSERT IGNORE INTO products
-          (id, brand, name, gender, price, decant_price, decant_price_5,
+          (id, brand, name, gender, price, decant_price, decant_price_5, decant_size_ml,
            size, badge, luxury, notes, top_notes, mid_notes, base_notes,
            top_intensity, mid_intensity, base_intensity,
            tagline, description, concentration, season, sillage, longevity,
            colors, shape, photos, sort_order, active, created_at, updated_at)
-        VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
+        VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
         [
           p.id,
-          p.brand        || '',
-          p.name         || '',
-          p.g            || 'U',
-          parseFloat(p.price)        || 0,
-          p.decantPrice  ? parseFloat(p.decantPrice)  : null,
-          p.decantPrice5 ? parseFloat(p.decantPrice5) : null,
-          p.size         || null,
-          p.badge        || null,
-          p.luxury       ? 1 : 0,
-          p.notes        || null,
-          p.top          || null,
-          p.mid          || null,
-          p.base         || null,
+          p.brand          || '',
+          p.name           || '',
+          p.g              || 'U',
+          parseFloat(p.price)           || 0,
+          p.decantPrice    ? parseFloat(p.decantPrice)    : null,
+          p.decantPrice5   ? parseFloat(p.decantPrice5)   : null,
+          p.decantSizeMl   ? parseFloat(p.decantSizeMl)   : null,
+          p.size           || null,
+          p.badge          || null,
+          p.luxury         ? 1 : 0,
+          p.notes          || null,
+          p.top            || null,
+          p.mid            || null,
+          p.base           || null,
           scores.top_intensity,
           scores.mid_intensity,
           scores.base_intensity,
-          p.tagline      || null,
-          p.desc         || null,
-          p.conc         || null,
-          p.season       || null,
-          p.sillage      || null,
-          p.long         || null,
-          p.c            ? JSON.stringify(p.c)      : null,
-          p.s            || null,
-          p.photos       ? JSON.stringify(p.photos) : null,
+          p.tagline        || null,
+          p.desc           || null,
+          p.conc           || null,
+          p.season         || null,
+          p.sillage        || null,
+          p.long           || null,
+          p.c              ? JSON.stringify(p.c)      : null,
+          p.s              || null,
+          p.photos         ? JSON.stringify(p.photos) : null,
           migrated,   // sort_order preserves original catalogue order
           1,
           now, now,
@@ -3894,7 +3897,7 @@ Responde en el idioma del cliente.`
             messages:    oaiMessages,
             tools:       isLastIter ? undefined : tools,
             tool_choice: isLastIter ? undefined : 'auto',
-            max_tokens:  700,  // enough for 3 recommendations + PERFIL_JSON
+            max_tokens:  900,  // enough for 3 recommendations + PERFIL_JSON
             temperature: 0.7
           })
         });
@@ -3973,7 +3976,14 @@ Responde en el idioma del cliente.`
       }
       catch(e) { console.warn('Profile parse failed:', e.message); }
     } else {
-      console.warn('Nez: no PERFIL_JSON in reply. Reply snippet:', finalReply.slice(0, 120));
+      // Only warn if Nez gave recommendations (has **bold** product names) but skipped PERFIL_JSON
+      // Clarifying questions legitimately omit it per system prompt
+      const hasRecommendations = /\*\*[^*]+\*\*/.test(finalReply);
+      if (hasRecommendations) {
+        console.warn('Nez: no PERFIL_JSON in reply. Reply snippet:', finalReply.slice(0, 120));
+      } else {
+        console.log('Nez: clarifying question — PERFIL_JSON omitted correctly');
+      }
     }
     const cleanReply = finalReply.replace(/PERFIL_JSON:[\s\S]+$/, '').trim();
 
