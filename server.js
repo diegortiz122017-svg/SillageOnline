@@ -1010,6 +1010,13 @@ app.use(express.json({
 }));
 app.use(security.securityHeaders);
 app.use(security.rateLimit());                         // global rate limit
+// Explicit route for JS files that must not fall through to index.html
+app.get('/gsap-animations.js', (req, res) => {
+  res.setHeader('Content-Type', 'application/javascript');
+  res.setHeader('Cache-Control', 'public, max-age=3600');
+  res.sendFile(path.join(__dirname, 'gsap-animations.js'));
+});
+
 app.use(express.static(__dirname, {
   maxAge: '1d',        // cache static assets for 1 day
   etag:   true,
