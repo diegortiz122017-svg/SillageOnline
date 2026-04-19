@@ -3058,8 +3058,10 @@ var shippingCost=5, shippingThreshold=50;
 fetch(API+'/settings/shipping')
   .then(function(r){return r.json();})
   .then(function(data){
-    shippingCost      = parseFloat(data.cost)      || 5;
-    shippingThreshold = parseFloat(data.threshold) || 50;
+    var _c = parseFloat(data.cost);
+    var _t = parseFloat(data.threshold);
+    shippingCost      = isNaN(_c) ? 5  : _c;
+    shippingThreshold = isNaN(_t) ? 50 : _t;
     renderCart();
   }).catch(function(){});
 
