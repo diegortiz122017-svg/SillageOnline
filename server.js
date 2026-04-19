@@ -2279,8 +2279,10 @@ app.post('/api/orders', orderLimiter, async (req, res) => {
       serverTotal += unitPrice * qty;
     }
     // Fetch shipping cost from settings
-    const shippingCost      = parseFloat(await getSetting('shipping_cost', '5')) || 5;
-    const shippingThreshold = parseFloat(await getSetting('shipping_threshold', '50')) || 50;
+    const _sc = parseFloat(await getSetting('shipping_cost', '5'));
+    const _st = parseFloat(await getSetting('shipping_threshold', '50'));
+    const shippingCost      = isNaN(_sc) ? 5  : _sc;
+    const shippingThreshold = isNaN(_st) ? 50 : _st;
     if (serverTotal < shippingThreshold) serverTotal += shippingCost;
     serverTotal = Math.round(serverTotal * 100) / 100;
 
@@ -4310,8 +4312,10 @@ app.patch('/api/customer/link-order', requireCustomer, async (req, res) => {
 
 // ── Settings / Shipping ───────────────────────────────
 app.get('/api/settings/shipping', async (req, res) => {
-  const cost      = parseFloat(await getSetting('shipping_cost', '5')) || 5;
-  const threshold = parseFloat(await getSetting('shipping_threshold', '50')) || 50;
+  const _c = parseFloat(await getSetting('shipping_cost', '5'));
+  const _t = parseFloat(await getSetting('shipping_threshold', '50'));
+  const cost      = isNaN(_c) ? 5  : _c;
+  const threshold = isNaN(_t) ? 50 : _t;
   const freeMsg   = await getSetting('shipping_free_msg', 'Envío gratis en pedidos mayores a');
   const paidMsg   = await getSetting('shipping_paid_msg', 'Envío estándar');
   res.json({ cost, threshold, freeMsg, paidMsg });
@@ -4319,7 +4323,6 @@ app.get('/api/settings/shipping', async (req, res) => {
 
 app.post('/api/settings/shipping', requireAdmin, async (req, res) => {
   try {
-    console.log('POST /api/settings/shipping — body:', JSON.stringify(req.body), '— token:', req.headers['x-session-token'] ? 'present' : 'MISSING');
     const { cost, threshold, freeMsg, paidMsg } = req.body;
     if (cost      !== undefined) await setSetting('shipping_cost',      parseFloat(cost));
     if (threshold !== undefined) await setSetting('shipping_threshold', parseFloat(threshold));
