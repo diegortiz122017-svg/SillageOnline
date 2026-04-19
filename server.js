@@ -27,7 +27,7 @@ const security     = require('./middleware/security');
 const auth         = require('./middleware/auth');
 
 // ─── Aliases for backwards compatibility within this file ──────────────────
-const { getCatalogue, saveCatalogue, getInventoryMap, invalidateInventory, getPricingMap, getActivity, getSetting, setSetting, getBrandHierarchy } = catalogueSvc;
+const { getCatalogue, saveCatalogue, addProduct, updateProduct, deleteProduct, getProductById, getInventoryMap, invalidateInventory, getPricingMap, getActivity, getSetting, setSetting, getBrandHierarchy } = catalogueSvc;
 const { calcIntensity } = require('./services/noteIntensity');
 
 // logActivity also broadcasts to admin WebSocket clients
@@ -161,6 +161,45 @@ async function initDB() {
   `);
 
   await db.execute(`
+    CREATE TABLE IF NOT EXISTS products (
+      id              INT PRIMARY KEY,
+      brand           VARCHAR(100)  NOT NULL DEFAULT '',
+      name            VARCHAR(100)  NOT NULL DEFAULT '',
+      gender          CHAR(1)       DEFAULT 'U',
+      price           DECIMAL(10,2) NOT NULL DEFAULT 0,
+      decant_price    DECIMAL(10,2) DEFAULT NULL,
+      decant_price_5  DECIMAL(10,2) DEFAULT NULL,
+      size            VARCHAR(30)   DEFAULT NULL,
+      badge           VARCHAR(30)   DEFAULT NULL,
+      luxury          TINYINT(1)    DEFAULT 0,
+      notes           TEXT          DEFAULT NULL,
+      top_notes       TEXT          DEFAULT NULL,
+      mid_notes       TEXT          DEFAULT NULL,
+      base_notes      TEXT          DEFAULT NULL,
+      top_intensity   TINYINT       DEFAULT 30,
+      mid_intensity   TINYINT       DEFAULT 30,
+      base_intensity  TINYINT       DEFAULT 30,
+      tagline         VARCHAR(255)  DEFAULT NULL,
+      description     TEXT          DEFAULT NULL,
+      concentration   VARCHAR(50)   DEFAULT NULL,
+      season          VARCHAR(50)   DEFAULT NULL,
+      sillage         VARCHAR(50)   DEFAULT NULL,
+      longevity       VARCHAR(50)   DEFAULT NULL,
+      colors          JSON          DEFAULT NULL,
+      shape           VARCHAR(20)   DEFAULT NULL,
+      photos          JSON          DEFAULT NULL,
+      sort_order      INT           DEFAULT 0,
+      active          TINYINT(1)    DEFAULT 1,
+      created_at      DATETIME      NOT NULL,
+      updated_at      DATETIME      NOT NULL,
+      INDEX idx_brand  (brand),
+      INDEX idx_gender (gender),
+      INDEX idx_price  (price),
+      INDEX idx_sort   (sort_order)
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
+  `);
+
+  await db.execute(`
     CREATE TABLE IF NOT EXISTS scent_profiles (
       id          INT AUTO_INCREMENT PRIMARY KEY,
       customer_id INT DEFAULT NULL,
@@ -260,6 +299,78 @@ async function initDB() {
 
 // ─── Seed default data ────────────────────────────────
 // Ensure every product in the catalogue has an inventory row
+async function migrateToProductsTable() {
+  try {
+    // Check if products table is empty — only run if not yet migrated
+    const [existing] = await db.execute('SELECT COUNT(*) AS cnt FROM products');
+    if (existing[0].cnt > 0) {
+      console.log(`✅ Products table already has ${existing[0].cnt} rows — skipping migration`);
+      return;
+    }
+
+    // Load from legacy catalogue JSON blob
+    const [rows] = await db.execute('SELECT data FROM catalogue ORDER BY id DESC LIMIT 1');
+    if (!rows.length) {
+      console.log('ℹ️  No catalogue data found — products table will start empty');
+      return;
+    }
+
+    const catalogue = JSON.parse(rows[0].data);
+    const { calcIntensity } = require('./services/noteIntensity');
+    const now = new Date();
+    let migrated = 0;
+
+    for (const p of catalogue) {
+      const scores = calcIntensity(p);
+      await db.execute(`
+        INSERT IGNORE INTO products
+          (id, brand, name, gender, price, decant_price, decant_price_5,
+           size, badge, luxury, notes, top_notes, mid_notes, base_notes,
+           top_intensity, mid_intensity, base_intensity,
+           tagline, description, concentration, season, sillage, longevity,
+           colors, shape, photos, sort_order, active, created_at, updated_at)
+        VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
+        [
+          p.id,
+          p.brand        || '',
+          p.name         || '',
+          p.g            || 'U',
+          parseFloat(p.price)        || 0,
+          p.decantPrice  ? parseFloat(p.decantPrice)  : null,
+          p.decantPrice5 ? parseFloat(p.decantPrice5) : null,
+          p.size         || null,
+          p.badge        || null,
+          p.luxury       ? 1 : 0,
+          p.notes        || null,
+          p.top          || null,
+          p.mid          || null,
+          p.base         || null,
+          scores.top_intensity,
+          scores.mid_intensity,
+          scores.base_intensity,
+          p.tagline      || null,
+          p.desc         || null,
+          p.conc         || null,
+          p.season       || null,
+          p.sillage      || null,
+          p.long         || null,
+          p.c            ? JSON.stringify(p.c)      : null,
+          p.s            || null,
+          p.photos       ? JSON.stringify(p.photos) : null,
+          migrated,   // sort_order preserves original catalogue order
+          1,
+          now, now,
+        ]
+      );
+      migrated++;
+    }
+
+    console.log(`✅ Migrated ${migrated} products from catalogue JSON to products table`);
+  } catch(e) {
+    console.error('migrateToProductsTable error:', e.message);
+  }
+}
+
 async function migrateInventoryRows() {
   try {
     const catalogue = await getCatalogue();
@@ -4004,15 +4115,11 @@ app.delete('/api/bundles/:id', requireAdmin, async (req, res) => {
 });
 // ─── Catalogue routes ─────────────────────────────────
 app.post('/api/catalogue', requireAdmin, async (req, res) => {
-  const catalogue = await getCatalogue();
-  const maxId = catalogue.reduce((m, p) => Math.max(m, p.id || 0), 0);
-  const newFrag = { ...req.body, id: maxId + 1, ...calcIntensity(req.body) };
-  catalogue.push(newFrag);
-  await saveCatalogue(catalogue);
-  broadcast('catalogue', catalogue);
-  await logActivity(`Fragancia agregada: ${newFrag.brand} ${newFrag.name}`);
+  const fragData = { ...req.body, ...calcIntensity(req.body) };
+  const newId    = await addProduct(fragData);
+  const newFrag  = { ...fragData, id: newId };
 
-  // Auto-create bottle_inventory record for this new fragrance (ml=0, ready to configure)
+  // Auto-create bottle_inventory record
   try {
     const sizeStr    = String(newFrag.size || '');
     const sizeMatch  = sizeStr.match(/([\d.]+)\s*ml/i);
@@ -4021,31 +4128,33 @@ app.post('/api/catalogue', requireAdmin, async (req, res) => {
       INSERT IGNORE INTO bottle_inventory
         (product_id, ml_total, ml_remaining, ml_reserved, decant_size, sample_size, alert_ml, bottles_count, bottle_size, notes, updated_at)
       VALUES (?, 0, 0, 0, 5, 1.5, ?, 0, ?, '', ?)
-    `, [newFrag.id, Math.max(10, bottleSize * 0.15), bottleSize, new Date()]);
+    `, [newId, Math.max(10, bottleSize * 0.15), bottleSize, new Date()]);
   } catch(e) { /* non-fatal */ }
 
+  const catalogue = await getCatalogue();
+  broadcast('catalogue', catalogue);
+  await logActivity(`Fragancia agregada: ${newFrag.brand} ${newFrag.name}`);
   res.json({ ok: true, fragrance: newFrag });
 });
 
 app.put('/api/catalogue/:id', requireAdmin, async (req, res) => {
   const id = parseInt(req.params.id, 10);
+  const existing = await getProductById(id);
+  if (!existing) return res.status(404).json({ error: 'Fragancia no encontrada' });
+  const updated = { ...req.body, id, ...calcIntensity(req.body) };
+  await updateProduct(id, updated);
   const catalogue = await getCatalogue();
-  const idx = catalogue.findIndex(p => p.id === id);
-  if (idx === -1) return res.status(404).json({ error: 'Fragancia no encontrada' });
-  catalogue[idx] = { ...req.body, id, ...calcIntensity(req.body) };
-  await saveCatalogue(catalogue);
   broadcast('catalogue', catalogue);
-  await logActivity(`Fragancia actualizada: ${catalogue[idx].brand} ${catalogue[idx].name}`);
-  res.json({ ok: true, fragrance: catalogue[idx] });
+  await logActivity(`Fragancia actualizada: ${updated.brand} ${updated.name}`);
+  res.json({ ok: true, fragrance: updated });
 });
 
 app.delete('/api/catalogue/:id', requireAdmin, async (req, res) => {
   const id = parseInt(req.params.id, 10);
-  let catalogue = await getCatalogue();
-  const frag = catalogue.find(p => p.id === id);
+  const frag = await getProductById(id);
   if (!frag) return res.status(404).json({ error: 'Fragancia no encontrada' });
-  catalogue = catalogue.filter(p => p.id !== id);
-  await saveCatalogue(catalogue);
+  await deleteProduct(id);
+  const catalogue = await getCatalogue();
   broadcast('catalogue', catalogue);
   await logActivity(`Fragancia eliminada: ${frag.brand} ${frag.name}`);
   res.json({ ok: true });
@@ -4059,15 +4168,20 @@ app.post('/api/admin/migrate-note-intensity', requireAdmin, async (req, res) => 
   try {
     const catalogue = await getCatalogue();
     let updated = 0;
-    const scored = catalogue.map(p => {
+    for (const p of catalogue) {
       const scores = calcIntensity(p);
+      await db.execute(
+        'UPDATE products SET top_intensity=?, mid_intensity=?, base_intensity=?, updated_at=? WHERE id=?',
+        [scores.top_intensity, scores.mid_intensity, scores.base_intensity, new Date(), p.id]
+      );
       updated++;
-      return { ...p, ...scores };
-    });
-    await saveCatalogue(scored);
-    broadcast('catalogue', scored);
+    }
+    // Invalidate cache so next getCatalogue() reads fresh scores
+    const { catalogueCache } = require('./services/cache');
+    catalogueCache.delete('catalogue');
+    const refreshed = await getCatalogue();
     await logActivity(`Note intensity migration: scored ${updated} products`);
-    res.json({ ok: true, updated, sample: scored.slice(0, 3).map(p => ({
+    res.json({ ok: true, updated, sample: refreshed.slice(0, 3).map(p => ({
       id: p.id, name: p.name,
       top_intensity: p.top_intensity,
       mid_intensity: p.mid_intensity,
@@ -4682,6 +4796,7 @@ async function start() {
     await migrateOrders();
     await migrateConsultCounts();
     await migrateCustomers();
+    await migrateToProductsTable();
     await seedData();
     await restoreLoginAttempts();
     await auth.restoreRevocations();
