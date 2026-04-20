@@ -2265,15 +2265,18 @@ app.post('/api/orders', orderLimiter, async (req, res) => {
         const price10 = prod.decantPrice ? parseFloat(prod.decantPrice) : Math.round(fullPrice * 0.30);
         const price5  = prod.decantPrice5 ? parseFloat(prod.decantPrice5) : Math.round(price10 * 0.55);
         const catalogDecantPrice = is5ml ? price5 : price10;
-        const clientUnitPrice = parseFloat(item.unitPrice || 0);
+        const clientUnitPrice = parseFloat(item.unitPrice || item.price || 0);
         if (clientUnitPrice > 0 && Math.abs(clientUnitPrice - catalogDecantPrice) <= 1.00) {
           unitPrice = clientUnitPrice;
         } else {
           unitPrice = catalogDecantPrice;
         }
       } else {
-        unitPrice = parseFloat(item.unitPrice || fullPrice);
+        // Client may send either `unitPrice` or `price` depending on codepath
+        unitPrice = parseFloat(item.unitPrice || item.price || fullPrice);
         if (unitPrice < 0.50) unitPrice = fullPrice;
+        // Sanity check: reject prices way above catalog (prevents tampering)
+        if (unitPrice > fullPrice * 1.1) unitPrice = fullPrice;
       }
 
       serverTotal += unitPrice * qty;
