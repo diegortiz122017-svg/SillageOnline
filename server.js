@@ -2292,6 +2292,11 @@ app.post('/api/orders', orderLimiter, async (req, res) => {
     const clientTotal = Math.round(parseFloat(req.body.total || 0) * 100) / 100;
     if (Math.abs(serverTotal - clientTotal) > 0.02) {
       console.warn(`Order total mismatch — client:$${clientTotal} server:$${serverTotal}`);
+      console.warn(`  items: ${JSON.stringify(rawItems.map(i => ({
+        id: i.productId, qty: i.qty, type: i.type, size: i.size,
+        price: i.price, unitPrice: i.unitPrice,
+        bundleId: i.bundleId, bundlePrice: i.bundlePrice, bundleCount: i.bundleCount,
+      })))}`);
       const failIp = (req.headers['x-forwarded-for']
         ? req.headers['x-forwarded-for'].split(',').map(s => s.trim()).filter(Boolean).pop()
         : null) || req.socket.remoteAddress || 'unknown';
