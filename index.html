@@ -266,11 +266,11 @@ nav a:hover{color:var(--gold)}
 .d-size-lbl{font-size:0.62rem;letter-spacing:0.12em;color:var(--muted);text-transform:uppercase}
 .d-section-lbl{font-size:0.58rem;letter-spacing:0.22em;text-transform:uppercase;color:var(--gold);margin-bottom:0.8rem}
 .notes-section{margin-bottom:1.8rem}
-.note-row{display:flex;align-items:center;gap:0.8rem;margin-bottom:0.6rem}
-.note-lbl{font-size:0.52rem;letter-spacing:0.12em;text-transform:uppercase;color:var(--muted);width:46px;flex-shrink:0}
-.note-bar{width:160px;flex-shrink:0;height:2px;background:var(--border)}
+.note-row{display:flex;align-items:flex-start;flex-wrap:wrap;gap:0.4rem 0.8rem;margin-bottom:0.8rem}
+.note-lbl{font-size:0.52rem;letter-spacing:0.12em;text-transform:uppercase;color:var(--muted);width:52px;flex-shrink:0;padding-top:0.35rem}
+.note-bar{flex-shrink:0;height:2px;background:var(--border);align-self:center;width:min(120px,22vw)}
 .note-fill{height:100%;background:linear-gradient(to right,var(--gold),var(--gold-light))}
-.note-text{font-size:0.68rem;color:var(--charcoal);flex:1}
+.note-text{font-size:0.68rem;color:var(--charcoal);flex:1;min-width:120px;line-height:1.6}
 .d-desc{font-size:0.78rem;line-height:1.9;color:var(--muted);margin-bottom:1.8rem}
 .d-profile{display:grid;grid-template-columns:1fr 1fr;gap:0.8rem;margin-bottom:1.8rem;padding:1.2rem;background:rgba(184,149,90,0.05);border:1px solid var(--border-light)}
 .d-prof-lbl{font-size:0.52rem;letter-spacing:0.18em;text-transform:uppercase;color:var(--muted);margin-bottom:0.2rem}
@@ -2295,8 +2295,10 @@ function connectWS() {
           }
         }
         if (msg.type === 'shipping_update') {
-          shippingCost      = parseFloat(msg.payload.cost)      || shippingCost;
-          shippingThreshold = parseFloat(msg.payload.threshold) || shippingThreshold;
+          var _wsc = parseFloat(msg.payload.cost);
+          var _wst = parseFloat(msg.payload.threshold);
+          if(!isNaN(_wsc)) shippingCost      = _wsc;
+          if(!isNaN(_wst)) shippingThreshold = _wst;
           renderCart();
         }
       } catch(err) {}
