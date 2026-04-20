@@ -4779,7 +4779,8 @@ setInterval(runFollowupCron, 6 * 60 * 60 * 1000);
 // ── Unsubscribe / Email preferences page ─────────────────
 app.get('/preferencias-email', async (req, res) => {
   const { token } = req.query;
-  if (!token) return res.redirect('/');
+  // Validate token format: must be 64 hex chars (matches crypto.randomBytes(32).toString('hex'))
+  if (!token || !/^[a-f0-9]{64}$/i.test(token)) return res.redirect('/');
   const [rows] = await db.execute(
     'SELECT ep.*, c.name FROM email_preferences ep JOIN customers c ON ep.customer_id=c.id WHERE ep.unsubscribe_token=?',
     [token]
@@ -4838,7 +4839,7 @@ function save(){
   fetch('/api/email-preferences',{
     method:'POST',
     headers:{'Content-Type':'application/json'},
-    body:JSON.stringify({token:'${token}',marketing:document.getElementById('mktg').checked,followup:document.getElementById('flwp').checked})
+    body:JSON.stringify({token:${JSON.stringify(token)},marketing:document.getElementById('mktg').checked,followup:document.getElementById('flwp').checked})
   }).then(function(r){return r.json();}).then(function(){
     var m=document.getElementById('msg');m.style.display='block';setTimeout(function(){m.style.display='none';},3000);
   }).catch(function(){alert('Error al guardar. Intenta de nuevo.');});
