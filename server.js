@@ -737,9 +737,9 @@ async function sendOrderConfirmation(order) {
 async function sendWelcomeEmail(customer) {
   const html = emailTemplate(`
     <h2 style="font-family:Georgia,serif;font-size:24px;font-weight:300;color:#1a1714;margin:0 0 8px">Bienvenido a Sillage ✨</h2>
-    <p style="font-size:13px;color:#8a7f72;margin:0 0 16px">Hola <strong style="color:#1a1714">${customer.name}</strong>, tu cuenta ha sido creada exitosamente.</p>
+    <p style="font-size:13px;color:#8a7f72;margin:0 0 16px">Hola <strong style="color:#1a1714">${escHtml(customer.name)}</strong>, tu cuenta ha sido creada exitosamente.</p>
     <div style="padding:1rem;background:#faf8f4;border:1px solid #e8d8b8;font-size:12px;color:#8a7f72">
-      Correo de acceso: <strong style="color:#1a1714">${customer.email}</strong>
+      Correo de acceso: <strong style="color:#1a1714">${escHtml(customer.email)}</strong>
     </div>
     <p style="font-size:12px;color:#8a7f72;margin-top:16px;line-height:1.8">Puedes ver el estado de tus pedidos, gestionar tus direcciones y más desde tu cuenta en la tienda.</p>`);
   await sendEmail({
@@ -766,7 +766,7 @@ async function sendShippedEmail(order) {
   const trackingHtml = order.tracking_number
     ? `<div style="background:#faf8f4;border:1px solid #e8d8b8;padding:12px 16px;margin-bottom:24px">
         <span style="font-size:10px;letter-spacing:3px;text-transform:uppercase;color:#8a7f72">Número de Seguimiento</span><br/>
-        <span style="font-family:Georgia,serif;font-size:18px;color:#b8955a">${order.tracking_number}</span>
+        <span style="font-family:Georgia,serif;font-size:18px;color:#b8955a">${escHtml(order.tracking_number)}</span>
        </div>`
     : '';
   const html = emailTemplate(`
@@ -2787,7 +2787,8 @@ app.post('/api/btcpay/webhook', async (req, res) => {
   res.sendStatus(200); // ack immediately
 
   const { type, invoiceId, metadata } = event;
-  if (!invoiceId) return;
+  console.log(`BTCPay webhook received — type: ${type}, invoiceId: ${invoiceId}`);
+  if (!invoiceId) { console.warn('BTCPay webhook: no invoiceId in event'); return; }
 
   // ── InvoiceExpired: send renewal email if pending order exists ───────────────
   if (type === 'InvoiceExpired') {
@@ -2801,9 +2802,12 @@ app.post('/api/btcpay/webhook', async (req, res) => {
 
       // Generate a signed renew token: HMAC-SHA256(invoiceId + orderId + secret)
       const BASE          = BASE_URL || 'https://sillage-sv.com';
-      const SESSION_SECRET = process.env.SESSION_SECRET || 'fallback-secret';
+      if (!process.env.SESSION_SECRET) {
+        console.error('BTCPay renewal: SESSION_SECRET not set — cannot sign renewal token');
+        return;
+      }
       const renewToken    = crypto
-        .createHmac('sha256', SESSION_SECRET)
+        .createHmac('sha256', process.env.SESSION_SECRET)
         .update(`btcpay-renew:${invoiceId}:${pending.order_id}`)
         .digest('hex');
 
