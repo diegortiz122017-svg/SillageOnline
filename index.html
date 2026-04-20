@@ -2279,6 +2279,15 @@ function connectWS() {
         }
         if (msg.type === 'pricing') {
           adminState.pricing = msg.payload;
+          // Refresh any cart items that have stale unitPrice due to the pricing change
+          var priceChanged = false;
+          cart.forEach(function(i){
+            if(i.bundleId) return; // bundle items keep their bundle-split price
+            if(!i.p) return;
+            var fresh = effectivePrice(i.p);
+            if(i.unitPrice !== fresh){ i.unitPrice = fresh; priceChanged = true; }
+          });
+          if(priceChanged){ saveCart(); renderCart(); }
           buildGrid();
         }
         if (msg.type === 'catalogue') {
