@@ -3511,7 +3511,7 @@ function placeOrder(){
   fetch(API+'/orders',{method:'POST',headers:_headers,body:JSON.stringify(orderData)})
     .then(function(r){return r.json();})
     .then(function(res){
-      if(!res.ok){throw new Error('Server error');}
+      if(!res.ok){throw new Error(res.error || 'Server error');}
       var order=res.order;
       if(selectedPayMethod==='wompi'&&res.wompiRef){
         placeBtn.textContent='Realizar Pedido';
@@ -3571,7 +3571,7 @@ function placeOrder(){
     })
     .catch(function(err){
       console.error(err);
-      toast('Error','No se pudo conectar con el servidor. Intenta de nuevo.','');
+      toast('Error', err.message || 'No se pudo conectar con el servidor. Intenta de nuevo.','');
       placeBtn.textContent='Realizar Pedido';
       placeBtn.disabled=false;
     });
