@@ -3240,15 +3240,38 @@ app.post('/api/inventory', requireAdmin, async (req, res) => {
 
 app.post('/api/pricing', requireAdmin, async (req, res) => {
   const n = new Date();
+  const catalogue = await getCatalogue();
+  const warnings  = [];
   for (const [pid, val] of Object.entries(req.body)) {
+    const productId = parseInt(pid);
+    const salePrice = String(val.salePrice || '').trim();
+    const onSale    = val.onSale ? 1 : 0;
+
+    // Sanity check: if onSale=true, ensure salePrice is reasonable (>= 30% of catalog price)
+    // This prevents typos that would sell a $300 product for $1
+    if (onSale && salePrice) {
+      const priceNum = parseFloat(salePrice);
+      const product  = catalogue.find(p => p.id === productId);
+      if (product && !isNaN(priceNum)) {
+        const catalogPrice = parseFloat(product.price);
+        if (priceNum < catalogPrice * 0.3) {
+          warnings.push(`id:${productId} (${product.brand} ${product.name}) — sale price $${priceNum} is less than 30% of catalog $${catalogPrice}. Rejected.`);
+          continue; // skip this update
+        }
+      }
+    }
+
     await db.execute(
       `INSERT INTO pricing (product_id,sale_price,on_sale,updated_at) VALUES (?,?,?,?)
        ON DUPLICATE KEY UPDATE sale_price=VALUES(sale_price),on_sale=VALUES(on_sale),updated_at=VALUES(updated_at)`,
-      [parseInt(pid), val.salePrice || '', val.onSale ? 1 : 0, n]
+      [productId, salePrice, onSale, n]
     );
   }
   broadcast('pricing', await getPricingMap());
   await logActivity('Precios actualizados');
+  if (warnings.length) {
+    return res.json({ ok: true, warnings });
+  }
   res.json({ ok: true });
 });
 
