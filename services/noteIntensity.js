@@ -164,10 +164,25 @@ function scoreNotes(notesStr, weightTable) {
 }
 
 function calcIntensity(product) {
+  const top  = scoreNotes(product.top,  TOP_WEIGHTS);
+  const mid  = scoreNotes(product.mid,  HEART_WEIGHTS);
+  const base = scoreNotes(product.base, BASE_WEIGHTS);
+
+  // Step 1: enforce pyramid — base >= mid >= top
+  const enforcedBase = Math.max(base, mid, top);
+  const enforcedMid  = Math.max(mid, top);
+  const enforcedTop  = top;
+
+  // Step 2: normalize so the heaviest layer (base) always = 100%
+  // This makes bars stretch across the full width and shows
+  // relative differences clearly between layers per product.
+  // A minimum floor of 15 ensures no bar is invisible.
+  const scale = enforcedBase > 0 ? 100 / enforcedBase : 1;
+
   return {
-    top_intensity:  scoreNotes(product.top,  TOP_WEIGHTS),
-    mid_intensity:  scoreNotes(product.mid,  HEART_WEIGHTS),
-    base_intensity: scoreNotes(product.base, BASE_WEIGHTS),
+    top_intensity:  Math.max(15, Math.round(enforcedTop  * scale)),
+    mid_intensity:  Math.max(25, Math.round(enforcedMid  * scale)),
+    base_intensity: 100, // always full width after normalization
   };
 }
 
