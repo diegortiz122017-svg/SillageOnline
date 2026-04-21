@@ -269,9 +269,9 @@ nav a:hover{color:var(--gold)}
 .notes-hdr{display:flex;align-items:center;gap:0.5rem;margin-bottom:0.6rem}
 .notes-info{position:relative;display:inline-flex;align-items:center}
 .notes-info-btn{background:none;border:1px solid var(--border);border-radius:50%;width:14px;height:14px;font-size:0.5rem;color:var(--muted);cursor:pointer;display:flex;align-items:center;justify-content:center;padding:0;line-height:1;flex-shrink:0}
-.notes-info-tip{display:none;position:absolute;bottom:calc(100% + 6px);left:50%;transform:translateX(-50%);background:#1a1714;border:1px solid var(--border);color:var(--cream);font-size:0.58rem;line-height:1.5;padding:0.5rem 0.7rem;white-space:nowrap;z-index:100;pointer-events:none;width:220px;white-space:normal;text-align:left}
-.notes-info-tip::after{content:'';position:absolute;top:100%;left:50%;transform:translateX(-50%);border:4px solid transparent;border-top-color:#1a1714}
-.notes-info:hover .notes-info-tip,.notes-info:focus-within .notes-info-tip{display:block}
+.notes-info-tip{display:none;position:fixed;background:#1a1714;border:1px solid var(--border);color:var(--cream);font-size:0.58rem;line-height:1.6;padding:0.6rem 0.8rem;z-index:10000;pointer-events:none;width:min(240px,80vw);text-align:left;box-shadow:0 4px 16px rgba(0,0,0,0.4)}
+.notes-info-tip::after{content:'';position:absolute;top:100%;left:16px;border:4px solid transparent;border-top-color:#1a1714}
+/* tooltip shown via JS for accurate mobile positioning */
 .note-row{display:flex;align-items:flex-start;flex-wrap:wrap;gap:0.4rem 0.8rem;margin-bottom:0.8rem}
 .note-lbl{font-size:0.52rem;letter-spacing:0.12em;text-transform:uppercase;color:var(--muted);width:52px;flex-shrink:0;padding-top:0.35rem}
 .note-bar{flex-shrink:0;height:2px;background:var(--border);align-self:center;width:min(120px,22vw)}
@@ -2810,7 +2810,7 @@ function openDetail(pid){
           '<div class="notes-info">'+
             '<button class="notes-info-btn" aria-label="¿Qué son los acordes?">?</button>'+
             '<div class="notes-info-tip">'+
-              'Los <strong>acordes</strong> describen el carácter olfativo general de la fragancia — las familias de sensaciones que predominan en el conjunto, más allá de las notas individuales.'+
+              'Los <strong>acordes</strong> describen el carácter olfativo del drydown — las familias predominantes cuando la fragancia se asienta en la piel, no las notas de apertura.'+
             '</div>'+
           '</div>'+
         '</div>'+
@@ -3190,6 +3190,25 @@ function translateConc(s){
     }, 2500);
   } catch(e) {}
 })();
+
+// ── Tooltip positioning — prevents overflow on mobile ────────────────────────
+document.addEventListener('click', function(e) {
+  var btn = e.target.closest('.notes-info-btn');
+  // Close any open tooltip
+  document.querySelectorAll('.notes-info-tip').forEach(function(t){ t.style.display='none'; });
+  if (!btn) return;
+  var tip = btn.parentElement.querySelector('.notes-info-tip');
+  if (!tip) return;
+  // Position using fixed coordinates to avoid overflow
+  var rect = btn.getBoundingClientRect();
+  tip.style.display = 'block';
+  // Calculate left — keep within viewport with 12px margin
+  var left = rect.left + rect.width/2 - 16; // align arrow to button center
+  var maxLeft = window.innerWidth - tip.offsetWidth - 12;
+  tip.style.left = Math.max(12, Math.min(left, maxLeft)) + 'px';
+  tip.style.top = (rect.top - tip.offsetHeight - 8) + 'px';
+  e.stopPropagation();
+});
 
 function dismissPrivacyBanner(){
   var banner = document.getElementById('privacyBanner');
