@@ -1886,6 +1886,27 @@ footer{background:var(--dark);padding:3.5rem 4rem;text-align:center;border-top:1
         <div id="pmInfoWompi" class="pm-info"><div class="sec-row"><span class="sec-badge">&#128274; SSL</span><span class="sec-badge">Wompi</span><span class="sec-badge">&#10003; Seguro</span></div><p style="font-size:0.68rem;color:var(--muted);line-height:1.7;margin-top:0.8rem">Serás redirigido a la pasarela segura de Wompi.</p></div>
         <div id="pmInfoBtcpay" class="pm-info" style="display:none"><p style="font-size:0.68rem;color:var(--muted);line-height:1.7">Serás redirigido a una página de pago segura donde podrás pagar con <strong style="color:var(--gold)">Bitcoin on-chain o Lightning Network</strong>.<br><span style="font-size:0.62rem">Compatible con Chivo Wallet, Phoenix, Muun, y cualquier wallet Bitcoin.</span></p></div>
         <div id="pmInfoCod" class="pm-info" style="display:none"><p style="font-size:0.68rem;color:var(--muted);line-height:1.7">Pagarás en efectivo cuando recibas tu pedido.</p></div>
+        <!-- Promo code -->
+        <div style="margin-top:1.2rem">
+          <p class="f-label-top">Código de descuento (opcional)</p>
+          <div style="display:flex;gap:0.5rem;align-items:flex-start">
+            <div style="flex:1">
+              <input id="promoInput" type="text" placeholder="CÓDIGO" maxlength="30"
+                style="width:100%;padding:0.7rem 0.9rem;background:#0e0c0a;border:1px solid var(--border);
+                       color:var(--cream);font-family:'Jost',sans-serif;font-size:0.75rem;
+                       letter-spacing:0.12em;text-transform:uppercase;outline:none;box-sizing:border-box"
+                oninput="this.value=this.value.toUpperCase();clearPromo()"/>
+              <div id="promoMsg" style="font-size:0.62rem;margin-top:0.3rem;min-height:1rem"></div>
+            </div>
+            <button onclick="applyPromo()"
+              style="padding:0.7rem 1rem;background:transparent;border:1px solid var(--border);
+                     color:var(--muted);font-family:'Jost',sans-serif;font-size:0.6rem;
+                     letter-spacing:0.15em;text-transform:uppercase;cursor:pointer;white-space:nowrap;
+                     flex-shrink:0">
+              Aplicar
+            </button>
+          </div>
+        </div>
         <div class="m-actions"><button class="m-btn-s" id="s2back" onclick="goStep(1)">&#8592; Volver</button><button class="m-btn-p" id="s2next">Revisar Pedido &#8594;</button></div>
       </div>
 <div class="m-section" id="ms3">
@@ -2783,7 +2804,24 @@ function openDetail(pid){
     '<p class="decant-note" id="decantNote" style="display:none">Un decant es una muestra en frasco de viaje. Perfecto para probar antes de invertir en el frasco completo.</p>'+
     (low?'<p class="inv-note">\u26a0 Solo '+inv.stock+' unidades — ordena pronto</p>':'')+
     (pr.onSale&&pr.salePrice?'<p style="font-size:0.62rem;color:var(--error);margin-top:0.4rem">Oferta activa — ahorra $'+(p.price-Math.round(+pr.salePrice))+'</p>':'')+
-    '<div class="d-actions"><button class="d-add-btn" id="dAddBtn"'+(oos?' disabled':'')+'>Añadir al Carrito — $'+ep+'</button><button class="d-wish-btn" id="dWishBtn">'+(isFav(pid)?'♥':'♡')+'</button></div>';
+    '<div class="d-actions"><button class="d-add-btn" id="dAddBtn"'+(oos?' disabled':'')+'>'+
+      (oos?'Sin Stock':'Añadir al Carrito — $'+ep)+
+    '</button><button class="d-wish-btn" id="dWishBtn">'+(isFav(pid)?'♥':'♡')+'</button></div>'+
+    (oos ?
+      '<div id="stockNotifyWrap_'+pid+'" style="margin-top:0.8rem">'+
+        '<p style="font-size:0.62rem;color:var(--muted);margin-bottom:0.4rem">Avísame cuando esté disponible</p>'+
+        '<div style="display:flex;gap:0.4rem">'+
+          '<input id="stockNotifyEmail_'+pid+'" type="email" placeholder="tu@correo.com"'+
+            ' style="flex:1;padding:0.5rem 0.7rem;background:#0e0c0a;border:1px solid var(--border);'+
+            'color:var(--cream);font-family:Jost,sans-serif;font-size:0.68rem;outline:none"/>'+
+          '<button id="stockNotifyBtn_'+pid+'" onclick="submitStockNotify('+pid+')"'+
+            ' style="padding:0.5rem 0.8rem;background:transparent;border:1px solid var(--border);'+
+            'color:var(--muted);font-family:Jost,sans-serif;font-size:0.58rem;letter-spacing:0.12em;'+
+            'text-transform:uppercase;cursor:pointer;white-space:nowrap">Notificarme</button>'+
+        '</div>'+
+        '<div id="stockNotifyMsg_'+pid+'" style="font-size:0.6rem;margin-top:0.3rem;min-height:1rem"></div>'+
+      '</div>'
+    : '');
   // Track selected size for this product
   var _selType  = 'full';
   var _selPrice = ep;
@@ -3109,6 +3147,95 @@ function productUrl(p){
   return 'https://sillage-sv.com/fragancia/'+slugify(p.brand+'-'+p.name);
 }
 
+// ═══════════════════════════════════════════════════════
+// PROMO CODES
+// ═══════════════════════════════════════════════════════
+var _appliedPromo = null; // { code, type, value, discount }
+
+function applyPromo(){
+  var code = document.getElementById('promoInput').value.trim().toUpperCase();
+  var msg  = document.getElementById('promoMsg');
+  if(!code){ msg.style.color='var(--error)'; msg.textContent='Ingresa un código.'; return; }
+  var total = cartSum();
+  msg.style.color='var(--muted)'; msg.textContent='Verificando...';
+  fetch(API+'/promo/validate',{
+    method:'POST',
+    headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({code:code, cartTotal:total})
+  }).then(function(r){return r.json();}).then(function(res){
+    if(!res.ok){
+      msg.style.color='var(--error)'; msg.textContent=res.error||'Código inválido.';
+      _appliedPromo=null; return;
+    }
+    _appliedPromo = res;
+    msg.style.color='var(--success)';
+    var label = res.type==='percent' ? res.value+'% descuento' : '$'+parseFloat(res.value).toFixed(2)+' de descuento';
+    msg.textContent='✓ '+label+' aplicado — ahorras $'+parseFloat(res.discount).toFixed(2);
+    renderCart();
+  }).catch(function(){
+    msg.style.color='var(--error)'; msg.textContent='Error al verificar.';
+  });
+}
+
+function clearPromo(){
+  if(_appliedPromo){ _appliedPromo=null; renderCart(); }
+  var msg=document.getElementById('promoMsg');
+  if(msg) msg.textContent='';
+}
+
+function getPromoDiscount(){
+  if(!_appliedPromo) return 0;
+  return parseFloat(_appliedPromo.discount)||0;
+}
+
+// ═══════════════════════════════════════════════════════
+// STOCK NOTIFICATIONS
+// ═══════════════════════════════════════════════════════
+function submitStockNotify(productId){
+  var input = document.getElementById('stockNotifyEmail_'+productId);
+  var btn   = document.getElementById('stockNotifyBtn_'+productId);
+  var msg   = document.getElementById('stockNotifyMsg_'+productId);
+  if(!input||!btn||!msg) return;
+  var email = input.value.trim();
+  var re = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/;
+  if(!re.test(email)){ msg.style.color='var(--error)'; msg.textContent='Correo inválido.'; return; }
+  btn.disabled=true; msg.textContent='Guardando...';
+  fetch(API+'/stock-notify',{
+    method:'POST',
+    headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({productId:productId, email:email})
+  }).then(function(r){return r.json();}).then(function(res){
+    if(res.ok){
+      msg.style.color='var(--success)';
+      msg.textContent='✓ Te avisamos cuando esté disponible.';
+      input.style.display='none'; btn.style.display='none';
+    } else {
+      msg.style.color='var(--error)';
+      msg.textContent=res.error||'Error al guardar.';
+      btn.disabled=false;
+    }
+  }).catch(function(){ msg.style.color='var(--error)'; msg.textContent='Error de conexión.'; btn.disabled=false; });
+}
+
+// ═══════════════════════════════════════════════════════
+// ABANDONED CART CAPTURE
+// ═══════════════════════════════════════════════════════
+var _cartCaptured = false;
+function captureAbandonedCart(email, name){
+  if(_cartCaptured || !email || !cart.length) return;
+  var items = cart.map(function(i){
+    return { productId: i.p.id, name: i.label||(i.p.brand+' '+i.p.name),
+             qty: i.qty, price: i.unitPrice||effectivePrice(i.p) };
+  });
+  fetch(API+'/cart/capture',{
+    method:'POST',
+    headers:{'Content-Type':'application/json',
+             'x-customer-token': (typeof customerToken!=='undefined'&&customerToken)||''},
+    body:JSON.stringify({email:email, name:name, cart:items, sessionId:_somSession||null})
+  }).catch(function(){});
+  _cartCaptured = true;
+}
+
 function saveCart(){
   try{localStorage.setItem('sillage_cart',JSON.stringify(cart));}catch(e){}
 }
@@ -3149,7 +3276,7 @@ function getShipping(){
   var sub = cartSum();
   return sub >= shippingThreshold ? 0 : shippingCost;
 }
-function orderTotal(){return cartSum() + getShipping();}
+function orderTotal(){return Math.max(0, cartSum() + getShipping() - getPromoDiscount());}
 function addToCart(pid){
   var p=P.find(function(x){return x.id===pid;});if(!p)return;
   if(getInv(pid).outOfStock){toast('Sin Stock','Este artículo no está disponible');return;}
@@ -3468,6 +3595,14 @@ function fillReview(){
     ? '<div class="ms-shipping"><span>Envío</span><span>$'+shipping.toFixed(2)+'</span></div>'
     : '<div class="ms-shipping"><span>Envío</span><span class="shipping-free">Gratis ✓</span></div>';
   if(summaryEl) summaryEl.innerHTML += shippingRow;
+  // Show promo discount if applied
+  if(_appliedPromo && _appliedPromo.discount > 0){
+    var promoRow = '<div class="ms-shipping" style="color:var(--success)">'+
+      '<span>Descuento ('+esc(_appliedPromo.code)+')</span>'+
+      '<span>−$'+parseFloat(_appliedPromo.discount).toFixed(2)+'</span>'+
+    '</div>';
+    if(summaryEl) summaryEl.innerHTML += promoRow;
+  }
   document.getElementById('mSummaryTotal').textContent='$'+total.toFixed(2);
   document.getElementById('mDelivery').textContent=gv('fn')+' \u00b7 '+gv('fa')+', '+gv('fc')+(gv('fs')?' '+gv('fs'):'')+', '+gv('fco');
   var pmLabels={
@@ -3479,6 +3614,10 @@ function fillReview(){
 }
 document.getElementById('s1next').addEventListener('click',function(){
   if(!v1()) return;
+  // Capture cart for abandoned cart recovery
+  var emailVal = document.getElementById('fe') ? document.getElementById('fe').value.trim() : '';
+  var nameVal  = document.getElementById('fn') ? document.getElementById('fn').value.trim() : '';
+  if(emailVal && cart.length) captureAbandonedCart(emailVal, nameVal);
   // If logged in and checkbox is checked, save the address to DB before advancing
   var chk = document.getElementById('saveAddrCheck');
   if(chk && chk.checked && typeof customerToken !== 'undefined' && customerToken) {
@@ -3549,7 +3688,9 @@ function placeOrder(){
     fullAddress: gv('fa')+', '+gv('fc')+(gv('fs')?' '+gv('fs'):'')+', '+gv('fco'),
     items:       orderItems,
     total:       total,
-    paymentMethod: selectedPayMethod
+    paymentMethod: selectedPayMethod,
+    promoCode:     _appliedPromo ? _appliedPromo.code : null,
+    promoDiscount: _appliedPromo ? parseFloat(_appliedPromo.discount) : 0
   };
 
   var placeBtn=document.getElementById('s3place');
@@ -3594,6 +3735,8 @@ function placeOrder(){
       }
       document.getElementById('successOid').textContent='Pedido '+order.id;
       document.getElementById('notifyEmail').textContent=email;
+      var invLink=document.getElementById('invoiceLink');
+      if(invLink) invLink.href=API+'/orders/'+order.id+'/invoice'+(typeof customerToken!=='undefined'&&customerToken?'?token=':'');
       document.getElementById('successItems').innerHTML='<div class="ms-title">Tu Pedido</div>'+
         orderItems.map(function(i){return'<div class="ms-row"><span>'+i.name+' \u00d7'+i.qty+'</span><span class="ms-price">$'+parseFloat(i.total||0).toFixed(2)+'</span></div>';}).join('')+
         '<div class="ms-div"></div><div class="ms-total"><span class="ms-total-lbl">Total Pagado</span><span class="ms-total-val">$'+total.toLocaleString()+'</span></div>';
