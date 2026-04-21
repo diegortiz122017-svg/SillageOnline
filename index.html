@@ -2810,7 +2810,7 @@ function openDetail(pid){
     var shareData = {
       title: p.brand + ' ' + p.name + ' — Sillage Parfumerie',
       text: p.tagline || ('Descubre ' + p.brand + ' ' + p.name + ' en Sillage Parfumerie'),
-      url: 'https://sillage-sv.com/?producto=' + p.id
+      url: productUrl(p)
     };
     if(navigator.share){
       navigator.share(shareData).catch(function(){});
@@ -2819,7 +2819,7 @@ function openDetail(pid){
       navigator.clipboard.writeText(shareData.url).then(function(){
         toast('Enlace copiado', 'Comparte donde quieras', 'ok');
       }).catch(function(){
-        toast('Enlace: sillage-sv.com/?producto='+p.id, '', 'ok');
+        toast('Enlace copiado', productUrl(p), 'ok');
       });
     }
   });
@@ -2960,9 +2960,27 @@ function openDetail(pid){
   document.getElementById('detailOverlay').classList.add('open');
   document.querySelector('.detail-panel').scrollTop=0;
   document.body.style.overflow='hidden';
+  // Update address bar to clean product URL (for sharing)
+  window.history.pushState({producto: p.id}, '', productUrl(p));
 }
-function closeDetail(){document.getElementById('detailOverlay').classList.remove('open');document.body.style.overflow='';}
+function closeDetail(){
+  document.getElementById('detailOverlay').classList.remove('open');
+  document.body.style.overflow='';
+  // Restore base URL
+  if(window.history.state && window.history.state.producto){
+    window.history.pushState({}, '', '/');
+  }
+}
 document.getElementById('backBtn').addEventListener('click',closeDetail);
+
+// Handle browser back button — close modal instead of navigating away
+window.addEventListener('popstate', function(e) {
+  var overlay = document.getElementById('detailOverlay');
+  if (overlay && overlay.classList.contains('open')) {
+    overlay.classList.remove('open');
+    document.body.style.overflow = '';
+  }
+});
 document.getElementById('overlayBg').addEventListener('click',closeDetail);
 function gotoSlide(idx){
   var sls=document.getElementById('slides').querySelectorAll('.slide');
@@ -3058,6 +3076,16 @@ function translateConc(s){
     'Solid Perfume':  'Perfume sólido',
   };
   return map[s] || s;
+}
+
+function slugify(str){
+  return String(str).toLowerCase()
+    .normalize('NFD').replace(/[̀-ͯ]/g,'')
+    .replace(/[^a-z0-9\s-]/g,'').trim()
+    .replace(/\s+/g,'-').replace(/-+/g,'-');
+}
+function productUrl(p){
+  return 'https://sillage-sv.com/fragancia/'+slugify(p.brand+'-'+p.name);
 }
 
 function saveCart(){
