@@ -1363,6 +1363,72 @@ app.get('/fragancia/:slug', async (req, res) => {
   }
 });
 
+// ── /bundle/:slug — clean bundle URLs ────────────────────────────────────────
+app.get('/bundle/:slug', async (req, res) => {
+  try {
+    const [bundles] = await db.execute('SELECT * FROM bundles WHERE active=1');
+    const slug   = req.params.slug.toLowerCase();
+    const bundle = bundles.find(b => slugify(b.name) === slug);
+
+    if (!bundle) return res.redirect('/');
+
+    const ua        = req.headers['user-agent'] || '';
+    const isCrawler = /facebookexternalhit|twitterbot|whatsapp|telegram|linkedinbot|slackbot|discordbot|googlebot|bingbot|applebot|duckduckbot|curl|wget|python|node-fetch|axios|go-http|java/i.test(ua);
+
+    if (!isCrawler) {
+      return res.redirect(301, `/?bundle=${bundle.id}`);
+    }
+
+    // Serve enriched HTML for crawlers
+    const fs    = require('fs');
+    const index = path.join(__dirname, 'index.html');
+    if (!fs.existsSync(index)) return res.redirect('/');
+
+    const BASE     = process.env.BASE_URL || 'https://sillage-sv.com';
+    const cleanUrl = `${BASE}/bundle/${slugify(bundle.name)}`;
+    const title    = `${bundle.name} — Sillage Parfumerie`;
+    const saving   = bundle.orig_price && parseFloat(bundle.orig_price) > parseFloat(bundle.price)
+      ? ` · Ahorras $${(parseFloat(bundle.orig_price) - parseFloat(bundle.price)).toFixed(2)}`
+      : '';
+    const desc = `${bundle.description || bundle.name} · $${parseFloat(bundle.price).toFixed(2)}${saving}`;
+
+    // Try to get first product image from bundle items
+    let imgUrl = `${BASE}/og-default.jpg`;
+    try {
+      const items    = typeof bundle.items === 'string' ? JSON.parse(bundle.items) : bundle.items;
+      const firstPid = items?.[0]?.productId;
+      if (firstPid) {
+        const catalogue = await getCatalogue();
+        const prod = catalogue.find(p => p.id === firstPid);
+        if (prod?.photos?.[0]) {
+          imgUrl = prod.photos[0].startsWith('http') ? prod.photos[0] : BASE + prod.photos[0];
+        }
+      }
+    } catch(e) { /* use default */ }
+
+    let html = fs.readFileSync(index, 'utf8');
+    html = html
+      .replace(/<meta property="og:title"[^>]*\/>/,
+        `<meta property="og:title" content="${escHtml(title)}"/>`)
+      .replace(/<meta property="og:description"[^>]*\/>/,
+        `<meta property="og:description" content="${escHtml(desc)}"/>`)
+      .replace(/<meta property="og:url"[^>]*\/>/, '')
+      .replace('</head>',
+        `<meta property="og:image" content="${imgUrl}"/>
+<meta property="og:url" content="${cleanUrl}"/>
+<meta property="og:type" content="product"/>
+<meta name="twitter:card" content="summary_large_image"/>
+<meta name="twitter:image" content="${imgUrl}"/>
+</head>`);
+
+    res.setHeader('Cache-Control', 'public, max-age=300');
+    res.send(html);
+  } catch(e) {
+    console.error('Bundle URL error:', e.message);
+    res.redirect('/');
+  }
+});
+
 app.get('/', async (req, res) => {
   const fs   = require('fs');
   const index = path.join(__dirname, 'index.html');
@@ -1615,7 +1681,14 @@ app.get('/sitemap.xml', async (req, res) => {
     freq:     'weekly',
   }));
 
-  const allPages = [...staticPages, ...productPages];
+  const [bundleRows] = await db.execute('SELECT name FROM bundles WHERE active=1').catch(() => [[]]);
+  const bundlePages  = bundleRows.map(b => ({
+    url:      `${BASE}/bundle/${slugify(b.name)}`,
+    priority: '0.7',
+    freq:     'weekly',
+  }));
+
+  const allPages = [...staticPages, ...productPages, ...bundlePages];
 
   res.type('application/xml');
   res.send([
