@@ -41,6 +41,7 @@ const RESEND_API_KEY = process.env.RESEND_API_KEY || null;
 const FROM_EMAIL     = process.env.FROM_EMAIL || 'noreply@sillage-sv.com';
 const EMAIL_HOLA     = process.env.EMAIL_HOLA    || 'hola@sillage-sv.com';
 const EMAIL_PEDIDOS  = process.env.EMAIL_PEDIDOS || 'pedidos@sillage-sv.com';
+const ADMIN_NOTIFY_EMAIL = process.env.ADMIN_NOTIFY_EMAIL || null; // email to receive new order alerts
 
 // ─── Payments ─────────────────────────────────────────────────────────────────
 const WOMPI_CLIENT_ID     = process.env.WOMPI_CLIENT_ID     || null;
@@ -86,7 +87,7 @@ module.exports = {
   PORT, NODE_ENV, IS_PROD, BASE_URL,
   SESSION_SECRET, SESSION_TTL_ADMIN, SESSION_TTL_CUSTOMER,
   DB,
-  RESEND_API_KEY, FROM_EMAIL, EMAIL_HOLA, EMAIL_PEDIDOS,
+  RESEND_API_KEY, FROM_EMAIL, EMAIL_HOLA, EMAIL_PEDIDOS, ADMIN_NOTIFY_EMAIL,
   WOMPI_CLIENT_ID, WOMPI_CLIENT_SECRET, WOMPI_PUBLIC_KEY,
   OPENAI_API_KEY,
   ADMIN_USER, ADMIN_PASS,
