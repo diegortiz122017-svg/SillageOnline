@@ -1842,7 +1842,7 @@ footer{background:var(--dark);padding:3.5rem 4rem;text-align:center;border-top:1
           </div>
         </div>
         <div class="f-row full"><div class="f-field"><label>Nombre Completo</label><input type="text" id="fn" placeholder="Alexandra Beaumont"/><div class="f-hint" id="en"></div></div></div>
-        <div class="f-row full"><div class="f-field"><label>Correo Electrónico</label><input type="email" id="fe" placeholder="alex@example.com"/><div class="f-hint" id="ee"></div></div></div>
+        <div class="f-row full"><div class="f-field"><label>Correo Electrónico</label><input type="email" id="fe" placeholder="alex@example.com"/><div class="f-hint" id="ee"></div><p style="font-size:0.58rem;color:var(--muted);margin-top:0.3rem;line-height:1.6">Al continuar aceptas recibir comunicaciones relacionadas con tu pedido. Puedes cancelar en cualquier momento.</p></div></div>
         <div class="f-row full"><div class="f-field"><label>Teléfono <span style="font-size:0.55rem;color:var(--muted)">(opcional)</span></label><input type="tel" id="fph" placeholder="+503 7000-0000"/></div></div>
         <div class="f-row full"><div class="f-field"><label>Dirección</label><input type="text" id="fa" placeholder="123 Main Street"/><div class="f-hint" id="ea"></div></div></div>
         <div class="f-row tri">
@@ -1940,6 +1940,10 @@ footer{background:var(--dark);padding:3.5rem 4rem;text-align:center;border-top:1
                   placeholder="Elige una contraseña (mín. 6 caracteres)"/>
               </div>
               <div class="por-err" id="porErr"></div>
+              <p style="font-size:0.57rem;color:var(--muted);line-height:1.6;margin-bottom:0.5rem">
+                Al crear cuenta aceptas nuestra <a href="/privacidad" target="_blank" style="color:var(--gold);text-decoration:none">Política de Privacidad</a>.
+                Podrás recibir recomendaciones de Nez — cancelables en cualquier momento.
+              </p>
               <button class="por-btn" id="porBtn" onclick="postOrderRegister()">Crear Cuenta Gratis</button>
               <button class="por-skip" onclick="dismissRegisterPrompt()">No, gracias — continuar sin cuenta</button>
             </div>
@@ -2155,6 +2159,10 @@ footer{background:var(--dark);padding:3.5rem 4rem;text-align:center;border-top:1
         </div>
       </div>
       <div class="auth-err" id="regErr"></div>
+      <p style="font-size:0.58rem;color:var(--muted);line-height:1.6;margin-bottom:0.8rem">
+        Al crear tu cuenta aceptas nuestra <a href="/privacidad" target="_blank" style="color:var(--gold);text-decoration:none">Política de Privacidad</a>.
+        Podrás recibir recomendaciones personalizadas de Nez — puedes cancelarlas en cualquier momento desde tu correo.
+      </p>
       <button class="auth-submit" id="regSubmit" onclick="doRegister()">Crear Cuenta</button>
     </div>
   </div>
