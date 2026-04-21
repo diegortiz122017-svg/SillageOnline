@@ -223,29 +223,36 @@ const SILLAGE_BONUS = {
 };
 
 // ── Score and rank ────────────────────────────────────────────────────────────
-function calcChords(product) {
-  const allNotes = [
-    product.top  || '',
-    product.mid  || '',
-    product.base || '',
-    product.notes|| '',
-  ].join(' ').toLowerCase();
+// Tier multipliers — base notes define the fragrance's character more than top notes
+const TIER_WEIGHT = { base: 2.0, mid: 1.5, top: 1.0, notes: 1.0 };
 
-  const scores = {};
-
-  // Score each chord from notes
+function scoreNoteTier(notesStr, tierWeight, scores) {
+  if (!notesStr) return;
+  const notes = notesStr.toLowerCase();
   for (const [keyword, chords] of Object.entries(NOTE_SIGNALS)) {
-    if (allNotes.includes(keyword)) {
-      chords.forEach(c => { scores[c] = (scores[c] || 0) + 1; });
+    if (notes.includes(keyword)) {
+      chords.forEach(c => {
+        scores[c] = (scores[c] || 0) + tierWeight;
+      });
     }
   }
+}
+
+function calcChords(product) {
+  const scores = {};
+
+  // Score each tier with its weight — base counts double, heart 1.5x, top 1x
+  scoreNoteTier(product.base,  TIER_WEIGHT.base,  scores);
+  scoreNoteTier(product.mid,   TIER_WEIGHT.mid,   scores);
+  scoreNoteTier(product.top,   TIER_WEIGHT.top,   scores);
+  scoreNoteTier(product.notes, TIER_WEIGHT.notes,  scores);
 
   // Sillage bonus
   if (product.sillage) {
     const s = product.sillage.toLowerCase();
     for (const [key, chord] of Object.entries(SILLAGE_BONUS)) {
       if (s.includes(key)) {
-        scores[chord] = (scores[chord] || 0) + 0.5;
+        scores[chord] = (scores[chord] || 0) + 0.75; // slightly heavier bonus
         break;
       }
     }
