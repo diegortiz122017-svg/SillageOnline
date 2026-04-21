@@ -279,7 +279,7 @@ nav a:hover{color:var(--gold)}
 .note-text{font-size:0.68rem;color:var(--charcoal);flex:1;min-width:120px;line-height:1.6}
 .d-desc{font-size:0.78rem;line-height:1.9;color:var(--muted);margin-bottom:1.8rem}
 .d-profile{display:grid;grid-template-columns:1fr 1fr;gap:0.8rem;margin-bottom:1.8rem;padding:1.2rem;background:rgba(184,149,90,0.05);border:1px solid var(--border-light)}
-.d-chords{margin-bottom:1.8rem}
+.d-chords{margin-bottom:1rem;margin-top:-0.6rem}
 .d-chord-tags{display:flex;flex-wrap:wrap;gap:0.4rem;margin-top:0.5rem}
 .d-chord-tag{font-size:0.58rem;letter-spacing:0.12em;text-transform:uppercase;padding:0.25rem 0.7rem;border:1px solid var(--border);color:var(--muted);background:transparent}
 .d-prof-lbl{font-size:0.52rem;letter-spacing:0.18em;text-transform:uppercase;color:var(--muted);margin-bottom:0.2rem}
@@ -2802,20 +2802,19 @@ function openDetail(pid){
       '<div class="note-row"><span class="note-lbl">Fondo</span><div class="note-bar"><div class="note-fill" style="width:'+(p.base_intensity||50)+'%"></div></div><span class="note-text">'+p.base+'</span></div>'+
     '</div>'+
     '<p class="d-desc">'+p.desc+'</p>'+
+    (p.chords && p.chords.length ?
+      '<div class="d-chords">'+
+        '<div class="d-chord-tags">'+
+          p.chords.map(function(c){ return '<span class="d-chord-tag">'+esc(c)+'</span>'; }).join('')+
+        '</div>'+
+      '</div>'
+    : '')+
     '<div class="d-profile">'+
       '<div><div class="d-prof-lbl">Concentración</div><div class="d-prof-val">'+translateConc(p.conc)+'</div></div>'+
       '<div><div class="d-prof-lbl">Temporada</div><div class="d-prof-val">'+translateSeason(p.season)+'</div></div>'+
       '<div><div class="d-prof-lbl">Sillage</div><div class="d-prof-val">'+translateSillage(p.sillage)+'</div></div>'+
       '<div><div class="d-prof-lbl">Duración</div><div class="d-prof-val">'+p.long+'</div></div>'+
     '</div>'+
-    (p.chords && p.chords.length ?
-      '<div class="d-chords">'+
-        '<div class="d-section-lbl">Acordes</div>'+
-        '<div class="d-chord-tags">'+
-          p.chords.map(function(c){ return '<span class="d-chord-tag">'+esc(c)+'</span>'; }).join('')+
-        '</div>'+
-      '</div>'
-    : '')+
     '<div class="size-selector" id="sizeSel">'+
       '<button class="size-opt active" data-type="full" data-price="'+ep+'" data-size="'+p.size+'">'+
         '<span class="so-label">Frasco Completo</span>'+
