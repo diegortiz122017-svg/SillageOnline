@@ -4410,16 +4410,16 @@ function migrateLocalAddresses() {
 }
 
 // ── Check URL for BTCPay renewal link ────────────────
-(function checkBtcpayRenew() {
+// Must run after DOM is ready so btcpayModalBg exists
+function checkBtcpayRenew() {
   var params = new URLSearchParams(window.location.search);
   var token  = params.get('btcpay_renew');
   if (!token) return;
 
   // Clean URL immediately so refresh doesn't retrigger
-  var cleanUrl = window.location.pathname;
-  window.history.replaceState({}, '', cleanUrl);
+  window.history.replaceState({}, '', window.location.pathname);
 
-  // Show modal in loading state right away
+  // Show modal in loading state
   var bg = document.getElementById('btcpayModalBg');
   if (bg) { bg.classList.add('open'); document.body.style.overflow = 'hidden'; }
   _btcPayRenderLoading();
@@ -4440,21 +4440,23 @@ function migrateLocalAddresses() {
     .catch(function() {
       _btcPayRenderError('No se pudo cargar el pago. Intenta de nuevo.');
     });
-})();
+}
 
-(function checkResetToken() {
+function checkResetToken() {
   var params = new URLSearchParams(window.location.search);
   var token  = params.get('reset_token');
   if (!token) return;
   _resetToken = token;
   // Open auth modal in reset view
-  document.getElementById('authModal').classList.add('open');
+  var authModal = document.getElementById('authModal');
+  if (!authModal) return;
+  authModal.classList.add('open');
   document.body.style.overflow = 'hidden';
   document.getElementById('authLogin').style.display    = 'none';
   document.getElementById('authRegister').style.display = 'none';
   document.getElementById('authForgot').style.display   = 'none';
   document.getElementById('authReset').style.display    = 'block';
-})();
+}
 
 function doLogin(){
   var email=document.getElementById('loginEmail').value.trim();
@@ -6185,6 +6187,9 @@ document.addEventListener('DOMContentLoaded', function(){
   if(input) input.addEventListener('keydown', function(e){
     if(e.key === 'Enter' && !e.shiftKey){ e.preventDefault(); sommelierSend(); }
   });
+  // Handle URL params that require DOM — must run after all elements exist
+  checkBtcpayRenew();
+  checkResetToken();
 });
 </script>
 
