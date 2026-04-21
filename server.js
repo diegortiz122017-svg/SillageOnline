@@ -1271,6 +1271,98 @@ app.use(express.static(__dirname, {
   etag:   true,
   lastModified: true,
 }));
+// ── Product slug helpers ─────────────────────────────────────────────────────
+function slugify(str) {
+  return String(str)
+    .toLowerCase()
+    .normalize('NFD').replace(/[̀-ͯ]/g, '') // remove accents
+    .replace(/[^a-z0-9\s-]/g, '')
+    .trim()
+    .replace(/\s+/g, '-')
+    .replace(/-+/g, '-');
+}
+
+function productSlug(p) {
+  return slugify(`${p.brand} ${p.name}`);
+}
+
+// ── /fragancia/:slug — clean product URLs ─────────────────────────────────────
+// For social crawlers and bots: serve enriched HTML with OG tags
+// For browsers: redirect to /?producto=ID so the SPA handles it
+app.get('/fragancia/:slug', async (req, res) => {
+  try {
+    const catalogue = await getCatalogue();
+    const slug      = req.params.slug.toLowerCase();
+    const product   = catalogue.find(p => productSlug(p) === slug);
+
+    if (!product) return res.status(404).redirect('/');
+
+    const ua        = req.headers['user-agent'] || '';
+    const isCrawler = /facebookexternalhit|twitterbot|whatsapp|telegram|linkedinbot|slackbot|discordbot|googlebot|bingbot|applebot|duckduckbot|curl|wget|python|node-fetch|axios|go-http|java/i.test(ua);
+
+    // Crawlers get enriched HTML — browsers get a clean redirect
+    if (!isCrawler) {
+      return res.redirect(301, `/?producto=${product.id}`);
+    }
+
+    // Serve enriched HTML for crawlers (same logic as /?producto=ID)
+    const fs    = require('fs');
+    const index = path.join(__dirname, 'index.html');
+    if (!fs.existsSync(index)) return res.redirect('/');
+
+    const BASE   = process.env.BASE_URL || 'https://sillage-sv.com';
+    const imgUrl = (product.photos && product.photos[0])
+      ? (product.photos[0].startsWith('http') ? product.photos[0] : BASE + product.photos[0])
+      : `${BASE}/og-default.jpg`;
+    const cleanUrl = `${BASE}/fragancia/${productSlug(product)}`;
+    const title    = `${product.brand} ${product.name} — Sillage Parfumerie`;
+    const desc     = product.tagline
+      ? `${product.tagline} · ${product.conc || 'Eau de Parfum'} · Desde $${product.price}`
+      : `${product.conc || 'Eau de Parfum'} de ${product.brand}. Disponible en Sillage Parfumerie, El Salvador.`;
+
+    let html = fs.readFileSync(index, 'utf8');
+    html = html
+      .replace(/<meta property="og:title"[^>]*\/>/,
+        `<meta property="og:title" content="${escHtml(title)}"/>`)
+      .replace(/<meta property="og:description"[^>]*\/>/,
+        `<meta property="og:description" content="${escHtml(desc)}"/>`)
+      .replace(/<meta property="og:url"[^>]*\/>/, '')
+      .replace('</head>',
+        `<meta property="og:image" content="${imgUrl}"/>
+<meta property="og:url" content="${cleanUrl}"/>
+<meta property="og:type" content="product"/>
+<meta name="twitter:card" content="summary_large_image"/>
+<meta name="twitter:image" content="${imgUrl}"/>
+</head>`);
+
+    // Schema.org JSON-LD
+    const schema = {
+      '@context': 'https://schema.org',
+      '@type': 'Product',
+      name: `${product.brand} ${product.name}`,
+      brand: { '@type': 'Brand', name: product.brand },
+      description: product.desc || product.tagline || '',
+      image: imgUrl,
+      url: cleanUrl,
+      offers: {
+        '@type': 'Offer',
+        price: String(product.price),
+        priceCurrency: 'USD',
+        availability: 'https://schema.org/InStock',
+        seller: { '@type': 'Organization', name: 'Sillage Parfumerie' },
+      },
+    };
+    html = html.replace('</head>',
+      `<script type="application/ld+json">${JSON.stringify(schema)}</script></head>`);
+
+    res.setHeader('Cache-Control', 'public, max-age=300'); // 5 min cache for crawlers
+    res.send(html);
+  } catch(e) {
+    console.error('Product URL error:', e.message);
+    res.redirect('/');
+  }
+});
+
 app.get('/', async (req, res) => {
   const fs   = require('fs');
   const index = path.join(__dirname, 'index.html');
@@ -1428,6 +1520,7 @@ Sillage Parfumerie es una tienda en línea especializada en alta perfumería en 
 Tenemos ${inStock.length} fragancias disponibles de las siguientes marcas: ${brands.join(', ')}.
 
 Catálogo completo en formato JSON: ${BASE}/api/catalogo.json
+URLs de producto: ${BASE}/fragancia/{brand-name} (ej: ${BASE}/fragancia/creed-aventus)
 
 ## Contacto y ubicación
 
@@ -1477,7 +1570,7 @@ app.get('/api/catalogo.json', async (req, res) => {
         longevity:   p.long || null,
         available,
         decant_available: available,
-        url:         `${BASE}/?producto=${p.id}`,
+        url:         `${BASE}/fragancia/${productSlug(p)}`,
         image:       (p.photos && p.photos[0]) || null,
       };
     });
@@ -1517,7 +1610,7 @@ app.get('/sitemap.xml', async (req, res) => {
   ];
 
   const productPages = catalogue.map(p => ({
-    url:      `${BASE}/?producto=${p.id}`,
+    url:      `${BASE}/fragancia/${productSlug(p)}`,
     priority: '0.8',
     freq:     'weekly',
   }));
