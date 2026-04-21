@@ -295,6 +295,53 @@ async function initDB() {
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
   `);
 
+  await db.execute(`
+    CREATE TABLE IF NOT EXISTS promo_codes (
+      id           INT AUTO_INCREMENT PRIMARY KEY,
+      code         VARCHAR(50) NOT NULL UNIQUE,
+      type         ENUM('percent','fixed') NOT NULL DEFAULT 'percent',
+      value        DECIMAL(10,2) NOT NULL,
+      min_order    DECIMAL(10,2) DEFAULT 0,
+      max_uses     INT DEFAULT NULL,
+      uses         INT DEFAULT 0,
+      active       TINYINT(1) DEFAULT 1,
+      expires_at   DATETIME DEFAULT NULL,
+      created_at   DATETIME NOT NULL,
+      INDEX idx_code (code)
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
+  `);
+
+  await db.execute(`
+    CREATE TABLE IF NOT EXISTS stock_notifications (
+      id          INT AUTO_INCREMENT PRIMARY KEY,
+      product_id  INT NOT NULL,
+      email       VARCHAR(255) NOT NULL,
+      notified    TINYINT(1) DEFAULT 0,
+      created_at  DATETIME NOT NULL,
+      UNIQUE KEY uniq_prod_email (product_id, email),
+      INDEX idx_product (product_id),
+      INDEX idx_notified (notified)
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
+  `);
+
+  await db.execute(`
+    CREATE TABLE IF NOT EXISTS abandoned_carts (
+      id          INT AUTO_INCREMENT PRIMARY KEY,
+      email       VARCHAR(255) NOT NULL,
+      name        VARCHAR(255),
+      cart        LONGTEXT NOT NULL,
+      session_id  VARCHAR(100),
+      customer_id INT DEFAULT NULL,
+      email_sent  TINYINT(1) DEFAULT 0,
+      sent_at     DATETIME DEFAULT NULL,
+      created_at  DATETIME NOT NULL,
+      updated_at  DATETIME NOT NULL,
+      INDEX idx_email    (email),
+      INDEX idx_sent     (email_sent),
+      INDEX idx_created  (created_at)
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
+  `);
+
   console.log('✅ Tables ready');
 }
 
@@ -719,6 +766,10 @@ async function sendOrderConfirmation(order) {
         <th style="padding:8px 12px;text-align:right;font-size:10px;color:#8a7f72;font-weight:400">Precio</th>
       </tr></thead><tbody>${itemsHtml}</tbody>
     </table>
+    ${order.promoCode ? `<div style="padding:8px 12px;background:#f0faf0;border:1px solid #c0e0c0;margin-bottom:4px;display:flex;justify-content:space-between">
+      <span style="font-size:11px;color:#5a9a6a">Descuento (${escHtml(order.promoCode)})</span>
+      <span style="font-size:11px;color:#5a9a6a">−$${parseFloat(order.promoDiscount||0).toFixed(2)}</span>
+    </div>` : ''}
     <div style="padding:12px;background:#faf8f4;border:1px solid #e8d8b8;margin-bottom:4px">
       <span style="font-size:11px;text-transform:uppercase;color:#8a7f72">Total</span>
       <span style="font-family:Georgia,serif;font-size:22px;color:#1a1714;float:right">$${parseFloat(order.total||0).toFixed(2)}</span>
@@ -2506,6 +2557,27 @@ app.post('/api/orders', orderLimiter, async (req, res) => {
     if (serverTotal < shippingThreshold) serverTotal += shippingCost;
     serverTotal = Math.round(serverTotal * 100) / 100;
 
+    // Apply promo discount server-side if code provided
+    let promoDiscount = 0;
+    const promoCode = String(req.body.promoCode || '').trim().toUpperCase();
+    if (promoCode) {
+      const [promoRows] = await db.execute(
+        `SELECT * FROM promo_codes WHERE code=? AND active=1
+         AND (expires_at IS NULL OR expires_at > NOW())
+         AND (max_uses IS NULL OR uses < max_uses)`,
+        [promoCode]
+      );
+      if (promoRows.length) {
+        const promo = promoRows[0];
+        promoDiscount = promo.type === 'percent'
+          ? Math.round((serverTotal * parseFloat(promo.value) / 100) * 100) / 100
+          : Math.min(parseFloat(promo.value), serverTotal);
+        serverTotal = Math.round(Math.max(0, serverTotal - promoDiscount) * 100) / 100;
+        // NOTE: usage counter is incremented only on confirmed payment (see incrementPromoUse)
+        // COD orders increment immediately; Wompi/BTCPay increment in their webhooks
+      }
+    }
+
     const clientTotal = Math.round(parseFloat(req.body.total || 0) * 100) / 100;
     if (Math.abs(serverTotal - clientTotal) > 0.02) {
       console.warn(`Order total mismatch — client:$${clientTotal} server:$${serverTotal}`);
@@ -2537,6 +2609,8 @@ app.post('/api/orders', orderLimiter, async (req, res) => {
     id:            'SLG-' + Date.now().toString(36).toUpperCase() + '-' + Math.random().toString(36).substr(2,4).toUpperCase(),
     customer:      String(req.body.customer   || '').slice(0, 200).replace(/[<>]/g, ''),
     email:         rawEmail.slice(0, 200),
+    promoCode:     promoCode || null,
+    promoDiscount: promoDiscount || 0,
     phone:         req.body.phone ? String(req.body.phone).slice(0, 30).replace(/[^0-9+\-\s()]/g, '') : null,
     address:       String(req.body.fullAddress || req.body.address || '').slice(0, 500).replace(/[<>]/g, ''),
     city:          req.body.city    ? String(req.body.city).slice(0,   100).replace(/[<>]/g, '') : null,
@@ -2658,6 +2732,10 @@ app.post('/api/orders', orderLimiter, async (req, res) => {
   broadcastAdmin('new_order', order);
   await logActivity(`Nuevo pedido ${escHtml(order.id)} de ${escHtml(order.customer)} — $${parseFloat(order.total||0).toFixed(2)}`);
   notifyAdminNewOrder(order).catch(() => {});
+  // Clear abandoned cart record for this email
+  db.execute('UPDATE abandoned_carts SET email_sent=1 WHERE email=?', [order.email]).catch(() => {});
+  // Increment promo usage on confirmed order
+  if (order.promoCode) incrementPromoUse(order.promoCode).catch(() => {});
   try { await sendOrderConfirmation(order); } catch(e) {}
   res.json({ ok: true, order, wompiUrl: null, btcpayUrl: null, btcpayInvoiceId: null });
 });
@@ -2818,6 +2896,7 @@ app.post('/api/wompi/webhook', express.json(), async (req, res) => {
     broadcastAdmin('new_order', fullOrder);
     await logActivity(`Pago Wompi confirmado — pedido ${orderObj.id} de ${orderObj.customer} — $${parseFloat(orderObj.total||0).toFixed(2)}`);
     notifyAdminNewOrder(fullOrder).catch(() => {});
+    if (orderObj.promoCode) incrementPromoUse(orderObj.promoCode).catch(() => {});
     try { await sendOrderConfirmation(fullOrder); } catch(e) { console.error('Wompi confirm email error:', e.message); }
     console.log(`Wompi order created on payment: ${orderObj.id} — ref ${reference}`);
   } catch(e) {
@@ -3173,6 +3252,7 @@ app.post('/api/btcpay/webhook', async (req, res) => {
       broadcastAdmin('new_order', fullOrder);
       await logActivity(`Pago BTCPay confirmado (${type}) — pedido ${orderObj.id} de ${orderObj.customer} — $${parseFloat(orderObj.total||0).toFixed(2)}`);
       notifyAdminNewOrder(fullOrder).catch(() => {});
+      if (orderObj.promoCode) incrementPromoUse(orderObj.promoCode).catch(() => {});
       try { await sendOrderConfirmation(fullOrder); } catch(e) { console.error('BTCPay confirmation email error:', e.message); }
       console.log(`BTCPay order created on payment: ${orderObj.id} — invoice ${invoiceId}`);
 
@@ -3455,6 +3535,14 @@ app.post('/api/inventory', requireAdmin, async (req, res) => {
   invalidateInventory(); // clear cache before broadcasting
   broadcast('inventory', await getInventoryMap());
   await logActivity('Inventario actualizado');
+
+  // Trigger stock notifications for any products that just came back in stock
+  for (const [pid, val] of Object.entries(req.body)) {
+    if (!val.outOfStock && parseInt(val.stock||0) > 0) {
+      triggerStockNotifications(parseInt(pid)).catch(() => {});
+    }
+  }
+
   res.json({ ok: true });
 });
 
@@ -4594,6 +4682,288 @@ app.post('/api/settings/shipping', requireAdmin, async (req, res) => {
 });
 // ── Top sellers — count units sold per product from orders ──
 
+// ═══════════════════════════════════════════════════════
+//  PROMO CODES
+// ═══════════════════════════════════════════════════════
+
+// POST /api/promo/validate — public, validates a promo code against a cart total
+app.post('/api/promo/validate', async (req, res) => {
+  const { code, cartTotal } = req.body;
+  if (!code || !cartTotal) return res.status(400).json({ error: 'Código y total requeridos.' });
+  try {
+    const [rows] = await db.execute(
+      `SELECT * FROM promo_codes WHERE code=? AND active=1
+       AND (expires_at IS NULL OR expires_at > NOW())
+       AND (max_uses IS NULL OR uses < max_uses)`,
+      [String(code).trim().toUpperCase()]
+    );
+    if (!rows.length) return res.status(404).json({ error: 'Código inválido o expirado.' });
+    const promo = rows[0];
+    const total = parseFloat(cartTotal);
+    if (promo.min_order && total < parseFloat(promo.min_order)) {
+      return res.status(400).json({
+        error: `Este código requiere un pedido mínimo de $${parseFloat(promo.min_order).toFixed(2)}.`
+      });
+    }
+    const discount = promo.type === 'percent'
+      ? Math.round((total * parseFloat(promo.value) / 100) * 100) / 100
+      : Math.min(parseFloat(promo.value), total);
+    res.json({ ok: true, code: promo.code, type: promo.type, value: parseFloat(promo.value), discount });
+  } catch(e) {
+    console.error('Promo validate error:', e.message);
+    res.status(500).json({ error: 'Error al validar código.' });
+  }
+});
+
+// GET /api/admin/promo-codes — admin: list all promo codes
+app.get('/api/admin/promo-codes', requireAdmin, async (req, res) => {
+  const [rows] = await db.execute('SELECT * FROM promo_codes ORDER BY created_at DESC');
+  res.json(rows);
+});
+
+// POST /api/admin/promo-codes — admin: create promo code
+app.post('/api/admin/promo-codes', requireAdmin, async (req, res) => {
+  const { code, type, value, min_order, max_uses, expires_at } = req.body;
+  if (!code || !type || !value) return res.status(400).json({ error: 'Código, tipo y valor requeridos.' });
+  const clean = String(code).trim().toUpperCase().replace(/[^A-Z0-9]/g, '');
+  if (!clean) return res.status(400).json({ error: 'Código inválido.' });
+  try {
+    await db.execute(
+      `INSERT INTO promo_codes (code, type, value, min_order, max_uses, active, created_at)
+       VALUES (?, ?, ?, ?, ?, 1, ?)`,
+      [clean, type, parseFloat(value), parseFloat(min_order||0), max_uses ? parseInt(max_uses) : null,
+       expires_at ? new Date(expires_at) : null, new Date()]
+    );
+
+    // Fix: missing created_at — re-do properly
+    await db.execute('DELETE FROM promo_codes WHERE code=?', [clean]);
+    await db.execute(
+      `INSERT INTO promo_codes (code, type, value, min_order, max_uses, expires_at, active, created_at)
+       VALUES (?, ?, ?, ?, ?, ?, 1, ?)`,
+      [clean, type, parseFloat(value), parseFloat(min_order||0),
+       max_uses ? parseInt(max_uses) : null,
+       expires_at ? new Date(expires_at) : null,
+       new Date()]
+    );
+    await logActivity(`Promo code creado: ${clean} (${type} ${value})`);
+    res.json({ ok: true, code: clean });
+  } catch(e) {
+    if (e.code === 'ER_DUP_ENTRY') return res.status(409).json({ error: 'Ya existe un código con ese nombre.' });
+    console.error('Promo create error:', e.message);
+    res.status(500).json({ error: 'Error al crear código.' });
+  }
+});
+
+// PATCH /api/admin/promo-codes/:id — admin: toggle active
+app.patch('/api/admin/promo-codes/:id', requireAdmin, async (req, res) => {
+  const { active } = req.body;
+  await db.execute('UPDATE promo_codes SET active=? WHERE id=?', [active ? 1 : 0, parseInt(req.params.id)]);
+  res.json({ ok: true });
+});
+
+// DELETE /api/admin/promo-codes/:id — admin: delete
+app.delete('/api/admin/promo-codes/:id', requireAdmin, async (req, res) => {
+  await db.execute('DELETE FROM promo_codes WHERE id=?', [parseInt(req.params.id)]);
+  await logActivity(`Promo code eliminado: id ${req.params.id}`);
+  res.json({ ok: true });
+});
+
+// ═══════════════════════════════════════════════════════
+//  STOCK NOTIFICATIONS
+// ═══════════════════════════════════════════════════════
+
+// POST /api/stock-notify — public: subscribe to restock notification
+app.post('/api/stock-notify', async (req, res) => {
+  const { productId, email } = req.body;
+  const emailRe = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/;
+  if (!productId || !email || !emailRe.test(email)) {
+    return res.status(400).json({ error: 'Producto y correo válidos requeridos.' });
+  }
+  try {
+    await db.execute(
+      `INSERT IGNORE INTO stock_notifications (product_id, email, created_at) VALUES (?, ?, ?)`,
+      [parseInt(productId), email.toLowerCase().trim(), new Date()]
+    );
+    res.json({ ok: true });
+  } catch(e) {
+    res.status(500).json({ error: 'Error al guardar notificación.' });
+  }
+});
+
+// ── Trigger stock notifications when inventory is updated ──
+async function triggerStockNotifications(productId) {
+  try {
+    const [notifs] = await db.execute(
+      'SELECT * FROM stock_notifications WHERE product_id=? AND notified=0', [productId]
+    );
+    if (!notifs.length) return;
+    const catalogue = await getCatalogue();
+    const product   = catalogue.find(p => p.id === productId);
+    if (!product) return;
+    const BASE = process.env.BASE_URL || 'https://sillage-sv.com';
+    const url  = `${BASE}/fragancia/${productSlug(product)}`;
+
+    for (const n of notifs) {
+      try {
+        await sendEmail({
+          to:      n.email,
+          subject: `${product.brand} ${product.name} ya está disponible — Sillage`,
+          from:    `Sillage Parfumerie <${EMAIL_HOLA}>`,
+          html: emailTemplate(`
+            <h2 style="font-family:Georgia,serif;font-size:22px;font-weight:300;color:#1a1714;margin:0 0 8px">
+              ${escHtml(product.brand)} ${escHtml(product.name)} ya está disponible
+            </h2>
+            <p style="font-size:13px;color:#8a7f72;margin:0 0 24px">
+              La fragancia que marcaste para notificación está de vuelta en stock.
+            </p>
+            <a href="${url}"
+               style="display:block;text-align:center;padding:14px 24px;background:#0e0c0a;
+                      color:#b8955a;text-decoration:none;font-size:11px;letter-spacing:3px;
+                      text-transform:uppercase;border:1px solid #b8955a">
+              Ver fragancia →
+            </a>
+            <p style="font-size:11px;color:#8a7f72;margin-top:16px;text-align:center">
+              ${escHtml(product.conc||'Eau de Parfum')} · $${product.price} · ${escHtml(product.size||'100ml')}
+            </p>`)
+        });
+        await db.execute(
+          'UPDATE stock_notifications SET notified=1 WHERE id=?', [n.id]
+        );
+      } catch(e) { console.error('Stock notify email error:', e.message); }
+    }
+    console.log(`✅ Stock notifications sent for product ${productId} (${notifs.length} emails)`);
+  } catch(e) { console.error('triggerStockNotifications error:', e.message); }
+}
+
+// ── Atomic promo code usage increment ────────────────────────────────────────
+// Uses conditional UPDATE to prevent race conditions:
+// Only increments if the code is still valid and under max_uses at time of increment.
+async function incrementPromoUse(code) {
+  if (!code) return;
+  try {
+    await db.execute(
+      `UPDATE promo_codes SET uses = uses + 1
+       WHERE code = ?
+         AND active = 1
+         AND (max_uses IS NULL OR uses < max_uses)`,
+      [code]
+    );
+  } catch(e) { console.error('incrementPromoUse error:', e.message); }
+}
+
+// ═══════════════════════════════════════════════════════
+//  ABANDONED CART
+// ═══════════════════════════════════════════════════════
+
+// POST /api/cart/capture — called when user reaches checkout step 1
+app.post('/api/cart/capture', async (req, res) => {
+  const { email, name, cart, sessionId } = req.body;
+  const emailRe = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/;
+  if (!email || !emailRe.test(email) || !cart || !cart.length) return res.json({ ok: false });
+  const customerToken   = req.headers['x-customer-token'];
+  const customerSession = customerToken ? validateSession(customerToken) : null;
+  const customerId      = customerSession?.role === 'customer' ? customerSession.user.id : null;
+  const now = new Date();
+  try {
+    await db.execute(
+      `INSERT INTO abandoned_carts (email, name, cart, session_id, customer_id, email_sent, created_at, updated_at)
+       VALUES (?, ?, ?, ?, ?, 0, ?, ?)
+       ON DUPLICATE KEY UPDATE name=VALUES(name), cart=VALUES(cart), session_id=VALUES(session_id),
+         customer_id=VALUES(customer_id), email_sent=0, updated_at=VALUES(updated_at)`,
+      [email.toLowerCase().trim(), name||null, JSON.stringify(cart), sessionId||null, customerId||null, now, now]
+    );
+    res.json({ ok: true });
+  } catch(e) { res.json({ ok: false }); }
+});
+
+// POST /api/cart/complete — called on successful order to clear abandoned cart
+app.post('/api/cart/complete', async (req, res) => {
+  const { email } = req.body;
+  if (email) {
+    await db.execute(
+      'UPDATE abandoned_carts SET email_sent=1 WHERE email=?',
+      [email.toLowerCase().trim()]
+    ).catch(() => {});
+  }
+  res.json({ ok: true });
+});
+
+// ── Abandoned cart cron — runs every 30 min, sends emails for carts abandoned 2h ago ──
+async function runAbandonedCartCron() {
+  try {
+    const [rows] = await db.execute(`
+      SELECT * FROM abandoned_carts
+      WHERE email_sent=0
+        AND created_at < DATE_SUB(NOW(), INTERVAL 2 HOUR)
+        AND updated_at < DATE_SUB(NOW(), INTERVAL 2 HOUR)
+      LIMIT 20
+    `);
+    if (!rows.length) return;
+    const catalogue = await getCatalogue();
+    const BASE = process.env.BASE_URL || 'https://sillage-sv.com';
+
+    for (const abandoned of rows) {
+      try {
+        const items = JSON.parse(abandoned.cart || '[]');
+        if (!items.length) continue;
+
+        // Build item list
+        const itemRows = items.slice(0,4).map(i => {
+          const prod = catalogue.find(p => p.id === (i.productId || i.p?.id));
+          const name = i.name || (prod ? `${prod.brand} ${prod.name}` : 'Fragancia');
+          const img  = prod?.photos?.[0] || null;
+          return { name, img, price: i.price || i.unitPrice || 0, qty: i.qty || 1 };
+        });
+
+        const itemsHtml = itemRows.map(it =>
+          `<tr>
+            <td style="padding:8px 12px;border-bottom:1px solid #f0e6d0;font-size:12px;color:#1a1714">${escHtml(it.name)}</td>
+            <td style="padding:8px 12px;border-bottom:1px solid #f0e6d0;font-size:12px;color:#8a7f72;text-align:center">×${it.qty}</td>
+            <td style="padding:8px 12px;border-bottom:1px solid #f0e6d0;font-size:12px;color:#1a1714;text-align:right">$${parseFloat(it.price*it.qty).toFixed(2)}</td>
+          </tr>`
+        ).join('');
+
+        const name = abandoned.name || 'Cliente';
+        const html = emailTemplate(`
+          <h2 style="font-family:Georgia,serif;font-size:22px;font-weight:300;color:#1a1714;margin:0 0 8px">
+            Olvidaste algo especial
+          </h2>
+          <p style="font-size:13px;color:#8a7f72;margin:0 0 24px">
+            Hola <strong style="color:#1a1714">${escHtml(name)}</strong> —
+            dejaste estas fragancias en tu carrito. Siguen aquí cuando estés listo.
+          </p>
+          <table style="width:100%;border-collapse:collapse;margin-bottom:20px">
+            <tbody>${itemsHtml}</tbody>
+          </table>
+          <a href="${BASE}/#shop"
+             style="display:block;text-align:center;padding:14px 24px;background:#0e0c0a;
+                    color:#b8955a;text-decoration:none;font-size:11px;letter-spacing:3px;
+                    text-transform:uppercase;border:1px solid #b8955a;margin-bottom:16px">
+            Completar mi pedido →
+          </a>
+          <p style="font-size:11px;color:#8a7f72;text-align:center;line-height:1.8">
+            ¿Tienes dudas? Nez, nuestro sommelier de IA, puede ayudarte a elegir.<br/>
+            Responde este correo o visita la tienda.
+          </p>`
+        );
+
+        await sendEmail({
+          to:      abandoned.email,
+          subject: `${escHtml(name)}, tu carrito en Sillage te espera`,
+          from:    `Sillage Parfumerie <${EMAIL_HOLA}>`,
+          html,
+        });
+
+        await db.execute(
+          'UPDATE abandoned_carts SET email_sent=1, sent_at=? WHERE id=?',
+          [new Date(), abandoned.id]
+        );
+        console.log(`Abandoned cart email sent to ${abandoned.email}`);
+      } catch(e) { console.error('Abandoned cart email error:', e.message); }
+    }
+  } catch(e) { console.error('Abandoned cart cron error:', e.message); }
+}
+
 // ─── Bottle Inventory API ─────────────────────────────
 
 // POST /api/bottle-inventory/init — admin: create missing records for all catalogue products
@@ -4772,6 +5142,136 @@ app.patch('/api/bottle-inventory/:id', requireAdmin, async (req, res) => {
 });
 
 // ─── Analytics Dashboard ──────────────────────────────
+// ── GET /api/orders/:id/invoice — print-ready invoice page ──────────────────
+app.get('/api/orders/:id/invoice', async (req, res) => {
+  const orderId = req.params.id;
+
+  // Auth: admin OR the customer who placed the order (verified by email token)
+  const adminToken    = req.headers['x-session-token'] || req.query.token;
+  const customerToken = req.headers['x-customer-token'];
+  const isAdmin       = adminToken && validateSession(adminToken)?.role === 'admin';
+  const customerSess  = customerToken ? validateSession(customerToken) : null;
+
+  const [rows] = await db.execute('SELECT * FROM orders WHERE id=?', [orderId]);
+  if (!rows.length) return res.status(404).send('Pedido no encontrado');
+  const order = rows[0];
+
+  // Allow if admin, or if the logged-in customer owns this order
+  const isOwner = customerSess?.role === 'customer' && order.customer_id === customerSess.user.id;
+  if (!isAdmin && !isOwner) return res.status(403).send('No autorizado');
+
+  const items = typeof order.items === 'string' ? JSON.parse(order.items) : (order.items || []);
+  const BASE  = process.env.BASE_URL || 'https://sillage-sv.com';
+
+  const itemRows = items.map(i => `
+    <tr>
+      <td>${escHtml(i.name)}</td>
+      <td style="text-align:center">×${i.qty}</td>
+      <td style="text-align:right">$${parseFloat(i.total||parseFloat(i.price||0)*parseInt(i.qty||1)).toFixed(2)}</td>
+    </tr>`).join('');
+
+  const promoRow = order.promo_code
+    ? `<tr class="promo-row"><td colspan="2">Descuento (${escHtml(order.promo_code)})</td><td style="text-align:right">−$${parseFloat(order.promo_discount||0).toFixed(2)}</td></tr>`
+    : '';
+
+  res.setHeader('Content-Type', 'text/html; charset=utf-8');
+  res.send(`<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1"/>
+<title>Factura ${escHtml(order.id)} — Sillage Parfumerie</title>
+<style>
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{font-family:'Helvetica Neue',Arial,sans-serif;color:#1a1714;background:#fff;padding:40px;max-width:680px;margin:0 auto}
+  .header{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:32px;padding-bottom:20px;border-bottom:2px solid #b8955a}
+  .brand{font-size:24px;letter-spacing:4px;text-transform:uppercase;color:#0e0c0a;font-weight:300}
+  .brand-sub{font-size:10px;letter-spacing:2px;color:#8a7f72;margin-top:2px}
+  .invoice-title{text-align:right}
+  .invoice-title h1{font-size:18px;font-weight:300;letter-spacing:2px;text-transform:uppercase;color:#b8955a}
+  .invoice-title .oid{font-size:12px;color:#8a7f72;margin-top:4px}
+  .meta{display:grid;grid-template-columns:1fr 1fr;gap:20px;margin-bottom:28px}
+  .meta-block h4{font-size:9px;letter-spacing:2px;text-transform:uppercase;color:#8a7f72;margin-bottom:6px}
+  .meta-block p{font-size:12px;line-height:1.7;color:#1a1714}
+  table{width:100%;border-collapse:collapse;margin-bottom:20px}
+  thead tr{background:#faf8f4}
+  th{padding:8px 12px;text-align:left;font-size:9px;letter-spacing:1px;text-transform:uppercase;color:#8a7f72;font-weight:400;border-bottom:1px solid #e8d8b8}
+  td{padding:9px 12px;font-size:12px;border-bottom:1px solid #f0e8dc}
+  .promo-row td{color:#5a9a6a;font-size:11px}
+  .total-row td{font-size:14px;font-weight:500;padding:12px;background:#faf8f4;border-top:1px solid #e8d8b8;border-bottom:none}
+  .footer{margin-top:32px;padding-top:16px;border-top:1px solid #e8d8b8;font-size:10px;color:#8a7f72;text-align:center;line-height:1.8}
+  @media print{
+    body{padding:20px}
+    .no-print{display:none}
+    @page{margin:1cm}
+  }
+</style>
+</head>
+<body>
+  <div class="header">
+    <div>
+      <div class="brand">SILLAGE</div>
+      <div class="brand-sub">PARFUMERIE</div>
+    </div>
+    <div class="invoice-title">
+      <h1>Factura</h1>
+      <div class="oid">${escHtml(order.id)}</div>
+      <div class="oid">${new Date(order.created_at).toLocaleDateString('es-SV', {year:'numeric',month:'long',day:'numeric'})}</div>
+    </div>
+  </div>
+
+  <div class="meta">
+    <div class="meta-block">
+      <h4>Facturado a</h4>
+      <p><strong>${escHtml(order.customer)}</strong><br/>
+      ${escHtml(order.email)}<br/>
+      ${order.phone ? escHtml(order.phone)+'<br/>' : ''}
+      ${escHtml(order.address||'')}${order.city ? ', '+escHtml(order.city) : ''}${order.state_province ? ', '+escHtml(order.state_province) : ''}<br/>
+      ${escHtml(order.country||'El Salvador')}</p>
+    </div>
+    <div class="meta-block">
+      <h4>Detalles del pedido</h4>
+      <p>Pedido: <strong>${escHtml(order.id)}</strong><br/>
+      Fecha: ${new Date(order.created_at).toLocaleDateString('es-SV')}<br/>
+      Método de pago: ${escHtml(order.payment_method||'—')}<br/>
+      Estado: ${escHtml(order.payment_status||'—')}</p>
+    </div>
+  </div>
+
+  <table>
+    <thead>
+      <tr>
+        <th>Producto</th>
+        <th style="text-align:center">Cant.</th>
+        <th style="text-align:right">Subtotal</th>
+      </tr>
+    </thead>
+    <tbody>
+      ${itemRows}
+      ${promoRow}
+      <tr class="total-row">
+        <td colspan="2">Total</td>
+        <td style="text-align:right">$${parseFloat(order.total||0).toFixed(2)}</td>
+      </tr>
+    </tbody>
+  </table>
+
+  <div class="footer">
+    <p>Sillage Parfumerie · El Salvador · sillage-sv.com · pedidos@sillage-sv.com</p>
+    <p>Fragancias 100% originales · Gracias por tu compra</p>
+  </div>
+
+  <div class="no-print" style="margin-top:24px;text-align:center">
+    <button onclick="window.print()"
+      style="padding:10px 24px;background:#0e0c0a;border:1px solid #b8955a;color:#b8955a;
+             font-size:11px;letter-spacing:2px;text-transform:uppercase;cursor:pointer;font-family:inherit">
+      Imprimir / Guardar PDF
+    </button>
+  </div>
+</body>
+</html>`);
+});
+
 app.get('/api/analytics', requireAdmin, async (req, res) => {
   try {
     const today     = new Date().toISOString().slice(0, 10);
@@ -5026,6 +5526,10 @@ async function runFollowupCron() {
 // Run once at startup (catches any missed), then every 6 hours
 setTimeout(runFollowupCron, 30000);
 setInterval(runFollowupCron, 6 * 60 * 60 * 1000);
+
+// Abandoned cart cron — every 30 minutes
+setTimeout(runAbandonedCartCron, 60000); // first run 1 min after startup
+setInterval(runAbandonedCartCron, 30 * 60 * 1000);
 
 // ── Unsubscribe / Email preferences page ─────────────────
 app.get('/preferencias-email', async (req, res) => {
