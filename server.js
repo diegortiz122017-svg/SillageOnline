@@ -661,7 +661,16 @@ function emailTemplate(bodyHtml) {
   </div>
   <div style="padding:40px">${bodyHtml}</div>
   <div style="background:#0e0c0a;padding:24px 40px;text-align:center">
-    <div style="font-size:10px;letter-spacing:3px;text-transform:uppercase;color:#8a7f72">&copy; 2025 Sillage Parfumerie</div>
+    <div style="font-size:10px;letter-spacing:3px;text-transform:uppercase;color:#8a7f72;margin-bottom:8px">&copy; 2026 Sillage Parfumerie</div>
+    <div style="font-size:10px;color:#5a5248;line-height:1.8">
+      Sillage Parfumerie · El Salvador<br/>
+      <a href="https://sillage-sv.com" style="color:#5a5248;text-decoration:none">sillage-sv.com</a> &nbsp;·&nbsp;
+      <a href="mailto:hola@sillage-sv.com" style="color:#5a5248;text-decoration:none">hola@sillage-sv.com</a>
+    </div>
+    <div style="font-size:9px;color:#3a3230;margin-top:10px;line-height:1.7">
+      Recibiste este correo porque realizaste o iniciaste una compra en Sillage Parfumerie.<br/>
+      Este no es un correo de marketing — está relacionado directamente con tu pedido o actividad en la tienda.
+    </div>
   </div>
 </div></body></html>`;
 }
@@ -890,7 +899,7 @@ async function sendShippedEmail(order) {
 }
 
 async function sendDeliveredEmail(order) {
-  // Nez note + schedule followup + unsubscribe footer
+  // Nez note — product usage guidance, fully transactional
   const nezNote = await buildNezNote(order.items).catch(() => null);
   const nezBlock = nezNote
     ? `<div style="border-left:3px solid #b8955a;padding:12px 16px;margin:20px 0;background:#faf8f4">` +
@@ -898,15 +907,6 @@ async function sendDeliveredEmail(order) {
       `<p style="font-family:Georgia,serif;font-size:14px;color:#4a3f35;line-height:1.9;margin:0;font-style:italic">${escHtml(nezNote).replace(/\n/g,'<br/>')}</p>` +
       `</div>`
     : '';
-
-  const unsubFooter = order.customer_id
-    ? await buildUnsubscribeFooter(order.customer_id).catch(() => '')
-    : '';
-
-  if (order.customer_id) {
-    const followupDate = new Date(Date.now() + 14 * 24 * 60 * 60 * 1000);
-    await db.execute('UPDATE orders SET followup_scheduled_at=? WHERE id=?', [followupDate, order.id]).catch(() => {});
-  }
 
   const html = emailTemplate(
     `<h2 style="font-family:Georgia,serif;font-size:24px;font-weight:300;color:#1a1714;margin:0 0 8px">¡Tu pedido fue entregado! ✨</h2>` +
@@ -919,9 +919,13 @@ async function sendDeliveredEmail(order) {
     `<p style="font-size:12px;color:#8a7f72;line-height:1.8;margin-bottom:16px">Si tienes algún problema, contáctanos dentro de los <strong style="color:#1a1714">8 días hábiles</strong> siguientes a la entrega.</p>` +
     `<div style="text-align:center;margin-top:24px">` +
       `<a href="https://sillage-sv.com/devoluciones" style="display:inline-block;padding:12px 28px;border:1px solid #b8955a;color:#b8955a;font-size:11px;letter-spacing:2px;text-transform:uppercase;text-decoration:none">Política de Devoluciones</a>` +
-    `</div>` +
-    unsubFooter
+    `</div>`
   );
+  // Schedule 14-day followup if registered customer
+  if (order.customer_id) {
+    const followupDate = new Date(Date.now() + 14 * 24 * 60 * 60 * 1000);
+    await db.execute('UPDATE orders SET followup_scheduled_at=? WHERE id=?', [followupDate, order.id]).catch(() => {});
+  }
   await sendEmail({
     to: order.email,
     subject: `✨ Pedido ${escHtml(order.id)} entregado — Sillage Parfumerie`,
@@ -4895,6 +4899,40 @@ app.post('/api/cart/capture', async (req, res) => {
   } catch(e) { res.json({ ok: false }); }
 });
 
+// GET /api/cart/unsubscribe — one-click unsubscribe from abandoned cart emails
+app.get('/api/cart/unsubscribe', async (req, res) => {
+  const email = String(req.query.email || '').toLowerCase().trim();
+  if (!email) return res.redirect('/');
+  try {
+    // Mark all abandoned carts for this email as sent so they never get emailed again
+    await db.execute(
+      'UPDATE abandoned_carts SET email_sent=1 WHERE email=?', [email]
+    );
+    // Also insert a sentinel record to prevent future captures from sending
+    await db.execute(
+      `INSERT INTO abandoned_carts (email, name, cart, email_sent, created_at, updated_at)
+       VALUES (?, 'unsubscribed', '[]', 1, ?, ?)
+       ON DUPLICATE KEY UPDATE email_sent=1, updated_at=VALUES(updated_at)`,
+      [email, new Date(), new Date()]
+    );
+    res.send(`<!DOCTYPE html><html lang="es"><head><meta charset="UTF-8"/>
+      <meta name="viewport" content="width=device-width,initial-scale=1"/>
+      <title>Cancelado — Sillage Parfumerie</title>
+      <style>body{font-family:Helvetica,Arial,sans-serif;background:#f5f0e8;display:flex;align-items:center;justify-content:center;min-height:100vh;margin:0}
+      .card{background:#fff;border:1px solid #e8d8b8;padding:40px;max-width:400px;text-align:center}
+      .brand{font-family:Georgia,serif;font-size:22px;letter-spacing:6px;color:#b8955a;margin-bottom:20px}
+      p{font-size:13px;color:#8a7f72;line-height:1.8}
+      a{color:#b8955a;font-size:12px}</style></head>
+      <body><div class="card">
+        <div class="brand">SILLAGE</div>
+        <p>Tu correo ha sido removido de los recordatorios de carrito.<br/>No recibirás más mensajes de este tipo.</p>
+        <br/><a href="https://sillage-sv.com">Volver a la tienda</a>
+      </div></body></html>`);
+  } catch(e) {
+    res.redirect('/');
+  }
+});
+
 // POST /api/cart/complete — called on successful order to clear abandoned cart
 app.post('/api/cart/complete', async (req, res) => {
   const { email } = req.body;
@@ -4963,6 +5001,12 @@ async function runAbandonedCartCron() {
           <p style="font-size:11px;color:#8a7f72;text-align:center;line-height:1.8">
             ¿Tienes dudas? Nez, nuestro sommelier de IA, puede ayudarte a elegir.<br/>
             Responde este correo o visita la tienda.
+          </p>
+          <p style="font-size:10px;color:#8a7f72;text-align:center;margin-top:20px;line-height:1.7">
+            Recibiste este correo porque comenzaste una compra en sillage-sv.com.<br/>
+            Si no deseas recibir más recordatorios,
+            <a href="${BASE}/api/cart/unsubscribe?email=${encodeURIComponent(abandoned.email)}"
+               style="color:#8a7f72">cancela aquí</a>.
           </p>`
         );
 
