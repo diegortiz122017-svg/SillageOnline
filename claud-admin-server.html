@@ -967,6 +967,80 @@ tr:hover td{background:rgba(255,255,255,0.02)}
             <span class="saved-msg" id="shippingMsg">✓ Guardado</span>
           </div>
         </div>
+
+        <!-- PROMO CODES -->
+        <div style="margin-top:2.5rem;padding-top:2rem;border-top:1px solid var(--border)">
+          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:1.5rem;flex-wrap:wrap;gap:0.8rem">
+            <div>
+              <div class="page-title" style="font-size:1.2rem;margin-bottom:0.2rem">Códigos de Descuento</div>
+              <div class="page-sub">Crea códigos de descuento para tus clientes</div>
+            </div>
+            <button onclick="togglePromoForm()" class="save-btn" id="promoFormToggle">+ Nuevo Código</button>
+          </div>
+
+          <!-- Create form -->
+          <div id="promoCreateForm" style="display:none;background:rgba(255,255,255,0.04);border:1px solid var(--border);padding:1.2rem;margin-bottom:1.5rem;max-width:600px">
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:0.8rem;margin-bottom:0.8rem">
+              <div>
+                <label style="font-size:0.52rem;letter-spacing:0.15em;text-transform:uppercase;color:var(--muted);display:block;margin-bottom:0.3rem">Código</label>
+                <input id="pcCode" type="text" placeholder="BIENVENIDO10" maxlength="30"
+                  style="width:100%;background:rgba(255,255,255,0.06);border:1px solid var(--border);
+                  color:var(--cream);font-family:'Jost',sans-serif;font-size:0.85rem;
+                  padding:0.55rem 0.8rem;outline:none;text-transform:uppercase"/>
+              </div>
+              <div>
+                <label style="font-size:0.52rem;letter-spacing:0.15em;text-transform:uppercase;color:var(--muted);display:block;margin-bottom:0.3rem">Tipo</label>
+                <select id="pcType"
+                  style="width:100%;background:rgba(255,255,255,0.06);border:1px solid var(--border);
+                  color:var(--cream);font-family:'Jost',sans-serif;font-size:0.85rem;
+                  padding:0.55rem 0.8rem;outline:none">
+                  <option value="percent">Porcentaje (%)</option>
+                  <option value="fixed">Monto fijo ($)</option>
+                </select>
+              </div>
+              <div>
+                <label style="font-size:0.52rem;letter-spacing:0.15em;text-transform:uppercase;color:var(--muted);display:block;margin-bottom:0.3rem">Valor</label>
+                <input id="pcValue" type="number" min="1" step="1" placeholder="10"
+                  style="width:100%;background:rgba(255,255,255,0.06);border:1px solid var(--border);
+                  color:var(--cream);font-family:'Jost',sans-serif;font-size:0.85rem;
+                  padding:0.55rem 0.8rem;outline:none"/>
+              </div>
+              <div>
+                <label style="font-size:0.52rem;letter-spacing:0.15em;text-transform:uppercase;color:var(--muted);display:block;margin-bottom:0.3rem">Pedido mínimo ($)</label>
+                <input id="pcMinOrder" type="number" min="0" step="5" placeholder="0"
+                  style="width:100%;background:rgba(255,255,255,0.06);border:1px solid var(--border);
+                  color:var(--cream);font-family:'Jost',sans-serif;font-size:0.85rem;
+                  padding:0.55rem 0.8rem;outline:none"/>
+              </div>
+              <div>
+                <label style="font-size:0.52rem;letter-spacing:0.15em;text-transform:uppercase;color:var(--muted);display:block;margin-bottom:0.3rem">Usos máximos (vacío = ilimitado)</label>
+                <input id="pcMaxUses" type="number" min="1" step="1" placeholder="Ilimitado"
+                  style="width:100%;background:rgba(255,255,255,0.06);border:1px solid var(--border);
+                  color:var(--cream);font-family:'Jost',sans-serif;font-size:0.85rem;
+                  padding:0.55rem 0.8rem;outline:none"/>
+              </div>
+              <div>
+                <label style="font-size:0.52rem;letter-spacing:0.15em;text-transform:uppercase;color:var(--muted);display:block;margin-bottom:0.3rem">Expira (vacío = nunca)</label>
+                <input id="pcExpires" type="datetime-local"
+                  style="width:100%;background:rgba(255,255,255,0.06);border:1px solid var(--border);
+                  color:var(--cream);font-family:'Jost',sans-serif;font-size:0.85rem;
+                  padding:0.55rem 0.8rem;outline:none"/>
+              </div>
+            </div>
+            <div style="display:flex;gap:0.6rem;align-items:center">
+              <button onclick="createPromoCode()" class="save-btn">Crear Código</button>
+              <span id="promoCreateMsg" style="font-size:0.65rem;color:var(--muted)"></span>
+            </div>
+          </div>
+
+          <!-- Codes list -->
+          <div class="tbl-wrap">
+            <table>
+              <thead><tr><th>Código</th><th>Tipo</th><th>Valor</th><th>Mínimo</th><th>Usos</th><th>Activo</th><th></th></tr></thead>
+              <tbody id="promoList"></tbody>
+            </table>
+          </div>
+        </div>
       </div>
 
       <!-- CATÁLOGO -->
@@ -1449,7 +1523,7 @@ function navTo(page){
   // Render page content
   if(page==='overview')  renderOverview();
   if(page==='inventory'){ renderInventory(); loadBottleInventory(); if(!catalogFragrances.length) adminFetch(API+'/catalogue',{}).then(function(r){return r?r.json():[];}).then(function(d){catalogFragrances=d||[];}); }
-  if(page==='pricing'){  renderPricing(); loadShippingConfig(); }
+  if(page==='pricing'){  renderPricing(); loadShippingConfig(); loadPromoCodes(); }
   if(page==='orders'){   renderOrders(); fetchAllData(); }
   if(page==='catalogo')  loadCatalogue();
   if(page==='bundles'){ renderBundles(); }
@@ -2503,6 +2577,94 @@ function saveShippingConfig(){
 }
 
 // Load shipping config when pricing tab opens
+
+// ════════════════════════════════════════════
+// PROMO CODES
+// ════════════════════════════════════════════
+function togglePromoForm(){
+  var form = document.getElementById('promoCreateForm');
+  var btn  = document.getElementById('promoFormToggle');
+  if(!form) return;
+  var open = form.style.display === 'none' || form.style.display === '';
+  form.style.display = open ? 'block' : 'none';
+  btn.textContent = open ? '✕ Cancelar' : '+ Nuevo Código';
+}
+
+function loadPromoCodes(){
+  adminFetch(API+'/admin/promo-codes',{})
+    .then(function(r){ return r ? r.json() : []; })
+    .then(function(codes){
+      var tbody = document.getElementById('promoList');
+      if(!tbody) return;
+      if(!codes.length){ tbody.innerHTML='<tr><td colspan="7" style="text-align:center;color:var(--muted);font-size:0.7rem;padding:1.5rem">No hay códigos creados aún</td></tr>'; return; }
+      tbody.innerHTML = codes.map(function(c){
+        var typeLabel = c.type === 'percent' ? c.value+'%' : '$'+parseFloat(c.value).toFixed(2);
+        var expiry = c.expires_at ? new Date(c.expires_at).toLocaleDateString('es-SV') : '—';
+        var uses   = c.max_uses ? c.uses+'/'+c.max_uses : c.uses+'/∞';
+        return '<tr>'+
+          '<td><strong style="font-family:monospace;font-size:0.85rem;color:var(--gold)">'+c.code+'</strong></td>'+
+          '<td style="font-size:0.72rem;color:var(--muted)">'+(c.type==='percent'?'Porcentaje':'Fijo')+'</td>'+
+          '<td>'+typeLabel+'</td>'+
+          '<td>'+(parseFloat(c.min_order)>0?'$'+parseFloat(c.min_order).toFixed(2):'—')+'</td>'+
+          '<td style="font-size:0.72rem">'+uses+'</td>'+
+          '<td><label style="display:flex;align-items:center;gap:0.4rem;cursor:pointer">'+
+            '<input type="checkbox" '+(c.active?'checked':'')+' onchange="togglePromoCode('+c.id+',this.checked)"/>'+
+            '<span style="font-size:0.65rem;color:var(--muted)">'+(c.active?'Activo':'Inactivo')+'</span>'+
+          '</label></td>'+
+          '<td><button onclick="deletePromoCode('+c.id+')" style="background:none;border:1px solid rgba(200,60,60,0.3);color:rgba(200,60,60,0.7);padding:0.2rem 0.5rem;font-size:0.6rem;cursor:pointer;letter-spacing:0.1em">Eliminar</button></td>'+
+        '</tr>';
+      }).join('');
+    }).catch(function(){});
+}
+
+function createPromoCode(){
+  var code     = document.getElementById('pcCode').value.trim().toUpperCase();
+  var type     = document.getElementById('pcType').value;
+  var value    = parseFloat(document.getElementById('pcValue').value);
+  var minOrder = parseFloat(document.getElementById('pcMinOrder').value)||0;
+  var maxUses  = document.getElementById('pcMaxUses').value ? parseInt(document.getElementById('pcMaxUses').value) : null;
+  var expires  = document.getElementById('pcExpires').value || null;
+  var msg      = document.getElementById('promoCreateMsg');
+
+  if(!code||!value||isNaN(value)){ msg.style.color='var(--error)'; msg.textContent='Código y valor requeridos.'; return; }
+
+  adminFetch(API+'/admin/promo-codes',{
+    method:'POST',
+    headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({code:code,type:type,value:value,min_order:minOrder,max_uses:maxUses,expires_at:expires})
+  }).then(function(r){ return r ? r.json() : null; })
+  .then(function(res){
+    if(!res) return;
+    if(res.ok){
+      msg.style.color='var(--success)'; msg.textContent='✓ Código '+res.code+' creado';
+      // Clear form
+      document.getElementById('pcCode').value='';
+      document.getElementById('pcValue').value='';
+      document.getElementById('pcMinOrder').value='';
+      document.getElementById('pcMaxUses').value='';
+      document.getElementById('pcExpires').value='';
+      loadPromoCodes();
+      setTimeout(function(){ togglePromoForm(); msg.textContent=''; }, 1500);
+    } else {
+      msg.style.color='var(--error)'; msg.textContent=res.error||'Error al crear.';
+    }
+  }).catch(function(){ msg.style.color='var(--error)'; msg.textContent='Error de conexión.'; });
+}
+
+function togglePromoCode(id, active){
+  adminFetch(API+'/admin/promo-codes/'+id,{
+    method:'PATCH',
+    headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({active:active})
+  }).then(function(){ loadPromoCodes(); }).catch(function(){});
+}
+
+function deletePromoCode(id){
+  if(!confirm('¿Eliminar este código de descuento?')) return;
+  adminFetch(API+'/admin/promo-codes/'+id,{method:'DELETE'})
+    .then(function(){ loadPromoCodes(); toast('Eliminado','Código eliminado','ok'); })
+    .catch(function(){});
+}
 
 // ── TOAST ─────────────────────────────────────────
 function exportOrders(){
