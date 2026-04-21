@@ -1744,7 +1744,10 @@ footer{background:var(--dark);padding:3.5rem 4rem;text-align:center;border-top:1
         <div id="bundleDetailName" style="font-family:'Cormorant Garamond',serif;font-size:1.4rem;color:var(--cream);font-weight:300"></div>
         <div id="bundleDetailDesc" style="font-size:0.7rem;color:var(--muted);margin-top:0.3rem"></div>
       </div>
-      <button onclick="closeBundleDetail()" style="background:none;border:none;color:var(--muted);font-size:1.1rem;cursor:pointer;line-height:1">&#10005;</button>
+      <div style="display:flex;align-items:center;gap:0.6rem">
+        <button id="bundleShareBtn" style="background:none;border:1px solid var(--border);color:var(--muted);font-size:0.55rem;letter-spacing:0.15em;text-transform:uppercase;padding:0.4rem 0.7rem;cursor:pointer;font-family:'Jost',sans-serif">&#8682; Compartir</button>
+        <button onclick="closeBundleDetail()" style="background:none;border:none;color:var(--muted);font-size:1.1rem;cursor:pointer;line-height:1">&#10005;</button>
+      </div>
     </div>
     <div class="bundle-modal-body" id="bundleDetailBody"></div>
     <div class="bundle-modal-footer">
@@ -2208,9 +2211,17 @@ function loadViaREST() {
     var _urlProd = new URLSearchParams(window.location.search).get('producto');
     if(_urlProd){
       setTimeout(function(){ openDetail(parseInt(_urlProd)); }, 400);
-      // Remove param from URL so polling doesn't reopen the modal
       var _cleanUrl = window.location.pathname + window.location.hash;
       window.history.replaceState(null, '', _cleanUrl);
+    }
+    var _urlBundle = new URLSearchParams(window.location.search).get('bundle');
+    if(_urlBundle){
+      var _bid = parseInt(_urlBundle);
+      setTimeout(function(){
+        var found = (window._allBundles||[]).find(function(b){ return b.id===_bid; });
+        if(found) openBundleDetail(found);
+      }, 600); // slightly longer delay to ensure bundles are loaded
+      window.history.replaceState(null, '', window.location.pathname);
     }
   }).catch(function() {
     setConn('offline', 'Sin conexión');
@@ -2973,11 +2984,17 @@ function closeDetail(){
 }
 document.getElementById('backBtn').addEventListener('click',closeDetail);
 
-// Handle browser back button — close modal instead of navigating away
+// Handle browser back button — close modals instead of navigating away
 window.addEventListener('popstate', function(e) {
-  var overlay = document.getElementById('detailOverlay');
-  if (overlay && overlay.classList.contains('open')) {
-    overlay.classList.remove('open');
+  var detailOverlay = document.getElementById('detailOverlay');
+  if (detailOverlay && detailOverlay.classList.contains('open')) {
+    detailOverlay.classList.remove('open');
+    document.body.style.overflow = '';
+    return;
+  }
+  var bundleOverlay = document.getElementById('bundleDetailOverlay');
+  if (bundleOverlay && bundleOverlay.classList.contains('open')) {
+    bundleOverlay.classList.remove('open');
     document.body.style.overflow = '';
   }
 });
@@ -3076,6 +3093,10 @@ function translateConc(s){
     'Solid Perfume':  'Perfume sólido',
   };
   return map[s] || s;
+}
+
+function bundleUrl(b){
+  return 'https://sillage-sv.com/bundle/'+slugify(b.name);
 }
 
 function slugify(str){
@@ -3747,11 +3768,37 @@ function openBundleDetail(b){
   }).join('');
 
   document.getElementById('bundleDetailAddBtn').onclick = function(){ addBundleToCart(b.id, b); closeBundleDetail(); };
+
+  // Share button
+  var shareBtn = document.getElementById('bundleShareBtn');
+  if(shareBtn){
+    shareBtn.onclick = function(){
+      var shareData = {
+        title: b.name + ' — Sillage Parfumerie',
+        text:  b.description || ('Descubre el bundle ' + b.name + ' en Sillage Parfumerie'),
+        url:   bundleUrl(b)
+      };
+      if(navigator.share){
+        navigator.share(shareData).catch(function(){});
+      } else {
+        navigator.clipboard.writeText(shareData.url).then(function(){
+          toast('Enlace copiado', 'Comparte donde quieras', 'ok');
+        }).catch(function(){
+          toast('Enlace copiado', bundleUrl(b), 'ok');
+        });
+      }
+    };
+  }
+
   document.getElementById('bundleDetailOverlay').classList.add('open');
+  window.history.pushState({bundle: b.id}, '', bundleUrl(b));
 }
 
 function closeBundleDetail(){
   document.getElementById('bundleDetailOverlay').classList.remove('open');
+  if(window.history.state && window.history.state.bundle){
+    window.history.pushState({}, '', '/');
+  }
 }
 
 function openBundleProdDetail(pid){
