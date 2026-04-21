@@ -266,6 +266,12 @@ nav a:hover{color:var(--gold)}
 .d-size-lbl{font-size:0.62rem;letter-spacing:0.12em;color:var(--muted);text-transform:uppercase}
 .d-section-lbl{font-size:0.58rem;letter-spacing:0.22em;text-transform:uppercase;color:var(--gold);margin-bottom:0.8rem}
 .notes-section{margin-bottom:1.8rem}
+.notes-hdr{display:flex;align-items:center;gap:0.5rem;margin-bottom:0.6rem}
+.notes-info{position:relative;display:inline-flex;align-items:center}
+.notes-info-btn{background:none;border:1px solid var(--border);border-radius:50%;width:14px;height:14px;font-size:0.5rem;color:var(--muted);cursor:pointer;display:flex;align-items:center;justify-content:center;padding:0;line-height:1;flex-shrink:0}
+.notes-info-tip{display:none;position:absolute;bottom:calc(100% + 6px);left:50%;transform:translateX(-50%);background:#1a1714;border:1px solid var(--border);color:var(--cream);font-size:0.58rem;line-height:1.5;padding:0.5rem 0.7rem;white-space:nowrap;z-index:100;pointer-events:none;width:220px;white-space:normal;text-align:left}
+.notes-info-tip::after{content:'';position:absolute;top:100%;left:50%;transform:translateX(-50%);border:4px solid transparent;border-top-color:#1a1714}
+.notes-info:hover .notes-info-tip,.notes-info:focus-within .notes-info-tip{display:block}
 .note-row{display:flex;align-items:flex-start;flex-wrap:wrap;gap:0.4rem 0.8rem;margin-bottom:0.8rem}
 .note-lbl{font-size:0.52rem;letter-spacing:0.12em;text-transform:uppercase;color:var(--muted);width:52px;flex-shrink:0;padding-top:0.35rem}
 .note-bar{flex-shrink:0;height:2px;background:var(--border);align-self:center;width:min(120px,22vw)}
@@ -2778,7 +2784,16 @@ function openDetail(pid){
     '</div>'+
     '<div class="d-tagline">'+esc(p.tagline||'')+'</div>'+
     '<div class="d-price-row"><span class="d-price">'+dPrice+'</span><span class="d-size-lbl">'+p.size+'</span></div>'+
-    '<div class="notes-section"><div class="d-section-lbl">Notas de Fragancia</div>'+
+    '<div class="notes-section">'+
+      '<div class="notes-hdr">'+
+        '<div class="d-section-lbl" style="margin-bottom:0">Notas de Fragancia</div>'+
+        '<div class="notes-info">'+
+          '<button class="notes-info-btn" aria-label="¿Qué miden las barras?">?</button>'+
+          '<div class="notes-info-tip">'+
+            'Las barras muestran la <strong>intensidad de proyección</strong> de cada familia de notas — qué tanto irradia desde la piel, según concentración e ingredientes.'+
+          '</div>'+
+        '</div>'+
+      '</div>'+
       '<div class="note-row"><span class="note-lbl">Top</span><div class="note-bar"><div class="note-fill" style="width:'+(p.top_intensity||90)+'%"></div></div><span class="note-text">'+p.top+'</span></div>'+
       '<div class="note-row"><span class="note-lbl">Corazón</span><div class="note-bar"><div class="note-fill" style="width:'+(p.mid_intensity||70)+'%"></div></div><span class="note-text">'+p.mid+'</span></div>'+
       '<div class="note-row"><span class="note-lbl">Fondo</span><div class="note-bar"><div class="note-fill" style="width:'+(p.base_intensity||50)+'%"></div></div><span class="note-text">'+p.base+'</span></div>'+
