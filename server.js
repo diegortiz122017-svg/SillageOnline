@@ -39,7 +39,7 @@ async function logActivity(msg) {
 }
 const { requireAdmin, requireCustomer, optionalCustomer, createSession, validateSession, destroySession } = auth;
 const { authLimiter, customerAuthLimiter, getIp } = security;
-const { ADMIN_USER, ADMIN_PASS, PORT, BASE_URL, OPENAI_API_KEY, WOMPI_CLIENT_ID, WOMPI_CLIENT_SECRET, WOMPI_PUBLIC_KEY, EMAIL_HOLA, EMAIL_PEDIDOS, SESSION_TTL_CUSTOMER, SESSION_TTL_ADMIN, RESEND_API_KEY, NODE_ENV, IS_PROD, ANON_SESSION_TTL, ANON_WS_LIMIT, ANON_SOMMELIER_MAX, REG_SOMMELIER_LIMIT, ANON_SOMMELIER_LIMIT, CACHE_TTL_TOOL, CACHE_TTL_REPLY } = cfg;
+const { ADMIN_USER, ADMIN_PASS, PORT, BASE_URL, OPENAI_API_KEY, WOMPI_CLIENT_ID, WOMPI_CLIENT_SECRET, WOMPI_PUBLIC_KEY, EMAIL_HOLA, EMAIL_PEDIDOS, ADMIN_NOTIFY_EMAIL, SESSION_TTL_CUSTOMER, SESSION_TTL_ADMIN, RESEND_API_KEY, NODE_ENV, IS_PROD, ANON_SESSION_TTL, ANON_WS_LIMIT, ANON_SOMMELIER_MAX, REG_SOMMELIER_LIMIT, ANON_SOMMELIER_LIMIT, CACHE_TTL_TOOL, CACHE_TTL_REPLY } = cfg;
 
 // ── BTCPay Server ─────────────────────────────────────
 const BTCPAY_URL            = process.env.BTCPAY_URL || 'https://btcpay.davidcoen.it';
@@ -761,6 +761,57 @@ function escHtml(str){
     .replace(/>/g,'&gt;')
     .replace(/"/g,'&quot;');
 }
+// ─── Admin new order notification ────────────────────
+async function notifyAdminNewOrder(order) {
+  if (!ADMIN_NOTIFY_EMAIL) return;
+  try {
+    const paymentLabels = { wompi: 'Tarjeta (Wompi)', btcpay: 'Bitcoin / Lightning', cod: 'Contra Entrega', chivo: 'Chivo' };
+    const payLabel = paymentLabels[order.payment_method || order.paymentMethod] || order.payment_method || '—';
+    const items = (typeof order.items === 'string' ? JSON.parse(order.items) : order.items) || [];
+    const itemRows = items.map(i =>
+      `<tr>
+        <td style="padding:6px 10px;border-bottom:1px solid #e8d8b8;font-size:12px;color:#1a1714">${escHtml(i.name)}</td>
+        <td style="padding:6px 10px;border-bottom:1px solid #e8d8b8;font-size:12px;color:#1a1714;text-align:center">×${i.qty}</td>
+        <td style="padding:6px 10px;border-bottom:1px solid #e8d8b8;font-size:12px;color:#1a1714;text-align:right">$${parseFloat(i.total||0).toFixed(2)}</td>
+      </tr>`
+    ).join('');
+    const html = emailTemplate(`
+      <div style="background:#b8955a;padding:6px 12px;display:inline-block;margin-bottom:16px">
+        <span style="font-size:9px;letter-spacing:3px;text-transform:uppercase;color:#0e0c0a;font-family:'Jost',sans-serif">Nuevo Pedido</span>
+      </div>
+      <h2 style="font-family:Georgia,serif;font-size:22px;font-weight:300;color:#1a1714;margin:0 0 4px">${escHtml(order.customer)}</h2>
+      <p style="font-size:12px;color:#8a7f72;margin:0 0 20px">${escHtml(order.email)} · ${escHtml(order.phone||'—')}</p>
+      <div style="background:#faf8f4;border:1px solid #e8d8b8;padding:10px 14px;margin-bottom:16px;display:flex;justify-content:space-between;align-items:center">
+        <span style="font-size:10px;letter-spacing:2px;text-transform:uppercase;color:#8a7f72">${escHtml(order.id)}</span>
+        <span style="font-size:10px;color:#8a7f72">${payLabel}</span>
+      </div>
+      <table style="width:100%;border-collapse:collapse;margin-bottom:16px">
+        <thead><tr style="background:#faf8f4">
+          <th style="padding:6px 10px;text-align:left;font-size:9px;color:#8a7f72;font-weight:400;text-transform:uppercase;letter-spacing:1px">Producto</th>
+          <th style="padding:6px 10px;text-align:center;font-size:9px;color:#8a7f72;font-weight:400">Cant.</th>
+          <th style="padding:6px 10px;text-align:right;font-size:9px;color:#8a7f72;font-weight:400">Precio</th>
+        </tr></thead>
+        <tbody>${itemRows}</tbody>
+      </table>
+      <div style="padding:10px 14px;background:#0e0c0a;margin-bottom:16px;display:flex;justify-content:space-between;align-items:center">
+        <span style="font-size:10px;text-transform:uppercase;letter-spacing:2px;color:#8a7f72">Total</span>
+        <span style="font-family:Georgia,serif;font-size:20px;color:#b8955a">$${parseFloat(order.total||0).toFixed(2)}</span>
+      </div>
+      <p style="font-size:11px;color:#8a7f72;margin:0">
+        📍 ${escHtml(order.address||'—')}, ${escHtml(order.city||'—')}${order.state ? ', '+escHtml(order.state) : ''}, ${escHtml(order.country||'—')}
+      </p>`
+    );
+    await sendEmail({
+      to:      ADMIN_NOTIFY_EMAIL,
+      subject: `🛍️ Nuevo pedido $${parseFloat(order.total||0).toFixed(2)} — ${escHtml(order.customer)} | Sillage`,
+      from:    `Sillage Pedidos <${EMAIL_PEDIDOS}>`,
+      html,
+    });
+  } catch(e) {
+    console.error('Admin notify error:', e.message);
+  }
+}
+
 // ─── Status notification emails ───────────────────────
 async function sendShippedEmail(order) {
   const trackingHtml = order.tracking_number
@@ -2440,6 +2491,7 @@ app.post('/api/orders', orderLimiter, async (req, res) => {
   // ── COD: insert order normally ────────────────────────────────────────────────
   broadcastAdmin('new_order', order);
   await logActivity(`Nuevo pedido ${escHtml(order.id)} de ${escHtml(order.customer)} — $${parseFloat(order.total||0).toFixed(2)}`);
+  notifyAdminNewOrder(order).catch(() => {});
   try { await sendOrderConfirmation(order); } catch(e) {}
   res.json({ ok: true, order, wompiUrl: null, btcpayUrl: null, btcpayInvoiceId: null });
 });
@@ -2599,6 +2651,7 @@ app.post('/api/wompi/webhook', express.json(), async (req, res) => {
     const fullOrder = { ...orderObj, status: 'Procesando', paymentStatus: 'Pagado', payment_method: 'wompi' };
     broadcastAdmin('new_order', fullOrder);
     await logActivity(`Pago Wompi confirmado — pedido ${orderObj.id} de ${orderObj.customer} — $${parseFloat(orderObj.total||0).toFixed(2)}`);
+    notifyAdminNewOrder(fullOrder).catch(() => {});
     try { await sendOrderConfirmation(fullOrder); } catch(e) { console.error('Wompi confirm email error:', e.message); }
     console.log(`Wompi order created on payment: ${orderObj.id} — ref ${reference}`);
   } catch(e) {
@@ -2953,6 +3006,7 @@ app.post('/api/btcpay/webhook', async (req, res) => {
       const fullOrder = { ...orderObj, status: 'Procesando', paymentStatus: 'Pagado', payment_method: 'btcpay' };
       broadcastAdmin('new_order', fullOrder);
       await logActivity(`Pago BTCPay confirmado (${type}) — pedido ${orderObj.id} de ${orderObj.customer} — $${parseFloat(orderObj.total||0).toFixed(2)}`);
+      notifyAdminNewOrder(fullOrder).catch(() => {});
       try { await sendOrderConfirmation(fullOrder); } catch(e) { console.error('BTCPay confirmation email error:', e.message); }
       console.log(`BTCPay order created on payment: ${orderObj.id} — invoice ${invoiceId}`);
 
