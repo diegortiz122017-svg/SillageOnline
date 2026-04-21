@@ -1086,6 +1086,7 @@ function rateLimit(max, windowMs) {
 const orderLimiter     = rateLimit(20, 60 * 60 * 1000);   // 20/hour
 const sommelierLimiter = rateLimit(30, 60 * 60 * 1000);   // 30/hour
 const sommelierBurst   = rateLimit(8,  60 * 1000);        // 8/min (was 5, too aggressive)
+const promoLimiter     = rateLimit(10, 60 * 60 * 1000);   // 10 attempts/hour/IP — brute force protection
 // ─── Anon session registry — server-issued sessionIds ────────────────────────
 // Prevents bots from inventing arbitrary sessionIds to bypass per-session limits
 const _anonSessions = new Map();
@@ -2559,7 +2560,8 @@ app.post('/api/orders', orderLimiter, async (req, res) => {
 
     // Apply promo discount server-side if code provided
     let promoDiscount = 0;
-    const promoCode = String(req.body.promoCode || '').trim().toUpperCase();
+    // Sanitize promo code — strip anything that isn't alphanumeric
+    const promoCode = String(req.body.promoCode || '').trim().toUpperCase().replace(/[^A-Z0-9]/g, '');
     if (promoCode) {
       const [promoRows] = await db.execute(
         `SELECT * FROM promo_codes WHERE code=? AND active=1
@@ -4687,19 +4689,35 @@ app.post('/api/settings/shipping', requireAdmin, async (req, res) => {
 // ═══════════════════════════════════════════════════════
 
 // POST /api/promo/validate — public, validates a promo code against a cart total
-app.post('/api/promo/validate', async (req, res) => {
-  const { code, cartTotal } = req.body;
-  if (!code || !cartTotal) return res.status(400).json({ error: 'Código y total requeridos.' });
+// Rate limited + sanitized + constant-time response to prevent brute force and timing attacks
+app.post('/api/promo/validate', promoLimiter, async (req, res) => {
+  // Sanitize: only allow alphanumeric, strip everything else — prevents injection attempts
+  const rawCode = String(req.body.code || '').trim().toUpperCase().replace(/[^A-Z0-9]/g, '');
+  const cartTotal = parseFloat(req.body.cartTotal);
+
+  // Constant-time baseline — always wait at least 80ms so response time
+  // doesn't reveal whether the code exists or not (timing attack mitigation)
+  const _start = Date.now();
+  const _minDelay = () => new Promise(r => setTimeout(r, Math.max(0, 80 - (Date.now() - _start))));
+
+  if (!rawCode || rawCode.length < 3 || rawCode.length > 30 || isNaN(cartTotal)) {
+    await _minDelay();
+    return res.status(400).json({ error: 'Código y total requeridos.' });
+  }
+
   try {
     const [rows] = await db.execute(
       `SELECT * FROM promo_codes WHERE code=? AND active=1
        AND (expires_at IS NULL OR expires_at > NOW())
        AND (max_uses IS NULL OR uses < max_uses)`,
-      [String(code).trim().toUpperCase()]
+      [rawCode]
     );
+
+    await _minDelay(); // ensure consistent response time regardless of DB speed
+
     if (!rows.length) return res.status(404).json({ error: 'Código inválido o expirado.' });
     const promo = rows[0];
-    const total = parseFloat(cartTotal);
+    const total = cartTotal;
     if (promo.min_order && total < parseFloat(promo.min_order)) {
       return res.status(400).json({
         error: `Este código requiere un pedido mínimo de $${parseFloat(promo.min_order).toFixed(2)}.`
@@ -4711,6 +4729,7 @@ app.post('/api/promo/validate', async (req, res) => {
     res.json({ ok: true, code: promo.code, type: promo.type, value: parseFloat(promo.value), discount });
   } catch(e) {
     console.error('Promo validate error:', e.message);
+    await _minDelay();
     res.status(500).json({ error: 'Error al validar código.' });
   }
 });
