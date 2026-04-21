@@ -279,6 +279,9 @@ nav a:hover{color:var(--gold)}
 .note-text{font-size:0.68rem;color:var(--charcoal);flex:1;min-width:120px;line-height:1.6}
 .d-desc{font-size:0.78rem;line-height:1.9;color:var(--muted);margin-bottom:1.8rem}
 .d-profile{display:grid;grid-template-columns:1fr 1fr;gap:0.8rem;margin-bottom:1.8rem;padding:1.2rem;background:rgba(184,149,90,0.05);border:1px solid var(--border-light)}
+.d-chords{margin-bottom:1.8rem}
+.d-chord-tags{display:flex;flex-wrap:wrap;gap:0.4rem;margin-top:0.5rem}
+.d-chord-tag{font-size:0.58rem;letter-spacing:0.12em;text-transform:uppercase;padding:0.25rem 0.7rem;border:1px solid var(--border);color:var(--muted);background:transparent}
 .d-prof-lbl{font-size:0.52rem;letter-spacing:0.18em;text-transform:uppercase;color:var(--muted);margin-bottom:0.2rem}
 .d-prof-val{font-size:0.75rem;color:var(--charcoal)}
 .d-cta{display:flex;gap:0.6rem}
@@ -2805,6 +2808,14 @@ function openDetail(pid){
       '<div><div class="d-prof-lbl">Sillage</div><div class="d-prof-val">'+translateSillage(p.sillage)+'</div></div>'+
       '<div><div class="d-prof-lbl">Duración</div><div class="d-prof-val">'+p.long+'</div></div>'+
     '</div>'+
+    (p.chords && p.chords.length ?
+      '<div class="d-chords">'+
+        '<div class="d-section-lbl">Acordes</div>'+
+        '<div class="d-chord-tags">'+
+          p.chords.map(function(c){ return '<span class="d-chord-tag">'+esc(c)+'</span>'; }).join('')+
+        '</div>'+
+      '</div>'
+    : '')+
     '<div class="size-selector" id="sizeSel">'+
       '<button class="size-opt active" data-type="full" data-price="'+ep+'" data-size="'+p.size+'">'+
         '<span class="so-label">Frasco Completo</span>'+
@@ -3158,14 +3169,16 @@ function translateConc(s){
 
 // ── Privacy banner ───────────────────────────────────────────────────────────
 (function initPrivacyBanner(){
-  // Only show to users who haven't dismissed it yet
   try {
+    // Already dismissed
     if(localStorage.getItem('sillage_privacy_ok')) return;
-    // Small delay so it doesn't flash immediately on load
+    // Registered users accepted at registration — no need to show
+    if(localStorage.getItem('sillage_customer_token')) return;
+    // Show after a short delay so it doesn't flash on load
     setTimeout(function(){
       var banner = document.getElementById('privacyBanner');
       if(banner) banner.style.display = 'flex';
-    }, 2000);
+    }, 2500);
   } catch(e) {}
 })();
 
@@ -3173,6 +3186,11 @@ function dismissPrivacyBanner(){
   var banner = document.getElementById('privacyBanner');
   if(banner) banner.style.display = 'none';
   try { localStorage.setItem('sillage_privacy_ok','1'); } catch(e) {}
+}
+
+function _autoHidePrivacyBanner(){
+  // Called after login/register — registered users don't need the banner
+  dismissPrivacyBanner();
 }
 
 function openPrivacyModal(e){
@@ -4748,6 +4766,7 @@ function doLogin(){
         localStorage.setItem('sillage_customer_token',customerToken);
         localStorage.setItem('sillage_token_ts', Date.now());
         localStorage.setItem('sillage_customer_name', currentCustomer.name||'');
+        _autoHidePrivacyBanner();
         clearSommelierConsultLimit();
         // Load full profile
         customerFetch(API+'/customer/profile',{})
@@ -4803,6 +4822,7 @@ function doRegister(){
         localStorage.setItem('sillage_customer_token',customerToken);
         localStorage.setItem('sillage_token_ts', Date.now());
         localStorage.setItem('sillage_customer_name', currentCustomer.name||'');
+        _autoHidePrivacyBanner();
         clearSommelierConsultLimit();
         closeAuth();
         renderCustomerArea();
@@ -5503,6 +5523,7 @@ function postOrderRegister(){
       customerToken   = res.data.token;
       currentCustomer = res.data.customer;
       localStorage.setItem('sillage_customer_token', customerToken);
+      _autoHidePrivacyBanner();
       renderCustomerArea();
       var token = customerToken;
       var hdrs  = {'Content-Type':'application/json','x-customer-token':token};
@@ -6545,7 +6566,7 @@ document.addEventListener('DOMContentLoaded', function(){
 <div id="privacyBanner"
   style="display:none;position:fixed;bottom:0;left:0;right:0;z-index:8000;
          background:#1a1714;border-top:1px solid rgba(184,149,90,0.2);
-         padding:0.8rem 1.5rem;display:flex;align-items:center;justify-content:space-between;
+         padding:0.8rem 1.5rem;align-items:center;justify-content:space-between;
          gap:1rem;flex-wrap:wrap">
   <p style="font-size:0.62rem;color:#8a7f72;line-height:1.6;margin:0;flex:1;min-width:200px">
     Usamos localStorage para tu carrito, sesión y perfil de Nez.
