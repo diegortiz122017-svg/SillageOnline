@@ -695,6 +695,13 @@ tr:hover td{background:rgba(255,255,255,0.02)}
     <div class="frag-row full">
       <div class="frag-field"><label>Descripción</label><textarea id="fDesc" rows="3" placeholder="Descripción detallada de la fragancia..."></textarea></div>
     </div>
+    <div class="frag-row full">
+      <div class="frag-field">
+        <label>Acordes — Override <span style="font-size:0.6rem;color:var(--muted);font-weight:300;text-transform:none;letter-spacing:0">(opcional — reemplaza los acordes auto-generados)</span></label>
+        <input type="text" id="fChordsOverride" placeholder="Sensual, Ambarado, Cálido, Ahumado, Amaderado" autocomplete="off"/>
+        <div style="font-size:0.6rem;color:var(--muted);margin-top:0.3rem">Separados por coma. Deja vacío para usar los acordes calculados automáticamente.</div>
+      </div>
+    </div>
     <div class="frag-section">Colores del Frasco (3 tonos en hex)</div>
     <div class="frag-row">
       <div class="frag-field"><label>Color Claro</label><input type="color" id="fC1" value="#f5e6c8" style="padding:0.2rem;height:2.4rem;cursor:pointer"/></div>
@@ -3073,10 +3080,12 @@ function openFragModal(id){
   initNoteTagPicker('mid',   p?p.mid:'');
   initNoteTagPicker('base',  p?p.base:'');
   document.getElementById('fConc').value   =p?p.conc:'Eau de Parfum';
+  document.getElementById('fChordsOverride').value = p && p.chords_override && p.chords_override.length ? p.chords_override.join(', ') : '';
   document.getElementById('fSeason').value =p?p.season:'All Seasons';
   document.getElementById('fSillage').value=p?p.sillage:'Moderate';
   document.getElementById('fLong').value   =p?p.long:'8+ Hours';
   document.getElementById('fTagline').value=p?p.tagline:'';
+  document.getElementById('fChordsOverride').value= p && p.chords_override && p.chords_override.length ? p.chords_override.join(', ') : '';
   document.getElementById('fDesc').value   =p?p.desc:'';
   document.getElementById('fC1').value     =p?p.c[0]:'#f5e6c8';
   document.getElementById('fC2').value     =p?p.c[1]:'#e8d0a0';
@@ -3136,7 +3145,12 @@ function saveFragrance(){
     long:document.getElementById('fLong').value,tagline:document.getElementById('fTagline').value,
     desc:document.getElementById('fDesc').value,
     c:[document.getElementById('fC1').value,document.getElementById('fC2').value,document.getElementById('fC3').value],
-    s:document.getElementById('fShape').value,photos:fragPhotos
+    s:document.getElementById('fShape').value,photos:fragPhotos,
+    chords_override:(function(){
+      var raw = (document.getElementById('fChordsOverride').value||'').trim();
+      if(!raw) return null;
+      return raw.split(',').map(function(s){return s.trim();}).filter(Boolean);
+    })()
   };
   var btn=document.querySelector('.frag-save');
   btn.textContent='Guardando...';btn.disabled=true;
