@@ -189,6 +189,7 @@ async function initDB() {
       colors          JSON          DEFAULT NULL,
       shape           VARCHAR(20)   DEFAULT NULL,
       photos          JSON          DEFAULT NULL,
+      chords          JSON          DEFAULT NULL,
       sort_order      INT           DEFAULT 0,
       active          TINYINT(1)    DEFAULT 1,
       created_at      DATETIME      NOT NULL,
@@ -397,6 +398,7 @@ async function migrateProductsColumns() {
     "colors          JSON          DEFAULT NULL",
     "shape           VARCHAR(20)   DEFAULT NULL",
     "photos          JSON          DEFAULT NULL",
+    "chords          JSON          DEFAULT NULL",
     "sort_order      INT           DEFAULT 0",
     "active          TINYINT(1)    DEFAULT 1",
     "created_at      DATETIME      DEFAULT NULL",
@@ -4608,13 +4610,15 @@ app.delete('/api/catalogue/:id', requireAdmin, async (req, res) => {
 // Safe to run multiple times — just recalculates and overwrites scores.
 app.post('/api/admin/migrate-note-intensity', requireAdmin, async (req, res) => {
   try {
+    const { calcChords } = require('./services/chords');
     const catalogue = await getCatalogue();
     let updated = 0;
     for (const p of catalogue) {
       const scores = calcIntensity(p);
+      const chords = calcChords(p);
       await db.execute(
-        'UPDATE products SET top_intensity=?, mid_intensity=?, base_intensity=?, updated_at=? WHERE id=?',
-        [scores.top_intensity, scores.mid_intensity, scores.base_intensity, new Date(), p.id]
+        'UPDATE products SET top_intensity=?, mid_intensity=?, base_intensity=?, chords=?, updated_at=? WHERE id=?',
+        [scores.top_intensity, scores.mid_intensity, scores.base_intensity, JSON.stringify(chords), new Date(), p.id]
       );
       updated++;
     }
@@ -4622,12 +4626,13 @@ app.post('/api/admin/migrate-note-intensity', requireAdmin, async (req, res) => 
     const { catalogueCache } = require('./services/cache');
     catalogueCache.delete('catalogue');
     const refreshed = await getCatalogue();
-    await logActivity(`Note intensity migration: scored ${updated} products`);
+    await logActivity(`Note intensity + chords migration: scored ${updated} products`);
     res.json({ ok: true, updated, sample: refreshed.slice(0, 3).map(p => ({
       id: p.id, name: p.name,
       top_intensity: p.top_intensity,
       mid_intensity: p.mid_intensity,
       base_intensity: p.base_intensity,
+      chords: p.chords,
     }))});
   } catch(e) {
     console.error('Note intensity migration error:', e.message);
