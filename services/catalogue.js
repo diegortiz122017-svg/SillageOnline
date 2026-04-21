@@ -36,6 +36,7 @@ function rowToProduct(r) {
     c:             r.colors  ? (typeof r.colors  === 'string' ? JSON.parse(r.colors)  : r.colors)  : [],
     s:             r.shape,
     photos:        r.photos  ? (typeof r.photos  === 'string' ? JSON.parse(r.photos)  : r.photos)  : [],
+    chords:        r.chords  ? (typeof r.chords  === 'string' ? JSON.parse(r.chords)  : r.chords)  : [],
     sort_order:    r.sort_order,
   };
 }
@@ -69,6 +70,7 @@ function productToRow(p, now) {
     p.c            ? JSON.stringify(p.c)      : null,
     p.s            || null,
     p.photos       ? JSON.stringify(p.photos) : null,
+    p.chords       ? JSON.stringify(p.chords) : null,
     p.sort_order   != null ? p.sort_order : 0,
     now,
   ];
@@ -100,8 +102,8 @@ async function saveCatalogue(data) {
          size, badge, luxury, notes, top_notes, mid_notes, base_notes,
          top_intensity, mid_intensity, base_intensity,
          tagline, description, concentration, season, sillage, longevity,
-         colors, shape, photos, sort_order, active, created_at, updated_at)
-      VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,1,?,?)
+         colors, shape, photos, chords, sort_order, active, created_at, updated_at)
+      VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,1,?,?)
       ON DUPLICATE KEY UPDATE
         brand=VALUES(brand), name=VALUES(name), gender=VALUES(gender),
         price=VALUES(price), decant_price=VALUES(decant_price),
@@ -114,7 +116,7 @@ async function saveCatalogue(data) {
         concentration=VALUES(concentration), season=VALUES(season),
         sillage=VALUES(sillage), longevity=VALUES(longevity),
         colors=VALUES(colors), shape=VALUES(shape), photos=VALUES(photos),
-        sort_order=VALUES(sort_order), updated_at=VALUES(updated_at)`,
+        chords=VALUES(chords), sort_order=VALUES(sort_order), updated_at=VALUES(updated_at)`,
       [p.id, ...productToRow(p, now), now]
     );
   }
@@ -134,8 +136,8 @@ async function addProduct(p) {
        size, badge, luxury, notes, top_notes, mid_notes, base_notes,
        top_intensity, mid_intensity, base_intensity,
        tagline, description, concentration, season, sillage, longevity,
-       colors, shape, photos, sort_order, active, created_at, updated_at)
-    VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,1,?,?)`,
+       colors, shape, photos, chords, sort_order, active, created_at, updated_at)
+    VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,1,?,?)`,
     [id, ...productToRow(p, now), now]
   );
   cache.catalogueCache.delete('catalogue');
@@ -150,7 +152,7 @@ async function updateProduct(id, p) {
       size=?, badge=?, luxury=?, notes=?, top_notes=?, mid_notes=?, base_notes=?,
       top_intensity=?, mid_intensity=?, base_intensity=?,
       tagline=?, description=?, concentration=?, season=?, sillage=?, longevity=?,
-      colors=?, shape=?, photos=?, sort_order=?, updated_at=?
+      colors=?, shape=?, photos=?, chords=?, sort_order=?, updated_at=?
     WHERE id=?`,
     [...productToRow(p, now), id]
   );
