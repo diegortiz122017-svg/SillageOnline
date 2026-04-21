@@ -280,7 +280,8 @@ nav a:hover{color:var(--gold)}
 .d-desc{font-size:0.78rem;line-height:1.9;color:var(--muted);margin-bottom:1.8rem}
 .d-profile{display:grid;grid-template-columns:1fr 1fr;gap:0.8rem;margin-bottom:1.8rem;padding:1.2rem;background:rgba(184,149,90,0.05);border:1px solid var(--border-light)}
 .d-chords{margin-bottom:1rem;margin-top:-0.6rem}
-.d-chord-tags{display:flex;flex-wrap:wrap;gap:0.4rem;margin-top:0.5rem}
+.d-chords-hdr{display:flex;align-items:center;gap:0.5rem;margin-bottom:0.5rem}
+.d-chord-tags{display:flex;flex-wrap:wrap;gap:0.4rem}
 .d-chord-tag{font-size:0.58rem;letter-spacing:0.12em;text-transform:uppercase;padding:0.25rem 0.7rem;border:1px solid var(--border);color:var(--muted);background:transparent}
 .d-prof-lbl{font-size:0.52rem;letter-spacing:0.18em;text-transform:uppercase;color:var(--muted);margin-bottom:0.2rem}
 .d-prof-val{font-size:0.75rem;color:var(--charcoal)}
@@ -2804,6 +2805,15 @@ function openDetail(pid){
     '<p class="d-desc">'+p.desc+'</p>'+
     (p.chords && p.chords.length ?
       '<div class="d-chords">'+
+        '<div class="d-chords-hdr">'+
+          '<div class="d-section-lbl" style="margin-bottom:0">Acordes</div>'+
+          '<div class="notes-info">'+
+            '<button class="notes-info-btn" aria-label="¿Qué son los acordes?">?</button>'+
+            '<div class="notes-info-tip">'+
+              'Los <strong>acordes</strong> describen el carácter olfativo general de la fragancia — las familias de sensaciones que predominan en el conjunto, más allá de las notas individuales.'+
+            '</div>'+
+          '</div>'+
+        '</div>'+
         '<div class="d-chord-tags">'+
           p.chords.map(function(c){ return '<span class="d-chord-tag">'+esc(c)+'</span>'; }).join('')+
         '</div>'+
