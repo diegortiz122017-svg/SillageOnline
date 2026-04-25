@@ -4793,6 +4793,33 @@ app.patch('/api/admin/promo-codes/:id', requireAdmin, async (req, res) => {
   res.json({ ok: true });
 });
 
+// PUT /api/admin/promo-codes/:id — admin: full update
+app.put('/api/admin/promo-codes/:id', requireAdmin, async (req, res) => {
+  const { type, value, min_order, max_uses, expires_at, active } = req.body;
+  try {
+    await db.execute(
+      `UPDATE promo_codes SET
+        type=?, value=?, min_order=?, max_uses=?, expires_at=?, active=?, updated_at=?
+       WHERE id=?`,
+      [
+        type,
+        parseFloat(value),
+        parseFloat(min_order || 0),
+        max_uses ? parseInt(max_uses) : null,
+        expires_at ? new Date(expires_at) : null,
+        active ? 1 : 0,
+        new Date(),
+        parseInt(req.params.id)
+      ]
+    );
+    await logActivity(`Promo code actualizado: id ${req.params.id}`);
+    res.json({ ok: true });
+  } catch(e) {
+    console.error('Promo update error:', e.message);
+    res.status(500).json({ error: e.message });
+  }
+});
+
 // DELETE /api/admin/promo-codes/:id — admin: delete
 app.delete('/api/admin/promo-codes/:id', requireAdmin, async (req, res) => {
   await db.execute('DELETE FROM promo_codes WHERE id=?', [parseInt(req.params.id)]);
