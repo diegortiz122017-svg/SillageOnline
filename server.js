@@ -416,6 +416,8 @@ async function migrateProductsColumns() {
     }
   }
   // Add indexes if missing
+  // Add updated_at to promo_codes if missing (created before this column was added)
+  try { await db.execute("ALTER TABLE promo_codes ADD COLUMN updated_at DATETIME DEFAULT NULL"); } catch(e) {}
   try { await db.execute('ALTER TABLE products ADD INDEX idx_brand (brand)'); } catch(e) {}
   try { await db.execute('ALTER TABLE products ADD INDEX idx_gender (gender)'); } catch(e) {}
   try { await db.execute('ALTER TABLE products ADD INDEX idx_price (price)'); } catch(e) {}
@@ -4799,7 +4801,7 @@ app.put('/api/admin/promo-codes/:id', requireAdmin, async (req, res) => {
   try {
     await db.execute(
       `UPDATE promo_codes SET
-        type=?, value=?, min_order=?, max_uses=?, expires_at=?, active=?, updated_at=?
+        type=?, value=?, min_order=?, max_uses=?, expires_at=?, active=?
        WHERE id=?`,
       [
         type,
@@ -4808,7 +4810,6 @@ app.put('/api/admin/promo-codes/:id', requireAdmin, async (req, res) => {
         max_uses ? parseInt(max_uses) : null,
         expires_at ? new Date(expires_at) : null,
         active ? 1 : 0,
-        new Date(),
         parseInt(req.params.id)
       ]
     );
