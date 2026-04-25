@@ -4728,7 +4728,7 @@ app.post('/api/promo/validate', promoLimiter, async (req, res) => {
 
     await _minDelay(); // ensure consistent response time regardless of DB speed
 
-    if (!rows.length) return res.status(404).json({ error: 'Código inválido o expirado.' });
+    if (!rows.length) return res.status(400).json({ error: 'Código inválido o expirado.' });
     const promo = rows[0];
     const total = cartTotal;
     if (promo.min_order && total < parseFloat(promo.min_order)) {
