@@ -1171,8 +1171,10 @@ const _revokedTokenIds = new Set(); // in-memory fast lookup
 // This survives server restarts — a logged-out token stays revoked.
 
 async function persistRevocation(jti, ttlMs) {
+  // Cap at 30 days — avoids 32-bit int overflow for long-lived customer sessions
+  const safeTtl = Math.min(ttlMs || 3600000, 30 * 24 * 60 * 60 * 1000);
   // Store revoked jti in settings table with expiry timestamp
-  const expiresAt = new Date(Date.now() + ttlMs);
+  const expiresAt = new Date(Date.now() + safeTtl);
   await db.execute(
     `INSERT INTO settings (key_name, value, updated_at)
      VALUES (?, ?, ?)
@@ -3948,11 +3950,11 @@ Presupuesto limitado → menciona el precio del decant. Para fragancias luxury e
 
 GÉNERO: perfil con género → úsalo siempre. Sin género → pregunta UNA vez. Unisex válido para cualquier género.
 
-PERFIL_JSON — al final cuando presentes fragancias (sin texto después):
+PERFIL_JSON — OBLIGATORIO al final de CUALQUIER respuesta que incluya recomendaciones. Sin excepción. Sin texto después del JSON.
 PERFIL_JSON:{...}
 Ejemplo: PERFIL_JSON:{"gender_pref":"M","families":["oriental","woody"],"notes":["amber","oud"],"intensity":"strong","occasions":["evening"],"season":"Fall","price_min":0,"price_max":500,"avoid":[],"recommended_ids":[33,40,22]}
-Campos: gender_pref, families (NON-EMPTY), notes, intensity, occasions, season, price_min, price_max, avoid, recommended_ids, gift (true solo en consultas de regalo).
-SOLO omite PERFIL_JSON si únicamente haces una pregunta.
+Campos: gender_pref, families (NON-EMPTY array), notes, intensity, occasions, season, price_min, price_max, avoid, recommended_ids, gift (true solo en regalo).
+OMITE PERFIL_JSON ÚNICAMENTE si tu respuesta es solo una pregunta sin ninguna recomendación.
 
 CIERRE: Cuando el cliente muestre interés o decisión, cierra directo: "La encuentras en las tarjetas de abajo — agrégala al carrito desde ahí." Si ya eligió, confirma y cierra: "Perfecto. La tienes en la tarjeta de abajo." No preguntes "¿te gustaría agregarla?" — simplemente indica dónde está.
 ÚLTIMO TURNO: Si es tu último mensaje disponible en esta consulta, NUNCA termines con una pregunta — el cliente no podrá responder. Cierra con una recomendación final clara y dirige a las tarjetas: "Ahí las tienes en las tarjetas — cualquiera es una excelente elección."
@@ -4273,7 +4275,7 @@ Responde en el idioma del cliente.`
             messages:    oaiMessages,
             tools:       isLastIter ? undefined : tools,
             tool_choice: isLastIter ? undefined : 'auto',
-            max_tokens:  900,  // enough for 3 recommendations + PERFIL_JSON
+            max_tokens:  1100, // enough for 3 recommendations + PERFIL_JSON
             temperature: 0.7
           })
         });
@@ -4899,7 +4901,9 @@ app.post('/api/cart/capture', async (req, res) => {
       `INSERT INTO abandoned_carts (email, name, cart, session_id, customer_id, email_sent, created_at, updated_at)
        VALUES (?, ?, ?, ?, ?, 0, ?, ?)
        ON DUPLICATE KEY UPDATE name=VALUES(name), cart=VALUES(cart), session_id=VALUES(session_id),
-         customer_id=VALUES(customer_id), email_sent=0, updated_at=VALUES(updated_at)`,
+         customer_id=VALUES(customer_id),
+         email_sent=IF(email_sent=1, 1, 0),
+         updated_at=VALUES(updated_at)`,
       [email.toLowerCase().trim(), name||null, JSON.stringify(cart), sessionId||null, customerId||null, now, now]
     );
     res.json({ ok: true });
