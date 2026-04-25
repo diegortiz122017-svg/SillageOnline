@@ -2595,6 +2595,12 @@ function togglePromoForm(){
   var open = form.style.display === 'none' || form.style.display === '';
   form.style.display = open ? 'block' : 'none';
   btn.textContent = open ? '✕ Cancelar' : '+ Nuevo Código';
+  if(!open){
+    // Reset form state when closing
+    document.getElementById('pcCode').disabled=false;
+    var saveBtn = document.querySelector('#promoCreateForm button[onclick*="savePromoCode"]');
+    if(saveBtn){ saveBtn.textContent='Crear Código'; saveBtn.setAttribute('onclick','createPromoCode()'); }
+  }
 }
 
 function loadPromoCodes(){
@@ -2618,7 +2624,10 @@ function loadPromoCodes(){
             '<input type="checkbox" '+(c.active?'checked':'')+' onchange="togglePromoCode('+c.id+',this.checked)"/>'+
             '<span style="font-size:0.65rem;color:var(--muted)">'+(c.active?'Activo':'Inactivo')+'</span>'+
           '</label></td>'+
-          '<td><button onclick="deletePromoCode('+c.id+')" style="background:none;border:1px solid rgba(200,60,60,0.3);color:rgba(200,60,60,0.7);padding:0.2rem 0.5rem;font-size:0.6rem;cursor:pointer;letter-spacing:0.1em">Eliminar</button></td>'+
+          '<td style="display:flex;gap:0.4rem">'+
+            '<button onclick="editPromoCode('+c.id+')" style="background:none;border:1px solid var(--border);color:var(--muted);padding:0.2rem 0.5rem;font-size:0.6rem;cursor:pointer;letter-spacing:0.1em">Editar</button>'+
+            '<button onclick="deletePromoCode('+c.id+')" style="background:none;border:1px solid rgba(200,60,60,0.3);color:rgba(200,60,60,0.7);padding:0.2rem 0.5rem;font-size:0.6rem;cursor:pointer;letter-spacing:0.1em">Eliminar</button>'+
+          '</td>'+
         '</tr>';
       }).join('');
     }).catch(function(){});
@@ -2654,6 +2663,66 @@ function createPromoCode(){
       setTimeout(function(){ togglePromoForm(); msg.textContent=''; }, 1500);
     } else {
       msg.style.color='var(--error)'; msg.textContent=res.error||'Error al crear.';
+    }
+  }).catch(function(){ msg.style.color='var(--error)'; msg.textContent='Error de conexión.'; });
+}
+
+function editPromoCode(id){
+  // Load the promo data and populate the create form for editing
+  adminFetch(API+'/admin/promo-codes',{})
+    .then(function(r){ return r ? r.json() : []; })
+    .then(function(codes){
+      var c = codes.find(function(x){ return x.id===id; });
+      if(!c) return;
+      // Populate form
+      document.getElementById('pcCode').value    = c.code;
+      document.getElementById('pcCode').disabled = true; // can't change the code string
+      document.getElementById('pcType').value    = c.type;
+      document.getElementById('pcValue').value   = c.value;
+      document.getElementById('pcMinOrder').value= parseFloat(c.min_order)||'';
+      document.getElementById('pcMaxUses').value = c.max_uses||'';
+      document.getElementById('pcExpires').value = c.expires_at
+        ? new Date(c.expires_at).toISOString().slice(0,16) : '';
+      // Show form in edit mode
+      document.getElementById('promoCreateForm').style.display='block';
+      document.getElementById('promoFormToggle').textContent='✕ Cancelar';
+      document.getElementById('promoCreateMsg').textContent='';
+      // Change create button to save
+      var btn = document.querySelector('#promoCreateForm button[onclick="createPromoCode()"]');
+      if(btn){
+        btn.textContent='Guardar Cambios';
+        btn.setAttribute('onclick','savePromoCode('+id+')');
+      }
+    });
+}
+
+function savePromoCode(id){
+  var type     = document.getElementById('pcType').value;
+  var value    = parseFloat(document.getElementById('pcValue').value);
+  var minOrder = parseFloat(document.getElementById('pcMinOrder').value)||0;
+  var maxUses  = document.getElementById('pcMaxUses').value ? parseInt(document.getElementById('pcMaxUses').value) : null;
+  var expires  = document.getElementById('pcExpires').value || null;
+  var msg      = document.getElementById('promoCreateMsg');
+
+  if(!value||isNaN(value)){ msg.style.color='var(--error)'; msg.textContent='Valor requerido.'; return; }
+
+  adminFetch(API+'/admin/promo-codes/'+id,{
+    method:'PUT',
+    headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({type:type,value:value,min_order:minOrder,max_uses:maxUses,expires_at:expires,active:true})
+  }).then(function(r){ return r ? r.json() : null; })
+  .then(function(res){
+    if(!res) return;
+    if(res.ok){
+      msg.style.color='var(--success)'; msg.textContent='✓ Guardado';
+      document.getElementById('pcCode').disabled=false;
+      loadPromoCodes();
+      // Reset button back to create
+      var btn = document.querySelector('#promoCreateForm button[onclick*="savePromoCode"]');
+      if(btn){ btn.textContent='Crear Código'; btn.setAttribute('onclick','createPromoCode()'); }
+      setTimeout(function(){ togglePromoForm(); msg.textContent=''; }, 1200);
+    } else {
+      msg.style.color='var(--error)'; msg.textContent=res.error||'Error al guardar.';
     }
   }).catch(function(){ msg.style.color='var(--error)'; msg.textContent='Error de conexión.'; });
 }
