@@ -5315,9 +5315,10 @@ app.patch('/api/bottle-inventory/:id', requireAdmin, async (req, res) => {
 app.get('/api/orders/:id/invoice', async (req, res) => {
   const orderId = req.params.id;
 
-  // Auth: admin OR the customer who placed the order (verified by email token)
+  // Auth: admin OR the customer who placed the order
+  // Accept tokens via headers (API calls) or query params (direct browser links)
   const adminToken    = req.headers['x-session-token'] || req.query.token;
-  const customerToken = req.headers['x-customer-token'];
+  const customerToken = req.headers['x-customer-token'] || req.query.ctoken;
   const isAdmin       = adminToken && validateSession(adminToken)?.role === 'admin';
   const customerSess  = customerToken ? validateSession(customerToken) : null;
 
