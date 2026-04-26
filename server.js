@@ -4867,10 +4867,10 @@ app.put('/api/catalogue/:id', requireAdmin, async (req, res) => {
     ...intensityScores,
     chords:          autoChords || req.body.chords || existing.chords || [],
     olfactive_family: req.body.family || autoFamily || existing.family || null,
-    // Preserve arrived_at from existing record unless explicitly set or cleared via showNewArrival flag
+    // Handle arrived_at based on showNewArrival checkbox
     arrivedAt: req.body.showNewArrival === false
-      ? null                                    // explicitly removed from new arrivals
-      : (req.body.arrivedAt || existing.arrivedAt || null), // keep existing or use new value
+      ? null                                              // unchecked — remove from new arrivals
+      : (existing.arrivedAt || req.body.arrivedAt || new Date()), // checked — keep existing or set now
   };
   await updateProduct(id, updated);
   const catalogue = await getCatalogue();
