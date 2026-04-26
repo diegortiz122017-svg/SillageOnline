@@ -5392,7 +5392,7 @@ function loadAcctOrders(){
                     'Enviado':'ship','Shipped':'ship','Entregado':'del','Delivered':'del'};
         var scls = 'ap-status-'+(sMap[o.status]||'pend');
         var trackerId = 'tracker-'+o.id.replace(/[^a-z0-9]/gi,'-');
-        var stepLabels = ['Confirmado','Preparando','Enviado','Entregado'];
+        var stepLabels = ['Recibido','Procesando','Empaquetado','Enviado','Entregado'];
         var trackerHtml = '<div class="ap-order-tracker" id="'+trackerId+'">'+
           '<div class="ap-tracker-steps">'+
             stepLabels.map(function(lbl, i){
@@ -5539,16 +5539,16 @@ function renderFavorites(){
     var pr = getPr(p.id);
     var price = (pr.onSale && pr.salePrice) ? parseFloat(pr.salePrice) : p.price;
     var inv = getInv(p.id);
-    return '<div class="ap-fav">'+
+    return '<div class="ap-fav" onclick="closeAccount();openDetail('+p.id+')" style="cursor:pointer">'+
       '<div>'+
         '<div class="ap-fav-brand">'+p.brand+'</div>'+
         '<div class="ap-fav-name">'+p.name+'</div>'+
       '</div>'+
       '<div class="ap-fav-actions">'+
         '<span class="ap-fav-price">$'+price+'</span>'+
-        (!inv.outOfStock?'<button class="ap-fav-add" onclick="addToCart('+p.id+');toast(\'Añadido\',\'\',\'ok\')">+</button>':
+        (!inv.outOfStock?'<button class="ap-fav-add" onclick="event.stopPropagation();addToCart('+p.id+');toast(\'Añadido\',\'\',\'ok\')">+</button>':
           '<span style="font-size:0.6rem;color:var(--muted)">Agotado</span>')+
-        '<button class="ap-fav-rm" onclick="toggleFav({stopPropagation:function(){}},'+p.id+');renderFavorites()" title="Eliminar">&#10005;</button>'+
+        '<button class="ap-fav-rm" onclick="event.stopPropagation();toggleFav({stopPropagation:function(){}},'+p.id+');renderFavorites()" title="Eliminar">&#10005;</button>'+
       '</div>'+
     '</div>';
   }).join('');
