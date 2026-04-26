@@ -600,7 +600,7 @@ tr:hover td{background:rgba(255,255,255,0.02)}
         <div class="notes-input-wrap">
           <div class="notes-tags" id="notesTags"></div>
           <div class="notes-add-row">
-            <input type="text" id="fNotesInput" placeholder="Escribir nota..." autocomplete="off"/>
+            <input type="text" id="fNotesInput" placeholder="Escribir nota..." autocomplete="off" oninput="this._manuallyEdited=!!this.value"/>
             <button type="button" class="notes-add-btn" onclick="addNoteTag()">+</button>
           </div>
           <div class="notes-suggestions" id="notesSuggestions" style="display:none"></div>
@@ -2553,6 +2553,21 @@ function deleteCustomer(id, name){
 // ════════════════════════════════════════════
 var shippingConfig = { cost: 5, threshold: 50 };
 
+// Auto-update notes preview from top/mid/base
+function autoUpdateNotesPreview(){
+  var manualNotes = document.getElementById('fNotes').value.trim();
+  if(manualNotes) return; // don't override manual input
+  var top  = (document.getElementById('fTop').value||'').split(',').map(function(s){return s.trim();}).filter(Boolean);
+  var mid  = (document.getElementById('fMid').value||'').split(',').map(function(s){return s.trim();}).filter(Boolean);
+  var base = (document.getElementById('fBase').value||'').split(',').map(function(s){return s.trim();}).filter(Boolean);
+  var picks = top.slice(0,2).concat(mid.slice(0,1)).concat(base.slice(0,1));
+  var preview = picks.join(' · ');
+  var notesInput = document.getElementById('fNotesInput');
+  if(notesInput && !notesInput._manuallyEdited) {
+    notesInput.placeholder = preview || 'Escribir nota...';
+  }
+}
+
 function loadShippingConfig(){
   adminFetch(API+'/settings/shipping',{})
     .then(function(r){ if(!r)return null; return r.json(); })
@@ -2847,7 +2862,7 @@ document.addEventListener('click', function(e){
   if(!btn) return;
   var id  = btn.dataset.pickerId;
   var idx = parseInt(btn.dataset.idx, 10);
-  if(id && !isNaN(idx)){ _notePickers[id].splice(idx, 1); renderNoteTagPicker(id); autoDetectFamilies(); }
+  if(id && !isNaN(idx)){ _notePickers[id].splice(idx, 1); renderNoteTagPicker(id); autoDetectFamilies(); if(id==='top'||id==='mid'||id==='base') autoUpdateNotesPreview(); }
 });
 
 function addNoteTag() { addNoteTagTo('notes'); }
@@ -2985,6 +3000,8 @@ function addNoteTagTo(id) {
   renderNoteTagPicker(id);
   hideSugg(id);
   autoDetectFamilies();
+  // If top/mid/base changed, update the notes preview
+  if(id === 'top' || id === 'mid' || id === 'base') autoUpdateNotesPreview();
 }
 
 function showSuggFor(id) {
@@ -3229,7 +3246,16 @@ function saveFragrance(){
     brand:brand,name:name,g:document.getElementById('fGender').value,
     price:price,decantPrice:parseFloat(document.getElementById('fDecantPrice').value)||null,decantPrice5:parseFloat(document.getElementById('fDecantPrice5').value)||null,decantSizeMl:parseFloat(document.getElementById('fDecantSizeMl').value)||null,luxury:document.getElementById('fLuxury').checked||false,size:document.getElementById('fSize').value||'100ml',
     badge:document.getElementById('fBadge').value||null,
-    notes:document.getElementById('fNotes').value,
+    notes:(function(){
+      var manual = document.getElementById('fNotes').value.trim();
+      if(manual) return manual;
+      // Auto-generate from top/mid/base — pick 2 from top, 1 from mid, 1 from base
+      var top  = (document.getElementById('fTop').value||'').split(',').map(function(s){return s.trim();}).filter(Boolean);
+      var mid  = (document.getElementById('fMid').value||'').split(',').map(function(s){return s.trim();}).filter(Boolean);
+      var base = (document.getElementById('fBase').value||'').split(',').map(function(s){return s.trim();}).filter(Boolean);
+      var picks = top.slice(0,2).concat(mid.slice(0,1)).concat(base.slice(0,1));
+      return picks.join(' · ') || '';
+    })(),
     top:document.getElementById('fTop').value,mid:document.getElementById('fMid').value,
     base:document.getElementById('fBase').value,conc:document.getElementById('fConc').value,
     season:document.getElementById('fSeason').value,sillage:document.getElementById('fSillage').value,
