@@ -705,15 +705,6 @@ tr:hover td{background:rgba(255,255,255,0.02)}
         <div style="font-size:0.6rem;color:var(--muted);margin-top:0.3rem">Separados por coma. Deja vacío para usar los acordes calculados automáticamente.</div>
       </div>
     </div>
-    <div class="frag-row full">
-      <div class="frag-field" style="display:flex;align-items:center;gap:0.8rem;padding:0.8rem;background:rgba(184,149,90,0.06);border:1px solid rgba(184,149,90,0.15)">
-        <input type="checkbox" id="fNotifySubscribers" style="accent-color:var(--gold);width:16px;height:16px;flex-shrink:0"/>
-        <div>
-          <label style="font-size:0.62rem;color:var(--cream);display:block;margin-bottom:0.1rem;cursor:pointer" for="fNotifySubscribers">Enviar email de nueva llegada</label>
-          <span style="font-size:0.58rem;color:var(--muted)">Notifica a todos los clientes con marketing activo. Solo se envía una vez al guardar.</span>
-        </div>
-      </div>
-    </div>
     <div class="frag-section">Colores del Frasco (3 tonos en hex)</div>
     <div class="frag-row">
       <div class="frag-field"><label>Color Claro</label><input type="color" id="fC1" value="#f5e6c8" style="padding:0.2rem;height:2.4rem;cursor:pointer"/></div>
@@ -739,6 +730,13 @@ tr:hover td{background:rgba(255,255,255,0.02)}
       <p style="font-size:0.58rem;color:var(--muted);margin-top:0.5rem">Sube tus fotos a un servicio como <strong>imgbb.com</strong> o <strong>cloudinary.com</strong> y pega la URL aquí.</p>
     </div>
     <div class="frag-err" id="fragErr"></div>
+    <div style="margin-bottom:1rem;padding:0.9rem 1rem;background:rgba(184,149,90,0.06);border:1px solid rgba(184,149,90,0.2);display:flex;align-items:center;gap:0.8rem">
+      <input type="checkbox" id="fNotifySubscribers" style="accent-color:var(--gold);width:16px;height:16px;flex-shrink:0;cursor:pointer"/>
+      <div>
+        <label style="font-size:0.62rem;color:var(--cream);display:block;margin-bottom:0.1rem;cursor:pointer" for="fNotifySubscribers">Enviar email de nueva llegada a suscriptores</label>
+        <span style="font-size:0.58rem;color:var(--muted)">Solo se envía una vez al guardar. Se desmarca automáticamente.</span>
+      </div>
+    </div>
     <button class="frag-save" onclick="saveFragrance()">Guardar Fragancia</button>
   </div>
 </div>
