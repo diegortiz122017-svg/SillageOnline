@@ -2123,6 +2123,14 @@ footer{background:var(--dark);padding:3.5rem 4rem;text-align:center;border-top:1
       <div class="ap-err" id="pwErr"></div>
       <div class="ap-ok" id="pwOk"></div>
       <button class="ap-btn" onclick="changePassword()">Actualizar Contraseña</button>
+      <hr class="ap-divider" style="margin:2rem 0"/>
+      <div style="border:1px solid rgba(200,60,60,0.2);padding:1.2rem">
+        <span class="ap-label" style="color:rgba(200,60,60,0.6)">Zona de Peligro</span>
+        <p style="font-size:0.68rem;color:var(--muted);line-height:1.7;margin:0.5rem 0 1rem">
+          Eliminar tu cuenta borrará permanentemente tu historial de pedidos y datos guardados. Esta acción no se puede deshacer.
+        </p>
+        <button class="ap-btn-ghost ap-btn-danger" onclick="confirmDeleteAccount()">Eliminar mi Cuenta</button>
+      </div>
 
     </div>
 
@@ -2171,14 +2179,7 @@ footer{background:var(--dark);padding:3.5rem 4rem;text-align:center;border-top:1
         </div>
         <p class="ap-ok" id="emailPrefsOk" style="min-height:1rem"></p>
       </div>
-      <hr class="ap-divider" style="margin:2rem 0"/>
-      <div style="border:1px solid rgba(200,60,60,0.2);padding:1.2rem;margin-bottom:0.5rem">
-        <span class="ap-label" style="color:rgba(200,60,60,0.6)">Zona de Peligro</span>
-        <p style="font-size:0.68rem;color:var(--muted);line-height:1.7;margin:0.5rem 0 1rem">
-          Eliminar tu cuenta borrará permanentemente tu historial de pedidos y datos guardados. Esta acción no se puede deshacer.
-        </p>
-        <button class="ap-btn-ghost ap-btn-danger" onclick="confirmDeleteAccount()">Eliminar mi Cuenta</button>
-      </div>
+
     </div>
 
   </div>
