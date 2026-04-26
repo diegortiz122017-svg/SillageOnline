@@ -2678,8 +2678,7 @@ function buildGrid(){
         '</div>'+
       '</div>';
 
-      return '<div class="na-banner" onclick="openDetail('+p.id+')" style="'+
-        (imgFirst ? '' : 'direction:rtl')+'">' +
+      return '<div class="na-banner" onclick="openDetail('+p.id+'">' +
         (imgFirst ? imgCol+bodyCol : bodyCol+imgCol) +
       '</div>';
     }).join('');
