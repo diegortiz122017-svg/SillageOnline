@@ -3954,11 +3954,13 @@ Presupuesto limitado → menciona el precio del decant. Para fragancias luxury e
 
 GÉNERO: perfil con género → úsalo siempre. Sin género → pregunta UNA vez. Unisex válido para cualquier género.
 
-PERFIL_JSON — OBLIGATORIO al final de CUALQUIER respuesta que incluya recomendaciones. Sin excepción. Sin texto después del JSON.
-PERFIL_JSON:{...}
-Ejemplo: PERFIL_JSON:{"gender_pref":"M","families":["oriental","woody"],"notes":["amber","oud"],"intensity":"strong","occasions":["evening"],"season":"Fall","price_min":0,"price_max":500,"avoid":[],"recommended_ids":[33,40,22]}
-Campos: gender_pref, families (NON-EMPTY array), notes, intensity, occasions, season, price_min, price_max, avoid, recommended_ids, gift (true solo en regalo).
-OMITE PERFIL_JSON ÚNICAMENTE si tu respuesta es solo una pregunta sin ninguna recomendación.
+HERRAMIENTAS — úsalas siempre que sea posible:
+- search_catalogue: para buscar fragancias del catálogo. Úsala cada vez que tengas contexto suficiente.
+- update_profile: para guardar lo que aprendes del cliente. Llámala SIEMPRE que llames search_catalogue, y también cuando el cliente mencione preferencias sin pedir recomendaciones. Nunca dejes families vacío — infiere al menos una familia del contexto.
+
+REGLA CRÍTICA: Cada vez que llames search_catalogue, llama update_profile en el mismo turno con los campos que conozcas. No esperes tener el perfil completo — guarda lo que tengas ahora y lo irás completando.
+
+PERFIL_JSON — solo como respaldo si no puedes llamar update_profile. Formato: PERFIL_JSON:{...} al final del mensaje.
 
 CIERRE: Cuando el cliente muestre interés o decisión, cierra directo: "La encuentras en las tarjetas de abajo — agrégala al carrito desde ahí." Si ya eligió, confirma y cierra: "Perfecto. La tienes en la tarjeta de abajo." No preguntes "¿te gustaría agregarla?" — simplemente indica dónde está.
 ÚLTIMO TURNO: Si es tu último mensaje disponible en esta consulta, NUNCA termines con una pregunta — el cliente no podrá responder. Cierra con una recomendación final clara y dirige a las tarjetas: "Ahí las tienes en las tarjetas — cualquiera es una excelente elección."
@@ -4007,6 +4009,29 @@ Responde en el idioma del cliente.`
   const tools = [{
     type: 'function',
     function: {
+      name: 'update_profile',
+      description: 'Save extracted scent preferences from this conversation. Call this alongside search_catalogue whenever you learn something about the customer — gender, families, notes, occasions, budget, or anything they mention. Merge with existing data; only include fields you have new info for.',
+      parameters: {
+        type: 'object',
+        properties: {
+          gender_pref:     { type: 'string', enum: ['M','F','U'], description: 'Gender preference inferred from context' },
+          families:        { type: 'array', items: { type: 'string' }, description: 'Olfactive families (woody, oriental, floral, fresh, etc.) — always infer at least one' },
+          notes:           { type: 'array', items: { type: 'string' }, description: 'Specific notes or ingredients mentioned' },
+          intensity:       { type: 'string', enum: ['light','moderate','strong','very strong'], description: 'Sillage/projection preference' },
+          occasions:       { type: 'array', items: { type: 'string' }, description: 'Occasions (evening, office, casual, sport, date, etc.)' },
+          season:          { type: 'string', description: 'Preferred season (Spring, Summer, Fall, Winter, All Seasons)' },
+          price_min:       { type: 'number', description: 'Minimum budget in USD' },
+          price_max:       { type: 'number', description: 'Maximum budget in USD' },
+          avoid:           { type: 'array', items: { type: 'string' }, description: 'Notes, families or fragrances to avoid' },
+          recommended_ids: { type: 'array', items: { type: 'number' }, description: 'Product IDs recommended in this turn' },
+          gift:            { type: 'boolean', description: 'True if shopping for someone else' }
+        },
+        required: []
+      }
+    }
+  },{
+    type: 'function',
+    function: {
       name: 'search_catalogue',
       description: 'Search the live fragrance catalogue. Call this whenever you have enough context about what the customer wants. You can search multiple families and notes at once for richer, more varied results.',
       parameters: {
@@ -4028,7 +4053,35 @@ Responde en el idioma del cliente.`
   }];
 
   // ── Tool executor ─────────────────────────────────────
+  // Holds profile data extracted via update_profile tool calls this turn
+  let toolProfile = null;
+
+  function mergeProfiles(existing, incoming) {
+    if (!existing) return incoming;
+    const merged = { ...existing };
+    // Merge arrays — union, deduplicated
+    for (const key of ['families','notes','occasions','avoid','recommended_ids']) {
+      if (incoming[key] && incoming[key].length) {
+        const combined = [...(existing[key]||[]), ...incoming[key]];
+        merged[key] = [...new Set(combined.map(v => typeof v === 'string' ? v.toLowerCase() : v))];
+      }
+    }
+    // Scalar fields — only overwrite if incoming has a value
+    for (const key of ['gender_pref','intensity','season','price_min','price_max','gift']) {
+      if (incoming[key] !== undefined && incoming[key] !== null) {
+        merged[key] = incoming[key];
+      }
+    }
+    return merged;
+  }
+
   async function executeTool(name, args) {
+    // Handle update_profile — merge into toolProfile, return confirmation
+    if (name === 'update_profile') {
+      toolProfile = mergeProfiles(toolProfile, args);
+      // Return a brief confirmation — model doesn't need the data back
+      return JSON.stringify({ ok: true, fields_saved: Object.keys(args).filter(k => args[k] !== undefined) });
+    }
     if (name !== 'search_catalogue') return '[]';
     try {
       const [catalogue, invMap, priceMap] = await Promise.all([
@@ -4250,9 +4303,18 @@ Responde en el idioma del cliente.`
       }
     }
 
+    // Strip PERFIL_JSON from history — model no longer generates it as primary method
+    // This ensures old sessions don't confuse the new function-call approach
+    const sanitizedHistory = messages.slice(-6).map(m => ({
+      role:    m.role === 'assistant' ? 'assistant' : 'user',
+      content: typeof m.content === 'string'
+        ? m.content.replace(/PERFIL_JSON:\s*\{[\s\S]+?\}\s*$/m, '').trim()
+        : m.content
+    })).filter(m => m.content); // drop any that become empty after stripping
+
     const oaiMessages = [
       { role: 'system', content: systemPrompt },
-      ...messages.slice(-4).map(m => ({ role: m.role === 'assistant' ? 'assistant' : 'user', content: m.content }))
+      ...sanitizedHistory
     ];
 
     let finalReply = '';
@@ -4279,7 +4341,7 @@ Responde en el idioma del cliente.`
             messages:    oaiMessages,
             tools:       isLastIter ? undefined : tools,
             tool_choice: isLastIter ? undefined : 'auto',
-            max_tokens:  1100, // enough for 3 recommendations + PERFIL_JSON
+            max_tokens:  1100, // enough for 3 recommendations + tool calls
             temperature: 0.7
           })
         });
@@ -4339,32 +4401,62 @@ Responde en el idioma del cliente.`
       break;
     }
 
-    // Extract profile JSON
+    // ── Profile extraction — tool call first, PERFIL_JSON as fallback ──────────
     let profile = null;
-    const profileMatch = finalReply.match(/PERFIL_JSON:({[\s\S]+?})/);
-    if (profileMatch) {
-      try {
-        const parsed = JSON.parse(profileMatch[1]);
-        // Reject if it's clearly the template placeholder (recommended_ids [1,2,3] with woody/moderate/300)
-        const isTemplate = JSON.stringify(parsed.recommended_ids) === '[1,2,3]' &&
-                           (parsed.families||[]).join(',') === 'woody' &&
-                           parsed.intensity === 'moderate' &&
-                           parsed.price_max === 300;
-        if (!isTemplate) {
-          profile = parsed;
-        } else {
-          console.warn('Nez returned template PERFIL_JSON — discarding');
-        }
-      }
-      catch(e) { console.warn('Profile parse failed:', e.message); }
+
+    if (toolProfile && Object.keys(toolProfile).length > 0) {
+      // Primary: profile came through update_profile function call — most reliable
+      profile = toolProfile;
+      console.log(`Nez: profile via tool call — fields: ${Object.keys(toolProfile).join(', ')}`);
     } else {
-      // Only warn if Nez gave recommendations (has **bold** product names) but skipped PERFIL_JSON
-      // Clarifying questions legitimately omit it per system prompt
-      const hasRecommendations = /\*\*[^*]+\*\*/.test(finalReply);
-      if (hasRecommendations) {
-        console.warn('Nez: no PERFIL_JSON in reply. Reply snippet:', finalReply.slice(0, 120));
+      // Fallback: parse inline PERFIL_JSON (legacy sessions + compliance safety net)
+      const profileMatch = finalReply.match(/PERFIL_JSON:({[\s\S]+?})/);
+      if (profileMatch) {
+        try {
+          const parsed = JSON.parse(profileMatch[1]);
+          // Reject template placeholder
+          const isTemplate = JSON.stringify(parsed.recommended_ids) === '[1,2,3]' &&
+                             (parsed.families||[]).join(',') === 'woody' &&
+                             parsed.intensity === 'moderate' &&
+                             parsed.price_max === 300;
+          if (!isTemplate) {
+            profile = parsed;
+            console.log('Nez: profile via PERFIL_JSON fallback');
+          } else {
+            console.warn('Nez returned template PERFIL_JSON — discarding');
+          }
+        } catch(e) { console.warn('Profile parse failed:', e.message); }
       } else {
-        console.log('Nez: clarifying question — PERFIL_JSON omitted correctly');
+        const hasRecommendations = /\*\*[^*]+\*\*/.test(finalReply);
+        if (hasRecommendations) {
+          // Mitigation: try to extract profile from the last search_catalogue args
+          // as a minimum profile when both methods miss
+          const lastSearchMsg = [...oaiMessages].reverse().find(m =>
+            Array.isArray(m.tool_calls) && m.tool_calls.some(tc => tc.function.name === 'search_catalogue')
+          );
+          if (lastSearchMsg) {
+            const searchArgs = JSON.parse(lastSearchMsg.tool_calls.find(tc =>
+              tc.function.name === 'search_catalogue'
+            ).function.arguments || '{}');
+            profile = {
+              gender_pref:    searchArgs.gender !== 'any' ? searchArgs.gender : undefined,
+              families:       searchArgs.families || [],
+              notes:          searchArgs.notes || [],
+              intensity:      searchArgs.intensity !== 'any' ? (searchArgs.intensity||'').toLowerCase() : undefined,
+              season:         searchArgs.season,
+              price_max:      searchArgs.max_price,
+              price_min:      searchArgs.min_price,
+              recommended_ids: []
+            };
+            // Clean undefined fields
+            Object.keys(profile).forEach(k => profile[k] === undefined && delete profile[k]);
+            console.log('Nez: profile inferred from search_catalogue args');
+          } else {
+            console.warn('Nez: no profile data in reply. Snippet:', finalReply.slice(0, 120));
+          }
+        } else {
+          console.log('Nez: clarifying question — profile update correctly omitted');
+        }
       }
     }
     const cleanReply = finalReply.replace(/PERFIL_JSON:[\s\S]+$/, '').trim();
