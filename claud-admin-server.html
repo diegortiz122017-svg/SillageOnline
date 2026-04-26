@@ -3168,8 +3168,7 @@ function openFragModal(id){
   document.getElementById('fConc').value   =p?p.conc:'Eau de Parfum';
   document.getElementById('fFamily').value =p&&p.family?p.family:'';
   document.getElementById('fNotifySubscribers').checked=false; // always reset — one-shot
-  // Show new arrival checked if product has arrived_at set (i.e. currently in new arrivals section)
-  document.getElementById('fShowNewArrival').checked = !!(p && p.arrivedAt);
+
   document.getElementById('fChordsOverride').value = p && p.chords_override && p.chords_override.length ? p.chords_override.join(', ') : '';
   // New products default to showing in new arrivals; existing products depend on whether they have arrived_at
   document.getElementById('fShowNewArrival').checked = p ? !!(p.arrivedAt) : true;
