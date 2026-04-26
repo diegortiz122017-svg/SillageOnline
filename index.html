@@ -6387,42 +6387,45 @@ function sommelierSendToAPI(primeText){
 // ── Save profile + reorder catalogue ─────────────────
 function mergeProfiles(existing, incoming){
   if(!existing) return incoming;
-  var merged = JSON.parse(JSON.stringify(incoming)); // start with incoming as base
+  // Start with existing as base — preserves all accumulated fields
+  // then overlay incoming on top. This way sparse incoming profiles
+  // don't wipe out previously learned data.
+  var merged = JSON.parse(JSON.stringify(existing));
 
-  // Families: union, keep all unique, preserve incoming order first
+  // Families: union, incoming weighted higher (more recent)
   var famSet = {};
-  (incoming.families||[]).forEach(function(f,i){ famSet[f] = (famSet[f]||0) + 10 - i; });
   (existing.families||[]).forEach(function(f,i){ famSet[f] = (famSet[f]||0) + 5 - i; });
-  merged.families = Object.keys(famSet).sort(function(a,b){ return famSet[b]-famSet[a]; }).slice(0,5);
+  (incoming.families||[]).forEach(function(f,i){ famSet[f] = (famSet[f]||0) + 10 - i; });
+  if(Object.keys(famSet).length) merged.families = Object.keys(famSet).sort(function(a,b){ return famSet[b]-famSet[a]; }).slice(0,5);
 
   // Notes: union, deduplicated, up to 6
-  var noteSet = new Set((incoming.notes||[]).concat(existing.notes||[]));
+  var noteSet = new Set((existing.notes||[]).concat(incoming.notes||[]));
   merged.notes = Array.from(noteSet).slice(0,6);
 
+  // Occasions: union
+  var occSet = new Set((existing.occasions||[]).concat(incoming.occasions||[]));
+  merged.occasions = Array.from(occSet);
+
   // Avoid: union
-  var avoidSet = new Set((incoming.avoid||[]).concat(existing.avoid||[]));
+  var avoidSet = new Set((existing.avoid||[]).concat(incoming.avoid||[]));
   merged.avoid = Array.from(avoidSet);
 
   // Recommended IDs: accumulate all
-  var idSet = new Set((incoming.recommended_ids||[]).concat(existing.recommended_ids||[]).map(Number).filter(Boolean));
+  var idSet = new Set((existing.recommended_ids||[]).concat(incoming.recommended_ids||[]).map(Number).filter(Boolean));
   merged.recommended_ids = Array.from(idSet);
 
-  // Gender: if incoming is a gift profile, preserve existing user gender
-  if(incoming.gift) {
-    merged.gender_pref = existing ? (existing.gender_pref || 'U') : 'U';
-    merged.gift = true; // keep flag
-  } else if(!merged.gender_pref || merged.gender_pref === 'U') {
-    merged.gender_pref = existing ? (existing.gender_pref || 'U') : 'U';
+  // Scalar fields: incoming overwrites only if it has a real value
+  if(incoming.gender_pref && incoming.gender_pref !== 'U') merged.gender_pref = incoming.gender_pref;
+  if(incoming.intensity)    merged.intensity = incoming.intensity;
+  if(incoming.season && incoming.season !== 'All') merged.season = incoming.season;
+  if(incoming.price_max && incoming.price_max !== 500) merged.price_max = incoming.price_max;
+  if(incoming.price_min)    merged.price_min = incoming.price_min;
+
+  // Gift: if incoming is a gift profile, preserve existing user gender
+  if(incoming.gift){
+    merged.gender_pref = existing.gender_pref || 'U';
+    merged.gift = true;
   }
-
-  // Intensity: prefer incoming if set
-  if(!merged.intensity) merged.intensity = existing.intensity;
-
-  // Season: prefer incoming if not 'All'
-  if(!merged.season || merged.season === 'All') merged.season = existing.season || 'All';
-
-  // Price: prefer incoming if set, else keep existing
-  if(!merged.price_max || merged.price_max === 500) merged.price_max = existing.price_max || 500;
 
   return merged;
 }
