@@ -1992,7 +1992,10 @@ footer{background:var(--dark);padding:3.5rem 4rem;text-align:center;border-top:1
 <div class="acct-panel" id="acctPanel">
   <!-- Header -->
   <div class="acct-hdr">
-    <div class="acct-hdr-info">
+    <div class="acct-hdr-top" style="display:flex;justify-content:space-between;align-items:center;margin-bottom:0.8rem">
+    <button class="acct-logout-btn" onclick="doLogout()" style="font-size:0.55rem;letter-spacing:0.12em;text-transform:uppercase;background:none;border:1px solid rgba(184,149,90,0.2);color:rgba(184,149,90,0.5);padding:0.3rem 0.7rem;cursor:pointer;font-family:'Jost',sans-serif">Cerrar Sesión</button>
+  </div>
+  <div class="acct-hdr-info">
       <div class="acct-hdr-avatar" id="acctAvatar">?</div>
       <div>
         <div class="acct-hdr-name" id="acctHdrName">Mi Cuenta</div>
@@ -2010,16 +2013,16 @@ footer{background:var(--dark);padding:3.5rem 4rem;text-align:center;border-top:1
       <span class="acct-tab-icon">📍</span>Direcciones
     </button>
     <button class="acct-tab" data-tab="favorites" onclick="switchAcctTab('favorites')">
-      <span class="acct-tab-icon">🌸</span>Favoritos
+      <span class="acct-tab-icon">♡</span>Favoritos
     </button>
     <button class="acct-tab" data-tab="profile" onclick="switchAcctTab('profile')">
       <span class="acct-tab-icon">👤</span>Perfil
     </button>
     <button class="acct-tab" data-tab="password" onclick="switchAcctTab('password')">
-      <span class="acct-tab-icon">🔑</span>Acceso
+      <span class="acct-tab-icon">🔑</span>Seguridad
     </button>
     <button class="acct-tab" data-tab="prefs" onclick="switchAcctTab('prefs')">
-      <span class="acct-tab-icon">⚙️</span>Preferencias
+      <span class="acct-tab-icon">⚙️</span>Ajustes
     </button>
   </div>
   <!-- Body -->
@@ -2077,15 +2080,12 @@ footer{background:var(--dark);padding:3.5rem 4rem;text-align:center;border-top:1
       <div class="ap-err" id="pwErr"></div>
       <div class="ap-ok" id="pwOk"></div>
       <button class="ap-btn" onclick="changePassword()">Actualizar Contraseña</button>
-      <hr class="ap-divider"/>
-      <div class="ap-logout-row">
-        <button class="ap-btn-ghost ap-btn-danger" onclick="doLogout()">Cerrar Sesión</button>
-      </div>
+
     </div>
 
     <!-- PREFERENCIAS -->
     <div class="acct-section" id="tab-prefs">
-      <span class="ap-label">Preferencias de Navegación</span>
+      <span class="ap-label">Visualización del Catálogo</span>
       <div class="ap-field">
         <label>Mostrar fragancias por defecto</label>
         <select id="prefGender" onchange="savePref('gender',this.value)"
@@ -2100,11 +2100,42 @@ footer{background:var(--dark);padding:3.5rem 4rem;text-align:center;border-top:1
       </div>
       <p class="ap-ok" id="prefOk"></p>
       <hr class="ap-divider"/>
-      <span class="ap-label">Zona de Peligro</span>
-      <p style="font-size:0.68rem;color:var(--muted);line-height:1.7;margin-bottom:1rem">
-        Eliminar tu cuenta borrará permanentemente tu historial de pedidos y datos guardados.
-      </p>
-      <button class="ap-btn-ghost ap-btn-danger" onclick="confirmDeleteAccount()">Eliminar mi Cuenta</button>
+      <span class="ap-label">Comunicaciones por Email</span>
+      <div id="emailPrefsLoading" style="font-size:0.68rem;color:var(--muted)">Cargando...</div>
+      <div id="emailPrefsForm" style="display:none">
+        <div style="display:flex;flex-direction:column;gap:0.8rem;margin-bottom:1rem">
+          <label style="display:flex;align-items:flex-start;gap:0.7rem;cursor:pointer">
+            <input type="checkbox" id="prefMarketing" onchange="saveEmailPrefs()" style="margin-top:2px;accent-color:var(--gold)"/>
+            <span>
+              <span style="font-size:0.68rem;color:var(--cream);display:block">Novedades y ofertas</span>
+              <span style="font-size:0.6rem;color:var(--muted)">Nuevas llegadas, colecciones y descuentos exclusivos</span>
+            </span>
+          </label>
+          <label style="display:flex;align-items:flex-start;gap:0.7rem;cursor:pointer">
+            <input type="checkbox" id="prefFollowup" onchange="saveEmailPrefs()" style="margin-top:2px;accent-color:var(--gold)"/>
+            <span>
+              <span style="font-size:0.68rem;color:var(--cream);display:block">Recomendaciones de Nez</span>
+              <span style="font-size:0.6rem;color:var(--muted)">Sugerencias personalizadas después de tu entrega</span>
+            </span>
+          </label>
+          <label style="display:flex;align-items:flex-start;gap:0.7rem;cursor:pointer">
+            <input type="checkbox" id="prefAbandonedCart" onchange="saveEmailPrefs()" style="margin-top:2px;accent-color:var(--gold)"/>
+            <span>
+              <span style="font-size:0.68rem;color:var(--cream);display:block">Recordatorio de carrito</span>
+              <span style="font-size:0.6rem;color:var(--muted)">Un recordatorio si dejas productos en tu carrito sin completar el pedido</span>
+            </span>
+          </label>
+        </div>
+        <p class="ap-ok" id="emailPrefsOk" style="min-height:1rem"></p>
+      </div>
+      <hr class="ap-divider" style="margin:2rem 0"/>
+      <div style="border:1px solid rgba(200,60,60,0.2);padding:1.2rem;margin-bottom:0.5rem">
+        <span class="ap-label" style="color:rgba(200,60,60,0.6)">Zona de Peligro</span>
+        <p style="font-size:0.68rem;color:var(--muted);line-height:1.7;margin:0.5rem 0 1rem">
+          Eliminar tu cuenta borrará permanentemente tu historial de pedidos y datos guardados. Esta acción no se puede deshacer.
+        </p>
+        <button class="ap-btn-ghost ap-btn-danger" onclick="confirmDeleteAccount()">Eliminar mi Cuenta</button>
+      </div>
     </div>
 
   </div>
@@ -5284,11 +5315,56 @@ function switchAcctTab(tab){
   });
   // Load data for each tab
   if(tab === 'orders')    loadAcctOrders();
+  if(tab === 'prefs')     loadEmailPrefs();
   if(tab === 'addresses') renderAddresses();
   if(tab === 'favorites') renderFavorites();
 }
 
 // ── PEDIDOS ───────────────────────────────────
+// ── Email preferences ─────────────────────────────────────────────────────────
+function loadEmailPrefs(){
+  var loading = document.getElementById('emailPrefsLoading');
+  var form    = document.getElementById('emailPrefsForm');
+  if(!customerToken){ if(loading) loading.style.display='none'; return; }
+  customerFetch(API+'/customer/email-prefs', {})
+    .then(function(r){ return r.json(); })
+    .then(function(prefs){
+      if(loading) loading.style.display='none';
+      if(form)    form.style.display='block';
+      document.getElementById('prefMarketing').checked      = !!prefs.marketing;
+      document.getElementById('prefFollowup').checked       = !!prefs.followup;
+      document.getElementById('prefAbandonedCart').checked  = !!prefs.abandoned_cart;
+    })
+    .catch(function(){
+      if(loading) loading.textContent='Error al cargar preferencias.';
+    });
+}
+
+function saveEmailPrefs(){
+  var ok = document.getElementById('emailPrefsOk');
+  customerFetch(API+'/customer/email-prefs', {
+    method:'POST',
+    headers:{'Content-Type':'application/json'},
+    body: JSON.stringify({
+      marketing:      document.getElementById('prefMarketing').checked,
+      followup:       document.getElementById('prefFollowup').checked,
+      abandoned_cart: document.getElementById('prefAbandonedCart').checked,
+    })
+  }).then(function(r){ return r.json(); })
+  .then(function(res){
+    if(ok){ ok.textContent='✓ Guardado'; setTimeout(function(){ ok.textContent=''; }, 2000); }
+  }).catch(function(){
+    if(ok){ ok.style.color='var(--error)'; ok.textContent='Error al guardar.'; }
+  });
+}
+
+function openTrackerFromOrder(orderId){
+  // Close account panel and open the tracker for this order
+  closeAcct();
+  // Find the order in the success screen or show a toast pointing to the order
+  toast('Pedido '+orderId, 'Consulta el estado en tu correo de confirmación', '');
+}
+
 function loadAcctOrders(){
   var container = document.getElementById('acctOrdersList');
   if(!customerToken){ container.innerHTML='<p style="color:var(--muted);font-size:0.72rem">Inicia sesión para ver tus pedidos.</p>'; return; }
@@ -5315,6 +5391,17 @@ function loadAcctOrders(){
           '<div class="ap-order-foot">'+
             '<span class="ap-order-status '+scls+'">'+o.status+'</span>'+
             '<span class="ap-order-total">$'+parseFloat(o.total||0).toFixed(2)+'</span>'+
+          '</div>'+
+          '<div style="display:flex;gap:0.8rem;margin-top:0.6rem;padding-top:0.6rem;border-top:1px solid rgba(184,149,90,0.08)">'+
+            '<a href="'+API+'/orders/'+o.id+'/invoice" target="_blank" '+
+               'style="font-size:0.55rem;letter-spacing:0.12em;text-transform:uppercase;color:rgba(184,149,90,0.5);text-decoration:none;border-bottom:1px solid rgba(184,149,90,0.2)">'+
+              '&#128196; Factura'+
+            '</a>'+
+            (o.trackerStep && o.trackerStep < 4 ?
+              '<button onclick="openTrackerFromOrder(\'' + esc(o.id) + '\')" '+
+                 'style="font-size:0.55rem;letter-spacing:0.12em;text-transform:uppercase;color:rgba(184,149,90,0.5);background:none;border:none;border-bottom:1px solid rgba(184,149,90,0.2);cursor:pointer;padding:0">'+
+                '&#128269; Rastrear'+
+              '</button>' : '')+
           '</div>'+
         '</div>';
       }).join('');
