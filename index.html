@@ -5355,11 +5355,28 @@ function saveEmailPrefs(){
   });
 }
 
-function openTrackerFromOrder(orderId){
-  // Close account panel and open the tracker for this order
+function openTrackerFromOrder(orderId, trackerStep){
+  // Close account panel
   closeAccount();
-  // Find the order in the success screen or show a toast pointing to the order
-  toast('Pedido '+orderId, 'Consulta el estado en tu correo de confirmación', '');
+  // Fetch order details and show tracker
+  customerFetch(API+'/customer/orders', {})
+    .then(function(r){ return r.json(); })
+    .then(function(orders){
+      var o = orders.find(function(x){ return x.id === orderId; });
+      if(!o) return;
+      // Populate success screen with this order
+      document.getElementById('successOid').textContent = 'Pedido ' + o.id;
+      var notifyEl = document.getElementById('notifyEmail');
+      if(notifyEl) notifyEl.textContent = o.email || '';
+      updateTrackerToStep(o.trackerStep || trackerStep || 1);
+      // Open checkout modal at step 4 (success/tracker screen)
+      document.getElementById('mOverlay').classList.add('open');
+      document.body.style.overflow = 'hidden';
+      goStep(4);
+    })
+    .catch(function(){
+      toast('Pedido '+orderId, 'No se pudo cargar el estado del pedido', '');
+    });
 }
 
 function loadAcctOrders(){
@@ -5395,7 +5412,7 @@ function loadAcctOrders(){
               '&#128196; Factura'+
             '</a>'+
             (o.trackerStep && o.trackerStep < 4 ?
-              '<button onclick="openTrackerFromOrder(\'' + esc(o.id) + '\')" '+
+              '<button onclick="openTrackerFromOrder(\'' + esc(o.id) + '\', ' + (o.trackerStep||1) + ')" '+
                  'style="font-size:0.55rem;letter-spacing:0.12em;text-transform:uppercase;color:rgba(184,149,90,0.5);background:none;border:none;border-bottom:1px solid rgba(184,149,90,0.2);cursor:pointer;padding:0">'+
                 '&#128269; Rastrear'+
               '</button>' : '')+
