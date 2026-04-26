@@ -5393,7 +5393,7 @@ function loadAcctOrders(){
             '<span class="ap-order-total">$'+parseFloat(o.total||0).toFixed(2)+'</span>'+
           '</div>'+
           '<div style="display:flex;gap:0.8rem;margin-top:0.6rem;padding-top:0.6rem;border-top:1px solid rgba(184,149,90,0.08)">'+
-            '<a href="'+API+'/orders/'+o.id+'/invoice" target="_blank" '+
+            '<a href="'+API+'/orders/'+o.id+'/invoice?ctoken='+encodeURIComponent(customerToken||'')+'" '+
                'style="font-size:0.55rem;letter-spacing:0.12em;text-transform:uppercase;color:rgba(184,149,90,0.5);text-decoration:none;border-bottom:1px solid rgba(184,149,90,0.2)">'+
               '&#128196; Factura'+
             '</a>'+
