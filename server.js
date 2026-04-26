@@ -2487,6 +2487,8 @@ app.post('/api/orders', orderLimiter, async (req, res) => {
   }
 
   // ── Verify total server-side (prevents price tampering from client) ───────
+  let promoCode = '';
+  let promoDiscount = 0;
   try {
     const catalogue  = await getCatalogue();
     const invMap     = await getInventoryMap();
@@ -2571,9 +2573,9 @@ app.post('/api/orders', orderLimiter, async (req, res) => {
     serverTotal = Math.round(serverTotal * 100) / 100;
 
     // Apply promo discount server-side if code provided
-    let promoDiscount = 0;
-    // Sanitize promo code — strip anything that isn't alphanumeric
-    const promoCode = String(req.body.promoCode || '').trim().toUpperCase().replace(/[^A-Z0-9]/g, '');
+    // NOTE: promoCode/promoDiscount declared here so they're in scope after the try block
+    promoDiscount = 0;
+    promoCode = String(req.body.promoCode || '').trim().toUpperCase().replace(/[^A-Z0-9]/g, '');
     if (promoCode) {
       const [promoRows] = await db.execute(
         `SELECT * FROM promo_codes WHERE code=? AND active=1
