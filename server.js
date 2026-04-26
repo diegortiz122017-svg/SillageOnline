@@ -190,6 +190,8 @@ async function initDB() {
       shape           VARCHAR(20)   DEFAULT NULL,
       photos          JSON          DEFAULT NULL,
       olfactive_family VARCHAR(100)  DEFAULT NULL,
+      arrived_at       DATETIME      DEFAULT NULL,
+      notify_subscribers TINYINT(1)  DEFAULT 0,
       chords          JSON          DEFAULT NULL,
       chords_override JSON          DEFAULT NULL,
       sort_order      INT           DEFAULT 0,
@@ -401,6 +403,8 @@ async function migrateProductsColumns() {
     "shape           VARCHAR(20)   DEFAULT NULL",
     "photos          JSON          DEFAULT NULL",
     "olfactive_family VARCHAR(100)  DEFAULT NULL",
+    "arrived_at       DATETIME      DEFAULT NULL",
+    "notify_subscribers TINYINT(1)  DEFAULT 0",
     "chords          JSON          DEFAULT NULL",
     "chords_override JSON          DEFAULT NULL",
     "sort_order      INT           DEFAULT 0",
@@ -940,6 +944,74 @@ async function sendDeliveredEmail(order) {
     from: `Sillage Pedidos <${EMAIL_PEDIDOS}>`,
     html
   });
+}
+
+// ── New arrival email — #4 ───────────────────────────────────────────────────
+async function sendNewArrivalEmail(product) {
+  // Fetch all marketing-subscribed customers
+  const [customers] = await db.execute(`
+    SELECT c.email, c.name FROM customers c
+    JOIN email_preferences ep ON ep.customer_id = c.id
+    WHERE ep.marketing = 1
+  `).catch(() => [[]]);
+  if (!customers.length) return;
+
+  const BASE = process.env.BASE_URL || 'https://sillage-sv.com';
+  const slug = productSlug(product);
+  const url  = `${BASE}/fragancia/${slug}`;
+
+  // Use Nez to write the email body
+  let nezIntro = '';
+  try {
+    const { OpenAI } = require('openai');
+    const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
+    const resp = await openai.chat.completions.create({
+      model: 'gpt-4o-mini',
+      max_tokens: 120,
+      messages: [{
+        role: 'system',
+        content: 'Eres Nez, sommelier de Sillage Parfumerie. Escribe 2 frases elegantes y evocadoras sobre esta fragancia para un email de "nueva llegada". Sin emojis. Sin mencionar precios. Solo el carácter olfativo.'
+      },{
+        role: 'user',
+        content: `${product.brand} ${product.name}. Notas: ${product.top||''} / ${product.mid||''} / ${product.base||''}. ${product.desc||''}`
+      }]
+    });
+    nezIntro = resp.choices[0]?.message?.content?.trim() || '';
+  } catch(e) { console.error('Nez new arrival email error:', e.message); }
+
+  const html = emailTemplate(`
+    <p style="font-size:10px;letter-spacing:3px;text-transform:uppercase;color:#b8955a;margin-bottom:12px">Nueva Llegada</p>
+    <h2 style="font-family:Georgia,serif;font-size:24px;font-weight:300;color:#1a1714;margin:0 0 4px">
+      ${escHtml(product.brand)}
+    </h2>
+    <h3 style="font-family:Georgia,serif;font-size:18px;font-weight:300;font-style:italic;color:#4a3f35;margin:0 0 20px">
+      ${escHtml(product.name)}
+    </h3>
+    ${nezIntro ? `<p style="font-family:Georgia,serif;font-size:14px;color:#4a3f35;line-height:1.9;margin:0 0 20px;font-style:italic">${escHtml(nezIntro)}</p>` : ''}
+    <p style="font-size:12px;color:#8a7f72;margin:0 0 20px">
+      ${escHtml(product.top||'')} · ${escHtml(product.mid||'')} · ${escHtml(product.base||'')}
+    </p>
+    <a href="${url}"
+       style="display:block;text-align:center;padding:14px 24px;background:#0e0c0a;
+              color:#b8955a;text-decoration:none;font-size:11px;letter-spacing:3px;
+              text-transform:uppercase;border:1px solid #b8955a;margin-bottom:16px">
+      Descubrir ${escHtml(product.name)} →
+    </a>`
+  );
+
+  let sent = 0;
+  for (const c of customers) {
+    try {
+      await sendEmail({
+        to:      c.email,
+        subject: `Nueva llegada — ${escHtml(product.brand)} ${escHtml(product.name)} | Sillage`,
+        from:    `Sillage Parfumerie <${EMAIL_HOLA}>`,
+        html
+      });
+      sent++;
+    } catch(e) { console.error(`New arrival email failed for ${c.email}:`, e.message); }
+  }
+  console.log(`New arrival emails sent: ${sent}/${customers.length}`);
 }
 
 // ─── Email Preferences ───────────────────────────────────
@@ -4332,11 +4404,28 @@ Responde en el idioma del cliente.`
     // Build dynamic context as a separate system message so the static system prompt
     // stays cacheable — OpenAI caches identical prefixes, changing the system prompt
     // breaks caching for every turn
+    // New arrivals context — tell Nez about recently added products
+    let newArrivalsContext = '';
+    try {
+      const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
+      const [newProds] = await db.execute(
+        'SELECT id, brand, name FROM products WHERE arrived_at > ? AND active=1 ORDER BY arrived_at DESC LIMIT 3',
+        [thirtyDaysAgo]
+      );
+      if (newProds.length) {
+        const names = newProds.map(p => `${p.brand} ${p.name} (id:${p.id})`).join(', ');
+        newArrivalsContext = `
+
+NUEVAS LLEGADAS esta semana: ${names}. Menciónala naturalmente cuando sea relevante para el cliente, sin forzarlo.`;
+      }
+    } catch(e) {}
+
     const dynamicParts = [];
-    if (profileContext)  dynamicParts.push(profileContext.trim());
-    if (avoidNote)       dynamicParts.push(avoidNote.trim());
-    if (genderOverride)  dynamicParts.push(genderOverride.trim());
-    if (lastTurnNote)    dynamicParts.push(lastTurnNote.trim());
+    if (profileContext)     dynamicParts.push(profileContext.trim());
+    if (avoidNote)          dynamicParts.push(avoidNote.trim());
+    if (genderOverride)     dynamicParts.push(genderOverride.trim());
+    if (lastTurnNote)       dynamicParts.push(lastTurnNote.trim());
+    if (newArrivalsContext) dynamicParts.push(newArrivalsContext.trim());
 
     const oaiMessages = [
       { role: 'system', content: systemPrompt },
@@ -4702,9 +4791,22 @@ app.post('/api/catalogue', requireAdmin, async (req, res) => {
     `, [newId, Math.max(10, bottleSize * 0.15), bottleSize, new Date()]);
   } catch(e) { /* non-fatal */ }
 
+  // Set arrived_at timestamp for new products
+  if (!newFrag.arrivedAt) {
+    await db.execute('UPDATE products SET arrived_at=? WHERE id=?', [new Date(), newId]);
+  }
+
   const catalogue = await getCatalogue();
   broadcast('catalogue', catalogue);
   await logActivity(`Fragancia agregada: ${newFrag.brand} ${newFrag.name}`);
+
+  // Send new arrival email to subscribers if requested
+  if (newFrag.notifySubscribers) {
+    sendNewArrivalEmail({ ...newFrag, id: newId }).catch(e => console.error('New arrival email error:', e.message));
+    // Reset flag so it doesn't re-send on subsequent edits
+    await db.execute('UPDATE products SET notify_subscribers=0 WHERE id=?', [newId]);
+  }
+
   res.json({ ok: true, fragrance: newFrag });
 });
 
@@ -4717,6 +4819,13 @@ app.put('/api/catalogue/:id', requireAdmin, async (req, res) => {
   const catalogue = await getCatalogue();
   broadcast('catalogue', catalogue);
   await logActivity(`Fragancia actualizada: ${updated.brand} ${updated.name}`);
+
+  // Send new arrival email if notify flag is set (can be triggered on edit too)
+  if (updated.notifySubscribers) {
+    sendNewArrivalEmail(updated).catch(e => console.error('New arrival email error:', e.message));
+    await db.execute('UPDATE products SET notify_subscribers=0 WHERE id=?', [id]);
+  }
+
   res.json({ ok: true, fragrance: updated });
 });
 
