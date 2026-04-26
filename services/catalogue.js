@@ -20,6 +20,7 @@ function rowToProduct(r) {
     size:          r.size,
     badge:         r.badge,
     luxury:        !!r.luxury,
+    family:        r.olfactive_family,
     notes:         r.notes,
     top:           r.top_notes,
     mid:           r.mid_notes,
@@ -59,6 +60,7 @@ function productToRow(p, now) {
     p.size         || null,
     p.badge        || null,
     p.luxury       ? 1 : 0,
+    p.family       || null,
     p.notes        || null,
     p.top          || null,
     p.mid          || null,
@@ -108,8 +110,8 @@ async function saveCatalogue(data) {
          size, badge, luxury, notes, top_notes, mid_notes, base_notes,
          top_intensity, mid_intensity, base_intensity,
          tagline, description, concentration, season, sillage, longevity,
-         colors, shape, photos, chords, chords_override, sort_order, active, created_at, updated_at)
-      VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,1,?,?)
+         olfactive_family, colors, shape, photos, chords, chords_override, sort_order, active, created_at, updated_at)
+      VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,1,?,?)
       ON DUPLICATE KEY UPDATE
         brand=VALUES(brand), name=VALUES(name), gender=VALUES(gender),
         price=VALUES(price), decant_price=VALUES(decant_price),
@@ -122,6 +124,7 @@ async function saveCatalogue(data) {
         concentration=VALUES(concentration), season=VALUES(season),
         sillage=VALUES(sillage), longevity=VALUES(longevity),
         colors=VALUES(colors), shape=VALUES(shape), photos=VALUES(photos),
+        olfactive_family=VALUES(olfactive_family),
         chords=VALUES(chords), chords_override=VALUES(chords_override),
         sort_order=VALUES(sort_order), updated_at=VALUES(updated_at)`,
       [p.id, ...productToRow(p, now), now]
@@ -143,8 +146,8 @@ async function addProduct(p) {
        size, badge, luxury, notes, top_notes, mid_notes, base_notes,
        top_intensity, mid_intensity, base_intensity,
        tagline, description, concentration, season, sillage, longevity,
-       colors, shape, photos, chords, chords_override, sort_order, active, created_at, updated_at)
-    VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,1,?,?)`,
+       olfactive_family, colors, shape, photos, chords, chords_override, sort_order, active, created_at, updated_at)
+    VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,1,?,?)`,
     [id, ...productToRow(p, now), now]
   );
   cache.catalogueCache.delete('catalogue');
@@ -159,7 +162,7 @@ async function updateProduct(id, p) {
       size=?, badge=?, luxury=?, notes=?, top_notes=?, mid_notes=?, base_notes=?,
       top_intensity=?, mid_intensity=?, base_intensity=?,
       tagline=?, description=?, concentration=?, season=?, sillage=?, longevity=?,
-      colors=?, shape=?, photos=?, chords=?, chords_override=?, sort_order=?, updated_at=?
+      olfactive_family=?, colors=?, shape=?, photos=?, chords=?, chords_override=?, sort_order=?, updated_at=?
     WHERE id=?`,
     [...productToRow(p, now), id]
   );
