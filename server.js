@@ -4940,6 +4940,71 @@ app.post('/api/cart/capture', async (req, res) => {
   } catch(e) { res.json({ ok: false }); }
 });
 
+// GET /api/customer/email-prefs — get email preferences for logged-in customer
+app.get('/api/customer/email-prefs', requireCustomer, async (req, res) => {
+  const customerId = req.customer.user.id;
+  try {
+    const [rows] = await db.execute(
+      'SELECT marketing, followup FROM email_preferences WHERE customer_id=?', [customerId]
+    );
+    if (!rows.length) {
+      res.json({ marketing: true, followup: true, abandoned_cart: true });
+    } else {
+      // Check if abandoned cart is opted out
+      const email = req.customer.user.email;
+      const [cartRows] = await db.execute(
+        "SELECT email_sent FROM abandoned_carts WHERE email=? AND cart='[]' LIMIT 1",
+        [email.toLowerCase()]
+      );
+      const abandonedOptOut = cartRows.length > 0;
+      res.json({
+        marketing:      !!rows[0].marketing,
+        followup:       !!rows[0].followup,
+        abandoned_cart: !abandonedOptOut,
+      });
+    }
+  } catch(e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
+// POST /api/customer/email-prefs — update email preferences
+app.post('/api/customer/email-prefs', requireCustomer, async (req, res) => {
+  const customerId = req.customer.user.id;
+  const email      = req.customer.user.email;
+  try {
+    const { marketing, followup, abandoned_cart } = req.body;
+
+    // Update marketing + followup in email_preferences
+    const prefs = await ensureEmailPreferences(customerId);
+    await db.execute(
+      `UPDATE email_preferences SET marketing=?, followup=?, updated_at=? WHERE customer_id=?`,
+      [marketing ? 1 : 0, followup ? 1 : 0, new Date(), customerId]
+    );
+
+    // Handle abandoned_cart opt-in/out
+    if (abandoned_cart === false) {
+      // Opt out — set sentinel record
+      await db.execute(
+        `INSERT INTO abandoned_carts (email, name, cart, email_sent, created_at, updated_at)
+         VALUES (?, 'unsubscribed', '[]', 1, ?, ?)
+         ON DUPLICATE KEY UPDATE email_sent=1, updated_at=VALUES(updated_at)`,
+        [email.toLowerCase(), new Date(), new Date()]
+      );
+    } else if (abandoned_cart === true) {
+      // Opt back in — remove sentinel record
+      await db.execute(
+        "DELETE FROM abandoned_carts WHERE email=? AND cart='[]'",
+        [email.toLowerCase()]
+      );
+    }
+
+    res.json({ ok: true });
+  } catch(e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
 // GET /api/cart/unsubscribe — one-click unsubscribe from abandoned cart emails
 app.get('/api/cart/unsubscribe', async (req, res) => {
   const email = String(req.query.email || '').toLowerCase().trim();
