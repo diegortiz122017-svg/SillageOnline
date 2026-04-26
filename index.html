@@ -1992,10 +1992,7 @@ footer{background:var(--dark);padding:3.5rem 4rem;text-align:center;border-top:1
 <div class="acct-panel" id="acctPanel">
   <!-- Header -->
   <div class="acct-hdr">
-    <div class="acct-hdr-top" style="display:flex;justify-content:space-between;align-items:center;margin-bottom:0.8rem">
-    <button class="acct-logout-btn" onclick="doLogout()" style="font-size:0.55rem;letter-spacing:0.12em;text-transform:uppercase;background:none;border:1px solid rgba(184,149,90,0.2);color:rgba(184,149,90,0.5);padding:0.3rem 0.7rem;cursor:pointer;font-family:'Jost',sans-serif">Cerrar Sesión</button>
-  </div>
-  <div class="acct-hdr-info">
+    <div class="acct-hdr-info">
       <div class="acct-hdr-avatar" id="acctAvatar">?</div>
       <div>
         <div class="acct-hdr-name" id="acctHdrName">Mi Cuenta</div>
@@ -5360,7 +5357,7 @@ function saveEmailPrefs(){
 
 function openTrackerFromOrder(orderId){
   // Close account panel and open the tracker for this order
-  closeAcct();
+  closeAccount();
   // Find the order in the success screen or show a toast pointing to the order
   toast('Pedido '+orderId, 'Consulta el estado en tu correo de confirmación', '');
 }
