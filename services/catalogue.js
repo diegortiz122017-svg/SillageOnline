@@ -111,10 +111,11 @@ async function saveCatalogue(data) {
     await db.execute(`
       INSERT INTO products
         (id, brand, name, gender, price, decant_price, decant_price_5, decant_size_ml,
-         size, badge, luxury, notes, top_notes, mid_notes, base_notes,
+         size, badge, luxury, olfactive_family, arrived_at, notify_subscribers,
+         notes, top_notes, mid_notes, base_notes,
          top_intensity, mid_intensity, base_intensity,
          tagline, description, concentration, season, sillage, longevity,
-         olfactive_family, arrived_at, notify_subscribers, colors, shape, photos, chords, chords_override, sort_order, active, created_at, updated_at)
+         colors, shape, photos, chords, chords_override, sort_order, active, created_at, updated_at)
       VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,1,?,?)
       ON DUPLICATE KEY UPDATE
         brand=VALUES(brand), name=VALUES(name), gender=VALUES(gender),
@@ -148,10 +149,11 @@ async function addProduct(p) {
   await db.execute(`
     INSERT INTO products
       (id, brand, name, gender, price, decant_price, decant_price_5, decant_size_ml,
-       size, badge, luxury, notes, top_notes, mid_notes, base_notes,
+       size, badge, luxury, olfactive_family, arrived_at, notify_subscribers,
+       notes, top_notes, mid_notes, base_notes,
        top_intensity, mid_intensity, base_intensity,
        tagline, description, concentration, season, sillage, longevity,
-       olfactive_family, arrived_at, notify_subscribers, colors, shape, photos, chords, chords_override, sort_order, active, created_at, updated_at)
+       colors, shape, photos, chords, chords_override, sort_order, active, created_at, updated_at)
     VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,1,?,?)`,
     [id, ...productToRow(p, now), now]
   );
@@ -164,10 +166,11 @@ async function updateProduct(id, p) {
   await db.execute(`
     UPDATE products SET
       brand=?, name=?, gender=?, price=?, decant_price=?, decant_price_5=?, decant_size_ml=?,
-      size=?, badge=?, luxury=?, notes=?, top_notes=?, mid_notes=?, base_notes=?,
+      size=?, badge=?, luxury=?, olfactive_family=?, arrived_at=?, notify_subscribers=?,
+      notes=?, top_notes=?, mid_notes=?, base_notes=?,
       top_intensity=?, mid_intensity=?, base_intensity=?,
       tagline=?, description=?, concentration=?, season=?, sillage=?, longevity=?,
-      olfactive_family=?, arrived_at=?, notify_subscribers=?, colors=?, shape=?, photos=?, chords=?, chords_override=?, sort_order=?, updated_at=?
+      colors=?, shape=?, photos=?, chords=?, chords_override=?, sort_order=?, updated_at=?
     WHERE id=?`,
     [...productToRow(p, now), id]
   );
