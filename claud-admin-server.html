@@ -730,6 +730,13 @@ tr:hover td{background:rgba(255,255,255,0.02)}
       <p style="font-size:0.58rem;color:var(--muted);margin-top:0.5rem">Sube tus fotos a un servicio como <strong>imgbb.com</strong> o <strong>cloudinary.com</strong> y pega la URL aquí.</p>
     </div>
     <div class="frag-err" id="fragErr"></div>
+    <div style="margin-bottom:0.6rem;padding:0.9rem 1rem;background:rgba(184,149,90,0.06);border:1px solid rgba(184,149,90,0.2);display:flex;align-items:center;gap:0.8rem">
+      <input type="checkbox" id="fShowNewArrival" style="accent-color:var(--gold);width:16px;height:16px;flex-shrink:0;cursor:pointer"/>
+      <div>
+        <label style="font-size:0.62rem;color:var(--cream);display:block;margin-bottom:0.1rem;cursor:pointer" for="fShowNewArrival">Mostrar en sección Recién Llegado</label>
+        <span style="font-size:0.58rem;color:var(--muted)">Activo durante 30 días desde la fecha de llegada. Desmarca para quitar de la sección.</span>
+      </div>
+    </div>
     <div style="margin-bottom:1rem;padding:0.9rem 1rem;background:rgba(184,149,90,0.06);border:1px solid rgba(184,149,90,0.2);display:flex;align-items:center;gap:0.8rem">
       <input type="checkbox" id="fNotifySubscribers" style="accent-color:var(--gold);width:16px;height:16px;flex-shrink:0;cursor:pointer"/>
       <div>
@@ -3161,7 +3168,11 @@ function openFragModal(id){
   document.getElementById('fConc').value   =p?p.conc:'Eau de Parfum';
   document.getElementById('fFamily').value =p&&p.family?p.family:'';
   document.getElementById('fNotifySubscribers').checked=false; // always reset — one-shot
+  // Show new arrival checked if product has arrived_at set (i.e. currently in new arrivals section)
+  document.getElementById('fShowNewArrival').checked = !!(p && p.arrivedAt);
   document.getElementById('fChordsOverride').value = p && p.chords_override && p.chords_override.length ? p.chords_override.join(', ') : '';
+  // New products default to showing in new arrivals; existing products depend on whether they have arrived_at
+  document.getElementById('fShowNewArrival').checked = p ? !!(p.arrivedAt) : true;
   document.getElementById('fSeason').value =p?p.season:'All Seasons';
   document.getElementById('fSillage').value=p?p.sillage:'Moderate';
   document.getElementById('fLong').value   =p?p.long:'8+ Hours';
@@ -3229,6 +3240,7 @@ function saveFragrance(){
     s:document.getElementById('fShape').value,photos:fragPhotos,
     family:(document.getElementById('fFamily').value||'').trim()||null,
     notifySubscribers: document.getElementById('fNotifySubscribers').checked,
+    showNewArrival: document.getElementById('fShowNewArrival').checked,
     chords_override:(function(){
       var raw = (document.getElementById('fChordsOverride').value||'').trim();
       if(!raw) return null;
