@@ -2895,6 +2895,12 @@ function applyFilters(){
   var es=document.getElementById('emptyState');
   if(rc)rc.textContent=count;
   if(es)es.classList.toggle('show',count===0);
+  // Hide new arrivals section when any filter or search is active
+  var na=document.getElementById('newArrivalsSection');
+  if(na){
+    var isFiltered = fSearch || fGender!=='all' || fBrand!=='all';
+    na.style.display = isFiltered ? 'none' : '';
+  }
 }
 document.getElementById('brandPills').addEventListener('click',function(e){
   var pill=e.target.closest('.pill');if(!pill)return;
