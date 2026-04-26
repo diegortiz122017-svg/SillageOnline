@@ -1005,15 +1005,31 @@ footer{background:var(--dark);padding:3.5rem 4rem;text-align:center;border-top:1
 
 /* Orders list */
 /* New arrivals section */
-.new-arrivals-section{margin-bottom:2.5rem}
-.new-arrivals-hdr{display:flex;align-items:center;gap:1rem;margin-bottom:1.2rem}
-.new-arrivals-title{font-size:0.58rem;letter-spacing:0.25em;text-transform:uppercase;color:rgba(184,149,90,0.6)}
-.new-arrivals-line{flex:1;height:1px;background:linear-gradient(to right,rgba(184,149,90,0.2),transparent)}
-.new-arrivals-strip{display:flex;gap:1rem;overflow-x:auto;padding-bottom:0.5rem;scrollbar-width:none}
-.new-arrivals-strip::-webkit-scrollbar{display:none}
-.na-card{transition:border-color 0.3s}
-.na-card:hover{border-color:rgba(184,149,90,0.35) !important}
-.na-card:hover .na-img img{transform:scale(1.04)}
+.new-arrivals-section{margin-bottom:3rem}
+.new-arrivals-hdr{display:flex;align-items:center;gap:1rem;margin-bottom:1.5rem}
+.new-arrivals-title{font-size:0.55rem;letter-spacing:0.3em;text-transform:uppercase;color:rgba(184,149,90,0.5);white-space:nowrap}
+.new-arrivals-line{flex:1;height:1px;background:linear-gradient(to right,rgba(184,149,90,0.15),transparent)}
+.na-banner{display:grid;grid-template-columns:1fr 1fr;border:1px solid rgba(184,149,90,0.12);margin-bottom:1px;cursor:pointer;overflow:hidden;transition:border-color 0.3s;min-height:260px}
+.na-banner:hover{border-color:rgba(184,149,90,0.3)}
+.na-banner:hover .na-banner-img img{transform:scale(1.03)}
+.na-banner-img{position:relative;overflow:hidden;background:rgba(255,255,255,0.01)}
+.na-banner-img img{width:100%;height:100%;object-fit:contain;position:absolute;top:0;left:0;transition:transform 0.7s ease}
+.na-banner-body{padding:2rem 2.5rem;display:flex;flex-direction:column;justify-content:center;background:rgba(255,255,255,0.02)}
+.na-banner-eyebrow{font-size:0.48rem;letter-spacing:0.25em;text-transform:uppercase;color:#b8955a;margin-bottom:0.6rem}
+.na-banner-brand{font-size:0.55rem;letter-spacing:0.2em;text-transform:uppercase;color:rgba(184,149,90,0.5);margin-bottom:0.2rem}
+.na-banner-name{font-family:'Cormorant Garamond',serif;font-size:clamp(1.6rem,3vw,2.2rem);font-weight:300;color:var(--cream);line-height:1.1;margin-bottom:0.6rem}
+.na-banner-tagline{font-size:0.72rem;color:var(--muted);line-height:1.7;font-style:italic;margin-bottom:1rem;max-width:320px}
+.na-banner-chords{display:flex;flex-wrap:wrap;gap:0.3rem;margin-bottom:1.2rem}
+.na-banner-chord{font-size:0.48rem;letter-spacing:0.12em;text-transform:uppercase;color:rgba(184,149,90,0.5);border:1px solid rgba(184,149,90,0.18);padding:0.2rem 0.55rem}
+.na-banner-footer{display:flex;align-items:center;gap:1.5rem;padding-top:1rem;border-top:1px solid rgba(184,149,90,0.1)}
+.na-banner-price{font-family:'Cormorant Garamond',serif;font-size:1.4rem;font-weight:300;color:#b8955a}
+.na-banner-cta{font-size:0.52rem;letter-spacing:0.2em;text-transform:uppercase;color:var(--muted);border-bottom:1px solid rgba(184,149,90,0.25);padding-bottom:1px;transition:color 0.2s,border-color 0.2s}
+.na-banner:hover .na-banner-cta{color:#b8955a;border-color:#b8955a}
+@media(max-width:600px){
+  .na-banner{grid-template-columns:1fr}
+  .na-banner-img{height:220px}
+  .na-banner-body{padding:1.2rem 1.2rem 1.5rem}
+}
 
 .ap-order{background:rgba(255,255,255,0.03);border:1px solid rgba(184,149,90,0.12);
   cursor:pointer;transition:border-color 0.2s}
@@ -2637,56 +2653,34 @@ function buildGrid(){
     naSection.id = 'newArrivalsSection';
     naSection.className = 'new-arrivals-section';
 
-    var cardsHtml = newArrivals.map(function(p){
-      var inv = getInv(p.id), oos = inv.outOfStock;
+    var bannersHtml = newArrivals.map(function(p, idx){
       var pr  = getPr(p.id);
       var ep  = pr.onSale && pr.salePrice ? parseFloat(pr.salePrice).toFixed(0) : parseFloat(p.price).toFixed(0);
       var img = p.photos && p.photos.length
-        ? '<img src="'+esc(cdnImg(p.photos[0],600))+'" alt="'+esc(p.brand+' '+p.name)+'" style="width:100%;height:100%;object-fit:contain;position:absolute;top:0;left:0;transition:transform 0.6s ease"/>'
-        : svg(p.c, p.s, 'lg');
-      var chordTags = (p.chords||[]).slice(0,3).map(function(c){
-        return '<span style="font-size:0.48rem;letter-spacing:0.12em;text-transform:uppercase;'+
-          'color:rgba(184,149,90,0.55);border:1px solid rgba(184,149,90,0.2);padding:0.15rem 0.45rem">'+esc(c)+'</span>';
+        ? '<img src="'+esc(cdnImg(p.photos[0],800))+'" alt="'+esc(p.brand+' '+p.name)+'">'
+        : '<div style="width:100%;height:100%;display:flex;align-items:center;justify-content:center">'+svg(p.c,p.s,'lg')+'</div>';
+      var chordHtml = (p.chords||[]).slice(0,4).map(function(c){
+        return '<span class="na-banner-chord">'+esc(c)+'</span>';
       }).join('');
 
-      return '<div onclick="openDetail('+p.id+')" class="na-card" style="'+
-        'flex-shrink:0;width:clamp(220px,28vw,300px);cursor:pointer;'+
-        'background:rgba(255,255,255,0.02);border:1px solid rgba(184,149,90,0.1);'+
-        'transition:border-color 0.3s" '+
-        'onmouseover="this.style.borderColor=&quot;rgba(184,149,90,0.35)&quot;" '+
-        'onmouseout="this.style.borderColor=&quot;rgba(184,149,90,0.1)&quot;"'+
-        '>'+
-        // Image
-        '<div class="na-img" style="position:relative;height:clamp(200px,25vw,280px);overflow:hidden;background:rgba(255,255,255,0.01)">'+
-          img+
-          '<div style="position:absolute;top:10px;left:10px;font-size:0.45rem;letter-spacing:0.2em;'+
-            'text-transform:uppercase;color:#0e0c0a;background:#b8955a;padding:3px 8px">'+
-            'Nueva Llegada'+
-          '</div>'+
+      // Alternate image left/right for visual rhythm
+      var imgFirst = idx % 2 === 0;
+      var imgCol = '<div class="na-banner-img">'+img+'</div>';
+      var bodyCol = '<div class="na-banner-body">'+
+        '<div class="na-banner-eyebrow">Nueva Llegada</div>'+
+        '<div class="na-banner-brand">'+esc(p.brand)+'</div>'+
+        '<div class="na-banner-name">'+esc(p.name)+'</div>'+
+        (p.tagline ? '<div class="na-banner-tagline">'+esc(p.tagline)+'</div>' : '')+
+        (chordHtml ? '<div class="na-banner-chords">'+chordHtml+'</div>' : '')+
+        '<div class="na-banner-footer">'+
+          '<span class="na-banner-price">$'+ep+'</span>'+
+          '<span class="na-banner-cta">Descubrir</span>'+
         '</div>'+
-        // Body
-        '<div style="padding:1rem 1.1rem 1.1rem">'+
-          '<div style="font-size:0.5rem;letter-spacing:0.2em;text-transform:uppercase;'+
-            'color:rgba(184,149,90,0.5);margin-bottom:0.25rem">'+esc(p.brand)+'</div>'+
-          '<div style="font-family:Cormorant Garamond,serif;font-size:1.2rem;font-weight:300;'+
-            'color:var(--cream);line-height:1.1;margin-bottom:0.3rem">'+esc(p.name)+'</div>'+
-          (p.tagline
-            ? '<div style="font-size:0.62rem;color:var(--muted);line-height:1.6;margin-bottom:0.7rem;'+
-              'font-style:italic">'+esc(p.tagline)+'</div>'
-            : '')+
-          (chordTags
-            ? '<div style="display:flex;flex-wrap:wrap;gap:0.3rem;margin-bottom:0.8rem">'+chordTags+'</div>'
-            : '')+
-          '<div style="display:flex;justify-content:space-between;align-items:center;'+
-            'padding-top:0.7rem;border-top:1px solid rgba(184,149,90,0.1)">'+
-            '<span style="font-family:Cormorant Garamond,serif;font-size:1.1rem;font-weight:300;color:#b8955a">'+
-              '$'+ep+
-            '</span>'+
-            '<span style="font-size:0.5rem;letter-spacing:0.15em;text-transform:uppercase;color:var(--muted)">'+
-              esc(p.conc||'Eau de Parfum')+
-            '</span>'+
-          '</div>'+
-        '</div>'+
+      '</div>';
+
+      return '<div class="na-banner" onclick="openDetail('+p.id+')" style="'+
+        (imgFirst ? '' : 'direction:rtl')+'">' +
+        (imgFirst ? imgCol+bodyCol : bodyCol+imgCol) +
       '</div>';
     }).join('');
 
@@ -2695,7 +2689,7 @@ function buildGrid(){
         '<span class="new-arrivals-title">Recién Llegado</span>'+
         '<div class="new-arrivals-line"></div>'+
       '</div>'+
-      '<div class="new-arrivals-strip">'+cardsHtml+'</div>';
+      bannersHtml;
     grid.parentNode.insertBefore(naSection, grid);
   }
 
