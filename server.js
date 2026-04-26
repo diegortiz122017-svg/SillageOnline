@@ -4833,8 +4833,8 @@ app.post('/api/catalogue', requireAdmin, async (req, res) => {
     `, [newId, Math.max(10, bottleSize * 0.15), bottleSize, new Date()]);
   } catch(e) { /* non-fatal */ }
 
-  // Set arrived_at timestamp for new products
-  if (!newFrag.arrivedAt) {
+  // Set arrived_at if showNewArrival is true (default true for new products)
+  if (req.body.showNewArrival !== false) {
     await db.execute('UPDATE products SET arrived_at=? WHERE id=?', [new Date(), newId]);
   }
 
@@ -4867,6 +4867,10 @@ app.put('/api/catalogue/:id', requireAdmin, async (req, res) => {
     ...intensityScores,
     chords:          autoChords || req.body.chords || existing.chords || [],
     olfactive_family: req.body.family || autoFamily || existing.family || null,
+    // Preserve arrived_at from existing record unless explicitly set or cleared via showNewArrival flag
+    arrivedAt: req.body.showNewArrival === false
+      ? null                                    // explicitly removed from new arrivals
+      : (req.body.arrivedAt || existing.arrivedAt || null), // keep existing or use new value
   };
   await updateProduct(id, updated);
   const catalogue = await getCatalogue();
