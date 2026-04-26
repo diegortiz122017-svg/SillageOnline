@@ -189,6 +189,7 @@ async function initDB() {
       colors          JSON          DEFAULT NULL,
       shape           VARCHAR(20)   DEFAULT NULL,
       photos          JSON          DEFAULT NULL,
+      olfactive_family VARCHAR(100)  DEFAULT NULL,
       chords          JSON          DEFAULT NULL,
       chords_override JSON          DEFAULT NULL,
       sort_order      INT           DEFAULT 0,
@@ -399,6 +400,7 @@ async function migrateProductsColumns() {
     "colors          JSON          DEFAULT NULL",
     "shape           VARCHAR(20)   DEFAULT NULL",
     "photos          JSON          DEFAULT NULL",
+    "olfactive_family VARCHAR(100)  DEFAULT NULL",
     "chords          JSON          DEFAULT NULL",
     "chords_override JSON          DEFAULT NULL",
     "sort_order      INT           DEFAULT 0",
@@ -4063,20 +4065,30 @@ Responde en el idioma del cliente.`
 
   function mergeProfiles(existing, incoming) {
     if (!existing) return incoming;
+    // Start from existing — incoming only overlays fields it has data for
+    // This prevents sparse tool calls from wiping accumulated profile data
     const merged = { ...existing };
-    // Merge arrays — union, deduplicated
-    for (const key of ['families','notes','occasions','avoid','recommended_ids']) {
-      if (incoming[key] && incoming[key].length) {
-        const combined = [...(existing[key]||[]), ...incoming[key]];
+    // Arrays: union, deduplicated, incoming weighted higher (more recent)
+    for (const key of ['families','notes','occasions','avoid']) {
+      const ex = existing[key] || [];
+      const inc = incoming[key] || [];
+      if (inc.length) {
+        const combined = [...ex, ...inc];
         merged[key] = [...new Set(combined.map(v => typeof v === 'string' ? v.toLowerCase() : v))];
       }
     }
-    // Scalar fields — only overwrite if incoming has a value
-    for (const key of ['gender_pref','intensity','season','price_min','price_max','gift']) {
-      if (incoming[key] !== undefined && incoming[key] !== null) {
-        merged[key] = incoming[key];
-      }
+    // Recommended IDs: always accumulate
+    if (incoming.recommended_ids?.length) {
+      const idSet = new Set([...(existing.recommended_ids||[]), ...incoming.recommended_ids].map(Number));
+      merged.recommended_ids = [...idSet];
     }
+    // Scalar fields — only overwrite if incoming has a meaningful value
+    if (incoming.gender_pref && incoming.gender_pref !== 'U') merged.gender_pref = incoming.gender_pref;
+    if (incoming.intensity)   merged.intensity  = incoming.intensity;
+    if (incoming.season && incoming.season !== 'All') merged.season = incoming.season;
+    if (incoming.price_min)   merged.price_min  = incoming.price_min;
+    if (incoming.price_max && incoming.price_max !== 500) merged.price_max = incoming.price_max;
+    if (incoming.gift !== undefined) merged.gift = incoming.gift;
     return merged;
   }
 
@@ -4728,12 +4740,51 @@ app.post('/api/admin/migrate-note-intensity', requireAdmin, async (req, res) => 
     const { calcChords } = require('./services/chords');
     const catalogue = await getCatalogue();
     let updated = 0;
+
+    // Family inference from notes — maps keyword patterns to olfactive family strings
+    function inferFamily(p) {
+      const text = [(p.notes||''),(p.top||''),(p.mid||''),(p.base||'')].join(' ').toLowerCase();
+      const families = [];
+      const checks = [
+        ['oriental', ['oud','amber','incense','resin','myrrh','labdanum','benzoin','frankincense','saffron']],
+        ['woody',    ['cedar','sandalwood','vetiver','patchouli','birch','guaiac','iso e','cashmeran']],
+        ['floral',   ['rose','jasmine','tuberose','lily','peony','gardenia','ylang','iris','violet','magnolia']],
+        ['fresh',    ['bergamot','lemon','lime','grapefruit','mint','cucumber','green','grass','bamboo']],
+        ['citrus',   ['bergamot','lemon','lime','grapefruit','orange','mandarin','yuzu','cedrat']],
+        ['aquatic',  ['marine','aquatic','sea salt','ozonic','water','ocean']],
+        ['gourmand', ['vanilla','caramel','chocolate','coffee','honey','praline','rum','almond','tonka']],
+        ['chypre',   ['oakmoss','labdanum','bergamot','patchouli','cistus']],
+        ['fougere',  ['lavender','coumarin','oakmoss','geranium','tonka']],
+        ['spicy',    ['pepper','cardamom','cinnamon','clove','ginger','nutmeg','saffron']],
+        ['powdery',  ['iris','orris','violet','heliotrope','musk','talc','ambrette']],
+      ];
+      for (const [fam, keywords] of checks) {
+        if (keywords.some(k => text.includes(k))) families.push(fam);
+      }
+      // Also use chords as signal
+      const chordFamMap = {
+        'Ambarado': 'oriental', 'Oriental': 'oriental',
+        'Amaderado': 'woody', 'Terroso': 'woody', 'Ahumado': 'woody',
+        'Floral': 'floral', 'Empolvado': 'powdery',
+        'Fresco': 'fresh', 'Cítrico': 'citrus', 'Acuático': 'aquatic', 'Verde': 'fresh',
+        'Gourmand': 'gourmand', 'Dulce': 'gourmand',
+        'Especiado': 'spicy', 'Aromático': 'fougere',
+        'Frutal': 'citrus', 'Sensual': 'oriental',
+      };
+      (p.chords||[]).forEach(c => {
+        const mapped = chordFamMap[c];
+        if (mapped && !families.includes(mapped)) families.push(mapped);
+      });
+      return [...new Set(families)].slice(0, 3).join(',') || 'fresh';
+    }
+
     for (const p of catalogue) {
       const scores = calcIntensity(p);
       const chords = calcChords(p);
+      const family = inferFamily(p);
       await db.execute(
-        'UPDATE products SET top_intensity=?, mid_intensity=?, base_intensity=?, chords=?, updated_at=? WHERE id=?',
-        [scores.top_intensity, scores.mid_intensity, scores.base_intensity, JSON.stringify(chords), new Date(), p.id]
+        'UPDATE products SET top_intensity=?, mid_intensity=?, base_intensity=?, chords=?, olfactive_family=?, updated_at=? WHERE id=?',
+        [scores.top_intensity, scores.mid_intensity, scores.base_intensity, JSON.stringify(chords), family, new Date(), p.id]
       );
       updated++;
     }
