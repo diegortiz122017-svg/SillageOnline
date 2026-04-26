@@ -3886,15 +3886,23 @@ app.post('/api/sommelier/chat', sommelierBurst, sommelierLimiter, async (req, re
   }
 
   // Extract IDs already recommended in this conversation to avoid repeats
+  // Check both legacy PERFIL_JSON (old sessions) and new tool_profile storage
   const alreadyRecommended = [];
   for (const m of messages) {
-    if (m.role === 'assistant' && m.content) {
-      const match = m.content.match(/PERFIL_JSON:\s*({[\s\S]+?})/);
-      if (match) {
-        try {
-          const prev = JSON.parse(match[1]);
-          if (Array.isArray(prev.recommended_ids)) alreadyRecommended.push(...prev.recommended_ids.map(Number));
-        } catch(e) {}
+    if (m.role === 'assistant') {
+      // Legacy: PERFIL_JSON inline
+      if (m.content) {
+        const match = m.content.match(/PERFIL_JSON:\s*({[\s\S]+?})/);
+        if (match) {
+          try {
+            const prev = JSON.parse(match[1]);
+            if (Array.isArray(prev.recommended_ids)) alreadyRecommended.push(...prev.recommended_ids.map(Number));
+          } catch(e) {}
+        }
+      }
+      // New: recommended_ids from stored profile
+      if (m.profile?.recommended_ids) {
+        alreadyRecommended.push(...m.profile.recommended_ids.map(Number));
       }
     }
   }
@@ -3917,7 +3925,8 @@ app.post('/api/sommelier/chat', sommelierBurst, sommelierLimiter, async (req, re
     genderOverride = '\n\nEl cliente pide fragancias femeninas en este mensaje. Usa gender:"F" en search_catalogue.';
   }
 
-  const systemPrompt = `Eres Nez, sommelier de Sillage Parfumerie, El Salvador.${profileContext}${avoidNote}${genderOverride}${lastTurnNote}
+  // Static system prompt — never changes so OpenAI can cache the full prefix
+  const systemPrompt = `Eres Nez, sommelier de Sillage Parfumerie, El Salvador.
 
 IDENTIDAD: Nunca digas que eres IA. Eres Nez, sommelier. Tono cálido, directo, premium. Sin rodeos. Sin preguntas innecesarias al final de cada mensaje.
 
@@ -3958,8 +3967,6 @@ HERRAMIENTAS — úsalas siempre que sea posible:
 - search_catalogue: para buscar fragancias del catálogo. Úsala cada vez que tengas contexto suficiente.
 - update_profile: para guardar lo que aprendes del cliente. Llámala SIEMPRE que llames search_catalogue, y también cuando el cliente mencione preferencias sin pedir recomendaciones. Nunca dejes families vacío — infiere al menos una familia del contexto.
 
-REGLA CRÍTICA: Cada vez que llames search_catalogue, llama update_profile en el mismo turno con los campos que conozcas. No esperes tener el perfil completo — guarda lo que tengas ahora y lo irás completando.
-
 PERFIL_JSON — solo como respaldo si no puedes llamar update_profile. Formato: PERFIL_JSON:{...} al final del mensaje.
 
 CIERRE: Cuando el cliente muestre interés o decisión, cierra directo: "La encuentras en las tarjetas de abajo — agrégala al carrito desde ahí." Si ya eligió, confirma y cierra: "Perfecto. La tienes en la tarjeta de abajo." No preguntes "¿te gustaría agregarla?" — simplemente indica dónde está.
@@ -3984,12 +3991,10 @@ OBJECIONES DE COMPETENCIA / CONFIANZA:
 - Si el cliente menciona otro vendedor o precio más bajo → no ataques, pero planta la duda: "La diferencia está en lo que no ves — procedencia, fraccionado, almacenamiento. Con Sillage eso está resuelto."
 - Si pregunta por autenticidad → responde con confianza total y sin rodeos.
 
-CIERRE FINAL — varía el cierre, nunca repitas la misma frase:
+CIERRE FINAL — varía, nunca repitas:
 - "Están en las tarjetas — es un buen momento para probarla."
 - "El decant es exactamente para esto. Lo tienes en la tarjeta."
-- "Pocas formas mejores de conocer una fragancia antes de comprometerte con el frasco."
-- "Si te convence en decant, el frasco siempre va a estar aquí."
-Nunca uses "cualquiera es una excelente elección" — es genérico y no cierra nada.
+Nunca uses "cualquiera es una excelente elección".
 
 EVITA REPETIR: No uses los mismos argumentos dos veces en la misma conversación. Si ya mencionaste "distribuidores autorizados", en la siguiente objeción usa otro ángulo — el vial de cristal, los tiempos de entrega, la política de devoluciones, o simplemente confía en el producto sin justificarlo.
 
@@ -4010,21 +4015,21 @@ Responde en el idioma del cliente.`
     type: 'function',
     function: {
       name: 'update_profile',
-      description: 'Save extracted scent preferences from this conversation. Call this alongside search_catalogue whenever you learn something about the customer — gender, families, notes, occasions, budget, or anything they mention. Merge with existing data; only include fields you have new info for.',
+      description: 'Save ALL scent preferences you can infer from this turn. Call alongside search_catalogue. Include every field you can infer — not just what was explicitly stated. If customer asks for evening fragrances, infer occasions:[evening] AND families. If they like heavy sillage, infer intensity. Be liberal in inferring fields.',
       parameters: {
         type: 'object',
         properties: {
-          gender_pref:     { type: 'string', enum: ['M','F','U'], description: 'Gender preference inferred from context' },
-          families:        { type: 'array', items: { type: 'string' }, description: 'Olfactive families (woody, oriental, floral, fresh, etc.) — always infer at least one' },
-          notes:           { type: 'array', items: { type: 'string' }, description: 'Specific notes or ingredients mentioned' },
-          intensity:       { type: 'string', enum: ['light','moderate','strong','very strong'], description: 'Sillage/projection preference' },
-          occasions:       { type: 'array', items: { type: 'string' }, description: 'Occasions (evening, office, casual, sport, date, etc.)' },
-          season:          { type: 'string', description: 'Preferred season (Spring, Summer, Fall, Winter, All Seasons)' },
-          price_min:       { type: 'number', description: 'Minimum budget in USD' },
-          price_max:       { type: 'number', description: 'Maximum budget in USD' },
-          avoid:           { type: 'array', items: { type: 'string' }, description: 'Notes, families or fragrances to avoid' },
-          recommended_ids: { type: 'array', items: { type: 'number' }, description: 'Product IDs recommended in this turn' },
-          gift:            { type: 'boolean', description: 'True if shopping for someone else' }
+          gender_pref:     { type: 'string', enum: ['M','F','U'], description: 'M/F/U' },
+          families:        { type: 'array', items: { type: 'string' }, description: 'Olfactive families — always infer at least one' },
+          notes:           { type: 'array', items: { type: 'string' }, description: 'Notes/ingredients' },
+          intensity:       { type: 'string', enum: ['light','moderate','strong','very strong'], description: 'Projection' },
+          occasions:       { type: 'array', items: { type: 'string' }, description: 'Occasions' },
+          season:          { type: 'string', description: 'Season' },
+          price_min:       { type: 'number', description: 'Min budget' },
+          price_max:       { type: 'number', description: 'Max budget' },
+          avoid:           { type: 'array', items: { type: 'string' }, description: 'Avoid list' },
+          recommended_ids: { type: 'array', items: { type: 'number' }, description: 'Recommended IDs this turn' },
+          gift:            { type: 'boolean', description: 'Gift purchase' }
         },
         required: []
       }
@@ -4037,15 +4042,15 @@ Responde en el idioma del cliente.`
       parameters: {
         type: 'object',
         properties: {
-          gender:    { type: 'string', enum: ['M','F','U','any'], description: 'Gender filter. Pass the customer profile gender by default. Use "any" only when customer explicitly shops for someone else or requests unisex.' },
-          families:  { type: 'array', items: { type: 'string' }, description: 'Olfactive families to search — use multiple for broader results (e.g. ["woody","oriental"] for an elegant evening scent, ["fresh","citrus"] for something light). Options: woody, floral, oriental, citrus, fresh, aquatic, gourmand, chypre, fougere, spicy, powdery, green' },
-          notes:     { type: 'array', items: { type: 'string' }, description: 'Specific ingredients the customer mentioned (e.g. ["oud","vanilla","rose"]). Use when customer explicitly names ingredients.' },
-          brand:     { type: 'string', description: 'Filter by brand name (e.g. "Creed", "Dior", "Chanel"). Use when customer asks about a specific brand.' },
-          exclude_ids: { type: 'array', items: { type: 'number' }, description: 'Product IDs already recommended in this conversation — exclude these from results' },
-          max_price: { type: 'number', description: 'Maximum price in USD' },
-          min_price: { type: 'number', description: 'Minimum price in USD' },
-          season:    { type: 'string', description: 'Season: Spring, Summer, Fall, Winter, All Seasons' },
-          intensity: { type: 'string', enum: ['Light','Moderate','Strong','Very Strong','any'], description: 'Sillage/projection preference' }
+          gender:    { type: 'string', enum: ['M','F','U','any'], description: 'M/F/U/any. Use profile gender by default.' },
+          families:  { type: 'array', items: { type: 'string' }, description: 'Families: woody, floral, oriental, citrus, fresh, aquatic, gourmand, chypre, fougere, spicy, powdery, green. Use multiple.' },
+          notes:     { type: 'array', items: { type: 'string' }, description: 'Specific ingredients mentioned.' },
+          brand:     { type: 'string', description: 'Brand filter.' },
+          exclude_ids: { type: 'array', items: { type: 'number' }, description: 'IDs already recommended — exclude.' },
+          max_price: { type: 'number', description: 'Max price USD' },
+          min_price: { type: 'number', description: 'Min price USD' },
+          season:    { type: 'string', description: 'Season' },
+          intensity: { type: 'string', enum: ['Light','Moderate','Strong','Very Strong','any'], description: 'Projection' }
         },
         required: []
       }
@@ -4312,8 +4317,18 @@ Responde en el idioma del cliente.`
         : m.content
     })).filter(m => m.content); // drop any that become empty after stripping
 
+    // Build dynamic context as a separate system message so the static system prompt
+    // stays cacheable — OpenAI caches identical prefixes, changing the system prompt
+    // breaks caching for every turn
+    const dynamicParts = [];
+    if (profileContext)  dynamicParts.push(profileContext.trim());
+    if (avoidNote)       dynamicParts.push(avoidNote.trim());
+    if (genderOverride)  dynamicParts.push(genderOverride.trim());
+    if (lastTurnNote)    dynamicParts.push(lastTurnNote.trim());
+
     const oaiMessages = [
       { role: 'system', content: systemPrompt },
+      ...(dynamicParts.length ? [{ role: 'system', content: dynamicParts.join('\n\n') }] : []),
       ...sanitizedHistory
     ];
 
