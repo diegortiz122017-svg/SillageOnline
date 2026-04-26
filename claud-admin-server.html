@@ -649,6 +649,9 @@ tr:hover td{background:rgba(255,255,255,0.02)}
       </div>
     </div>
     <div class="frag-row">
+      <div class="frag-field"><label>Familia Olfativa</label>
+        <input type="text" id="fFamily" placeholder="woody,oriental,spicy (separadas por coma)"/>
+      </div>
       <div class="frag-field"><label>Concentración</label>
         <select id="fConc">
           <option>Eau de Parfum</option>
@@ -3149,6 +3152,7 @@ function openFragModal(id){
   initNoteTagPicker('mid',   p?p.mid:'');
   initNoteTagPicker('base',  p?p.base:'');
   document.getElementById('fConc').value   =p?p.conc:'Eau de Parfum';
+  document.getElementById('fFamily').value =p&&p.family?p.family:'';
   document.getElementById('fChordsOverride').value = p && p.chords_override && p.chords_override.length ? p.chords_override.join(', ') : '';
   document.getElementById('fSeason').value =p?p.season:'All Seasons';
   document.getElementById('fSillage').value=p?p.sillage:'Moderate';
@@ -3215,6 +3219,7 @@ function saveFragrance(){
     desc:document.getElementById('fDesc').value,
     c:[document.getElementById('fC1').value,document.getElementById('fC2').value,document.getElementById('fC3').value],
     s:document.getElementById('fShape').value,photos:fragPhotos,
+    family:(document.getElementById('fFamily').value||'').trim()||null,
     chords_override:(function(){
       var raw = (document.getElementById('fChordsOverride').value||'').trim();
       if(!raw) return null;
