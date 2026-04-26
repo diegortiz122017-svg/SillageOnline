@@ -946,6 +946,39 @@ async function sendDeliveredEmail(order) {
   });
 }
 
+// ── Olfactive family inference helper (used by catalogue endpoints) ─────────
+function inferOlfactiveFamily(p) {
+  const text = [(p.notes||''),(p.top||''),(p.mid||''),(p.base||'')].join(' ').toLowerCase();
+  const families = [];
+  const checks = [
+    ['oriental', ['oud','amber','incense','resin','myrrh','labdanum','benzoin','frankincense','saffron']],
+    ['woody',    ['cedar','sandalwood','vetiver','patchouli','birch','guaiac','iso e','cashmeran']],
+    ['floral',   ['rose','jasmine','tuberose','lily','peony','gardenia','ylang','iris','violet','magnolia']],
+    ['fresh',    ['bergamot','lemon','lime','grapefruit','mint','cucumber','green','grass','bamboo']],
+    ['citrus',   ['bergamot','lemon','lime','grapefruit','orange','mandarin','yuzu','cedrat']],
+    ['aquatic',  ['marine','aquatic','sea salt','ozonic','water','ocean']],
+    ['gourmand', ['vanilla','caramel','chocolate','coffee','honey','praline','rum','almond','tonka']],
+    ['chypre',   ['oakmoss','labdanum','bergamot','patchouli','cistus']],
+    ['fougere',  ['lavender','coumarin','oakmoss','geranium','tonka']],
+    ['spicy',    ['pepper','cardamom','cinnamon','clove','ginger','nutmeg','saffron']],
+    ['powdery',  ['iris','orris','violet','heliotrope','musk','talc','ambrette']],
+  ];
+  for (const [fam, keywords] of checks) {
+    if (keywords.some(k => text.includes(k))) families.push(fam);
+  }
+  const chordFamMap = {
+    'Ambarado':'oriental','Oriental':'oriental','Amaderado':'woody','Terroso':'woody',
+    'Ahumado':'woody','Floral':'floral','Empolvado':'powdery','Fresco':'fresh',
+    'Cítrico':'citrus','Acuático':'aquatic','Verde':'fresh','Gourmand':'gourmand',
+    'Dulce':'gourmand','Especiado':'spicy','Aromático':'fougere','Frutal':'citrus','Sensual':'oriental',
+  };
+  (p.chords||[]).forEach(c => {
+    const mapped = chordFamMap[c];
+    if (mapped && !families.includes(mapped)) families.push(mapped);
+  });
+  return [...new Set(families)].slice(0, 3).join(',') || 'fresh';
+}
+
 // ── New arrival email — #4 ───────────────────────────────────────────────────
 async function sendNewArrivalEmail(product) {
   // Fetch all marketing-subscribed customers
@@ -4775,7 +4808,16 @@ app.delete('/api/bundles/:id', requireAdmin, async (req, res) => {
 });
 // ─── Catalogue routes ─────────────────────────────────
 app.post('/api/catalogue', requireAdmin, async (req, res) => {
-  const fragData = { ...req.body, ...calcIntensity(req.body) };
+  const { calcChords } = require('./services/chords');
+  const intensityScores = calcIntensity(req.body);
+  const autoChords = req.body.chords_override ? null : calcChords({ ...req.body, ...intensityScores });
+  const autoFamily = inferOlfactiveFamily({ ...req.body, chords: autoChords });
+  const fragData = {
+    ...req.body,
+    ...intensityScores,
+    chords:          autoChords || req.body.chords || [],
+    olfactive_family: req.body.family || autoFamily || null,
+  };
   const newId    = await addProduct(fragData);
   const newFrag  = { ...fragData, id: newId };
 
@@ -4814,7 +4856,18 @@ app.put('/api/catalogue/:id', requireAdmin, async (req, res) => {
   const id = parseInt(req.params.id, 10);
   const existing = await getProductById(id);
   if (!existing) return res.status(404).json({ error: 'Fragancia no encontrada' });
-  const updated = { ...req.body, id, ...calcIntensity(req.body) };
+  const { calcChords } = require('./services/chords');
+  const intensityScores = calcIntensity(req.body);
+  // Recalculate chords unless a manual override is set
+  const autoChords = req.body.chords_override ? null : calcChords({ ...req.body, ...intensityScores });
+  const autoFamily = inferOlfactiveFamily({ ...req.body, chords: autoChords });
+  const updated = {
+    ...req.body,
+    id,
+    ...intensityScores,
+    chords:          autoChords || req.body.chords || existing.chords || [],
+    olfactive_family: req.body.family || autoFamily || existing.family || null,
+  };
   await updateProduct(id, updated);
   const catalogue = await getCatalogue();
   broadcast('catalogue', catalogue);
@@ -4850,47 +4903,10 @@ app.post('/api/admin/migrate-note-intensity', requireAdmin, async (req, res) => 
     const catalogue = await getCatalogue();
     let updated = 0;
 
-    // Family inference from notes — maps keyword patterns to olfactive family strings
-    function inferFamily(p) {
-      const text = [(p.notes||''),(p.top||''),(p.mid||''),(p.base||'')].join(' ').toLowerCase();
-      const families = [];
-      const checks = [
-        ['oriental', ['oud','amber','incense','resin','myrrh','labdanum','benzoin','frankincense','saffron']],
-        ['woody',    ['cedar','sandalwood','vetiver','patchouli','birch','guaiac','iso e','cashmeran']],
-        ['floral',   ['rose','jasmine','tuberose','lily','peony','gardenia','ylang','iris','violet','magnolia']],
-        ['fresh',    ['bergamot','lemon','lime','grapefruit','mint','cucumber','green','grass','bamboo']],
-        ['citrus',   ['bergamot','lemon','lime','grapefruit','orange','mandarin','yuzu','cedrat']],
-        ['aquatic',  ['marine','aquatic','sea salt','ozonic','water','ocean']],
-        ['gourmand', ['vanilla','caramel','chocolate','coffee','honey','praline','rum','almond','tonka']],
-        ['chypre',   ['oakmoss','labdanum','bergamot','patchouli','cistus']],
-        ['fougere',  ['lavender','coumarin','oakmoss','geranium','tonka']],
-        ['spicy',    ['pepper','cardamom','cinnamon','clove','ginger','nutmeg','saffron']],
-        ['powdery',  ['iris','orris','violet','heliotrope','musk','talc','ambrette']],
-      ];
-      for (const [fam, keywords] of checks) {
-        if (keywords.some(k => text.includes(k))) families.push(fam);
-      }
-      // Also use chords as signal
-      const chordFamMap = {
-        'Ambarado': 'oriental', 'Oriental': 'oriental',
-        'Amaderado': 'woody', 'Terroso': 'woody', 'Ahumado': 'woody',
-        'Floral': 'floral', 'Empolvado': 'powdery',
-        'Fresco': 'fresh', 'Cítrico': 'citrus', 'Acuático': 'aquatic', 'Verde': 'fresh',
-        'Gourmand': 'gourmand', 'Dulce': 'gourmand',
-        'Especiado': 'spicy', 'Aromático': 'fougere',
-        'Frutal': 'citrus', 'Sensual': 'oriental',
-      };
-      (p.chords||[]).forEach(c => {
-        const mapped = chordFamMap[c];
-        if (mapped && !families.includes(mapped)) families.push(mapped);
-      });
-      return [...new Set(families)].slice(0, 3).join(',') || 'fresh';
-    }
-
     for (const p of catalogue) {
       const scores = calcIntensity(p);
       const chords = calcChords(p);
-      const family = inferFamily(p);
+      const family = inferOlfactiveFamily({ ...p, chords });
       await db.execute(
         'UPDATE products SET top_intensity=?, mid_intensity=?, base_intensity=?, chords=?, olfactive_family=?, updated_at=? WHERE id=?',
         [scores.top_intensity, scores.mid_intensity, scores.base_intensity, JSON.stringify(chords), family, new Date(), p.id]
