@@ -1011,8 +1011,8 @@ footer{background:var(--dark);padding:3.5rem 4rem;text-align:center;border-top:1
 .new-arrivals-line{flex:1;height:1px;background:linear-gradient(to right,rgba(184,149,90,0.2),transparent)}
 .na-banner{display:grid;grid-template-columns:1fr 1fr;border:1px solid rgba(184,149,90,0.12);margin-bottom:1px;cursor:pointer;overflow:hidden;transition:border-color 0.3s;min-height:260px;align-items:stretch;grid-auto-rows:1fr}
 .na-banner .na-banner-img,.na-banner .na-banner-body{min-height:260px;height:100%}
-.na-banner-img+.na-banner-body{border-left:1px solid rgba(184,149,90,0.1)}
-.na-banner-body+.na-banner-img{border-left:1px solid rgba(184,149,90,0.1)}
+.na-banner-img+.na-banner-body{border-left:none}
+.na-banner-body+.na-banner-img{border-left:none}
 .na-banner:hover{border-color:rgba(184,149,90,0.3)}
 .na-banner:hover .na-banner-img img{transform:scale(1.03)}
 .na-banner-img{position:relative;overflow:hidden;background:rgba(255,255,255,0.01);min-height:260px}
@@ -1028,10 +1028,10 @@ footer{background:var(--dark);padding:3.5rem 4rem;text-align:center;border-top:1
 .na-banner-price{font-family:'Cormorant Garamond',serif;font-size:1.4rem;font-weight:300;color:#b8955a}
 .na-banner-cta{font-size:0.52rem;letter-spacing:0.2em;text-transform:uppercase;color:#8a7f72;border-bottom:1px solid rgba(184,149,90,0.3);padding-bottom:1px;transition:color 0.2s,border-color 0.2s}
 .na-banner:hover .na-banner-cta{color:#b8955a;border-color:#b8955a}
-.na-banner:nth-child(even) .na-banner-body{align-items:flex-end;text-align:left}
-.na-banner:nth-child(even) .na-banner-chords{justify-content:flex-end}
-.na-banner:nth-child(even) .na-banner-footer{justify-content:flex-end}
-.na-banner:nth-child(even) .na-banner-tagline{text-align:right}
+.na-banner:nth-child(odd) .na-banner-body{align-items:flex-end;text-align:right}
+.na-banner:nth-child(odd) .na-banner-chords{justify-content:flex-end}
+.na-banner:nth-child(odd) .na-banner-footer{justify-content:flex-end}
+.na-banner:nth-child(odd) .na-banner-tagline{text-align:right}
 @media(max-width:600px){
   .na-banner{grid-template-columns:1fr}
   .na-banner-img{height:200px;min-height:200px;order:-1}
