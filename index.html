@@ -1032,6 +1032,27 @@ footer{background:var(--dark);padding:3.5rem 4rem;text-align:center;border-top:1
 .na-banner:nth-child(odd) .na-banner-chords{justify-content:flex-end}
 .na-banner:nth-child(odd) .na-banner-footer{justify-content:flex-end}
 .na-banner:nth-child(odd) .na-banner-tagline{text-align:right}
+
+/* ── New arrivals reveal on scroll ── */
+.na-banner{opacity:0;transform:translateY(24px);transition:opacity 0.7s ease,transform 0.7s ease,border-color 0.3s}
+.na-banner.na-visible{opacity:1;transform:translateY(0)}
+.na-banner:nth-child(2).na-visible{transition-delay:0.12s}
+
+/* ── Orbs inside image area ── */
+.na-orb{position:absolute;border-radius:50%;filter:blur(55px);pointer-events:none;animation:naFloat 7s ease-in-out infinite}
+.na-orb-1{width:55%;padding-bottom:55%;top:-10%;left:-5%;animation-delay:0s}
+.na-orb-2{width:40%;padding-bottom:40%;bottom:-10%;right:-5%;animation-delay:-3.5s}
+@keyframes naFloat{0%,100%{transform:translate(0,0)}50%{transform:translate(12px,-16px)}}
+
+/* ── Bottle reveal ── */
+.na-bottle-wrap{
+  position:relative;z-index:1;
+  width:100%;height:100%;
+  display:flex;align-items:center;justify-content:center;
+  transition:transform 0.6s cubic-bezier(0.34,1.2,0.64,1);
+}
+.na-banner.na-visible .na-bottle-wrap{transform:translateY(0)}
+.na-bottle-wrap{transform:translateY(16px)}
 @media(max-width:600px){
   .na-banner{grid-template-columns:1fr}
   .na-banner-img{height:200px;min-height:200px;order:-1}
@@ -2668,9 +2689,20 @@ function buildGrid(){
     var bannersHtml = newArrivals.map(function(p, idx){
       var pr  = getPr(p.id);
       var ep  = pr.onSale && pr.salePrice ? parseFloat(pr.salePrice).toFixed(0) : parseFloat(p.price).toFixed(0);
-      var img = p.photos && p.photos.length
-        ? '<img src="'+esc(cdnImg(p.photos[0],800))+'" alt="'+esc(p.brand+' '+p.name)+'">'
-        : '<div style="width:100%;height:100%;display:flex;align-items:center;justify-content:center">'+svg(p.c,p.s,'lg')+'</div>';
+
+      // Colores del perfume para los orbs
+      var c0 = p.c && p.c[0] ? p.c[0] : '#d4b87a';
+      var c1 = p.c && p.c[1] ? p.c[1] : '#b8955a';
+      var orbs =
+        '<div class="na-orb na-orb-1" style="background:'+c0+';opacity:0.18"></div>'+
+        '<div class="na-orb na-orb-2" style="background:'+c1+';opacity:0.13"></div>';
+
+      var bottleInner = p.photos && p.photos.length
+        ? '<img src="'+esc(cdnImg(p.photos[0],800))+'" alt="'+esc(p.brand+' '+p.name)+'" style="max-height:80%;max-width:80%;object-fit:contain;position:relative;z-index:1">'
+        : svg(p.c, p.s, 'lg');
+
+      var img = '<div class="na-bottle-wrap">'+orbs+bottleInner+'</div>';
+
       var chordHtml = (p.chords||[]).slice(0,4).map(function(c){
         return '<span class="na-banner-chord">'+esc(c)+'</span>';
       }).join('');
@@ -2702,6 +2734,15 @@ function buildGrid(){
       bannersHtml;
     var shopSection = document.getElementById('shop');
     shopSection.parentNode.insertBefore(naSection, shopSection);
+
+    // Reveal on scroll con Intersection Observer
+    var naObserver = new IntersectionObserver(function(entries){
+      entries.forEach(function(entry){
+        if(entry.isIntersecting) naObserver.unobserve(entry.target);
+        entry.target.classList.toggle('na-visible', entry.isIntersecting);
+      });
+    }, { threshold: 0.15 });
+    naSection.querySelectorAll('.na-banner').forEach(function(b){ naObserver.observe(b); });
   }
 
   // ── Main toast for newest product if user hasn't seen it ──
