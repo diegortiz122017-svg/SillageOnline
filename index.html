@@ -1005,10 +1005,10 @@ footer{background:var(--dark);padding:3.5rem 4rem;text-align:center;border-top:1
 
 /* Orders list */
 /* New arrivals section */
-.new-arrivals-section{margin-bottom:0;padding:2.5rem 4rem 3rem;border-top:1px solid rgba(184,149,90,0.12);border-bottom:1px solid rgba(184,149,90,0.12);background:var(--warm-white);margin-top:0}
+.new-arrivals-section{margin-bottom:0;padding:4rem 4rem 3rem;border-top:1px solid rgba(184,149,90,0.12);border-bottom:1px solid rgba(184,149,90,0.12);background:var(--warm-white);margin-top:0}
 .new-arrivals-hdr{text-align:center;margin-bottom:2.5rem}
 .new-arrivals-title{font-size:0.65rem;letter-spacing:0.35em;text-transform:uppercase;color:var(--gold);font-weight:400;display:block;margin-bottom:0.8rem}
-.new-arrivals-heading{font-family:'Cormorant Garamond',serif;font-size:clamp(2.5rem,5vw,4rem);font-weight:300;color:var(--charcoal);line-height:1.1}
+.new-arrivals-heading{font-family:'Cormorant Garamond',serif;font-size:clamp(2rem,4vw,3rem);font-weight:300;color:var(--charcoal);line-height:1.1}
 .new-arrivals-heading em{font-style:italic;color:var(--gold)}
 .new-arrivals-line{display:none}
 .na-banner{display:grid;grid-template-columns:1fr 1fr;border:1px solid rgba(184,149,90,0.12);margin-bottom:1px;cursor:pointer;overflow:hidden;transition:border-color 0.3s;min-height:260px;align-items:stretch;grid-auto-rows:1fr;background:var(--warm-white)}
@@ -1062,7 +1062,8 @@ footer{background:var(--dark);padding:3.5rem 4rem;text-align:center;border-top:1
   .na-banner .na-banner-img,.na-banner .na-banner-body{min-height:unset}
   .na-banner-name{font-size:1.5rem}
   .na-banner-tagline{font-size:0.68rem}
-  .new-arrivals-section{padding:2rem 1rem 2.5rem}
+  .new-arrivals-section{padding:3rem 1rem 2.5rem}
+  .new-arrivals-heading{font-size:2rem}
 }
 
 .ap-order{background:rgba(255,255,255,0.03);border:1px solid rgba(184,149,90,0.12);
@@ -2731,7 +2732,7 @@ function buildGrid(){
     naSection.innerHTML =
       '<div class="new-arrivals-hdr">'+
         '<span class="new-arrivals-title">Recién Llegado</span>'+
-        '<h2 class="new-arrivals-heading">La <em>Última</em> Llegada</h2>'+
+        '<h2 class="new-arrivals-heading">Lo Nuevo en <em>Sillage</em></h2>'+
       '</div>'+
       bannersHtml;
     var shopSection = document.getElementById('shop');
