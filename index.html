@@ -5208,7 +5208,8 @@ function getBrandColor(brand){
   return BRAND_PALETTE[hash % BRAND_PALETTE.length];
 }
 
-var CURATED = [
+// Fallback estático — se usa solo si la DB no tiene colecciones
+var CURATED_FALLBACK = [
   { id:'office',     icon:'💼', name:'La Oficina',       desc:'Presente sin saturar. El tipo que hace que pregunten.',
     filter:function(p){ var t=[(p.notes||''),(p.family||''),(p.top||''),(p.mid||''),(p.base||'')].join(' ').toLowerCase(); return t.indexOf('cedar')!==-1||t.indexOf('sandalwood')!==-1||t.indexOf('vetiver')!==-1||(p.family||'').indexOf('woody')!==-1||(p.family||'').indexOf('fresh')!==-1; } },
   { id:'evening',    icon:'🕯️', name:'Noche Especial',   desc:'Para cuando quieres dejar rastro.',
@@ -5222,6 +5223,45 @@ var CURATED = [
   { id:'romantic',   icon:'🌹', name:'Una Primera Cita',  desc:'Suave, memorable. Que invite a acercarse.',
     filter:function(p){ var t=[(p.family||''),(p.notes||''),(p.mid||''),(p.base||'')].join(' ').toLowerCase(); return t.indexOf('rose')!==-1||t.indexOf('floral')!==-1||t.indexOf('jasmine')!==-1||t.indexOf('musk')!==-1||t.indexOf('powdery')!==-1; } },
 ];
+
+// Convierte una colección de DB en un objeto compatible con el frontend
+function dbCollectionToLocal(c){
+  var f = c.filter_json || {};
+  return {
+    id:   'db_'+c.id,
+    icon:  c.icon || '✨',
+    name:  c.name,
+    desc:  c.description || '',
+    filter: c.type === 'manual'
+      ? function(p){ return (c.product_ids||[]).map(Number).indexOf(+p.id) !== -1; }
+      : function(p){
+          var t = [(p.notes||''),(p.family||''),(p.top||''),(p.mid||''),(p.base||'')].join(' ').toLowerCase();
+          if(f.family  && t.indexOf(f.family.toLowerCase())  === -1) return false;
+          if(f.note    && t.indexOf(f.note.toLowerCase())    === -1) return false;
+          if(f.badge   && p.badge !== f.badge)                        return false;
+          if(f.sillage && p.sillage !== f.sillage)                    return false;
+          if(f.price_min && parseFloat(p.price) < f.price_min)        return false;
+          if(f.price_max && parseFloat(p.price) > f.price_max)        return false;
+          return true;
+        }
+  };
+}
+
+var CURATED = CURATED_FALLBACK; // default — overridden by DB on load
+var _curatedLoaded = false;
+
+function loadCuratedFromDB(cb){
+  fetch(API+'/collections')
+    .then(function(r){ return r.ok ? r.json() : []; })
+    .then(function(cols){
+      if(cols && cols.length){
+        CURATED = cols.map(dbCollectionToLocal);
+      }
+      _curatedLoaded = true;
+      if(cb) cb();
+    })
+    .catch(function(){ _curatedLoaded = true; if(cb) cb(); });
+}
 
 function buildCollections(){
   var products = P || [];
@@ -5329,9 +5369,13 @@ function buildCollections(){
 }
 
 function openCollections(){
-  buildCollections();
   document.getElementById('collOverlay').classList.add('open');
   document.body.style.overflow = 'hidden';
+  if(_curatedLoaded){
+    buildCollections();
+  } else {
+    loadCuratedFromDB(function(){ buildCollections(); });
+  }
 }
 function closeCollections(){
   document.getElementById('collOverlay').classList.remove('open');
