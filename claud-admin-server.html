@@ -600,7 +600,7 @@ tr:hover td{background:rgba(255,255,255,0.02)}
         <div class="notes-input-wrap">
           <div class="notes-tags" id="notesTags"></div>
           <div class="notes-add-row">
-            <input type="text" id="fNotesInput" placeholder="Escribir nota..." autocomplete="off" oninput="this._manuallyEdited=!!this.value"/>
+            <input type="text" id="fNotesInput" placeholder="Escribir nota..." autocomplete="off"/>
             <button type="button" class="notes-add-btn" onclick="addNoteTag()">+</button>
           </div>
           <div class="notes-suggestions" id="notesSuggestions" style="display:none"></div>
@@ -649,9 +649,6 @@ tr:hover td{background:rgba(255,255,255,0.02)}
       </div>
     </div>
     <div class="frag-row">
-      <div class="frag-field"><label>Familia Olfativa</label>
-        <input type="text" id="fFamily" placeholder="woody,oriental,spicy (separadas por coma)"/>
-      </div>
       <div class="frag-field"><label>Concentración</label>
         <select id="fConc">
           <option>Eau de Parfum</option>
@@ -698,13 +695,6 @@ tr:hover td{background:rgba(255,255,255,0.02)}
     <div class="frag-row full">
       <div class="frag-field"><label>Descripción</label><textarea id="fDesc" rows="3" placeholder="Descripción detallada de la fragancia..."></textarea></div>
     </div>
-    <div class="frag-row full">
-      <div class="frag-field">
-        <label>Acordes — Override <span style="font-size:0.6rem;color:var(--muted);font-weight:300;text-transform:none;letter-spacing:0">(opcional — reemplaza los acordes auto-generados)</span></label>
-        <input type="text" id="fChordsOverride" placeholder="Sensual, Ambarado, Cálido, Ahumado, Amaderado" autocomplete="off"/>
-        <div style="font-size:0.6rem;color:var(--muted);margin-top:0.3rem">Separados por coma. Deja vacío para usar los acordes calculados automáticamente.</div>
-      </div>
-    </div>
     <div class="frag-section">Colores del Frasco (3 tonos en hex)</div>
     <div class="frag-row">
       <div class="frag-field"><label>Color Claro</label><input type="color" id="fC1" value="#f5e6c8" style="padding:0.2rem;height:2.4rem;cursor:pointer"/></div>
@@ -730,20 +720,6 @@ tr:hover td{background:rgba(255,255,255,0.02)}
       <p style="font-size:0.58rem;color:var(--muted);margin-top:0.5rem">Sube tus fotos a un servicio como <strong>imgbb.com</strong> o <strong>cloudinary.com</strong> y pega la URL aquí.</p>
     </div>
     <div class="frag-err" id="fragErr"></div>
-    <div style="margin-bottom:0.6rem;padding:0.9rem 1rem;background:rgba(184,149,90,0.06);border:1px solid rgba(184,149,90,0.2);display:flex;align-items:center;gap:0.8rem">
-      <input type="checkbox" id="fShowNewArrival" style="accent-color:var(--gold);width:16px;height:16px;flex-shrink:0;cursor:pointer"/>
-      <div>
-        <label style="font-size:0.62rem;color:var(--cream);display:block;margin-bottom:0.1rem;cursor:pointer" for="fShowNewArrival">Mostrar en sección Recién Llegado</label>
-        <span style="font-size:0.58rem;color:var(--muted)">Activo durante 30 días desde la fecha de llegada. Desmarca para quitar de la sección.</span>
-      </div>
-    </div>
-    <div style="margin-bottom:1rem;padding:0.9rem 1rem;background:rgba(184,149,90,0.06);border:1px solid rgba(184,149,90,0.2);display:flex;align-items:center;gap:0.8rem">
-      <input type="checkbox" id="fNotifySubscribers" style="accent-color:var(--gold);width:16px;height:16px;flex-shrink:0;cursor:pointer"/>
-      <div>
-        <label style="font-size:0.62rem;color:var(--cream);display:block;margin-bottom:0.1rem;cursor:pointer" for="fNotifySubscribers">Enviar email de nueva llegada a suscriptores</label>
-        <span style="font-size:0.58rem;color:var(--muted)">Solo se envía una vez al guardar. Se desmarca automáticamente.</span>
-      </div>
-    </div>
     <button class="frag-save" onclick="saveFragrance()">Guardar Fragancia</button>
   </div>
 </div>
@@ -788,6 +764,7 @@ tr:hover td{background:rgba(255,255,255,0.02)}
         <div class="sb-section">Catálogo</div>
         <button class="nav-btn" data-page="catalogo"><span class="nav-icon">🌸</span>Catálogo</button>
         <button class="nav-btn" data-page="bundles"><span class="nav-icon">🎁</span>Bundles</button>
+        <button class="nav-btn" data-page="collections"><span class="nav-icon">🗂️</span>Colecciones</button>
         <div class="sb-section">Clientes</div>
         <button class="nav-btn" data-page="clientes"><span class="nav-icon">👤</span>Clientes</button>
       </div>
@@ -991,80 +968,6 @@ tr:hover td{background:rgba(255,255,255,0.02)}
             <span class="saved-msg" id="shippingMsg">✓ Guardado</span>
           </div>
         </div>
-
-        <!-- PROMO CODES -->
-        <div style="margin-top:2.5rem;padding-top:2rem;border-top:1px solid var(--border)">
-          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:1.5rem;flex-wrap:wrap;gap:0.8rem">
-            <div>
-              <div class="page-title" style="font-size:1.2rem;margin-bottom:0.2rem">Códigos de Descuento</div>
-              <div class="page-sub">Crea códigos de descuento para tus clientes</div>
-            </div>
-            <button onclick="togglePromoForm()" class="save-btn" id="promoFormToggle">+ Nuevo Código</button>
-          </div>
-
-          <!-- Create form -->
-          <div id="promoCreateForm" style="display:none;background:rgba(255,255,255,0.04);border:1px solid var(--border);padding:1.2rem;margin-bottom:1.5rem;max-width:600px">
-            <div style="display:grid;grid-template-columns:1fr 1fr;gap:0.8rem;margin-bottom:0.8rem">
-              <div>
-                <label style="font-size:0.52rem;letter-spacing:0.15em;text-transform:uppercase;color:var(--muted);display:block;margin-bottom:0.3rem">Código</label>
-                <input id="pcCode" type="text" placeholder="BIENVENIDO10" maxlength="30"
-                  style="width:100%;background:rgba(255,255,255,0.06);border:1px solid var(--border);
-                  color:var(--cream);font-family:'Jost',sans-serif;font-size:0.85rem;
-                  padding:0.55rem 0.8rem;outline:none;text-transform:uppercase"/>
-              </div>
-              <div>
-                <label style="font-size:0.52rem;letter-spacing:0.15em;text-transform:uppercase;color:var(--muted);display:block;margin-bottom:0.3rem">Tipo</label>
-                <select id="pcType"
-                  style="width:100%;background:rgba(255,255,255,0.06);border:1px solid var(--border);
-                  color:var(--cream);font-family:'Jost',sans-serif;font-size:0.85rem;
-                  padding:0.55rem 0.8rem;outline:none">
-                  <option value="percent">Porcentaje (%)</option>
-                  <option value="fixed">Monto fijo ($)</option>
-                </select>
-              </div>
-              <div>
-                <label style="font-size:0.52rem;letter-spacing:0.15em;text-transform:uppercase;color:var(--muted);display:block;margin-bottom:0.3rem">Valor</label>
-                <input id="pcValue" type="number" min="1" step="1" placeholder="10"
-                  style="width:100%;background:rgba(255,255,255,0.06);border:1px solid var(--border);
-                  color:var(--cream);font-family:'Jost',sans-serif;font-size:0.85rem;
-                  padding:0.55rem 0.8rem;outline:none"/>
-              </div>
-              <div>
-                <label style="font-size:0.52rem;letter-spacing:0.15em;text-transform:uppercase;color:var(--muted);display:block;margin-bottom:0.3rem">Pedido mínimo ($)</label>
-                <input id="pcMinOrder" type="number" min="0" step="5" placeholder="0"
-                  style="width:100%;background:rgba(255,255,255,0.06);border:1px solid var(--border);
-                  color:var(--cream);font-family:'Jost',sans-serif;font-size:0.85rem;
-                  padding:0.55rem 0.8rem;outline:none"/>
-              </div>
-              <div>
-                <label style="font-size:0.52rem;letter-spacing:0.15em;text-transform:uppercase;color:var(--muted);display:block;margin-bottom:0.3rem">Usos máximos (vacío = ilimitado)</label>
-                <input id="pcMaxUses" type="number" min="1" step="1" placeholder="Ilimitado"
-                  style="width:100%;background:rgba(255,255,255,0.06);border:1px solid var(--border);
-                  color:var(--cream);font-family:'Jost',sans-serif;font-size:0.85rem;
-                  padding:0.55rem 0.8rem;outline:none"/>
-              </div>
-              <div>
-                <label style="font-size:0.52rem;letter-spacing:0.15em;text-transform:uppercase;color:var(--muted);display:block;margin-bottom:0.3rem">Expira (vacío = nunca)</label>
-                <input id="pcExpires" type="datetime-local"
-                  style="width:100%;background:rgba(255,255,255,0.06);border:1px solid var(--border);
-                  color:var(--cream);font-family:'Jost',sans-serif;font-size:0.85rem;
-                  padding:0.55rem 0.8rem;outline:none"/>
-              </div>
-            </div>
-            <div style="display:flex;gap:0.6rem;align-items:center">
-              <button onclick="createPromoCode()" class="save-btn">Crear Código</button>
-              <span id="promoCreateMsg" style="font-size:0.65rem;color:var(--muted)"></span>
-            </div>
-          </div>
-
-          <!-- Codes list -->
-          <div class="tbl-wrap">
-            <table>
-              <thead><tr><th>Código</th><th>Tipo</th><th>Valor</th><th>Mínimo</th><th>Usos</th><th>Activo</th><th></th></tr></thead>
-              <tbody id="promoList"></tbody>
-            </table>
-          </div>
-        </div>
       </div>
 
       <!-- CATÁLOGO -->
@@ -1134,6 +1037,17 @@ tr:hover td{background:rgba(255,255,255,0.02)}
         <div id="bundlesList" class="bundles-list"></div>
       </div>
 
+      <div id="page-collections" class="page">
+        <div class="page-hdr">
+          <div>
+            <div class="page-title">Colecciones Curadas</div>
+            <div class="page-sub">Gestiona las colecciones visibles en la tienda. Arrastra para reordenar.</div>
+          </div>
+          <button class="add-btn-lg" onclick="openCollectionModal(null)">+ Nueva Colección</button>
+        </div>
+        <div id="collectionsList" class="bundles-list"></div>
+      </div>
+
     </div>
   </div>
   <!-- Mobile bottom nav -->
@@ -1153,6 +1067,7 @@ tr:hover td{background:rgba(255,255,255,0.02)}
       <div class="mob-drawer-title">Más opciones</div>
       <button class="mob-drawer-item" data-page="pricing" onclick="navToFromDrawer('pricing')"><span class="mob-icon">💲</span>Precios</button>
       <button class="mob-drawer-item" data-page="bundles" onclick="navToFromDrawer('bundles')"><span class="mob-icon">🎁</span>Bundles</button>
+      <button class="mob-drawer-item" data-page="collections" onclick="navToFromDrawer('collections')"><span class="mob-icon">🗂️</span>Colecciones</button>
       <button class="mob-drawer-item" data-page="clientes" onclick="navToFromDrawer('clientes')"><span class="mob-icon">👤</span>Clientes</button>
     </div>
   </div>
@@ -1276,9 +1191,100 @@ tr:hover td{background:rgba(255,255,255,0.02)}
 </div>
 </div>
 
+<!-- COLLECTIONS MODAL -->
+<div id="collectionModal" style="display:none;position:fixed;inset:0;z-index:9999;background:rgba(0,0,0,0.75);align-items:center;justify-content:center">
+  <div style="background:#1a1714;border:1px solid rgba(184,149,90,0.3);width:90%;max-width:580px;max-height:90vh;overflow-y:auto;border-radius:2px">
+    <div style="display:flex;justify-content:space-between;align-items:center;padding:1.2rem 1.5rem;border-bottom:1px solid rgba(184,149,90,0.15)">
+      <span id="cmTitle" style="font-family:'Cormorant Garamond',serif;font-size:1.2rem;color:#e8dcc8;font-weight:300">Nueva Colección</span>
+      <button onclick="closeCollectionModal()" style="background:none;border:none;color:#8a7f72;cursor:pointer;font-size:1.1rem;line-height:1">&#10005;</button>
+    </div>
+    <div style="padding:1.5rem;display:flex;flex-direction:column;gap:1rem">
+      <div style="display:grid;grid-template-columns:1fr auto;gap:1rem;align-items:end">
+        <div>
+          <label style="display:block;font-size:0.6rem;letter-spacing:0.15em;text-transform:uppercase;color:#8a7f72;margin-bottom:0.4rem">Nombre *</label>
+          <input id="cmName" type="text" placeholder="Ej: Para la Oficina" style="width:100%;box-sizing:border-box;background:#0e0c0a;border:1px solid rgba(184,149,90,0.2);color:#e8dcc8;font-size:0.78rem;padding:0.5rem 0.7rem;outline:none"/>
+        </div>
+        <div>
+          <label style="display:block;font-size:0.6rem;letter-spacing:0.15em;text-transform:uppercase;color:#8a7f72;margin-bottom:0.4rem">Ícono</label>
+          <input id="cmIcon" type="text" placeholder="💼" maxlength="4" style="width:70px;background:#0e0c0a;border:1px solid rgba(184,149,90,0.2);color:#e8dcc8;font-size:1.2rem;padding:0.5rem;outline:none;text-align:center"/>
+        </div>
+      </div>
+      <div>
+        <label style="display:block;font-size:0.6rem;letter-spacing:0.15em;text-transform:uppercase;color:#8a7f72;margin-bottom:0.4rem">Descripción</label>
+        <textarea id="cmDesc" rows="2" placeholder="Descripción breve que ve el cliente..." style="width:100%;box-sizing:border-box;background:#0e0c0a;border:1px solid rgba(184,149,90,0.2);color:#e8dcc8;font-size:0.78rem;padding:0.5rem 0.7rem;outline:none;resize:vertical"></textarea>
+      </div>
+      <div>
+        <label style="display:block;font-size:0.6rem;letter-spacing:0.15em;text-transform:uppercase;color:#8a7f72;margin-bottom:0.6rem">Tipo de Colección</label>
+        <div style="display:flex;gap:0.5rem">
+          <button id="cmTypeAuto" onclick="setCmType('auto')" style="flex:1;padding:0.6rem;font-size:0.62rem;letter-spacing:0.12em;text-transform:uppercase;cursor:pointer;border:1px solid #b8955a;background:rgba(184,149,90,0.12);color:#b8955a;font-family:'Jost',sans-serif">Automática</button>
+          <button id="cmTypeManual" onclick="setCmType('manual')" style="flex:1;padding:0.6rem;font-size:0.62rem;letter-spacing:0.12em;text-transform:uppercase;cursor:pointer;border:1px solid rgba(184,149,90,0.2);background:none;color:#8a7f72;font-family:'Jost',sans-serif">Manual</button>
+        </div>
+        <p style="font-size:0.62rem;color:#8a7f72;margin-top:0.4rem;line-height:1.6" id="cmTypeHint">Automática: los productos se filtran por criterios (familia, notas, precio, badge).</p>
+      </div>
 
+      <!-- AUTO filters -->
+      <div id="cmAutoFields">
+        <label style="display:block;font-size:0.6rem;letter-spacing:0.15em;text-transform:uppercase;color:#8a7f72;margin-bottom:0.6rem">Criterios de Filtro</label>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:0.8rem">
+          <div>
+            <label style="display:block;font-size:0.58rem;color:#8a7f72;margin-bottom:0.3rem">Familia olfativa</label>
+            <input id="cmFamily" type="text" placeholder="woody, fresh, oriental..." style="width:100%;box-sizing:border-box;background:#0e0c0a;border:1px solid rgba(184,149,90,0.2);color:#e8dcc8;font-size:0.72rem;padding:0.45rem 0.6rem;outline:none"/>
+          </div>
+          <div>
+            <label style="display:block;font-size:0.58rem;color:#8a7f72;margin-bottom:0.3rem">Nota (contiene)</label>
+            <input id="cmNote" type="text" placeholder="oud, rose, cedar..." style="width:100%;box-sizing:border-box;background:#0e0c0a;border:1px solid rgba(184,149,90,0.2);color:#e8dcc8;font-size:0.72rem;padding:0.45rem 0.6rem;outline:none"/>
+          </div>
+          <div>
+            <label style="display:block;font-size:0.58rem;color:#8a7f72;margin-bottom:0.3rem">Badge</label>
+            <select id="cmBadge" style="width:100%;background:#0e0c0a;border:1px solid rgba(184,149,90,0.2);color:#e8dcc8;font-size:0.72rem;padding:0.45rem 0.6rem;outline:none">
+              <option value="">Cualquiera</option>
+              <option value="bestseller">Bestseller</option>
+              <option value="new">Nuevo</option>
+              <option value="limited">Limitado</option>
+              <option value="sale">Oferta</option>
+            </select>
+          </div>
+          <div>
+            <label style="display:block;font-size:0.58rem;color:#8a7f72;margin-bottom:0.3rem">Sillage</label>
+            <select id="cmSillage" style="width:100%;background:#0e0c0a;border:1px solid rgba(184,149,90,0.2);color:#e8dcc8;font-size:0.72rem;padding:0.45rem 0.6rem;outline:none">
+              <option value="">Cualquiera</option>
+              <option value="Light">Ligero</option>
+              <option value="Moderate">Moderado</option>
+              <option value="Strong">Fuerte</option>
+              <option value="Very Strong">Muy Fuerte</option>
+            </select>
+          </div>
+          <div>
+            <label style="display:block;font-size:0.58rem;color:#8a7f72;margin-bottom:0.3rem">Precio mínimo ($)</label>
+            <input id="cmPriceMin" type="number" min="0" placeholder="0" style="width:100%;box-sizing:border-box;background:#0e0c0a;border:1px solid rgba(184,149,90,0.2);color:#e8dcc8;font-size:0.72rem;padding:0.45rem 0.6rem;outline:none"/>
+          </div>
+          <div>
+            <label style="display:block;font-size:0.58rem;color:#8a7f72;margin-bottom:0.3rem">Precio máximo ($)</label>
+            <input id="cmPriceMax" type="number" min="0" placeholder="9999" style="width:100%;box-sizing:border-box;background:#0e0c0a;border:1px solid rgba(184,149,90,0.2);color:#e8dcc8;font-size:0.72rem;padding:0.45rem 0.6rem;outline:none"/>
+          </div>
+        </div>
+      </div>
 
-<script>
+      <!-- MANUAL product picker -->
+      <div id="cmManualFields" style="display:none">
+        <label style="display:block;font-size:0.6rem;letter-spacing:0.15em;text-transform:uppercase;color:#8a7f72;margin-bottom:0.4rem">Productos incluidos *</label>
+        <div id="cmProductsList" style="display:flex;flex-direction:column;gap:0.4rem;max-height:240px;overflow-y:auto;margin-bottom:0.5rem"></div>
+        <button onclick="addCmProduct()" style="width:100%;background:none;border:1px dashed rgba(184,149,90,0.3);color:#8a7f72;font-size:0.62rem;letter-spacing:0.12em;text-transform:uppercase;padding:0.4rem;cursor:pointer">+ Agregar Producto</button>
+      </div>
+
+      <div>
+        <label style="display:block;font-size:0.6rem;letter-spacing:0.15em;text-transform:uppercase;color:#8a7f72;margin-bottom:0.4rem">Orden (número)</label>
+        <input id="cmOrder" type="number" min="0" placeholder="0" style="width:100px;background:#0e0c0a;border:1px solid rgba(184,149,90,0.2);color:#e8dcc8;font-size:0.78rem;padding:0.5rem 0.7rem;outline:none"/>
+      </div>
+
+      <div id="cmErr" style="color:#c05050;font-size:0.7rem;min-height:1rem"></div>
+      <div style="display:flex;gap:0.8rem;padding-top:0.8rem;border-top:1px solid rgba(184,149,90,0.15)">
+        <button onclick="closeCollectionModal()" style="flex:1;background:none;border:1px solid rgba(138,127,114,0.3);color:#8a7f72;font-family:'Jost',sans-serif;font-size:0.62rem;letter-spacing:0.12em;text-transform:uppercase;padding:0.6rem;cursor:pointer">Cancelar</button>
+        <button onclick="saveCollection()" style="flex:2;background:#b8955a;border:none;color:#0e0c0a;font-family:'Jost',sans-serif;font-size:0.62rem;letter-spacing:0.15em;text-transform:uppercase;padding:0.6rem;cursor:pointer">Guardar Colección</button>
+      </div>
+    </div>
+  </div>
+</div>
 function togglePhoneMenu(uid){
   // Close any other open phone menus first
   document.querySelectorAll('[id^="ph-"]').forEach(function(el){
@@ -1547,10 +1553,11 @@ function navTo(page){
   // Render page content
   if(page==='overview')  renderOverview();
   if(page==='inventory'){ renderInventory(); loadBottleInventory(); if(!catalogFragrances.length) adminFetch(API+'/catalogue',{}).then(function(r){return r?r.json():[];}).then(function(d){catalogFragrances=d||[];}); }
-  if(page==='pricing'){  renderPricing(); loadShippingConfig(); loadPromoCodes(); }
+  if(page==='pricing'){  renderPricing(); loadShippingConfig(); }
   if(page==='orders'){   renderOrders(); fetchAllData(); }
   if(page==='catalogo')  loadCatalogue();
   if(page==='bundles'){ renderBundles(); }
+  if(page==='collections'){ renderCollections(); }
   if(page==='clientes')  loadClientes();
 }
 document.querySelectorAll('.nav-btn,.mob-tab').forEach(function(b){
@@ -2553,21 +2560,6 @@ function deleteCustomer(id, name){
 // ════════════════════════════════════════════
 var shippingConfig = { cost: 5, threshold: 50 };
 
-// Auto-update notes preview from top/mid/base
-function autoUpdateNotesPreview(){
-  var manualNotes = document.getElementById('fNotes').value.trim();
-  if(manualNotes) return; // don't override manual input
-  var top  = (document.getElementById('fTop').value||'').split(',').map(function(s){return s.trim();}).filter(Boolean);
-  var mid  = (document.getElementById('fMid').value||'').split(',').map(function(s){return s.trim();}).filter(Boolean);
-  var base = (document.getElementById('fBase').value||'').split(',').map(function(s){return s.trim();}).filter(Boolean);
-  var picks = top.slice(0,2).concat(mid.slice(0,1)).concat(base.slice(0,1));
-  var preview = picks.join(' · ');
-  var notesInput = document.getElementById('fNotesInput');
-  if(notesInput && !notesInput._manuallyEdited) {
-    notesInput.placeholder = preview || 'Escribir nota...';
-  }
-}
-
 function loadShippingConfig(){
   adminFetch(API+'/settings/shipping',{})
     .then(function(r){ if(!r)return null; return r.json(); })
@@ -2616,163 +2608,6 @@ function saveShippingConfig(){
 }
 
 // Load shipping config when pricing tab opens
-
-// ════════════════════════════════════════════
-// PROMO CODES
-// ════════════════════════════════════════════
-function togglePromoForm(){
-  var form = document.getElementById('promoCreateForm');
-  var btn  = document.getElementById('promoFormToggle');
-  if(!form) return;
-  var open = form.style.display === 'none' || form.style.display === '';
-  form.style.display = open ? 'block' : 'none';
-  btn.textContent = open ? '✕ Cancelar' : '+ Nuevo Código';
-  if(!open){
-    // Reset form state when closing
-    document.getElementById('pcCode').disabled=false;
-    var saveBtn = document.querySelector('#promoCreateForm button[onclick*="savePromoCode"]');
-    if(saveBtn){ saveBtn.textContent='Crear Código'; saveBtn.setAttribute('onclick','createPromoCode()'); }
-  }
-}
-
-function loadPromoCodes(){
-  adminFetch(API+'/admin/promo-codes',{})
-    .then(function(r){ return r ? r.json() : []; })
-    .then(function(codes){
-      var tbody = document.getElementById('promoList');
-      if(!tbody) return;
-      if(!codes.length){ tbody.innerHTML='<tr><td colspan="7" style="text-align:center;color:var(--muted);font-size:0.7rem;padding:1.5rem">No hay códigos creados aún</td></tr>'; return; }
-      tbody.innerHTML = codes.map(function(c){
-        var typeLabel = c.type === 'percent' ? c.value+'%' : '$'+parseFloat(c.value).toFixed(2);
-        var expiry = c.expires_at ? new Date(c.expires_at).toLocaleDateString('es-SV') : '—';
-        var uses   = c.max_uses ? c.uses+'/'+c.max_uses : c.uses+'/∞';
-        return '<tr>'+
-          '<td><strong style="font-family:monospace;font-size:0.85rem;color:var(--gold)">'+c.code+'</strong></td>'+
-          '<td style="font-size:0.72rem;color:var(--muted)">'+(c.type==='percent'?'Porcentaje':'Fijo')+'</td>'+
-          '<td>'+typeLabel+'</td>'+
-          '<td>'+(parseFloat(c.min_order)>0?'$'+parseFloat(c.min_order).toFixed(2):'—')+'</td>'+
-          '<td style="font-size:0.72rem">'+uses+'</td>'+
-          '<td><label style="display:flex;align-items:center;gap:0.4rem;cursor:pointer">'+
-            '<input type="checkbox" '+(c.active?'checked':'')+' onchange="togglePromoCode('+c.id+',this.checked)"/>'+
-            '<span style="font-size:0.65rem;color:var(--muted)">'+(c.active?'Activo':'Inactivo')+'</span>'+
-          '</label></td>'+
-          '<td style="display:flex;gap:0.4rem">'+
-            '<button onclick="editPromoCode('+c.id+')" style="background:none;border:1px solid var(--border);color:var(--muted);padding:0.2rem 0.5rem;font-size:0.6rem;cursor:pointer;letter-spacing:0.1em">Editar</button>'+
-            '<button onclick="deletePromoCode('+c.id+')" style="background:none;border:1px solid rgba(200,60,60,0.3);color:rgba(200,60,60,0.7);padding:0.2rem 0.5rem;font-size:0.6rem;cursor:pointer;letter-spacing:0.1em">Eliminar</button>'+
-          '</td>'+
-        '</tr>';
-      }).join('');
-    }).catch(function(){});
-}
-
-function createPromoCode(){
-  var code     = document.getElementById('pcCode').value.trim().toUpperCase();
-  var type     = document.getElementById('pcType').value;
-  var value    = parseFloat(document.getElementById('pcValue').value);
-  var minOrder = parseFloat(document.getElementById('pcMinOrder').value)||0;
-  var maxUses  = document.getElementById('pcMaxUses').value ? parseInt(document.getElementById('pcMaxUses').value) : null;
-  var expires  = document.getElementById('pcExpires').value || null;
-  var msg      = document.getElementById('promoCreateMsg');
-
-  if(!code||!value||isNaN(value)){ msg.style.color='var(--error)'; msg.textContent='Código y valor requeridos.'; return; }
-
-  adminFetch(API+'/admin/promo-codes',{
-    method:'POST',
-    headers:{'Content-Type':'application/json'},
-    body:JSON.stringify({code:code,type:type,value:value,min_order:minOrder,max_uses:maxUses,expires_at:expires})
-  }).then(function(r){ return r ? r.json() : null; })
-  .then(function(res){
-    if(!res) return;
-    if(res.ok){
-      msg.style.color='var(--success)'; msg.textContent='✓ Código '+res.code+' creado';
-      // Clear form
-      document.getElementById('pcCode').value='';
-      document.getElementById('pcValue').value='';
-      document.getElementById('pcMinOrder').value='';
-      document.getElementById('pcMaxUses').value='';
-      document.getElementById('pcExpires').value='';
-      loadPromoCodes();
-      setTimeout(function(){ togglePromoForm(); msg.textContent=''; }, 1500);
-    } else {
-      msg.style.color='var(--error)'; msg.textContent=res.error||'Error al crear.';
-    }
-  }).catch(function(){ msg.style.color='var(--error)'; msg.textContent='Error de conexión.'; });
-}
-
-function editPromoCode(id){
-  // Load the promo data and populate the create form for editing
-  adminFetch(API+'/admin/promo-codes',{})
-    .then(function(r){ return r ? r.json() : []; })
-    .then(function(codes){
-      var c = codes.find(function(x){ return x.id===id; });
-      if(!c) return;
-      // Populate form
-      document.getElementById('pcCode').value    = c.code;
-      document.getElementById('pcCode').disabled = true; // can't change the code string
-      document.getElementById('pcType').value    = c.type;
-      document.getElementById('pcValue').value   = c.value;
-      document.getElementById('pcMinOrder').value= parseFloat(c.min_order)||'';
-      document.getElementById('pcMaxUses').value = c.max_uses||'';
-      document.getElementById('pcExpires').value = c.expires_at
-        ? new Date(c.expires_at).toISOString().slice(0,16) : '';
-      // Show form in edit mode
-      document.getElementById('promoCreateForm').style.display='block';
-      document.getElementById('promoFormToggle').textContent='✕ Cancelar';
-      document.getElementById('promoCreateMsg').textContent='';
-      // Change create button to save
-      var btn = document.querySelector('#promoCreateForm button[onclick="createPromoCode()"]');
-      if(btn){
-        btn.textContent='Guardar Cambios';
-        btn.setAttribute('onclick','savePromoCode('+id+')');
-      }
-    });
-}
-
-function savePromoCode(id){
-  var type     = document.getElementById('pcType').value;
-  var value    = parseFloat(document.getElementById('pcValue').value);
-  var minOrder = parseFloat(document.getElementById('pcMinOrder').value)||0;
-  var maxUses  = document.getElementById('pcMaxUses').value ? parseInt(document.getElementById('pcMaxUses').value) : null;
-  var expires  = document.getElementById('pcExpires').value || null;
-  var msg      = document.getElementById('promoCreateMsg');
-
-  if(!value||isNaN(value)){ msg.style.color='var(--error)'; msg.textContent='Valor requerido.'; return; }
-
-  adminFetch(API+'/admin/promo-codes/'+id,{
-    method:'PUT',
-    headers:{'Content-Type':'application/json'},
-    body:JSON.stringify({type:type,value:value,min_order:minOrder,max_uses:maxUses,expires_at:expires,active:true})
-  }).then(function(r){ return r ? r.json() : null; })
-  .then(function(res){
-    if(!res) return;
-    if(res.ok){
-      msg.style.color='var(--success)'; msg.textContent='✓ Guardado';
-      document.getElementById('pcCode').disabled=false;
-      loadPromoCodes();
-      // Reset button back to create
-      var btn = document.querySelector('#promoCreateForm button[onclick*="savePromoCode"]');
-      if(btn){ btn.textContent='Crear Código'; btn.setAttribute('onclick','createPromoCode()'); }
-      setTimeout(function(){ togglePromoForm(); msg.textContent=''; }, 1200);
-    } else {
-      msg.style.color='var(--error)'; msg.textContent=res.error||'Error al guardar.';
-    }
-  }).catch(function(){ msg.style.color='var(--error)'; msg.textContent='Error de conexión.'; });
-}
-
-function togglePromoCode(id, active){
-  adminFetch(API+'/admin/promo-codes/'+id,{
-    method:'PATCH',
-    headers:{'Content-Type':'application/json'},
-    body:JSON.stringify({active:active})
-  }).then(function(){ loadPromoCodes(); }).catch(function(){});
-}
-
-function deletePromoCode(id){
-  if(!confirm('¿Eliminar este código de descuento?')) return;
-  adminFetch(API+'/admin/promo-codes/'+id,{method:'DELETE'})
-    .then(function(){ loadPromoCodes(); toast('Eliminado','Código eliminado','ok'); })
-    .catch(function(){});
-}
 
 // ── TOAST ─────────────────────────────────────────
 function exportOrders(){
@@ -2862,7 +2697,7 @@ document.addEventListener('click', function(e){
   if(!btn) return;
   var id  = btn.dataset.pickerId;
   var idx = parseInt(btn.dataset.idx, 10);
-  if(id && !isNaN(idx)){ _notePickers[id].splice(idx, 1); renderNoteTagPicker(id); autoDetectFamilies(); if(id==='top'||id==='mid'||id==='base') autoUpdateNotesPreview(); }
+  if(id && !isNaN(idx)){ _notePickers[id].splice(idx, 1); renderNoteTagPicker(id); autoDetectFamilies(); }
 });
 
 function addNoteTag() { addNoteTagTo('notes'); }
@@ -3000,8 +2835,6 @@ function addNoteTagTo(id) {
   renderNoteTagPicker(id);
   hideSugg(id);
   autoDetectFamilies();
-  // If top/mid/base changed, update the notes preview
-  if(id === 'top' || id === 'mid' || id === 'base') autoUpdateNotesPreview();
 }
 
 function showSuggFor(id) {
@@ -3183,17 +3016,10 @@ function openFragModal(id){
   initNoteTagPicker('mid',   p?p.mid:'');
   initNoteTagPicker('base',  p?p.base:'');
   document.getElementById('fConc').value   =p?p.conc:'Eau de Parfum';
-  document.getElementById('fFamily').value =p&&p.family?p.family:'';
-  document.getElementById('fNotifySubscribers').checked=false; // always reset — one-shot
-
-  document.getElementById('fChordsOverride').value = p && p.chords_override && p.chords_override.length ? p.chords_override.join(', ') : '';
-  // New products default to showing in new arrivals; existing products depend on whether they have arrived_at
-  document.getElementById('fShowNewArrival').checked = p ? !!(p.arrivedAt) : true;
   document.getElementById('fSeason').value =p?p.season:'All Seasons';
   document.getElementById('fSillage').value=p?p.sillage:'Moderate';
   document.getElementById('fLong').value   =p?p.long:'8+ Hours';
   document.getElementById('fTagline').value=p?p.tagline:'';
-  document.getElementById('fChordsOverride').value= p && p.chords_override && p.chords_override.length ? p.chords_override.join(', ') : '';
   document.getElementById('fDesc').value   =p?p.desc:'';
   document.getElementById('fC1').value     =p?p.c[0]:'#f5e6c8';
   document.getElementById('fC2').value     =p?p.c[1]:'#e8d0a0';
@@ -3246,31 +3072,14 @@ function saveFragrance(){
     brand:brand,name:name,g:document.getElementById('fGender').value,
     price:price,decantPrice:parseFloat(document.getElementById('fDecantPrice').value)||null,decantPrice5:parseFloat(document.getElementById('fDecantPrice5').value)||null,decantSizeMl:parseFloat(document.getElementById('fDecantSizeMl').value)||null,luxury:document.getElementById('fLuxury').checked||false,size:document.getElementById('fSize').value||'100ml',
     badge:document.getElementById('fBadge').value||null,
-    notes:(function(){
-      var manual = document.getElementById('fNotes').value.trim();
-      if(manual) return manual;
-      // Auto-generate from top/mid/base — pick 2 from top, 1 from mid, 1 from base
-      var top  = (document.getElementById('fTop').value||'').split(',').map(function(s){return s.trim();}).filter(Boolean);
-      var mid  = (document.getElementById('fMid').value||'').split(',').map(function(s){return s.trim();}).filter(Boolean);
-      var base = (document.getElementById('fBase').value||'').split(',').map(function(s){return s.trim();}).filter(Boolean);
-      var picks = top.slice(0,2).concat(mid.slice(0,1)).concat(base.slice(0,1));
-      return picks.join(' · ') || '';
-    })(),
+    notes:document.getElementById('fNotes').value,
     top:document.getElementById('fTop').value,mid:document.getElementById('fMid').value,
     base:document.getElementById('fBase').value,conc:document.getElementById('fConc').value,
     season:document.getElementById('fSeason').value,sillage:document.getElementById('fSillage').value,
     long:document.getElementById('fLong').value,tagline:document.getElementById('fTagline').value,
     desc:document.getElementById('fDesc').value,
     c:[document.getElementById('fC1').value,document.getElementById('fC2').value,document.getElementById('fC3').value],
-    s:document.getElementById('fShape').value,photos:fragPhotos,
-    family:(document.getElementById('fFamily').value||'').trim()||null,
-    notifySubscribers: document.getElementById('fNotifySubscribers').checked,
-    showNewArrival: document.getElementById('fShowNewArrival').checked,
-    chords_override:(function(){
-      var raw = (document.getElementById('fChordsOverride').value||'').trim();
-      if(!raw) return null;
-      return raw.split(',').map(function(s){return s.trim();}).filter(Boolean);
-    })()
+    s:document.getElementById('fShape').value,photos:fragPhotos
   };
   var btn=document.querySelector('.frag-save');
   btn.textContent='Guardando...';btn.disabled=true;
@@ -3631,6 +3440,221 @@ function deleteBundle(id){
   if(!confirm('¿Eliminar este bundle?')) return;
   adminFetch(API+'/bundles/'+id,{method:'DELETE'})
     .then(function(r){ if(!r)return; renderBundles(); toast('Bundle eliminado','','ok'); });
+}
+
+// ── COLLECTIONS ──────────────────────────────────────
+var _editingCollectionId = null;
+var _cmType = 'auto';
+
+function renderCollections(){
+  if(!sessionToken) return;
+  var container = document.getElementById('collectionsList');
+  if(!container) return;
+  container.innerHTML = '<div style="color:var(--muted);font-size:0.7rem;padding:2rem 0">Cargando...</div>';
+  adminFetch(API+'/collections/all', {})
+    .then(function(r){ if(!r) throw new Error('401'); return r.json(); })
+    .then(function(cols){
+      if(!Array.isArray(cols) || !cols.length){
+        container.innerHTML = '<div style="color:var(--muted);font-size:0.7rem;padding:2rem 0;text-align:center">No hay colecciones. Crea la primera.</div>';
+        return;
+      }
+      container.innerHTML = cols.map(function(c){
+        var filterSummary = '';
+        if(c.type === 'auto' && c.filter_json){
+          var f = c.filter_json;
+          var parts = [];
+          if(f.family) parts.push('Familia: '+f.family);
+          if(f.note)   parts.push('Nota: '+f.note);
+          if(f.badge)  parts.push('Badge: '+f.badge);
+          if(f.sillage) parts.push('Sillage: '+f.sillage);
+          if(f.price_min || f.price_max) parts.push('$'+(f.price_min||0)+' – $'+(f.price_max||'∞'));
+          filterSummary = parts.join(' · ');
+        } else if(c.type === 'manual'){
+          filterSummary = (c.product_ids||[]).length + ' productos seleccionados';
+        }
+        return '<div class="bundle-card" draggable="true" data-id="'+c.id+'" ondragstart="cmDragStart(event,'+c.id+')" ondragover="cmDragOver(event)" ondrop="cmDrop(event,'+c.id+')">'+
+          '<div class="bc-header">'+
+            '<span class="bc-name">'+esc(c.icon||'✨')+' '+esc(c.name)+'</span>'+
+            '<span class="bc-badge '+(c.active?'active':'inactive')+'">'+(c.active?'Activa':'Inactiva')+'</span>'+
+          '</div>'+
+          (c.description?'<div class="bc-desc">'+esc(c.description)+'</div>':'')+
+          '<div style="font-size:0.6rem;color:var(--muted);margin:0.3rem 0">'+
+            '<span style="color:rgba(184,149,90,0.5);text-transform:uppercase;letter-spacing:0.1em;font-size:0.55rem">'+(c.type==='auto'?'Automática':'Manual')+'</span>'+
+            (filterSummary?' · '+esc(filterSummary):'')+
+          '</div>'+
+          '<div style="font-size:0.58rem;color:var(--muted)">Orden: '+c.sort_order+'</div>'+
+          '<div class="bc-actions">'+
+            '<button class="bc-btn" onclick="editCollection('+c.id+')">Editar</button>'+
+            '<button class="bc-btn" onclick="toggleCollection('+c.id+','+(c.active?0:1)+')">'+
+              (c.active?'Desactivar':'Activar')+
+            '</button>'+
+            '<button class="bc-btn danger" onclick="deleteCollection('+c.id+')">Eliminar</button>'+
+          '</div>'+
+        '</div>';
+      }).join('');
+    })
+    .catch(function(){ container.innerHTML='<div style="color:#c05050;font-size:0.7rem;padding:2rem 0;text-align:center">Error al cargar colecciones.</div>'; });
+}
+
+// Drag-and-drop reorder
+var _cmDragId = null;
+function cmDragStart(e, id){ _cmDragId = id; e.dataTransfer.effectAllowed='move'; }
+function cmDragOver(e){ e.preventDefault(); e.dataTransfer.dropEffect='move'; }
+function cmDrop(e, targetId){
+  e.preventDefault();
+  if(_cmDragId === targetId) return;
+  var cards = Array.from(document.querySelectorAll('#collectionsList .bundle-card'));
+  var order = cards.map(function(c){ return parseInt(c.dataset.id); });
+  var fromIdx = order.indexOf(_cmDragId);
+  var toIdx   = order.indexOf(targetId);
+  order.splice(fromIdx, 1);
+  order.splice(toIdx, 0, _cmDragId);
+  adminFetch(API+'/collections/reorder', {
+    method:'PATCH', headers:{'Content-Type':'application/json'},
+    body: JSON.stringify({ order: order.map(function(id, i){ return { id:id, sort_order:i }; }) })
+  }).then(function(){ renderCollections(); });
+}
+
+function setCmType(type){
+  _cmType = type;
+  document.getElementById('cmAutoFields').style.display   = type==='auto'   ? 'block' : 'none';
+  document.getElementById('cmManualFields').style.display = type==='manual' ? 'block' : 'none';
+  document.getElementById('cmTypeAuto').style.background   = type==='auto'   ? 'rgba(184,149,90,0.12)' : 'none';
+  document.getElementById('cmTypeAuto').style.borderColor  = type==='auto'   ? '#b8955a' : 'rgba(184,149,90,0.2)';
+  document.getElementById('cmTypeAuto').style.color        = type==='auto'   ? '#b8955a' : '#8a7f72';
+  document.getElementById('cmTypeManual').style.background  = type==='manual' ? 'rgba(184,149,90,0.12)' : 'none';
+  document.getElementById('cmTypeManual').style.borderColor = type==='manual' ? '#b8955a' : 'rgba(184,149,90,0.2)';
+  document.getElementById('cmTypeManual').style.color       = type==='manual' ? '#b8955a' : '#8a7f72';
+  document.getElementById('cmTypeHint').textContent = type==='auto'
+    ? 'Automática: los productos se filtran por criterios (familia, notas, precio, badge).'
+    : 'Manual: elige exactamente qué productos aparecen en esta colección.';
+}
+
+function addCmProduct(productId){
+  var list = document.getElementById('cmProductsList');
+  var frags = catalogFragrances || [];
+  var selStyle = 'flex:1;background:#0e0c0a;border:1px solid rgba(184,149,90,0.2);color:#e8dcc8;font-size:0.7rem;padding:0.4rem;outline:none';
+  var row = document.createElement('div');
+  row.style.cssText = 'display:flex;gap:0.5rem;align-items:center';
+  var opts = '<option value="">Elegir fragancia...</option>'+frags.map(function(p){
+    return '<option value="'+p.id+'"'+(productId==p.id?' selected':'')+'>'+esc(p.brand)+' — '+esc(p.name)+'</option>';
+  }).join('');
+  row.innerHTML = '<select style="'+selStyle+'" class="cm-prod-sel">'+opts+'</select>'+
+    '<button onclick="this.parentElement.remove()" style="background:none;border:none;color:#8a7f72;cursor:pointer;font-size:0.85rem;padding:0.2rem 0.4rem">&#10005;</button>';
+  list.appendChild(row);
+}
+
+function openCollectionModal(col){
+  _editingCollectionId = col ? col.id : null;
+  document.getElementById('cmTitle').textContent = col ? 'Editar Colección' : 'Nueva Colección';
+  document.getElementById('cmName').value   = col ? col.name        : '';
+  document.getElementById('cmIcon').value   = col ? (col.icon||'✨') : '✨';
+  document.getElementById('cmDesc').value   = col ? (col.description||'') : '';
+  document.getElementById('cmOrder').value  = col ? (col.sort_order||0) : 0;
+  document.getElementById('cmErr').textContent = '';
+
+  var type = col ? (col.type||'auto') : 'auto';
+  setCmType(type);
+
+  // Fill auto fields
+  var f = col && col.filter_json ? col.filter_json : {};
+  document.getElementById('cmFamily').value   = f.family   || '';
+  document.getElementById('cmNote').value     = f.note     || '';
+  document.getElementById('cmBadge').value    = f.badge    || '';
+  document.getElementById('cmSillage').value  = f.sillage  || '';
+  document.getElementById('cmPriceMin').value = f.price_min || '';
+  document.getElementById('cmPriceMax').value = f.price_max || '';
+
+  // Fill manual fields
+  var list = document.getElementById('cmProductsList');
+  list.innerHTML = '';
+  if(type === 'manual' && col && col.product_ids && col.product_ids.length){
+    col.product_ids.forEach(function(pid){ addCmProduct(pid); });
+  }
+
+  // Ensure catalogue loaded
+  if(!catalogFragrances.length){
+    adminFetch(API+'/catalogue',{}).then(function(r){return r?r.json():[];}).then(function(d){
+      catalogFragrances=d||[];
+      document.getElementById('collectionModal').style.display='flex';
+    });
+  } else {
+    document.getElementById('collectionModal').style.display='flex';
+  }
+}
+
+function closeCollectionModal(){
+  document.getElementById('collectionModal').style.display='none';
+  _editingCollectionId = null;
+}
+
+function saveCollection(){
+  var name  = document.getElementById('cmName').value.trim();
+  var icon  = document.getElementById('cmIcon').value.trim() || '✨';
+  var desc  = document.getElementById('cmDesc').value.trim();
+  var order = parseInt(document.getElementById('cmOrder').value)||0;
+  var errEl = document.getElementById('cmErr');
+  errEl.textContent = '';
+  if(!name){ errEl.textContent='El nombre es requerido.'; return; }
+
+  var filter_json  = null;
+  var product_ids  = [];
+
+  if(_cmType === 'auto'){
+    var family   = document.getElementById('cmFamily').value.trim();
+    var note     = document.getElementById('cmNote').value.trim();
+    var badge    = document.getElementById('cmBadge').value;
+    var sillage  = document.getElementById('cmSillage').value;
+    var priceMin = parseFloat(document.getElementById('cmPriceMin').value)||0;
+    var priceMax = parseFloat(document.getElementById('cmPriceMax').value)||0;
+    filter_json = {};
+    if(family)   filter_json.family    = family;
+    if(note)     filter_json.note      = note;
+    if(badge)    filter_json.badge     = badge;
+    if(sillage)  filter_json.sillage   = sillage;
+    if(priceMin) filter_json.price_min = priceMin;
+    if(priceMax) filter_json.price_max = priceMax;
+  } else {
+    document.getElementById('cmProductsList').querySelectorAll('.cm-prod-sel').forEach(function(sel){
+      if(sel.value) product_ids.push(parseInt(sel.value));
+    });
+    if(!product_ids.length){ errEl.textContent='Selecciona al menos un producto.'; return; }
+  }
+
+  var url    = _editingCollectionId ? API+'/collections/'+_editingCollectionId : API+'/collections';
+  var method = _editingCollectionId ? 'PATCH' : 'POST';
+  var body   = { name:name, icon:icon, description:desc, type:_cmType, filter_json:filter_json, product_ids:product_ids, sort_order:order };
+
+  adminFetch(url,{method:method,headers:{'Content-Type':'application/json'},body:JSON.stringify(body)})
+    .then(function(r){ if(!r)return null; return r.json(); })
+    .then(function(res){
+      if(!res) return;
+      if(res.ok){ closeCollectionModal(); renderCollections(); toast('Colección guardada','','ok'); }
+      else{ errEl.textContent = res.error||'Error al guardar.'; }
+    })
+    .catch(function(){ errEl.textContent='Error de conexión.'; });
+}
+
+function editCollection(id){
+  adminFetch(API+'/collections/all',{})
+    .then(function(r){ if(!r)return null; return r.json(); })
+    .then(function(cols){
+      if(!cols) return;
+      var c = cols.find(function(x){ return x.id===id; });
+      if(c) openCollectionModal(c);
+    });
+}
+
+function toggleCollection(id, active){
+  adminFetch(API+'/collections/'+id,{method:'PATCH',headers:{'Content-Type':'application/json'},body:JSON.stringify({active:active})})
+    .then(function(r){ if(!r)return null; return r.json(); })
+    .then(function(){ renderCollections(); });
+}
+
+function deleteCollection(id){
+  if(!confirm('¿Eliminar esta colección?')) return;
+  adminFetch(API+'/collections/'+id,{method:'DELETE'})
+    .then(function(r){ if(!r)return; renderCollections(); toast('Colección eliminada','','ok'); });
 }
 
 // ── BOTTLE INVENTORY ─────────────────────────────────
