@@ -1005,11 +1005,11 @@ footer{background:var(--dark);padding:3.5rem 4rem;text-align:center;border-top:1
 
 /* Orders list */
 /* New arrivals section */
-.new-arrivals-section{margin-bottom:0;padding:2.5rem 4rem 3rem;border-top:1px solid rgba(184,149,90,0.12);border-bottom:1px solid rgba(184,149,90,0.12);background:rgba(184,149,90,0.025);margin-top:0}
+.new-arrivals-section{margin-bottom:0;padding:2.5rem 4rem 3rem;border-top:1px solid rgba(184,149,90,0.12);border-bottom:1px solid rgba(184,149,90,0.12);background:var(--warm-white);margin-top:0}
 .new-arrivals-hdr{display:flex;align-items:center;gap:1rem;margin-bottom:1.5rem}
-.new-arrivals-title{font-size:0.6rem;letter-spacing:0.3em;text-transform:uppercase;color:rgba(184,149,90,0.75);white-space:nowrap;font-weight:400}
-.new-arrivals-line{flex:1;height:1px;background:linear-gradient(to right,rgba(184,149,90,0.2),transparent)}
-.na-banner{display:grid;grid-template-columns:1fr 1fr;border:1px solid rgba(184,149,90,0.12);margin-bottom:1px;cursor:pointer;overflow:hidden;transition:border-color 0.3s;min-height:260px;align-items:stretch;grid-auto-rows:1fr}
+.new-arrivals-title{font-size:0.6rem;letter-spacing:0.3em;text-transform:uppercase;color:var(--gold);white-space:nowrap;font-weight:400}
+.new-arrivals-line{flex:1;height:1px;background:linear-gradient(to right,rgba(184,149,90,0.3),transparent)}
+.na-banner{display:grid;grid-template-columns:1fr 1fr;border:1px solid rgba(184,149,90,0.12);margin-bottom:1px;cursor:pointer;overflow:hidden;transition:border-color 0.3s;min-height:260px;align-items:stretch;grid-auto-rows:1fr;background:var(--warm-white)}
 .na-banner .na-banner-img,.na-banner .na-banner-body{min-height:260px;height:100%}
 .na-banner-img+.na-banner-body{border-left:none}
 .na-banner-body+.na-banner-img{border-left:none}
@@ -1017,16 +1017,16 @@ footer{background:var(--dark);padding:3.5rem 4rem;text-align:center;border-top:1
 .na-banner:hover .na-banner-img img{transform:scale(1.03)}
 .na-banner-img{position:relative;overflow:hidden;background:rgba(255,255,255,0.01);min-height:260px}
 .na-banner-img img{width:100%;height:100%;object-fit:contain;position:absolute;top:0;left:0;transition:transform 0.7s ease}
-.na-banner-body{padding:2rem 2.5rem;display:flex;flex-direction:column;justify-content:center;align-self:stretch;background:rgba(255,255,255,0.015)}
+.na-banner-body{padding:2rem 2.5rem;display:flex;flex-direction:column;justify-content:center;align-self:stretch;background:rgba(184,149,90,0.02)}
 .na-banner-eyebrow{font-size:0.48rem;letter-spacing:0.25em;text-transform:uppercase;color:#b8955a;margin-bottom:0.6rem}
 .na-banner-brand{font-size:0.55rem;letter-spacing:0.2em;text-transform:uppercase;color:#8a6a3a;margin-bottom:0.2rem}
-.na-banner-name{font-family:'Cormorant Garamond',serif;font-size:clamp(1.6rem,3vw,2.2rem);font-weight:300;color:#1a1714;line-height:1.1;margin-bottom:0.6rem}
-.na-banner-tagline{font-size:0.72rem;color:#6a6058;line-height:1.7;font-style:italic;margin-bottom:1rem;max-width:320px}
+.na-banner-name{font-family:'Cormorant Garamond',serif;font-size:clamp(1.6rem,3vw,2.2rem);font-weight:300;color:var(--charcoal);line-height:1.1;margin-bottom:0.6rem}
+.na-banner-tagline{font-size:0.72rem;color:var(--muted);line-height:1.7;font-style:italic;margin-bottom:1rem;max-width:320px}
 .na-banner-chords{display:flex;flex-wrap:wrap;gap:0.3rem;margin-bottom:1.2rem}
-.na-banner-chord{font-size:0.48rem;letter-spacing:0.12em;text-transform:uppercase;color:#8a7f72;border:1px solid rgba(184,149,90,0.3);padding:0.2rem 0.55rem}
+.na-banner-chord{font-size:0.48rem;letter-spacing:0.12em;text-transform:uppercase;color:var(--muted);border:1px solid rgba(184,149,90,0.3);padding:0.2rem 0.55rem}
 .na-banner-footer{display:flex;align-items:center;gap:1.5rem;padding-top:1rem;border-top:1px solid rgba(184,149,90,0.15)}
-.na-banner-price{font-family:'Cormorant Garamond',serif;font-size:1.4rem;font-weight:300;color:#b8955a}
-.na-banner-cta{font-size:0.52rem;letter-spacing:0.2em;text-transform:uppercase;color:#8a7f72;border-bottom:1px solid rgba(184,149,90,0.3);padding-bottom:1px;transition:color 0.2s,border-color 0.2s}
+.na-banner-price{font-family:'Cormorant Garamond',serif;font-size:1.4rem;font-weight:300;color:var(--charcoal)}
+.na-banner-cta{font-size:0.52rem;letter-spacing:0.2em;text-transform:uppercase;color:var(--muted);border-bottom:1px solid rgba(184,149,90,0.3);padding-bottom:1px;transition:color 0.2s,border-color 0.2s}
 .na-banner:hover .na-banner-cta{color:#b8955a;border-color:#b8955a}
 .na-banner:nth-child(odd) .na-banner-body{align-items:flex-end;text-align:right}
 .na-banner:nth-child(odd) .na-banner-chords{justify-content:flex-end}
