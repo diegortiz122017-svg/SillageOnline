@@ -5227,6 +5227,8 @@ var CURATED_FALLBACK = [
 // Convierte una colección de DB en un objeto compatible con el frontend
 function dbCollectionToLocal(c){
   var f = c.filter_json || {};
+  var families = f.family ? f.family.split(',').map(function(s){ return s.trim().toLowerCase(); }).filter(Boolean) : [];
+  var notes    = f.note   ? f.note.split(',').map(function(s){ return s.trim().toLowerCase(); }).filter(Boolean) : [];
   return {
     id:   'db_'+c.id,
     icon:  c.icon || '✨',
@@ -5236,12 +5238,14 @@ function dbCollectionToLocal(c){
       ? function(p){ return (c.product_ids||[]).map(Number).indexOf(+p.id) !== -1; }
       : function(p){
           var t = [(p.notes||''),(p.family||''),(p.top||''),(p.mid||''),(p.base||'')].join(' ').toLowerCase();
-          if(f.family  && t.indexOf(f.family.toLowerCase())  === -1) return false;
-          if(f.note    && t.indexOf(f.note.toLowerCase())    === -1) return false;
-          if(f.badge   && p.badge !== f.badge)                        return false;
-          if(f.sillage && p.sillage !== f.sillage)                    return false;
-          if(f.price_min && parseFloat(p.price) < f.price_min)        return false;
-          if(f.price_max && parseFloat(p.price) > f.price_max)        return false;
+          // Families: match ANY of the selected families
+          if(families.length && !families.some(function(fam){ return t.indexOf(fam) !== -1; })) return false;
+          // Notes: match ANY of the selected notes
+          if(notes.length && !notes.some(function(n){ return t.indexOf(n) !== -1; })) return false;
+          if(f.badge   && p.badge !== f.badge)         return false;
+          if(f.sillage && p.sillage !== f.sillage)     return false;
+          if(f.price_min && parseFloat(p.price) < f.price_min) return false;
+          if(f.price_max && parseFloat(p.price) > f.price_max) return false;
           return true;
         }
   };
