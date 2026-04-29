@@ -1225,15 +1225,42 @@ tr:hover td{background:rgba(255,255,255,0.02)}
       <!-- AUTO filters -->
       <div id="cmAutoFields">
         <label style="display:block;font-size:0.6rem;letter-spacing:0.15em;text-transform:uppercase;color:#8a7f72;margin-bottom:0.6rem">Criterios de Filtro</label>
+
+        <!-- Familias olfativas — botones igual que en catálogo -->
+        <div style="margin-bottom:0.8rem">
+          <label style="display:block;font-size:0.58rem;color:#8a7f72;margin-bottom:0.4rem">Familias olfativas (puede seleccionar varias)</label>
+          <div style="display:flex;flex-wrap:wrap;gap:0.35rem;margin-bottom:0.4rem" id="cmFamilyBtns">
+            <button type="button" class="ftag" data-cmfamily="woody">🪵 Woody</button>
+            <button type="button" class="ftag" data-cmfamily="floral">🌸 Floral</button>
+            <button type="button" class="ftag" data-cmfamily="oriental">🌙 Oriental</button>
+            <button type="button" class="ftag" data-cmfamily="citrus">🍋 Citrus</button>
+            <button type="button" class="ftag" data-cmfamily="fresh">💨 Fresh</button>
+            <button type="button" class="ftag" data-cmfamily="aquatic">🌊 Aquatic</button>
+            <button type="button" class="ftag" data-cmfamily="gourmand">🍪 Gourmand</button>
+            <button type="button" class="ftag" data-cmfamily="chypre">🍂 Chypre</button>
+            <button type="button" class="ftag" data-cmfamily="fougère">🌿 Fougère</button>
+            <button type="button" class="ftag" data-cmfamily="spicy">🌶 Spicy</button>
+            <button type="button" class="ftag" data-cmfamily="powdery">✨ Powdery</button>
+            <button type="button" class="ftag" data-cmfamily="green">🍃 Green</button>
+          </div>
+          <input type="hidden" id="cmFamily" value=""/>
+        </div>
+
+        <!-- Nota con autocomplete igual que en catálogo -->
+        <div style="margin-bottom:0.8rem">
+          <label style="display:block;font-size:0.58rem;color:#8a7f72;margin-bottom:0.4rem">Notas (contiene alguna de estas)</label>
+          <div style="display:flex;flex-wrap:wrap;gap:0.3rem;margin-bottom:0.4rem;min-height:1.5rem" id="cmNoteTags"></div>
+          <div style="position:relative">
+            <div class="notes-add-row" style="background:#0e0c0a;border:1px solid rgba(184,149,90,0.2);padding:0.3rem 0.5rem">
+              <input type="text" id="cmNoteInput" placeholder="Sándalo, Oud, Rosa..." autocomplete="off" style="flex:1;background:transparent;border:none;color:#e8dcc8;font-family:'Jost',sans-serif;font-size:0.72rem;padding:0.2rem 0;outline:none"/>
+              <button type="button" class="notes-add-btn" onclick="addCmNoteTag()">+</button>
+            </div>
+            <div id="cmNoteSuggestions" class="notes-suggestions" style="display:none;position:absolute;top:100%;left:0;right:0;z-index:100;background:#1a1714;border:1px solid rgba(184,149,90,0.2);max-height:160px;overflow-y:auto"></div>
+          </div>
+          <input type="hidden" id="cmNote" value=""/>
+        </div>
+
         <div style="display:grid;grid-template-columns:1fr 1fr;gap:0.8rem">
-          <div>
-            <label style="display:block;font-size:0.58rem;color:#8a7f72;margin-bottom:0.3rem">Familia olfativa</label>
-            <input id="cmFamily" type="text" placeholder="woody, fresh, oriental..." style="width:100%;box-sizing:border-box;background:#0e0c0a;border:1px solid rgba(184,149,90,0.2);color:#e8dcc8;font-size:0.72rem;padding:0.45rem 0.6rem;outline:none"/>
-          </div>
-          <div>
-            <label style="display:block;font-size:0.58rem;color:#8a7f72;margin-bottom:0.3rem">Nota (contiene)</label>
-            <input id="cmNote" type="text" placeholder="oud, rose, cedar..." style="width:100%;box-sizing:border-box;background:#0e0c0a;border:1px solid rgba(184,149,90,0.2);color:#e8dcc8;font-size:0.72rem;padding:0.45rem 0.6rem;outline:none"/>
-          </div>
           <div>
             <label style="display:block;font-size:0.58rem;color:#8a7f72;margin-bottom:0.3rem">Badge</label>
             <select id="cmBadge" style="width:100%;background:#0e0c0a;border:1px solid rgba(184,149,90,0.2);color:#e8dcc8;font-size:0.72rem;padding:0.45rem 0.6rem;outline:none">
@@ -3447,6 +3474,98 @@ function deleteBundle(id){
 // ── COLLECTIONS ──────────────────────────────────────
 var _editingCollectionId = null;
 var _cmType = 'auto';
+var _cmNotes = []; // current note tags for collection modal
+var _cmFamilies = []; // current family tags
+
+// Family button toggle for collection modal
+document.addEventListener('click', function(e){
+  var btn = e.target.closest('[data-cmfamily]');
+  if(!btn) return;
+  var fam = btn.dataset.cmfamily;
+  var idx = _cmFamilies.indexOf(fam);
+  if(idx === -1){ _cmFamilies.push(fam); btn.classList.add('active'); }
+  else { _cmFamilies.splice(idx,1); btn.classList.remove('active'); }
+  document.getElementById('cmFamily').value = _cmFamilies.join(',');
+});
+
+// Note tags for collection modal
+function addCmNoteTag(){
+  var inp = document.getElementById('cmNoteInput');
+  if(!inp) return;
+  var parts = inp.value.split(',').map(function(t){ return t.trim(); }).filter(Boolean);
+  parts.forEach(function(tag){
+    var norm = tag.charAt(0).toUpperCase() + tag.slice(1);
+    if(_cmNotes.indexOf(norm) === -1) _cmNotes.push(norm);
+  });
+  inp.value = '';
+  renderCmNoteTags();
+  hideCmSugg();
+}
+
+function renderCmNoteTags(){
+  var container = document.getElementById('cmNoteTags');
+  if(!container) return;
+  container.innerHTML = '';
+  _cmNotes.forEach(function(tag, i){
+    var span = document.createElement('span');
+    span.className = 'note-tag';
+    span.textContent = tag;
+    var btn = document.createElement('button');
+    btn.type = 'button';
+    btn.className = 'note-tag-rm';
+    btn.innerHTML = '&#10005;';
+    btn.dataset.cmidx = i;
+    span.appendChild(btn);
+    container.appendChild(span);
+  });
+  document.getElementById('cmNote').value = _cmNotes.join(', ');
+}
+
+document.addEventListener('click', function(e){
+  var btn = e.target.closest('.note-tag-rm[data-cmidx]');
+  if(!btn) return;
+  _cmNotes.splice(parseInt(btn.dataset.cmidx), 1);
+  renderCmNoteTags();
+});
+
+function showCmNoteSugg(){
+  var inp = document.getElementById('cmNoteInput');
+  var sugg = document.getElementById('cmNoteSuggestions');
+  if(!inp || !sugg) return;
+  var q = inp.value.trim().toLowerCase();
+  var matches = NOTE_PRESETS.filter(function(n){
+    return n.toLowerCase().indexOf(q) !== -1 && _cmNotes.indexOf(n) === -1;
+  }).slice(0, 8);
+  if(!matches.length && !q){ hideCmSugg(); return; }
+  sugg.innerHTML = '';
+  matches.forEach(function(n){
+    var div = document.createElement('div');
+    div.className = 'notes-sugg-item';
+    div.textContent = n;
+    div.addEventListener('mousedown', function(){ 
+      document.getElementById('cmNoteInput').value = n;
+      addCmNoteTag();
+    });
+    sugg.appendChild(div);
+  });
+  sugg.style.display = sugg.children.length ? 'block' : 'none';
+}
+
+function hideCmSugg(){
+  var el = document.getElementById('cmNoteSuggestions');
+  if(el) el.style.display = 'none';
+}
+
+(function wireCmNoteInput(){
+  document.addEventListener('DOMContentLoaded', function(){
+    var inp = document.getElementById('cmNoteInput');
+    if(!inp) return;
+    inp.addEventListener('input',   showCmNoteSugg);
+    inp.addEventListener('focus',   showCmNoteSugg);
+    inp.addEventListener('blur',    function(){ setTimeout(hideCmSugg, 150); });
+    inp.addEventListener('keydown', function(e){ if(e.key==='Enter'){ e.preventDefault(); addCmNoteTag(); } });
+  });
+})();
 
 function renderCollections(){
   if(!sessionToken) return;
@@ -3558,10 +3677,27 @@ function openCollectionModal(col){
   var type = col ? (col.type||'auto') : 'auto';
   setCmType(type);
 
+  // Reset family buttons and tags
+  _cmFamilies = [];
+  _cmNotes = [];
+  document.querySelectorAll('[data-cmfamily]').forEach(function(b){ b.classList.remove('active'); });
+
   // Fill auto fields
   var f = col && col.filter_json ? col.filter_json : {};
-  document.getElementById('cmFamily').value   = f.family   || '';
-  document.getElementById('cmNote').value     = f.note     || '';
+  // Restore families
+  if(f.family){
+    f.family.split(',').map(function(s){ return s.trim(); }).filter(Boolean).forEach(function(fam){
+      _cmFamilies.push(fam);
+      var btn = document.querySelector('[data-cmfamily="'+fam+'"]');
+      if(btn) btn.classList.add('active');
+    });
+  }
+  document.getElementById('cmFamily').value = _cmFamilies.join(',');
+  // Restore notes
+  if(f.note){
+    _cmNotes = f.note.split(',').map(function(s){ return s.trim(); }).filter(Boolean);
+  }
+  renderCmNoteTags();
   document.getElementById('cmBadge').value    = f.badge    || '';
   document.getElementById('cmSillage').value  = f.sillage  || '';
   document.getElementById('cmPriceMin').value = f.price_min || '';
@@ -3603,8 +3739,8 @@ function saveCollection(){
   var product_ids  = [];
 
   if(_cmType === 'auto'){
-    var family   = document.getElementById('cmFamily').value.trim();
-    var note     = document.getElementById('cmNote').value.trim();
+    var family   = _cmFamilies.join(',');
+    var note     = _cmNotes.join(',');
     var badge    = document.getElementById('cmBadge').value;
     var sillage  = document.getElementById('cmSillage').value;
     var priceMin = parseFloat(document.getElementById('cmPriceMin').value)||0;
