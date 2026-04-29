@@ -1005,7 +1005,7 @@ footer{background:var(--dark);padding:3.5rem 4rem;text-align:center;border-top:1
 
 /* Orders list */
 /* New arrivals section */
-.new-arrivals-section{margin-bottom:0;padding:2.5rem 0 3rem;border-top:1px solid rgba(184,149,90,0.12);border-bottom:1px solid rgba(184,149,90,0.12);background:rgba(184,149,90,0.025);margin-top:0.5rem}
+.new-arrivals-section{margin-bottom:0;padding:2.5rem 4rem 3rem;border-top:1px solid rgba(184,149,90,0.12);border-bottom:1px solid rgba(184,149,90,0.12);background:rgba(184,149,90,0.025);margin-top:0}
 .new-arrivals-hdr{display:flex;align-items:center;gap:1rem;margin-bottom:1.5rem}
 .new-arrivals-title{font-size:0.6rem;letter-spacing:0.3em;text-transform:uppercase;color:rgba(184,149,90,0.75);white-space:nowrap;font-weight:400}
 .new-arrivals-line{flex:1;height:1px;background:linear-gradient(to right,rgba(184,149,90,0.2),transparent)}
@@ -1039,6 +1039,7 @@ footer{background:var(--dark);padding:3.5rem 4rem;text-align:center;border-top:1
   .na-banner .na-banner-img,.na-banner .na-banner-body{min-height:unset}
   .na-banner-name{font-size:1.5rem}
   .na-banner-tagline{font-size:0.68rem}
+  .new-arrivals-section{padding:2rem 1rem 2.5rem}
 }
 
 .ap-order{background:rgba(255,255,255,0.03);border:1px solid rgba(184,149,90,0.12);
@@ -2699,7 +2700,8 @@ function buildGrid(){
         '<div class="new-arrivals-line"></div>'+
       '</div>'+
       bannersHtml;
-    grid.parentNode.insertBefore(naSection, grid);
+    var shopSection = document.getElementById('shop');
+    shopSection.parentNode.insertBefore(naSection, shopSection);
   }
 
   // ── Main toast for newest product if user hasn't seen it ──
