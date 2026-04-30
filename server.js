@@ -208,6 +208,17 @@ async function initDB() {
   `);
 
   await db.execute(`
+    CREATE TABLE IF NOT EXISTS stock_notify (
+      id          INT AUTO_INCREMENT PRIMARY KEY,
+      product_id  INT NOT NULL,
+      email       VARCHAR(255) NOT NULL,
+      notified    TINYINT(1) DEFAULT 0,
+      created_at  DATETIME NOT NULL,
+      UNIQUE KEY uq_product_email (product_id, email)
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
+  `);
+
+  await db.execute(`
     CREATE TABLE IF NOT EXISTS btcpay_pending (
       invoice_id   VARCHAR(100) PRIMARY KEY,
       order_id     VARCHAR(40)  NOT NULL,
@@ -3041,7 +3052,77 @@ app.post('/api/inventory', requireAdmin, async (req, res) => {
   invalidateInventory(); // clear cache before broadcasting
   broadcast('inventory', await getInventoryMap());
   await logActivity('Inventario actualizado');
+
+  // Send stock notification emails for products that just came back in stock
+  try {
+    const catalogue = await getCatalogue();
+    for (const [pid, val] of Object.entries(req.body)) {
+      const pidInt = parseInt(pid);
+      if (!val.outOfStock && parseInt(val.stock) > 0) {
+        // Product is now in stock — check for pending notifications
+        const [pending] = await db.execute(
+          'SELECT id, email FROM stock_notify WHERE product_id=? AND notified=0',
+          [pidInt]
+        );
+        if (!pending.length) continue;
+
+        const prod = catalogue.find(p => p.id === pidInt);
+        if (!prod) continue;
+
+        for (const row of pending) {
+          await sendEmail({
+            to: row.email,
+            subject: `${prod.brand} ${prod.name} ya está disponible — Sillage`,
+            html: `
+              <div style="font-family:'Helvetica Neue',Arial,sans-serif;max-width:520px;margin:0 auto;background:#faf8f4;padding:2.5rem 2rem">
+                <div style="font-family:Georgia,serif;font-size:1.6rem;font-weight:300;letter-spacing:0.3em;color:#b8955a;margin-bottom:1.5rem">Sillage</div>
+                <h2 style="font-family:Georgia,serif;font-size:1.5rem;font-weight:300;color:#1a1714;margin:0 0 0.8rem">
+                  ${prod.brand} ${prod.name} está disponible
+                </h2>
+                <p style="font-size:0.88rem;color:#5a5248;line-height:1.8;margin:0 0 1.5rem">
+                  Nos avisaste que querías saber cuando volviera. Ya está disponible en nuestra tienda.
+                </p>
+                <p style="font-size:0.8rem;color:#8a7f72;font-style:italic;line-height:1.7;margin:0 0 1.8rem">
+                  "${prod.tagline || prod.desc || ''}"
+                </p>
+                <a href="https://sillage-sv.com/?producto=${prod.id}"
+                   style="display:inline-block;padding:0.85rem 2rem;background:#b8955a;color:#0e0c0a;text-decoration:none;font-size:0.72rem;letter-spacing:0.2em;text-transform:uppercase">
+                  Ver fragancia →
+                </a>
+                <p style="font-size:0.65rem;color:#aaa;margin-top:2rem;line-height:1.6">
+                  Recibiste este correo porque solicitaste una notificación de disponibilidad en Sillage Parfumerie.
+                </p>
+              </div>
+            `
+          });
+          // Mark as notified
+          await db.execute('UPDATE stock_notify SET notified=1 WHERE id=?', [row.id]);
+        }
+        await logActivity(`Notificaciones de stock enviadas: ${prod.brand} ${prod.name} (${pending.length} correo${pending.length > 1 ? 's' : ''})`);
+      }
+    }
+  } catch(e) {
+    console.error('Stock notify email error:', e.message); // non-fatal
+  }
+
   res.json({ ok: true });
+});
+
+// POST /api/stock-notify — save email notification request for OOS product
+app.post('/api/stock-notify', async (req, res) => {
+  const { productId, email } = req.body;
+  if (!productId || !email) return res.status(400).json({ error: 'Faltan datos.' });
+  const re = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/;
+  if (!re.test(email)) return res.status(400).json({ error: 'Correo inválido.' });
+  try {
+    await db.execute(
+      'INSERT INTO stock_notify (product_id, email, notified, created_at) VALUES (?,?,0,?) ON DUPLICATE KEY UPDATE notified=0, created_at=VALUES(created_at)',
+      [parseInt(productId), email.toLowerCase().trim(), new Date()]
+    );
+    res.json({ ok: true });
+  } catch(e) {
+    res.status(500).json({ error: 'Error al guardar.' });
+  }
 });
 
 app.post('/api/pricing', requireAdmin, async (req, res) => {
