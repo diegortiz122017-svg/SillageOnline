@@ -3979,6 +3979,21 @@ document.getElementById('s3back').addEventListener('click',function(){goStep(2);
 document.getElementById('s3place').addEventListener('click',placeOrder);
 
 function placeOrder(){
+  // Always fetch current shipping settings before calculating total
+  // to avoid mismatch if admin changed them since page load
+  fetch(API+'/settings/shipping')
+    .then(function(r){ return r.json(); })
+    .then(function(data){
+      var _c = parseFloat(data.cost);
+      var _t = parseFloat(data.threshold);
+      if(!isNaN(_c)) shippingCost      = _c;
+      if(!isNaN(_t)) shippingThreshold = _t;
+    })
+    .catch(function(){})
+    .finally(function(){ _doPlaceOrder(); });
+}
+
+function _doPlaceOrder(){
   var email=gv('fe');
   // Build order items — bundle items share bundlePrice split across them for line-item display
   var _bundlePriceAssigned = {};
