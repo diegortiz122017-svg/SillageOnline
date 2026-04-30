@@ -1460,7 +1460,7 @@ footer{background:var(--dark);padding:3.5rem 4rem;text-align:center;border-top:1
   gap:0.5rem;
   flex-wrap:nowrap;
   max-width:480px;
-  opacity:0;animation:fadeUp 1s ease 1.3s forwards;
+  opacity:0;animation:fadeUp 1s ease 1.1s forwards;
 }
 .profile-label{
   font-family:'Jost',sans-serif;
@@ -3821,12 +3821,16 @@ function openCheckout(){
       block.style.display = 'block';
       list.innerHTML = addrs.map(function(a){
         var parts = [a.line, a.city, a.state, a.country].filter(Boolean).join(', ');
-        return '<div class="saved-addr-option" onclick="fillSavedAddress('+JSON.stringify(a).replace(/"/g,'&quot;')+')">'+
-          '<div style="font-size:0.58rem;letter-spacing:0.14em;text-transform:uppercase;color:#b8955a;margin-bottom:0.2rem;font-weight:500">'+esc(a.label)+'</div>'+
+        return '<div class="saved-addr-option" onclick="fillSavedAddress('+JSON.stringify(a).replace(/"/g,'&quot;')+')" style="'+(a.is_default?'border-color:rgba(184,149,90,0.5);background:#fdf8f0':'')+'">'+ 
+          '<div style="font-size:0.58rem;letter-spacing:0.14em;text-transform:uppercase;color:#b8955a;margin-bottom:0.2rem;font-weight:500">'+esc(a.label)+(a.is_default?' · Predeterminada':'')+'</div>'+
           '<div style="font-size:0.68rem;color:#1a1714;line-height:1.5">'+esc(parts)+'</div>'+
           '<div style="font-size:0.58rem;color:#b8955a;letter-spacing:0.1em;text-transform:uppercase;margin-top:0.35rem">Usar esta dirección →</div>'+
         '</div>';
       }).join('');
+
+      // Auto-fill default address if fields are empty
+      var defaultAddr = addrs.find(function(a){ return a.is_default; });
+      if(defaultAddr){ var fa=document.getElementById('fa'); if(!fa||!fa.value) fillSavedAddress(defaultAddr); }
 
       // Show save prompt — logged in, has addresses already
       var prompt = document.getElementById('saveAddrPrompt');
