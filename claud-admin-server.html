@@ -571,6 +571,18 @@ tr:hover td{background:rgba(255,255,255,0.02)}
         </select>
       </div>
     </div>
+    <div class="frag-row">
+      <div class="frag-field">
+        <label>Fecha de llegada <span style="font-size:0.5rem;color:var(--muted)">(para sección "Lo nuevo")</span></label>
+        <input type="date" id="fArrivedAt"/>
+      </div>
+      <div class="frag-field" style="display:flex;align-items:flex-end;padding-bottom:0.2rem">
+        <button type="button" onclick="document.getElementById('fArrivedAt').value=new Date().toISOString().slice(0,10)"
+          style="background:rgba(184,149,90,0.1);border:1px solid rgba(184,149,90,0.3);color:#b8955a;font-family:'Jost',sans-serif;font-size:0.58rem;letter-spacing:0.12em;text-transform:uppercase;padding:0.4rem 0.8rem;cursor:pointer">
+          Hoy
+        </button>
+      </div>
+    </div>
     <!-- FAMILY TAGS -->
     <div class="frag-row full">
       <div class="frag-field">
@@ -3040,6 +3052,7 @@ function openFragModal(id){
   document.getElementById('fLuxury').checked=p?!!(p.luxury):false;
   document.getElementById('fSize').value   =p?p.size:'100ml';
   document.getElementById('fBadge').value  =p?(p.badge||''):'';
+  document.getElementById('fArrivedAt').value = p && p.arrivedAt ? new Date(p.arrivedAt).toISOString().slice(0,10) : '';
   initNoteTagPicker('notes', p?p.notes:'');
   initNoteTagPicker('top',   p?p.top:'');
   initNoteTagPicker('mid',   p?p.mid:'');
@@ -3101,6 +3114,7 @@ function saveFragrance(){
     brand:brand,name:name,g:document.getElementById('fGender').value,
     price:price,decantPrice:parseFloat(document.getElementById('fDecantPrice').value)||null,decantPrice5:parseFloat(document.getElementById('fDecantPrice5').value)||null,decantSizeMl:parseFloat(document.getElementById('fDecantSizeMl').value)||null,luxury:document.getElementById('fLuxury').checked||false,size:document.getElementById('fSize').value||'100ml',
     badge:document.getElementById('fBadge').value||null,
+    arrivedAt: document.getElementById('fArrivedAt').value || null,
     notes:document.getElementById('fNotes').value,
     top:document.getElementById('fTop').value,mid:document.getElementById('fMid').value,
     base:document.getElementById('fBase').value,conc:document.getElementById('fConc').value,
