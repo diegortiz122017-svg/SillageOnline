@@ -125,10 +125,10 @@ nav a:hover{color:var(--gold)}
 .scroll-line{width:1px;height:40px;background:linear-gradient(to bottom,var(--gold),transparent);animation:spulse 2s ease-in-out infinite}
 @keyframes spulse{0%,100%{opacity:0.3}50%{opacity:1}}
 
-#shop{padding:6rem 4rem;background:var(--warm-white);color:var(--charcoal);scroll-margin-top:80px}
-.section-header{text-align:center;margin-bottom:4rem}
-.section-eyebrow{font-size:0.65rem;letter-spacing:0.35em;text-transform:uppercase;color:var(--gold);margin-bottom:1rem}
-.section-title{font-family:Cormorant Garamond,serif;font-size:clamp(2.5rem,5vw,4rem);font-weight:300;color:var(--charcoal);line-height:1.1}
+#shop{padding:4rem 4rem 6rem;background:var(--warm-white);color:var(--charcoal);scroll-margin-top:80px}
+.section-header{text-align:center;margin-bottom:3rem}
+.section-eyebrow{font-size:0.65rem;letter-spacing:0.35em;text-transform:uppercase;color:var(--gold);margin-bottom:0.8rem}
+.section-title{font-family:Cormorant Garamond,serif;font-size:clamp(3rem,5.5vw,4.5rem);font-weight:300;color:var(--charcoal);line-height:1.1}
 .section-title em{font-style:italic;color:var(--gold)}
 .filters-bar{
   display:flex;flex-direction:column;align-items:center;
@@ -682,7 +682,7 @@ footer{background:var(--dark);padding:3.5rem 4rem;text-align:center;border-top:1
   /* Shop section */
   #shop{padding:3.5rem 1rem 2rem}
   .section-eyebrow{font-size:0.58rem}
-  .section-title{font-size:clamp(2rem,8vw,3rem)}
+  .section-title{font-size:clamp(2.5rem,9vw,3.5rem)}
 
   /* Filters — stack cleanly */
   .filters-bar{gap:0.5rem;padding:0 0.5rem}
@@ -1008,7 +1008,7 @@ footer{background:var(--dark);padding:3.5rem 4rem;text-align:center;border-top:1
 .new-arrivals-section{margin-bottom:0;padding:4rem 4rem 3rem;border-top:1px solid rgba(184,149,90,0.12);border-bottom:1px solid rgba(184,149,90,0.12);background:var(--warm-white);margin-top:0}
 .new-arrivals-hdr{text-align:center;margin-bottom:2.5rem}
 .new-arrivals-title{font-size:0.65rem;letter-spacing:0.35em;text-transform:uppercase;color:var(--gold);font-weight:400;display:block;margin-bottom:0.8rem}
-.new-arrivals-heading{font-family:'Cormorant Garamond',serif;font-size:clamp(2rem,4vw,3rem);font-weight:300;color:var(--charcoal);line-height:1.1}
+.new-arrivals-heading{font-family:'Cormorant Garamond',serif;font-size:clamp(2.5rem,5vw,4rem);font-weight:300;color:var(--charcoal);line-height:1.1}
 .new-arrivals-heading em{font-style:italic;color:var(--gold)}
 .new-arrivals-line{display:none}
 .na-banner{display:grid;grid-template-columns:1fr 1fr;border:1px solid rgba(184,149,90,0.12);margin-bottom:1px;cursor:pointer;overflow:hidden;transition:border-color 0.3s;min-height:260px;align-items:stretch;grid-auto-rows:1fr;background:var(--warm-white)}
@@ -1111,20 +1111,21 @@ footer{background:var(--dark);padding:3.5rem 4rem;text-align:center;border-top:1
 .ap-addr-btn.danger:hover{border-color:var(--error);color:var(--error)}
 
 /* Favorites */
-.ap-fav{display:flex;align-items:center;justify-content:space-between;
-  padding:0.7rem 0;border-bottom:1px solid rgba(184,149,90,0.1);gap:0.8rem}
-.ap-fav:last-child{border-bottom:none}
-.ap-fav-name{font-family:Cormorant Garamond,serif;font-size:1rem;color:var(--cream)}
-.ap-fav-brand{font-size:0.55rem;letter-spacing:0.12em;text-transform:uppercase;color:var(--muted)}
-.ap-fav-price{font-family:Cormorant Garamond,serif;font-size:0.95rem;color:var(--gold-light)}
-.ap-fav-actions{display:flex;gap:0.4rem;flex-shrink:0}
-.ap-fav-add{padding:0.35rem 0.8rem;background:var(--gold);border:none;
-  color:var(--dark);font-family:'Jost',sans-serif;font-size:0.58rem;
-  letter-spacing:0.1em;text-transform:uppercase;cursor:pointer;transition:background 0.25s}
-.ap-fav-add:hover{background:var(--gold-light)}
-.ap-fav-rm{background:none;border:none;color:var(--muted);font-size:1rem;
-  cursor:pointer;transition:color 0.2s;padding:0.2rem}
-.ap-fav-rm:hover{color:var(--error)}
+.ap-fav-grid{display:grid;grid-template-columns:1fr 1fr;gap:0.6rem}
+.ap-fav-card{background:rgba(255,255,255,0.03);border:1px solid rgba(184,149,90,0.12);cursor:pointer;transition:all 0.25s;position:relative;overflow:hidden}
+.ap-fav-card:hover{border-color:rgba(184,149,90,0.35);transform:translateY(-2px)}
+.ap-fav-card-img{height:120px;display:flex;align-items:center;justify-content:center;background:linear-gradient(135deg,rgba(184,149,90,0.06),rgba(184,149,90,0.02))}
+.ap-fav-card-body{padding:0.65rem 0.7rem 0.8rem}
+.ap-fav-card-brand{font-size:0.48rem;letter-spacing:0.2em;text-transform:uppercase;color:var(--gold);margin-bottom:0.15rem}
+.ap-fav-card-name{font-family:'Cormorant Garamond',serif;font-size:0.95rem;color:var(--cream);line-height:1.2;margin-bottom:0.5rem}
+.ap-fav-card-footer{display:flex;align-items:center;justify-content:space-between;gap:0.4rem}
+.ap-fav-card-price{font-family:'Cormorant Garamond',serif;font-size:0.9rem;color:var(--gold-light)}
+.ap-fav-card-actions{display:flex;gap:0.3rem}
+.ap-fav-card-add{width:26px;height:26px;background:var(--gold);border:none;color:var(--dark);font-size:0.9rem;cursor:pointer;display:flex;align-items:center;justify-content:center;transition:background 0.2s;flex-shrink:0}
+.ap-fav-card-add:hover{background:var(--gold-light)}
+.ap-fav-card-rm{width:26px;height:26px;background:none;border:1px solid rgba(184,149,90,0.2);color:var(--muted);font-size:0.7rem;cursor:pointer;display:flex;align-items:center;justify-content:center;transition:all 0.2s;flex-shrink:0}
+.ap-fav-card-rm:hover{border-color:#c05050;color:#c05050}
+.ap-fav-card-oos{font-size:0.48rem;letter-spacing:0.12em;text-transform:uppercase;color:var(--muted);padding:0.2rem 0.4rem;border:1px solid rgba(138,127,114,0.2)}
 
 .fav-btn{background:none;border:1px solid rgba(184,149,90,0.2);color:var(--muted);width:28px;height:28px;cursor:pointer;font-size:0.85rem;display:flex;align-items:center;justify-content:center;transition:all 0.25s;flex-shrink:0}
 .fav-btn:hover{border-color:var(--gold);color:var(--gold)}
@@ -5780,23 +5781,32 @@ function renderFavorites(){
     container.innerHTML='<p style="color:var(--muted);font-size:0.72rem;text-align:center;padding:2rem 0">Cargando favoritos...</p>';
     return;
   }
-  container.innerHTML = favProds.map(function(p){
-    var pr = getPr(p.id);
-    var price = (pr.onSale && pr.salePrice) ? parseFloat(pr.salePrice) : p.price;
-    var inv = getInv(p.id);
-    return '<div class="ap-fav" onclick="closeAccount();openDetail('+p.id+')" style="cursor:pointer">'+
-      '<div>'+
-        '<div class="ap-fav-brand">'+p.brand+'</div>'+
-        '<div class="ap-fav-name">'+p.name+'</div>'+
-      '</div>'+
-      '<div class="ap-fav-actions">'+
-        '<span class="ap-fav-price">$'+price+'</span>'+
-        (!inv.outOfStock?'<button class="ap-fav-add" onclick="event.stopPropagation();addToCart('+p.id+');toast(\'Añadido\',\'\',\'ok\')">+</button>':
-          '<span style="font-size:0.6rem;color:var(--muted)">Agotado</span>')+
-        '<button class="ap-fav-rm" onclick="event.stopPropagation();toggleFav({stopPropagation:function(){}},'+p.id+');renderFavorites()" title="Eliminar">&#10005;</button>'+
-      '</div>'+
-    '</div>';
-  }).join('');
+  container.innerHTML = '<div class="ap-fav-grid">' +
+    favProds.map(function(p){
+      var pr    = getPr(p.id);
+      var price = (pr.onSale && pr.salePrice) ? parseFloat(pr.salePrice) : p.price;
+      var inv   = getInv(p.id);
+      var imgHtml = p.photos && p.photos.length
+        ? '<img src="'+esc(cdnImg(p.photos[0],200))+'" alt="'+esc(p.brand+' '+p.name)+'" style="max-height:90px;max-width:90%;object-fit:contain"/>'
+        : svg(p.c, p.s, 'sm');
+      return '<div class="ap-fav-card" onclick="closeAccount();openDetail('+p.id+')">'+
+        '<div class="ap-fav-card-img">'+imgHtml+'</div>'+
+        '<div class="ap-fav-card-body">'+
+          '<div class="ap-fav-card-brand">'+esc(p.brand)+'</div>'+
+          '<div class="ap-fav-card-name">'+esc(p.name)+'</div>'+
+          '<div class="ap-fav-card-footer">'+
+            '<span class="ap-fav-card-price">$'+price+'</span>'+
+            '<div class="ap-fav-card-actions">'+
+              (!inv.outOfStock
+                ? '<button class="ap-fav-card-add" onclick="event.stopPropagation();addToCart('+p.id+');toast(\''+esc(p.name)+'\',\'Añadido\',\'ok\')">+</button>'
+                : '<span class="ap-fav-card-oos">Agotado</span>')+
+              '<button class="ap-fav-card-rm" onclick="event.stopPropagation();toggleFav({stopPropagation:function(){}},'+p.id+');renderFavorites()" title="Quitar">&#10005;</button>'+
+            '</div>'+
+          '</div>'+
+        '</div>'+
+      '</div>';
+    }).join('') +
+  '</div>';
 }
 
 // ── PERFIL ────────────────────────────────────
