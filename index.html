@@ -2332,7 +2332,7 @@ footer{background:var(--dark);padding:3.5rem 4rem;text-align:center;border-top:1
 var API    = window.location.origin + '/api';
 var WS_URL = (window.location.protocol === 'https:' ? 'wss://' : 'ws://') + window.location.host;
 
-var adminState       = { inventory: {}, pricing: {} };
+var adminState       = { inventory: {}, pricing: {}, decants: {} };
 var ws               = null;
 var wsReconnectTimer = null;
 var wsConnected      = false;
@@ -2346,11 +2346,13 @@ function loadViaREST() {
   Promise.all([
     safe(fetch(API + '/inventory')),
     safe(fetch(API + '/pricing')),
-    safe(fetch(API + '/catalogue'))
+    safe(fetch(API + '/catalogue')),
+    safe(fetch(API + '/decant-inventory'))
   ]).then(function(results) {
     if(results[0]) adminState.inventory = results[0];
     if(results[1]) adminState.pricing   = results[1];
     if(results[2] && results[2].length > 0) P = results[2];
+    if(results[3]) adminState.decants   = results[3];
     setConn(results[0] ? 'live' : 'offline', results[0] ? 'En línea' : 'Sin conexión');
     buildGrid();
     loadBundles();
@@ -2528,6 +2530,12 @@ function setConn(state, label) {
 
 function getInv(pid)  { return adminState.inventory[pid] || { stock:99, lowStock:false, outOfStock:false }; }
 function getPr(pid)   { return adminState.pricing[pid]   || { salePrice:'', onSale:false }; }
+function getDecantInv(pid, sizeMl) {
+  var d = adminState.decants;
+  if(!d || !d[pid]) return { stock:99, low:false, out:false }; // no DB entry = unlimited
+  var key = String(parseFloat(sizeMl));
+  return d[pid][key] || { stock:99, low:false, out:false };
+}
 function effectivePrice(p) {
   var pr = getPr(p.id);
   if (pr.onSale && pr.salePrice && !isNaN(+pr.salePrice)) return +pr.salePrice;
@@ -3635,11 +3643,18 @@ function addToCart(pid){
 function addToCartWithOptions(pid, label, price, size, type){
   var p=P.find(function(x){return x.id===pid;});if(!p)return;
   if(getInv(pid).outOfStock){toast('Sin Stock','Este artículo no está disponible');return;}
+  // Check decant inventory if applicable
+  if(type === 'decant' || type === 'decant5'){
+    var sizeMl = parseFloat(size) || (type === 'decant5' ? 5 : 10);
+    var di = getDecantInv(pid, sizeMl);
+    if(di.out){ toast('Sin Stock','Este decant no está disponible en este momento'); return; }
+  }
   // Match by pid + type so full and decant can coexist in cart
   var ex=cart.find(function(i){return i.p.id===pid&&i.type===type;});
   if(ex)ex.qty++;
   else cart.push({p:p,qty:1,type:type,label:label,unitPrice:price,size:size});
   renderCart();
+  saveCart();
 }
 function removeFromCart(pid){cart=cart.filter(function(i){return i.p.id!==pid;});renderCart();saveCart();}
 function changeQty(pid,d){var it=cart.find(function(i){return i.p.id===pid;});if(!it)return;it.qty=Math.max(1,it.qty+d);renderCart();saveCart();}
@@ -4236,6 +4251,8 @@ var currentCustomer = null;
         }
         renderCustomerArea();
         migrateLocalAddresses(); // migrate any pre-login localStorage addresses
+        syncLocalFavsToDb();    // migrate localStorage favorites to DB
+        loadDbFavs();           // load favorites from DB
         // Load full profile
         return customerFetch(API+'/customer/profile',{});
       } else {
@@ -5073,6 +5090,8 @@ function doLogin(){
           .catch(function(){});
         // Migrate any addresses saved locally before login
         migrateLocalAddresses();
+        syncLocalFavsToDb();
+        loadDbFavs();
         closeAuth();
         renderCustomerArea();
         toast('¡Bienvenido!','Hola '+esc(currentCustomer.name),'ok');
@@ -5494,20 +5513,73 @@ function filterByCurated(col){
 // ════════════════════════════════════════════
 
 // ── Favorites (localStorage) ─────────────────
-function getFavs(){ try{return JSON.parse(localStorage.getItem('sillage_favs')||'[]');}catch(e){return[];} }
+// ── FAVORITES — DB-backed for logged-in users, localStorage fallback for guests ──
+var _dbFavs = null; // cached Set of product IDs from DB, null = not loaded
+
+function getFavs(){
+  if(currentCustomer && _dbFavs !== null) return Array.from(_dbFavs);
+  try{ return JSON.parse(localStorage.getItem('sillage_favs')||'[]'); }catch(e){ return []; }
+}
 function saveFavs(arr){ localStorage.setItem('sillage_favs', JSON.stringify(arr)); }
-function isFav(pid){ return getFavs().indexOf(+pid) !== -1; }
+function isFav(pid){
+  if(currentCustomer && _dbFavs !== null) return _dbFavs.has(+pid);
+  return getFavs().indexOf(+pid) !== -1;
+}
+
+function loadDbFavs(cb){
+  if(!currentCustomer){ if(cb) cb(); return; }
+  customerFetch(API+'/customer/favorites', {})
+    .then(function(r){ return r ? r.json() : []; })
+    .then(function(ids){ _dbFavs = new Set((ids||[]).map(Number)); if(cb) cb(); })
+    .catch(function(){ if(cb) cb(); });
+}
+
+function syncLocalFavsToDb(){
+  if(!currentCustomer) return;
+  var local = [];
+  try{ local = JSON.parse(localStorage.getItem('sillage_favs')||'[]'); }catch(e){}
+  if(!local.length) return;
+  customerFetch(API+'/customer/favorites/sync', {
+    method:'POST', headers:{'Content-Type':'application/json'},
+    body: JSON.stringify({ productIds: local })
+  }).then(function(r){ return r ? r.json() : null; })
+  .then(function(res){
+    if(res && res.ok){
+      local.forEach(function(id){ if(_dbFavs) _dbFavs.add(+id); });
+      localStorage.removeItem('sillage_favs');
+    }
+  }).catch(function(){});
+}
+
 function toggleFav(e, pid){
   e.stopPropagation();
-  var favs = getFavs();
-  var idx  = favs.indexOf(+pid);
-  if(idx === -1){ favs.push(+pid); toast('Guardado','Añadido a favoritos','ok'); }
-  else          { favs.splice(idx,1); }
-  saveFavs(favs);
-  // Update button state on card
+  if(!currentCustomer){
+    var favs = getFavs();
+    var idx  = favs.indexOf(+pid);
+    if(idx === -1){ favs.push(+pid); toast('Guardado','A\u00f1adido a favoritos','ok'); }
+    else          { favs.splice(idx,1); }
+    saveFavs(favs);
+    var btn = e.currentTarget;
+    btn.classList.toggle('saved', isFav(pid));
+    btn.textContent = isFav(pid) ? '\u2665' : '\u2661';
+    return;
+  }
+  // Logged in — toggle in DB optimistically
+  var wasAdded = !isFav(pid);
+  if(_dbFavs){ if(wasAdded) _dbFavs.add(+pid); else _dbFavs.delete(+pid); }
   var btn = e.currentTarget;
   btn.classList.toggle('saved', isFav(pid));
   btn.textContent = isFav(pid) ? '\u2665' : '\u2661';
+  if(wasAdded) toast('','A\u00f1adido a favoritos','ok');
+  customerFetch(API+'/customer/favorites', {
+    method:'POST', headers:{'Content-Type':'application/json'},
+    body: JSON.stringify({ productId: pid })
+  }).catch(function(){
+    // Rollback on error
+    if(_dbFavs){ if(wasAdded) _dbFavs.delete(+pid); else _dbFavs.add(+pid); }
+    btn.classList.toggle('saved', isFav(pid));
+    btn.textContent = isFav(pid) ? '\u2665' : '\u2661';
+  });
 }
 
 // ── Addresses (DB-backed via /api/customer/addresses) ────────────────────────
