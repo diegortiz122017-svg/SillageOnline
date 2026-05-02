@@ -2158,14 +2158,33 @@ app.get('/api/catalogue', async (req, res) => res.json(await getCatalogue()));
 async function deductInventory(items) {
   const n = new Date();
   for (const item of items) {
+    const pid  = parseInt(item.productId);
+    const qty  = parseInt(item.qty) || 1;
+    const type = (item.type || 'full').toLowerCase();
+
+    // Deduct from main inventory (bottles)
     await db.execute(
       `UPDATE inventory SET
         stock        = GREATEST(0, stock - ?),
         low_stock    = CASE WHEN GREATEST(0, stock - ?) <= 5 AND GREATEST(0, stock - ?) > 0 THEN 1 ELSE low_stock END,
         out_of_stock = CASE WHEN GREATEST(0, stock - ?) = 0 THEN 1 ELSE 0 END,
         updated_at   = ? WHERE product_id = ?`,
-      [parseInt(item.qty), parseInt(item.qty), parseInt(item.qty), parseInt(item.qty), n, parseInt(item.productId)]
+      [qty, qty, qty, qty, n, pid]
     );
+
+    // Deduct from decant_inventory for decant items
+    if (type === 'decant' || type === 'decant5' || type === 'sample') {
+      const sizeStr = String(item.size || '');
+      const sizeMatch = sizeStr.match(/([\d.]+)\s*ml/i);
+      const sizeMl = sizeMatch ? parseFloat(sizeMatch[1]) : (type === 'decant5' ? 5 : 10);
+      await db.execute(
+        `UPDATE decant_inventory SET
+          stock      = GREATEST(0, stock - ?),
+          updated_at = ?
+         WHERE product_id=? AND size_ml=? AND stock > 0`,
+        [qty, n, pid, sizeMl]
+      ).catch(() => {}); // non-fatal if no record exists
+    }
   }
   broadcast('inventory', await getInventoryMap());
 }
@@ -2311,6 +2330,24 @@ app.post('/api/orders', orderLimiter, async (req, res) => {
       if (type === 'decant' || type === 'sample') {
         const sizeStr = String(item.size || '');
         const is5ml   = sizeStr.includes('5ml') || sizeStr === '5';
+        const sizeMl  = is5ml ? 5 : 10;
+
+        // Check decant inventory
+        const [decantRows] = await db.execute(
+          'SELECT stock FROM decant_inventory WHERE product_id=? AND size_ml=?',
+          [pid, sizeMl]
+        );
+        if (decantRows.length && decantRows[0].stock !== null) {
+          const availableDecants = parseInt(decantRows[0].stock);
+          if (availableDecants < qty) {
+            return res.status(400).json({
+              error: availableDecants === 0
+                ? `Decant ${sizeMl}ml de ${prod.brand} ${prod.name} está agotado.`
+                : `Solo quedan ${availableDecants} decant${availableDecants > 1 ? 's' : ''} de ${sizeMl}ml de ${prod.brand} ${prod.name}.`
+            });
+          }
+        }
+
         const price10 = prod.decantPrice ? parseFloat(prod.decantPrice) : Math.round(fullPrice * 0.30);
         const price5  = prod.decantPrice5 ? parseFloat(prod.decantPrice5) : Math.round(price10 * 0.55);
         const catalogDecantPrice = is5ml ? price5 : price10;
