@@ -1149,6 +1149,23 @@ app.get('/nosotros',    (req, res) => res.sendFile(path.join(__dirname, 'nosotro
 app.get('/envios', (req, res) => res.sendFile(path.join(__dirname, 'envios.html')));
 app.get('/terminos', (req, res) => res.sendFile(path.join(__dirname, 'terminos.html')));
 app.get('/devoluciones', (req, res) => res.sendFile(path.join(__dirname, 'devoluciones.html')));
+
+// Shared product and bundle links — serve index.html so JS can open the detail overlay
+app.get('/fragancia/:slug', (req, res) => {
+  const index = path.join(__dirname, 'index.html');
+  const store = path.join(__dirname, 'store.html');
+  if (fs.existsSync(index)) return res.sendFile(index);
+  if (fs.existsSync(store)) return res.sendFile(store);
+  res.redirect('/');
+});
+
+app.get('/bundle/:slug', (req, res) => {
+  const index = path.join(__dirname, 'index.html');
+  const store = path.join(__dirname, 'store.html');
+  if (fs.existsSync(index)) return res.sendFile(index);
+  if (fs.existsSync(store)) return res.sendFile(store);
+  res.redirect('/');
+});
 app.get('/privacidad', (req, res) => {
   const fs = require('fs');
   const file = path.join(__dirname, 'privacidad.html');
@@ -1818,6 +1835,7 @@ app.get('/api/orders/:id/invoice', optionalCustomer, async (req, res) => {
   const html = `<!DOCTYPE html><html lang="es"><head>
     <meta charset="UTF-8"/>
     <meta name="viewport" content="width=device-width,initial-scale=1"/>
+    <meta name="email-obfuscation" content="off"/>
     <title>Factura ${escHtml(order.id)} — Sillage Parfumerie</title>
     <style>
       *{box-sizing:border-box;margin:0;padding:0}
@@ -1864,7 +1882,7 @@ app.get('/api/orders/:id/invoice', optionalCustomer, async (req, res) => {
             <div class="inv-section-title">Cliente</div>
             <div class="inv-value">
               ${escHtml(order.customer)}<br/>
-              ${escHtml(order.email)}<br/>
+              ${escHtml(order.email).replace('@', '&#64;')}<br/>
               ${order.phone ? escHtml(order.phone) : ''}
             </div>
           </div>
