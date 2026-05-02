@@ -1974,7 +1974,15 @@ footer{background:var(--dark);padding:3.5rem 4rem;text-align:center;border-top:1
         </div>
         <div id="pmInfoWompi" class="pm-info"><div class="sec-row"><span class="sec-badge">&#128274; SSL</span><span class="sec-badge">Wompi</span><span class="sec-badge">&#10003; Seguro</span></div><p style="font-size:0.68rem;color:var(--muted);line-height:1.7;margin-top:0.8rem">Serás redirigido a la pasarela segura de Wompi.</p></div>
         <div id="pmInfoBtcpay" class="pm-info" style="display:none"><p style="font-size:0.68rem;color:var(--muted);line-height:1.7">Serás redirigido a una página de pago segura donde podrás pagar con <strong style="color:var(--gold)">Bitcoin on-chain o Lightning Network</strong>.<br><span style="font-size:0.62rem">Compatible con Chivo Wallet, Phoenix, Muun, y cualquier wallet Bitcoin.</span></p></div>
-        <div id="pmInfoCod" class="pm-info" style="display:none"><p style="font-size:0.68rem;color:var(--muted);line-height:1.7">Pagarás en efectivo cuando recibas tu pedido.</p></div>
+        <div id="pmInfoCod" class="pm-info" style="display:none">
+          <p style="font-size:0.68rem;color:var(--muted);line-height:1.7">Pagarás en efectivo cuando recibas tu pedido.</p>
+          <div id="codRequirements" style="margin-top:0.6rem;padding:0.6rem 0.8rem;background:rgba(184,149,90,0.06);border-left:2px solid rgba(184,149,90,0.4);font-size:0.65rem;color:var(--muted);line-height:1.7">
+            <strong style="color:var(--charcoal)">Requisitos COD:</strong><br/>
+            · Teléfono válido de El Salvador requerido<br/>
+            · <span id="codMinOrderNote">Pedido mínimo: $25</span><br/>
+            · Máximo 1 pedido COD pendiente por contacto
+          </div>
+        </div>
         <!-- Promo code -->
         <div style="margin-top:1.2rem">
           <p class="f-label-top">Código de descuento (opcional)</p>
@@ -3939,6 +3947,8 @@ function v1(){
   return ok;
 }
 var selectedPayMethod='wompi';
+var _codMinOrder = 25; // loaded from server
+
 function selectPayMethod(method){
   selectedPayMethod=method;
   document.querySelectorAll('.pay-method').forEach(function(b){b.classList.remove('active');});
@@ -3947,6 +3957,16 @@ function selectPayMethod(method){
   document.querySelectorAll('.pm-info').forEach(function(d){d.style.display='none';});
   var info=document.getElementById('pmInfo'+method.charAt(0).toUpperCase()+method.slice(1));
   if(info)info.style.display='block';
+  // Load COD min order if not yet fetched
+  if(method==='cod'){
+    fetch(API+'/settings/shipping').then(function(r){ return r.json(); }).catch(function(){ return {}; });
+    fetch(API+'/admin/cod-settings').then(function(r){ return r.ok?r.json():{minOrder:25}; })
+      .then(function(s){
+        _codMinOrder = parseFloat(s.minOrder)||25;
+        var note = document.getElementById('codMinOrderNote');
+        if(note) note.textContent = 'Pedido mínimo: $'+_codMinOrder;
+      }).catch(function(){});
+  }
 }
 function v2(){return true;}
 
