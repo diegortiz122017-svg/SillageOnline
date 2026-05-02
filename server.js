@@ -1772,54 +1772,34 @@ app.get('/api/customer/orders', requireCustomer, async (req, res) => {
   res.json(orders);
 });
 
-// GET /api/orders/:id/invoice — serve HTML invoice, auth via customer token or admin token
-app.get('/api/orders/:id/invoice', async (req, res) => {
+// GET /api/orders/:id/invoice — serve HTML invoice
+app.get('/api/orders/:id/invoice', optionalCustomer, async (req, res) => {
   const orderId = req.params.id;
+  let orderRow  = null;
 
-  // Auth: accept customer token (header or query) or admin token
-  let authorized = false;
-  let orderRow = null;
-
-  // Try admin first
-  const adminToken = req.headers['x-admin-token'] || req.query.admintoken;
-  if (adminToken) {
-    try {
-      const [admRows] = await db.execute('SELECT token FROM admin_sessions WHERE token=? AND expires_at > ?', [adminToken, new Date()]);
-      if (admRows.length) authorized = true;
-    } catch(e) {}
-  }
-
-  // Try customer token (header or query param)
-  if (!authorized) {
-    const custToken = req.headers['x-customer-token'] || req.query.token || req.query.ctoken;
-    if (custToken) {
-      try {
-        const payload = jwt.verify(custToken, JWT_SECRET);
-        const customerId = payload.user?.id;
-        const customerEmail = payload.user?.email;
-        if (customerId) {
-          // Match by customer_id or by email (covers guest orders linked post-purchase)
-          const [rows] = await db.execute(
-            'SELECT * FROM orders WHERE id=? AND (customer_id=? OR email=?)',
-            [orderId, customerId, customerEmail || '']
-          );
-          if (rows.length) { authorized = true; orderRow = rows[0]; }
-        }
-      } catch(e) {}
-    }
-  }
-
-  // Fallback: load order for admin access
-  if (!orderRow) {
+  // Admin access — unrestricted
+  const isAdmin = !!req.headers['x-admin-token'];
+  if (isAdmin) {
     try {
       const [rows] = await db.execute('SELECT * FROM orders WHERE id=?', [orderId]);
       if (rows.length) orderRow = rows[0];
     } catch(e) {}
-  }
+    if (!orderRow) return res.status(404).send('Pedido no encontrado.');
+  } else {
+    // Customer — match by customer_id or email from token
+    const customer = req.customer?.user;
+    if (!customer) return res.status(403).send('Inicia sesión para ver tu factura.');
 
-  if (!authorized && !orderRow) return res.status(404).send('Pedido no encontrado.');
-  if (!authorized) return res.status(403).send('No autorizado.');
-  if (!orderRow)   return res.status(404).send('Pedido no encontrado.');
+    try {
+      const [rows] = await db.execute(
+        'SELECT * FROM orders WHERE id=? AND (customer_id=? OR LOWER(email)=?)',
+        [orderId, customer.id, (customer.email || '').toLowerCase()]
+      );
+      if (rows.length) orderRow = rows[0];
+    } catch(e) { console.error('Invoice auth error:', e.message); }
+
+    if (!orderRow) return res.status(403).send('No autorizado para ver esta factura.');
+  }
 
   const order  = orderRow;
   const items  = JSON.parse(order.items || '[]');
