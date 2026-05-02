@@ -1924,9 +1924,9 @@ footer{background:var(--dark);padding:3.5rem 4rem;text-align:center;border-top:1
         <div id="savedAddrBlock" style="display:none;margin-bottom:1rem">
           <div class="saved-addr-toggle" onclick="toggleAddrDrawer(this)">
             <span class="saved-addr-toggle-label">Direcciones guardadas</span>
-            <span class="saved-addr-toggle-arrow">&#9650;</span>
+            <span class="saved-addr-toggle-arrow">&#9660;</span>
           </div>
-          <div class="saved-addr-drawer open" id="savedAddrDrawer">
+          <div class="saved-addr-drawer" id="savedAddrDrawer">
             <div id="savedAddrList"></div>
           </div>
         </div>
@@ -1977,10 +1977,11 @@ footer{background:var(--dark);padding:3.5rem 4rem;text-align:center;border-top:1
         <div id="pmInfoCod" class="pm-info" style="display:none">
           <p style="font-size:0.68rem;color:var(--muted);line-height:1.7">Pagarás en efectivo cuando recibas tu pedido.</p>
           <div id="codRequirements" style="margin-top:0.6rem;padding:0.6rem 0.8rem;background:rgba(184,149,90,0.06);border-left:2px solid rgba(184,149,90,0.4);font-size:0.65rem;color:var(--muted);line-height:1.7">
-            <strong style="color:var(--charcoal)">Requisitos COD:</strong><br/>
-            · Teléfono válido de El Salvador requerido<br/>
-            · <span id="codMinOrderNote">Pedido mínimo: $25</span><br/>
-            · Máximo 1 pedido COD pendiente por contacto
+            <strong style="color:var(--charcoal)">Requisitos para pago contra entrega:</strong><br/>
+            · Número de teléfono válido requerido<br/>
+            · Pedido mínimo: <span id="codMinOrderNote">$25</span><br/>
+            · Máximo 1 pedido COD pendiente por contacto<br/>
+            · Máximo 2 pedidos COD por día
           </div>
         </div>
         <!-- Promo code -->
