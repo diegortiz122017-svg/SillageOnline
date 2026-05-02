@@ -1152,6 +1152,7 @@ app.get('/devoluciones', (req, res) => res.sendFile(path.join(__dirname, 'devolu
 
 // Shared product and bundle links — serve index.html so JS can open the detail overlay
 app.get('/fragancia/:slug', (req, res) => {
+  const fs    = require('fs');
   const index = path.join(__dirname, 'index.html');
   const store = path.join(__dirname, 'store.html');
   if (fs.existsSync(index)) return res.sendFile(index);
@@ -1160,6 +1161,7 @@ app.get('/fragancia/:slug', (req, res) => {
 });
 
 app.get('/bundle/:slug', (req, res) => {
+  const fs    = require('fs');
   const index = path.join(__dirname, 'index.html');
   const store = path.join(__dirname, 'store.html');
   if (fs.existsSync(index)) return res.sendFile(index);
