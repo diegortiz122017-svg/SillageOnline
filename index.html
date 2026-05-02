@@ -4083,7 +4083,11 @@ function _doPlaceOrder(){
       document.getElementById('successOid').textContent='Pedido '+order.id;
       document.getElementById('notifyEmail').textContent=email;
       var invLink=document.getElementById('invoiceLink');
-      if(invLink) invLink.href=API+'/orders/'+order.id+'/invoice'+(typeof customerToken!=='undefined'&&customerToken?'?token=':'');
+      if(invLink) invLink.href=API+'/orders/'+order.id+'/invoice';
+      if(invLink) invLink.onclick=function(e){
+        e.preventDefault();
+        openInvoice(order.id);
+      };
       document.getElementById('successItems').innerHTML='<div class="ms-title">Tu Pedido</div>'+
         orderItems.map(function(i){return'<div class="ms-row"><span>'+i.name+' \u00d7'+i.qty+'</span><span class="ms-price">$'+parseFloat(i.total||0).toFixed(2)+'</span></div>';}).join('')+
         '<div class="ms-div"></div><div class="ms-total"><span class="ms-total-lbl">Total Pagado</span><span class="ms-total-val">$'+total.toLocaleString()+'</span></div>';
@@ -5624,6 +5628,26 @@ function toggleOrderTracker(trackerId){
   el.classList.toggle('open');
 }
 
+function openInvoice(orderId){
+  var token = (typeof customerToken !== 'undefined') ? customerToken : null;
+  var url   = API+'/orders/'+orderId+'/invoice';
+  if(!token){ window.open(url, '_blank'); return; }
+  // Fetch with auth header then open blob in new tab
+  fetch(url, { headers:{ 'x-customer-token': token } })
+    .then(function(r){
+      if(r.status === 403){ toast('Sin acceso','No tienes permiso para ver esta factura',''); return null; }
+      if(!r.ok){ toast('Error','No se pudo cargar la factura',''); return null; }
+      return r.blob();
+    })
+    .then(function(blob){
+      if(!blob) return;
+      var blobUrl = URL.createObjectURL(blob);
+      var win = window.open(blobUrl, '_blank');
+      if(!win) window.location.href = blobUrl; // fallback if popup blocked
+    })
+    .catch(function(){ toast('Error','No se pudo cargar la factura',''); });
+}
+
 function loadAcctOrders(){
   var container = document.getElementById('acctOrdersList');
   if(!customerToken){ container.innerHTML='<p style="color:var(--muted);font-size:0.72rem">Inicia sesión para ver tus pedidos.</p>'; return; }
@@ -5665,7 +5689,7 @@ function loadAcctOrders(){
             '<span class="ap-order-total">$'+parseFloat(o.total||0).toFixed(2)+'</span>'+
           '</div>'+
           '<div style="display:flex;gap:0.8rem;margin-top:0.6rem;padding-top:0.6rem;border-top:1px solid rgba(184,149,90,0.08)">'+
-            '<a href="'+API+'/orders/'+o.id+'/invoice?ctoken='+encodeURIComponent(customerToken||'')+'" '+
+            '<a href="#" onclick="openInvoice(&#39;'+o.id+'&#39;)" '+
                'style="font-size:0.55rem;letter-spacing:0.12em;text-transform:uppercase;color:rgba(184,149,90,0.5);text-decoration:none;border-bottom:1px solid rgba(184,149,90,0.2)">'+
               '&#128196; Factura'+
             '</a>'+
