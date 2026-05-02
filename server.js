@@ -1772,6 +1772,155 @@ app.get('/api/customer/orders', requireCustomer, async (req, res) => {
   res.json(orders);
 });
 
+// GET /api/orders/:id/invoice — serve HTML invoice, auth via customer token or admin token
+app.get('/api/orders/:id/invoice', async (req, res) => {
+  const orderId = req.params.id;
+
+  // Auth: accept customer token (header or query) or admin token
+  let authorized = false;
+  let orderRow = null;
+
+  // Try admin first
+  const adminToken = req.headers['x-admin-token'] || req.query.admintoken;
+  if (adminToken) {
+    try {
+      const [admRows] = await db.execute('SELECT token FROM admin_sessions WHERE token=? AND expires_at > ?', [adminToken, new Date()]);
+      if (admRows.length) authorized = true;
+    } catch(e) {}
+  }
+
+  // Try customer token (header or query param)
+  if (!authorized) {
+    const custToken = req.headers['x-customer-token'] || req.query.token;
+    if (custToken) {
+      try {
+        const payload = jwt.verify(custToken, JWT_SECRET);
+        const customerId = payload.user?.id;
+        if (customerId) {
+          // Verify this order belongs to this customer
+          const [rows] = await db.execute(
+            'SELECT * FROM orders WHERE id=? AND customer_id=?', [orderId, customerId]
+          );
+          if (rows.length) { authorized = true; orderRow = rows[0]; }
+        }
+      } catch(e) {}
+    }
+  }
+
+  // Fallback: load order for admin access
+  if (!orderRow) {
+    try {
+      const [rows] = await db.execute('SELECT * FROM orders WHERE id=?', [orderId]);
+      if (rows.length) orderRow = rows[0];
+    } catch(e) {}
+  }
+
+  if (!authorized && !orderRow) return res.status(404).send('Pedido no encontrado.');
+  if (!authorized) return res.status(403).send('No autorizado.');
+  if (!orderRow)   return res.status(404).send('Pedido no encontrado.');
+
+  const order  = orderRow;
+  const items  = JSON.parse(order.items || '[]');
+  const total  = parseFloat(order.total || 0).toFixed(2);
+  const date   = new Date(order.created_at).toLocaleDateString('es-ES', { day:'numeric', month:'long', year:'numeric' });
+
+  const itemRows = items.map(i =>
+    `<tr>
+      <td style="padding:10px 12px;border-bottom:1px solid #f0e6d0;color:#1a1714;font-size:13px">${escHtml(i.name)}</td>
+      <td style="padding:10px 12px;border-bottom:1px solid #f0e6d0;color:#8a7f72;font-size:13px;text-align:center">${i.qty}</td>
+      <td style="padding:10px 12px;border-bottom:1px solid #f0e6d0;color:#1a1714;font-size:13px;text-align:right">$${parseFloat(i.price||0).toFixed(2)}</td>
+      <td style="padding:10px 12px;border-bottom:1px solid #f0e6d0;color:#1a1714;font-size:13px;text-align:right">$${parseFloat(i.total||0).toFixed(2)}</td>
+    </tr>`
+  ).join('');
+
+  const html = `<!DOCTYPE html><html lang="es"><head>
+    <meta charset="UTF-8"/>
+    <meta name="viewport" content="width=device-width,initial-scale=1"/>
+    <title>Factura ${escHtml(order.id)} — Sillage Parfumerie</title>
+    <style>
+      *{box-sizing:border-box;margin:0;padding:0}
+      body{font-family:'Helvetica Neue',Arial,sans-serif;background:#f5f0e8;padding:2rem 1rem;color:#1a1714}
+      .invoice{max-width:620px;margin:0 auto;background:#fff;border:1px solid #e8d8b8}
+      .inv-header{background:#0e0c0a;padding:28px 36px;display:flex;justify-content:space-between;align-items:flex-start}
+      .inv-logo{font-family:Georgia,serif;font-size:22px;font-weight:300;letter-spacing:6px;color:#b8955a;text-transform:uppercase}
+      .inv-logo-sub{font-size:9px;letter-spacing:3px;color:#8a7f72;text-transform:uppercase;margin-top:3px}
+      .inv-label{text-align:right}
+      .inv-label-title{font-size:10px;letter-spacing:3px;text-transform:uppercase;color:#b8955a}
+      .inv-label-id{font-family:Georgia,serif;font-size:14px;color:#e8dcc8;margin-top:3px}
+      .inv-label-date{font-size:11px;color:#8a7f72;margin-top:2px}
+      .inv-body{padding:28px 36px}
+      .inv-section{margin-bottom:20px}
+      .inv-section-title{font-size:9px;letter-spacing:3px;text-transform:uppercase;color:#b8955a;margin-bottom:8px}
+      .inv-value{font-size:13px;color:#1a1714;line-height:1.7}
+      table{width:100%;border-collapse:collapse}
+      thead tr{background:#f5f0e8}
+      th{padding:8px 12px;text-align:left;font-size:9px;letter-spacing:2px;text-transform:uppercase;color:#8a7f72;font-weight:400}
+      th:last-child,th:nth-child(3){text-align:right}
+      th:nth-child(2){text-align:center}
+      .inv-total-row{display:flex;justify-content:flex-end;padding:16px 0 0}
+      .inv-total-box{text-align:right}
+      .inv-total-label{font-size:9px;letter-spacing:2px;text-transform:uppercase;color:#8a7f72;margin-bottom:4px}
+      .inv-total-val{font-family:Georgia,serif;font-size:24px;font-weight:300;color:#1a1714}
+      .inv-footer{padding:16px 36px 24px;border-top:1px solid #f0e6d0;font-size:10px;color:#aaa;text-align:center;line-height:1.7}
+      @media print{body{background:#fff;padding:0}.inv-footer{display:none}}
+      .print-btn{display:block;width:100%;max-width:200px;margin:1.5rem auto 0;padding:10px;background:#b8955a;border:none;color:#0e0c0a;font-family:inherit;font-size:11px;letter-spacing:2px;text-transform:uppercase;cursor:pointer}
+      @media print{.print-btn{display:none}}
+    </style>
+  </head><body>
+    <div class="invoice">
+      <div class="inv-header">
+        <div><div class="inv-logo">Sillage</div><div class="inv-logo-sub">Parfumerie</div></div>
+        <div class="inv-label">
+          <div class="inv-label-title">Factura</div>
+          <div class="inv-label-id">${escHtml(order.id)}</div>
+          <div class="inv-label-date">${date}</div>
+        </div>
+      </div>
+      <div class="inv-body">
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:1.5rem;margin-bottom:24px">
+          <div class="inv-section">
+            <div class="inv-section-title">Cliente</div>
+            <div class="inv-value">
+              ${escHtml(order.customer)}<br/>
+              ${escHtml(order.email)}<br/>
+              ${order.phone ? escHtml(order.phone) : ''}
+            </div>
+          </div>
+          <div class="inv-section">
+            <div class="inv-section-title">Enviar a</div>
+            <div class="inv-value">
+              ${escHtml(order.address || '')}<br/>
+              ${escHtml(order.city || '')}${order.state ? ', '+escHtml(order.state) : ''}<br/>
+              ${escHtml(order.country || '')}
+            </div>
+          </div>
+        </div>
+        <div class="inv-section">
+          <div class="inv-section-title">Detalle del Pedido</div>
+          <table>
+            <thead><tr><th>Producto</th><th>Cant.</th><th>Precio</th><th>Total</th></tr></thead>
+            <tbody>${itemRows}</tbody>
+          </table>
+        </div>
+        <div class="inv-total-row">
+          <div class="inv-total-box">
+            <div class="inv-total-label">Total</div>
+            <div class="inv-total-val">$${total}</div>
+          </div>
+        </div>
+      </div>
+      <div class="inv-footer">
+        Sillage Parfumerie · El Salvador · sillage-sv.com<br/>
+        Gracias por tu compra
+      </div>
+    </div>
+    <button class="print-btn" onclick="window.print()">Imprimir</button>
+  </body></html>`;
+
+  res.setHeader('Content-Type', 'text/html; charset=utf-8');
+  res.send(html);
+});
+
 // ── Customer addresses CRUD ──────────────────────────────────────────────────
 
 // GET /api/customer/addresses — list all addresses for the logged-in customer
@@ -4229,7 +4378,126 @@ app.delete('/api/catalogue/:id', requireAdmin, async (req, res) => {
   res.json({ ok: true });
 });
 
-// ── One-time migration: score all existing products ───────────────────────────
+// POST /api/admin/sale-email — send sale notification to targeted customers
+app.post('/api/admin/sale-email', requireAdmin, async (req, res) => {
+  const { productId, audience, message } = req.body;
+  if (!productId) return res.status(400).json({ error: 'productId requerido.' });
+
+  try {
+    const catalogue = await getCatalogue();
+    const prod = catalogue.find(p => p.id === parseInt(productId));
+    if (!prod) return res.status(404).json({ error: 'Fragancia no encontrada.' });
+
+    const [priceRows] = await db.execute(
+      'SELECT sale_price, on_sale FROM pricing WHERE product_id=?', [parseInt(productId)]
+    );
+    const pr = priceRows[0] || {};
+    const salePrice = pr.on_sale && pr.sale_price ? parseFloat(pr.sale_price) : null;
+    const savings   = salePrice ? Math.round(prod.price - salePrice) : null;
+
+    // Build recipient list based on audience
+    let customers = [];
+    if (audience === 'favorites') {
+      // Customers whose Nez profile includes this product in recommended_ids
+      const [rows] = await db.execute(`
+        SELECT DISTINCT c.id, c.name, c.email, ep.unsubscribe_token
+        FROM customers c
+        JOIN email_preferences ep ON ep.customer_id = c.id
+        LEFT JOIN sommelier_profiles sp ON sp.customer_id = c.id
+        WHERE ep.marketing = 1
+          AND sp.profile_json IS NOT NULL
+          AND JSON_CONTAINS(
+            JSON_EXTRACT(sp.profile_json, '$.recommended_ids'),
+            CAST(? AS JSON)
+          )
+      `, [parseInt(productId)]);
+      customers = rows;
+
+      // Fallback: if no profile matches, get all marketing customers
+      if (!customers.length) {
+        const [allRows] = await db.execute(`
+          SELECT c.id, c.name, c.email, ep.unsubscribe_token
+          FROM customers c
+          JOIN email_preferences ep ON ep.customer_id = c.id
+          WHERE ep.marketing = 1
+        `);
+        customers = allRows;
+      }
+    } else {
+      // All customers with marketing enabled
+      const [rows] = await db.execute(`
+        SELECT c.id, c.name, c.email, ep.unsubscribe_token
+        FROM customers c
+        JOIN email_preferences ep ON ep.customer_id = c.id
+        WHERE ep.marketing = 1
+      `);
+      customers = rows;
+    }
+
+    if (!customers.length) return res.json({ ok: true, sent: 0 });
+
+    const BASE = process.env.BASE_URL || 'https://sillage-sv.com';
+    let sent = 0;
+
+    for (const customer of customers) {
+      const unsubUrl = `${BASE}/preferencias-email?token=${customer.unsubscribe_token}`;
+      const productUrl = `${BASE}/?producto=${prod.id}`;
+
+      const savingsHtml = savings
+        ? `<div style="display:inline-block;background:#b8955a;color:#0e0c0a;font-size:11px;letter-spacing:2px;text-transform:uppercase;padding:4px 12px;margin-bottom:16px">Ahorra $${savings}</div>`
+        : '';
+
+      const customMsgHtml = message
+        ? `<p style="font-size:13px;color:#8a7f72;line-height:1.8;font-style:italic;margin:0 0 20px;border-left:2px solid #b8955a;padding-left:12px">${escHtml(message)}</p>`
+        : '';
+
+      const html = emailTemplate(`
+        <p style="font-size:13px;color:#8a7f72;margin:0 0 20px">
+          Hola <strong style="color:#1a1714">${escHtml(customer.name.split(' ')[0])}</strong> —
+          una fragancia que podrías amar acaba de tener un precio especial.
+        </p>
+        ${savingsHtml}
+        <table width="100%" cellpadding="0" cellspacing="0" style="border:1px solid #e8d8b8;margin-bottom:20px">
+          <tr>
+            <td style="padding:20px 24px">
+              <div style="font-size:10px;letter-spacing:3px;text-transform:uppercase;color:#b8955a;margin-bottom:4px">${escHtml(prod.brand)}</div>
+              <div style="font-family:Georgia,serif;font-size:22px;font-weight:300;color:#1a1714;margin-bottom:8px">${escHtml(prod.name)}</div>
+              ${prod.tagline ? `<div style="font-size:12px;color:#8a7f72;font-style:italic;margin-bottom:16px">${escHtml(prod.tagline)}</div>` : ''}
+              <div style="display:flex;align-items:baseline;gap:12px;margin-bottom:20px">
+                ${salePrice ? `<span style="font-family:Georgia,serif;font-size:26px;color:#b8955a">$${salePrice}</span>` : ''}
+                ${salePrice ? `<span style="font-size:14px;color:#aaa;text-decoration:line-through">$${prod.price}</span>` : `<span style="font-family:Georgia,serif;font-size:26px;color:#1a1714">$${prod.price}</span>`}
+              </div>
+              ${customMsgHtml}
+              <a href="${productUrl}"
+                 style="display:inline-block;padding:10px 24px;background:#b8955a;color:#0e0c0a;text-decoration:none;font-size:11px;letter-spacing:3px;text-transform:uppercase">
+                Ver Fragancia →
+              </a>
+            </td>
+          </tr>
+        </table>
+        <p style="font-size:11px;color:#aaa;line-height:1.6">
+          Recibiste este correo porque tienes una cuenta en Sillage Parfumerie y aceptaste emails de novedades.
+          <a href="${unsubUrl}" style="color:#b8955a">Gestionar preferencias</a>
+        </p>
+      `);
+
+      await sendEmail({
+        to: customer.email,
+        subject: `${prod.brand} ${prod.name} — precio especial${savings ? ` · Ahorra $${savings}` : ''} | Sillage`,
+        html
+      });
+      sent++;
+    }
+
+    await logActivity(`Email de oferta enviado: ${prod.brand} ${prod.name} → ${sent} clientes (audiencia: ${audience})`);
+    res.json({ ok: true, sent });
+
+  } catch(e) {
+    console.error('Sale email error:', e.message);
+    res.status(500).json({ error: e.message });
+  }
+});
+
 // POST /api/admin/migrate-note-intensity
 // Runs calcIntensity on every product and saves updated catalogue.
 // Safe to run multiple times — just recalculates and overwrites scores.
