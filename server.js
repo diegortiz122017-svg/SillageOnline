@@ -2298,11 +2298,13 @@ app.post('/api/orders', orderLimiter, async (req, res) => {
       return res.status(400).json({ error: 'El número de teléfono es requerido para pago contra entrega.' });
     }
 
-    // 2. Valid SV phone format (+503 XXXX-XXXX or 8 digits)
-    const phoneDigits = rawPhone.replace(/[\s\-\+]/g, '');
-    const svPhone = phoneDigits.startsWith('503') ? phoneDigits.slice(3) : phoneDigits;
+    // 2. Valid SV phone — normalize and extract 8 digits
+    const phoneDigits = rawPhone.replace(/\D/g, '');
+    const svPhone = phoneDigits.startsWith('503') && phoneDigits.length === 11
+      ? phoneDigits.slice(3)
+      : phoneDigits;
     if (!/^\d{8}$/.test(svPhone)) {
-      return res.status(400).json({ error: 'Ingresa un número de teléfono válido de El Salvador (8 dígitos).' });
+      return res.status(400).json({ error: 'Ingresa un número de teléfono válido de El Salvador (8 dígitos), ej: +503-7500-1234.' });
     }
 
     // 3. Minimum order value for COD
