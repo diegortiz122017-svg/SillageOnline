@@ -3972,7 +3972,11 @@ function v2(){return true;}
 
 function fillReview(){
   document.getElementById('mSummaryItems').innerHTML=cart.map(function(it){
-    return'<div class="ms-row"><span>'+esc(it.p.brand)+' '+esc(it.p.name)+' \u00d7'+it.qty+'</span><span class="ms-price">$'+parseFloat(effectivePrice(it.p)*it.qty).toFixed(2)+'</span></div>';
+    var label = it.label || (it.p.brand+' '+it.p.name);
+    var up    = it.unitPrice !== undefined ? it.unitPrice : effectivePrice(it.p);
+    // Bundle items show bundle price, not per-item price
+    if(it.bundleId) up = it.bundlePrice || up;
+    return'<div class="ms-row"><span>'+esc(label)+' \u00d7'+it.qty+'</span><span class="ms-price">$'+parseFloat(up*it.qty).toFixed(2)+'</span></div>';
   }).join('');
   var shipping = getShipping();
   var total    = cartSum() + shipping;
