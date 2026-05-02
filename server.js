@@ -219,6 +219,29 @@ async function initDB() {
   `);
 
   await db.execute(`
+    CREATE TABLE IF NOT EXISTS customer_favorites (
+      id          INT AUTO_INCREMENT PRIMARY KEY,
+      customer_id INT NOT NULL,
+      product_id  INT NOT NULL,
+      created_at  DATETIME NOT NULL,
+      UNIQUE KEY uq_cust_prod (customer_id, product_id),
+      KEY idx_customer (customer_id)
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
+  `);
+
+  await db.execute(`
+    CREATE TABLE IF NOT EXISTS decant_inventory (
+      id            INT AUTO_INCREMENT PRIMARY KEY,
+      product_id    INT NOT NULL,
+      size_ml       DECIMAL(5,1) NOT NULL,
+      stock         INT DEFAULT 0,
+      low_stock_threshold INT DEFAULT 3,
+      updated_at    DATETIME NOT NULL,
+      UNIQUE KEY uq_prod_size (product_id, size_ml)
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
+  `);
+
+  await db.execute(`
     CREATE TABLE IF NOT EXISTS btcpay_pending (
       invoice_id   VARCHAR(100) PRIMARY KEY,
       order_id     VARCHAR(40)  NOT NULL,
@@ -3298,6 +3321,115 @@ app.post('/api/inventory', requireAdmin, async (req, res) => {
     console.error('Stock notify email error:', e.message); // non-fatal
   }
 
+  res.json({ ok: true });
+});
+
+// ── CUSTOMER FAVORITES (DB-backed) ───────────────────────────────────────────
+
+// GET /api/customer/favorites
+app.get('/api/customer/favorites', requireCustomer, async (req, res) => {
+  const id = req.customer.user.id;
+  const [rows] = await db.execute(
+    'SELECT product_id FROM customer_favorites WHERE customer_id=? ORDER BY created_at DESC',
+    [id]
+  );
+  res.json(rows.map(r => r.product_id));
+});
+
+// POST /api/customer/favorites — add or remove (toggle)
+app.post('/api/customer/favorites', requireCustomer, async (req, res) => {
+  const id  = req.customer.user.id;
+  const pid = parseInt(req.body.productId);
+  if (!pid) return res.status(400).json({ error: 'productId requerido.' });
+
+  const [existing] = await db.execute(
+    'SELECT id FROM customer_favorites WHERE customer_id=? AND product_id=?', [id, pid]
+  );
+  if (existing.length) {
+    await db.execute('DELETE FROM customer_favorites WHERE customer_id=? AND product_id=?', [id, pid]);
+    res.json({ ok: true, action: 'removed' });
+  } else {
+    await db.execute(
+      'INSERT INTO customer_favorites (customer_id, product_id, created_at) VALUES (?,?,?)',
+      [id, pid, new Date()]
+    );
+    res.json({ ok: true, action: 'added' });
+  }
+});
+
+// POST /api/customer/favorites/sync — bulk sync from localStorage on login
+app.post('/api/customer/favorites/sync', requireCustomer, async (req, res) => {
+  const id   = req.customer.user.id;
+  const pids = (req.body.productIds || []).map(Number).filter(Boolean);
+  if (!pids.length) return res.json({ ok: true, synced: 0 });
+
+  let synced = 0;
+  for (const pid of pids) {
+    try {
+      await db.execute(
+        'INSERT IGNORE INTO customer_favorites (customer_id, product_id, created_at) VALUES (?,?,?)',
+        [id, pid, new Date()]
+      );
+      synced++;
+    } catch(e) { /* ignore dupes */ }
+  }
+  res.json({ ok: true, synced });
+});
+
+// ── DECANT INVENTORY ──────────────────────────────────────────────────────────
+
+// GET /api/decant-inventory — public, returns stock for all products
+app.get('/api/decant-inventory', async (req, res) => {
+  const [rows] = await db.execute('SELECT product_id, size_ml, stock, low_stock_threshold FROM decant_inventory');
+  // Return as { productId: { '10': { stock, low }, '5': { stock, low } } }
+  const result = {};
+  for (const r of rows) {
+    if (!result[r.product_id]) result[r.product_id] = {};
+    result[r.product_id][String(parseFloat(r.size_ml))] = {
+      stock: r.stock,
+      low:   r.stock > 0 && r.stock <= r.low_stock_threshold,
+      out:   r.stock === 0
+    };
+  }
+  res.json(result);
+});
+
+// GET /api/decant-inventory/all — admin, full details
+app.get('/api/decant-inventory/all', requireAdmin, async (req, res) => {
+  const [rows] = await db.execute(
+    'SELECT * FROM decant_inventory ORDER BY product_id, size_ml'
+  );
+  res.json(rows);
+});
+
+// POST /api/decant-inventory — admin: upsert stock for a product+size
+app.post('/api/decant-inventory', requireAdmin, async (req, res) => {
+  const { productId, sizeMl, stock, lowStockThreshold } = req.body;
+  if (!productId || !sizeMl) return res.status(400).json({ error: 'productId y sizeMl requeridos.' });
+  await db.execute(
+    `INSERT INTO decant_inventory (product_id, size_ml, stock, low_stock_threshold, updated_at)
+     VALUES (?,?,?,?,?)
+     ON DUPLICATE KEY UPDATE stock=VALUES(stock), low_stock_threshold=VALUES(low_stock_threshold), updated_at=VALUES(updated_at)`,
+    [parseInt(productId), parseFloat(sizeMl), parseInt(stock)||0, parseInt(lowStockThreshold)||3, new Date()]
+  );
+  await logActivity(`Decant inventory actualizado — producto ${productId} ${sizeMl}ml: ${stock} uds`);
+  res.json({ ok: true });
+});
+
+// PATCH /api/decant-inventory/batch — admin: save multiple at once
+app.patch('/api/decant-inventory/batch', requireAdmin, async (req, res) => {
+  const { items } = req.body; // [{ productId, sizeMl, stock, lowStockThreshold }]
+  if (!Array.isArray(items)) return res.status(400).json({ error: 'items debe ser un array.' });
+  const n = new Date();
+  for (const item of items) {
+    await db.execute(
+      `INSERT INTO decant_inventory (product_id, size_ml, stock, low_stock_threshold, updated_at)
+       VALUES (?,?,?,?,?)
+       ON DUPLICATE KEY UPDATE stock=VALUES(stock), low_stock_threshold=VALUES(low_stock_threshold), updated_at=VALUES(updated_at)`,
+      [parseInt(item.productId), parseFloat(item.sizeMl), parseInt(item.stock)||0, parseInt(item.lowStockThreshold)||3, n]
+    );
+  }
+  await logActivity(`Decant inventory batch actualizado — ${items.length} registros`);
   res.json({ ok: true });
 });
 
