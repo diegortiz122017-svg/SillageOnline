@@ -242,6 +242,31 @@ async function initDB() {
   `);
 
   await db.execute(`
+    CREATE TABLE IF NOT EXISTS cod_blocklist (
+      id         INT AUTO_INCREMENT PRIMARY KEY,
+      email      VARCHAR(255),
+      phone      VARCHAR(50),
+      reason     VARCHAR(255) DEFAULT 'No-show repetido',
+      blocked_by VARCHAR(50) DEFAULT 'system',
+      created_at DATETIME NOT NULL,
+      KEY idx_email (email),
+      KEY idx_phone (phone)
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
+  `);
+
+  await db.execute(`
+    CREATE TABLE IF NOT EXISTS cod_noshows (
+      id         INT AUTO_INCREMENT PRIMARY KEY,
+      email      VARCHAR(255) NOT NULL,
+      phone      VARCHAR(50),
+      order_id   VARCHAR(40) NOT NULL,
+      created_at DATETIME NOT NULL,
+      KEY idx_email (email),
+      KEY idx_phone (phone)
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
+  `);
+
+  await db.execute(`
     CREATE TABLE IF NOT EXISTS btcpay_pending (
       invoice_id   VARCHAR(100) PRIMARY KEY,
       order_id     VARCHAR(40)  NOT NULL,
@@ -334,7 +359,8 @@ async function migrateOrders() {
     "payment_method VARCHAR(50)  DEFAULT 'wompi'",
     "tracking_number VARCHAR(200) DEFAULT NULL",
     "followup_scheduled_at DATETIME DEFAULT NULL",
-    "followup_sent_at      DATETIME DEFAULT NULL"
+    "followup_sent_at      DATETIME DEFAULT NULL",
+    "customer_ip    VARCHAR(100) DEFAULT NULL",
   ];
   for (const col of cols) {
     const colName = col.trim().split(' ')[0];
@@ -2259,6 +2285,78 @@ app.post('/api/orders', orderLimiter, async (req, res) => {
   const customerId     = (customerSession && customerSession.role === 'customer') ? customerSession.user.id : null;
   const paymentMethod  = req.body.paymentMethod || 'wompi';
 
+  // ── COD-specific abuse prevention ────────────────────────────────────────
+  if (paymentMethod === 'cod') {
+    const rawPhone = String(req.body.phone || '').trim();
+    const rawEmail = String(req.body.email || '').toLowerCase().trim();
+    const clientIp = (req.headers['x-forwarded-for']
+      ? req.headers['x-forwarded-for'].split(',').map(s => s.trim()).filter(Boolean)[0]
+      : req.ip) || 'unknown';
+
+    // 1. Phone required for COD
+    if (!rawPhone) {
+      return res.status(400).json({ error: 'El número de teléfono es requerido para pago contra entrega.' });
+    }
+
+    // 2. Valid SV phone format (+503 XXXX-XXXX or 8 digits)
+    const phoneDigits = rawPhone.replace(/[\s\-\+]/g, '');
+    const svPhone = phoneDigits.startsWith('503') ? phoneDigits.slice(3) : phoneDigits;
+    if (!/^\d{8}$/.test(svPhone)) {
+      return res.status(400).json({ error: 'Ingresa un número de teléfono válido de El Salvador (8 dígitos).' });
+    }
+
+    // 3. Minimum order value for COD
+    const COD_MIN = parseFloat(await getSetting('cod_min_order', '25')) || 25;
+    const clientTotal = parseFloat(req.body.total || 0);
+    if (clientTotal < COD_MIN) {
+      return res.status(400).json({ error: `El pedido mínimo para pago contra entrega es $${COD_MIN}.` });
+    }
+
+    // 4. Check blocklist (email or phone)
+    const normalizedPhone = '+503' + svPhone;
+    const [blocked] = await db.execute(
+      'SELECT id, reason FROM cod_blocklist WHERE email=? OR phone=? LIMIT 1',
+      [rawEmail, normalizedPhone]
+    );
+    if (blocked.length) {
+      return res.status(403).json({
+        error: 'No es posible realizar pedidos contra entrega desde esta cuenta. Por favor usa otro método de pago o contáctanos.'
+      });
+    }
+
+    // 5. Max 1 pending COD order per email or phone
+    const [pendingCOD] = await db.execute(
+      `SELECT id FROM orders
+       WHERE payment_method='cod'
+         AND status NOT IN ('Entregado','Cancelado','No Entregado')
+         AND (LOWER(email)=? OR phone LIKE ?)
+       LIMIT 1`,
+      [rawEmail, '%' + svPhone + '%']
+    );
+    if (pendingCOD.length) {
+      return res.status(400).json({
+        error: 'Ya tienes un pedido contra entrega pendiente. Espera a que sea entregado antes de hacer otro.'
+      });
+    }
+
+    // 6. IP rate limit — max 2 COD orders per IP in 24h
+    const yesterday = new Date(Date.now() - 24 * 60 * 60 * 1000);
+    const [recentByIp] = await db.execute(
+      `SELECT COUNT(*) as cnt FROM orders
+       WHERE payment_method='cod' AND created_at > ? AND customer_ip=?`,
+      [yesterday, clientIp]
+    );
+    if ((recentByIp[0]?.cnt || 0) >= 2) {
+      return res.status(429).json({
+        error: 'Límite de pedidos contra entrega alcanzado. Intenta de nuevo mañana o usa otro método de pago.'
+      });
+    }
+
+    // Store IP on the order for tracking (added to INSERT below via req.codClientIp)
+    req.codClientIp = clientIp;
+    req.normalizedPhone = normalizedPhone;
+  }
+
   // ── Validate required fields ──────────────────────────────────────────────
   const rawEmail = String(req.body.email || '').toLowerCase().trim();
   const emailRe  = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/;
@@ -2410,13 +2508,14 @@ app.post('/api/orders', orderLimiter, async (req, res) => {
   };
 
   await db.execute(
-    `INSERT INTO orders (id,customer,email,phone,address,city,state_province,country,items,total,status,payment_status,payment_method,tracker_step,customer_id,created_at,updated_at)
-     VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
+    `INSERT INTO orders (id,customer,email,phone,address,city,state_province,country,items,total,status,payment_status,payment_method,tracker_step,customer_id,customer_ip,created_at,updated_at)
+     VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
     [order.id, order.customer, order.email, order.phone, order.address,
      order.city, order.state, order.country,
      JSON.stringify(order.items), order.total,
      order.status, order.paymentStatus, order.paymentMethod,
-     parseInt(order.trackerStep), customerId ? parseInt(customerId) : null, n, n]
+     parseInt(order.trackerStep), customerId ? parseInt(customerId) : null,
+     req.codClientIp || null, n, n]
   );
 
   // Save shipping info to customer profile if logged in
@@ -3566,6 +3665,41 @@ app.patch('/api/orders/:id', requireAdmin, async (req, res) => {
       broadcastAdmin('order_update', { id: order.id, status: order.status, paymentStatus: 'Pagado', trackerStep: order.tracker_step });
       await logActivity(`Pago COD confirmado para pedido ${escHtml(order.id)}`);
     }
+
+    // COD → No Entregado: track no-show and auto-block after threshold
+    if (isCOD && status === 'No Entregado') {
+      const noShowEmail = order.email?.toLowerCase()?.trim();
+      const noShowPhone = order.phone?.trim();
+
+      // Record the no-show
+      await db.execute(
+        'INSERT INTO cod_noshows (email, phone, order_id, created_at) VALUES (?,?,?,?)',
+        [noShowEmail || null, noShowPhone || null, order.id, new Date()]
+      );
+
+      // Count total no-shows for this contact
+      const [nsCounts] = await db.execute(
+        'SELECT COUNT(*) as cnt FROM cod_noshows WHERE email=? OR phone=?',
+        [noShowEmail || '', noShowPhone || '']
+      );
+      const noShowCount = nsCounts[0]?.cnt || 0;
+
+      const COD_NOSHOW_LIMIT = parseInt(await getSetting('cod_noshow_limit', '2')) || 2;
+
+      if (noShowCount >= COD_NOSHOW_LIMIT) {
+        // Auto-block this contact
+        await db.execute(
+          `INSERT INTO cod_blocklist (email, phone, reason, blocked_by, created_at)
+           VALUES (?,?,?,?,?)
+           ON DUPLICATE KEY UPDATE reason=VALUES(reason), created_at=VALUES(created_at)`,
+          [noShowEmail || null, noShowPhone || null,
+           `Auto-bloqueado: ${noShowCount} no-shows`, 'system', new Date()]
+        );
+        await logActivity(`COD auto-bloqueado: ${noShowEmail} (${noShowCount} no-shows)`);
+      }
+
+      await logActivity(`No entregado: pedido ${escHtml(order.id)} — no-shows acumulados: ${noShowCount}`);
+    }
   }
 
   // Send status notification emails
@@ -4588,6 +4722,69 @@ app.delete('/api/catalogue/:id', requireAdmin, async (req, res) => {
   await saveCatalogue(catalogue);
   broadcast('catalogue', catalogue);
   await logActivity(`Fragancia eliminada: ${frag.brand} ${frag.name}`);
+  res.json({ ok: true });
+});
+
+// ── COD ABUSE MANAGEMENT ─────────────────────────────────────────────────────
+
+// GET /api/admin/cod-blocklist
+app.get('/api/admin/cod-blocklist', requireAdmin, async (req, res) => {
+  const [rows] = await db.execute(
+    'SELECT * FROM cod_blocklist ORDER BY created_at DESC'
+  );
+  res.json(rows);
+});
+
+// POST /api/admin/cod-blocklist — manually block a contact
+app.post('/api/admin/cod-blocklist', requireAdmin, async (req, res) => {
+  const { email, phone, reason } = req.body;
+  if (!email && !phone) return res.status(400).json({ error: 'Email o teléfono requerido.' });
+  await db.execute(
+    `INSERT INTO cod_blocklist (email, phone, reason, blocked_by, created_at)
+     VALUES (?,?,?,?,?)`,
+    [email?.toLowerCase()?.trim() || null, phone?.trim() || null,
+     reason || 'Bloqueado manualmente', 'admin', new Date()]
+  );
+  await logActivity(`COD bloqueado manualmente: ${email || phone}`);
+  res.json({ ok: true });
+});
+
+// DELETE /api/admin/cod-blocklist/:id — unblock
+app.delete('/api/admin/cod-blocklist/:id', requireAdmin, async (req, res) => {
+  const [rows] = await db.execute('SELECT * FROM cod_blocklist WHERE id=?', [req.params.id]);
+  if (!rows.length) return res.status(404).json({ error: 'No encontrado.' });
+  await db.execute('DELETE FROM cod_blocklist WHERE id=?', [req.params.id]);
+  await logActivity(`COD desbloqueado: ${rows[0].email || rows[0].phone}`);
+  res.json({ ok: true });
+});
+
+// GET /api/admin/cod-noshows — list no-shows with counts
+app.get('/api/admin/cod-noshows', requireAdmin, async (req, res) => {
+  const [rows] = await db.execute(`
+    SELECT email, phone,
+           COUNT(*) as total,
+           MAX(created_at) as last_noshow,
+           GROUP_CONCAT(order_id ORDER BY created_at DESC) as order_ids
+    FROM cod_noshows
+    GROUP BY email, phone
+    ORDER BY total DESC, last_noshow DESC
+  `);
+  res.json(rows);
+});
+
+// GET /api/admin/cod-settings — get COD config
+app.get('/api/admin/cod-settings', requireAdmin, async (req, res) => {
+  const minOrder    = parseFloat(await getSetting('cod_min_order', '25')) || 25;
+  const noshowLimit = parseInt(await getSetting('cod_noshow_limit', '2')) || 2;
+  res.json({ minOrder, noshowLimit });
+});
+
+// POST /api/admin/cod-settings — update COD config
+app.post('/api/admin/cod-settings', requireAdmin, async (req, res) => {
+  const { minOrder, noshowLimit } = req.body;
+  if (minOrder !== undefined)    await setSetting('cod_min_order',    parseFloat(minOrder));
+  if (noshowLimit !== undefined) await setSetting('cod_noshow_limit', parseInt(noshowLimit));
+  await logActivity(`Configuración COD actualizada — mínimo: $${minOrder}, límite no-shows: ${noshowLimit}`);
   res.json({ ok: true });
 });
 
