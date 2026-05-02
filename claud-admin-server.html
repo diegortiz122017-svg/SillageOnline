@@ -777,6 +777,7 @@ tr:hover td{background:rgba(255,255,255,0.02)}
         <button class="nav-btn" data-page="catalogo"><span class="nav-icon">🌸</span>Catálogo</button>
         <button class="nav-btn" data-page="bundles"><span class="nav-icon">🎁</span>Bundles</button>
         <button class="nav-btn" data-page="collections"><span class="nav-icon">🗂️</span>Colecciones</button>
+        <button class="nav-btn" data-page="decants"><span class="nav-icon">🧪</span>Decants</button>
         <div class="sb-section">Clientes</div>
         <button class="nav-btn" data-page="clientes"><span class="nav-icon">👤</span>Clientes</button>
       </div>
@@ -980,6 +981,65 @@ tr:hover td{background:rgba(255,255,255,0.02)}
             <span class="saved-msg" id="shippingMsg">✓ Guardado</span>
           </div>
         </div>
+
+        <!-- SALE EMAIL BLAST -->
+        <div style="margin-top:2.5rem;padding-top:2rem;border-top:1px solid var(--border)">
+          <div class="page-title" style="font-size:1.2rem;margin-bottom:0.3rem">Email de Oferta</div>
+          <div class="page-sub" style="margin-bottom:1.5rem">Notifica a clientes registrados sobre ofertas activas. Se respetan las preferencias de marketing de cada usuario.</div>
+
+          <div style="display:flex;flex-direction:column;gap:1rem;max-width:580px">
+            <!-- Product selector -->
+            <div>
+              <label style="font-size:0.55rem;letter-spacing:0.18em;text-transform:uppercase;color:var(--muted);display:block;margin-bottom:0.4rem">Fragancia en oferta *</label>
+              <select id="saleEmailProduct" onchange="updateSaleEmailPreview()"
+                style="width:100%;background:var(--card);border:1px solid var(--border-light);color:var(--cream);font-family:'Jost',sans-serif;font-size:0.72rem;padding:0.55rem 0.8rem;outline:none">
+                <option value="">Seleccionar fragancia...</option>
+              </select>
+            </div>
+
+            <!-- Audience -->
+            <div>
+              <label style="font-size:0.55rem;letter-spacing:0.18em;text-transform:uppercase;color:var(--muted);display:block;margin-bottom:0.6rem">Audiencia</label>
+              <div style="display:flex;flex-direction:column;gap:0.5rem">
+                <label style="display:flex;align-items:flex-start;gap:0.7rem;cursor:pointer">
+                  <input type="radio" name="saleAudience" value="favorites" checked onchange="updateSaleEmailPreview()"
+                    style="margin-top:3px;accent-color:#b8955a"/>
+                  <span>
+                    <span style="font-size:0.72rem;color:var(--cream);display:block">Solo clientes con perfil afín</span>
+                    <span style="font-size:0.62rem;color:var(--muted)">Usuarios cuyo perfil de Nez incluye esta fragancia entre sus recomendadas</span>
+                  </span>
+                </label>
+                <label style="display:flex;align-items:flex-start;gap:0.7rem;cursor:pointer">
+                  <input type="radio" name="saleAudience" value="all" onchange="updateSaleEmailPreview()"
+                    style="margin-top:3px;accent-color:#b8955a"/>
+                  <span>
+                    <span style="font-size:0.72rem;color:var(--cream);display:block">Todos los clientes con marketing activo</span>
+                    <span style="font-size:0.62rem;color:var(--muted)">Todos los registrados que aceptaron emails de ofertas</span>
+                  </span>
+                </label>
+              </div>
+            </div>
+
+            <!-- Custom message -->
+            <div>
+              <label style="font-size:0.55rem;letter-spacing:0.18em;text-transform:uppercase;color:var(--muted);display:block;margin-bottom:0.4rem">Mensaje personalizado <span style="opacity:0.6">(opcional)</span></label>
+              <textarea id="saleEmailMsg" rows="2" placeholder="Ej: Solo por esta semana, aprovecha el precio especial."
+                style="width:100%;box-sizing:border-box;background:var(--card);border:1px solid var(--border-light);color:var(--cream);font-family:'Jost',sans-serif;font-size:0.72rem;padding:0.55rem 0.8rem;outline:none;resize:vertical"></textarea>
+            </div>
+
+            <!-- Preview -->
+            <div id="saleEmailPreview" style="display:none;background:rgba(184,149,90,0.06);border:1px solid rgba(184,149,90,0.2);padding:1rem;font-size:0.68rem;color:var(--muted);line-height:1.8"></div>
+
+            <!-- Send -->
+            <div style="display:flex;align-items:center;gap:1rem">
+              <button onclick="sendSaleEmail()" id="saleEmailBtn"
+                style="background:#b8955a;border:none;color:#0e0c0a;font-family:'Jost',sans-serif;font-size:0.62rem;letter-spacing:0.18em;text-transform:uppercase;padding:0.7rem 1.5rem;cursor:pointer;transition:background 0.2s">
+                Enviar Email de Oferta
+              </button>
+              <span id="saleEmailMsg" style="font-size:0.65rem;color:var(--muted)"></span>
+            </div>
+          </div>
+        </div>
       </div>
 
       <!-- CATÁLOGO -->
@@ -1060,6 +1120,18 @@ tr:hover td{background:rgba(255,255,255,0.02)}
         <div id="collectionsList" class="bundles-list"></div>
       </div>
 
+      <!-- DECANT INVENTORY PAGE -->
+      <div id="page-decants" class="page">
+        <div class="page-hdr">
+          <div>
+            <div class="page-title">Inventario de Decants</div>
+            <div class="page-sub">Stock físico de decants pre-embotellados por producto y tamaño</div>
+          </div>
+          <button class="save-btn" onclick="saveDecantInventory()" style="margin-left:auto">Guardar Cambios</button>
+        </div>
+        <div id="decantInventoryList"></div>
+      </div>
+
     </div>
   </div>
   <!-- Mobile bottom nav -->
@@ -1080,6 +1152,7 @@ tr:hover td{background:rgba(255,255,255,0.02)}
       <button class="mob-drawer-item" data-page="pricing" onclick="navToFromDrawer('pricing')"><span class="mob-icon">💲</span>Precios</button>
       <button class="mob-drawer-item" data-page="bundles" onclick="navToFromDrawer('bundles')"><span class="mob-icon">🎁</span>Bundles</button>
       <button class="mob-drawer-item" data-page="collections" onclick="navToFromDrawer('collections')"><span class="mob-icon">🗂️</span>Colecciones</button>
+      <button class="mob-drawer-item" data-page="decants" onclick="navToFromDrawer('decants')"><span class="mob-icon">🧪</span>Decants</button>
       <button class="mob-drawer-item" data-page="clientes" onclick="navToFromDrawer('clientes')"><span class="mob-icon">👤</span>Clientes</button>
     </div>
   </div>
@@ -1594,11 +1667,12 @@ function navTo(page){
   // Render page content
   if(page==='overview')  renderOverview();
   if(page==='inventory'){ renderInventory(); loadBottleInventory(); if(!catalogFragrances.length) adminFetch(API+'/catalogue',{}).then(function(r){return r?r.json():[];}).then(function(d){catalogFragrances=d||[];}); }
-  if(page==='pricing'){  renderPricing(); loadShippingConfig(); }
+  if(page==='pricing'){  renderPricing(); loadShippingConfig(); setTimeout(initSaleEmailUI, 800); }
   if(page==='orders'){   renderOrders(); fetchAllData(); }
   if(page==='catalogo')  loadCatalogue();
   if(page==='bundles'){ renderBundles(); }
   if(page==='collections'){ renderCollections(); }
+  if(page==='decants'){     renderDecantInventory(); }
   if(page==='clientes')  loadClientes();
 }
 document.querySelectorAll('.nav-btn,.mob-tab').forEach(function(b){
@@ -3807,6 +3881,208 @@ function deleteCollection(id){
   if(!confirm('¿Eliminar esta colección?')) return;
   adminFetch(API+'/collections/'+id,{method:'DELETE'})
     .then(function(r){ if(!r)return; renderCollections(); toast('Colección eliminada','','ok'); });
+}
+
+// ── SALE EMAIL BLAST ──────────────────────────────────
+function initSaleEmailUI(){
+  var sel = document.getElementById('saleEmailProduct');
+  if(!sel) return;
+  // Populate with products currently on sale
+  var priceRows = document.querySelectorAll('#priceBody tr');
+  var opts = ['<option value="">Seleccionar fragancia...</option>'];
+  priceRows.forEach(function(row){
+    var checkbox = row.querySelector('input[type="checkbox"]');
+    if(checkbox && checkbox.checked){
+      var pid = checkbox.dataset.pid || row.dataset.pid;
+      var name = row.querySelector('td')?.textContent || '';
+      if(pid) opts.push('<option value="'+pid+'">'+name+'</option>');
+    }
+  });
+  // Also try catalogFragrances with pricing data
+  if(opts.length === 1 && typeof catalogFragrances !== 'undefined'){
+    catalogFragrances.forEach(function(p){
+      opts.push('<option value="'+p.id+'">'+p.brand+' — '+p.name+'</option>');
+    });
+  }
+  sel.innerHTML = opts.join('');
+}
+
+function updateSaleEmailPreview(){
+  var pid      = document.getElementById('saleEmailProduct').value;
+  var audience = document.querySelector('input[name="saleAudience"]:checked')?.value;
+  var preview  = document.getElementById('saleEmailPreview');
+  if(!pid || !preview){ if(preview) preview.style.display='none'; return; }
+
+  var prod = (typeof catalogFragrances !== 'undefined') ? catalogFragrances.find(function(p){ return p.id == pid; }) : null;
+  var audienceLabel = audience === 'favorites'
+    ? 'clientes cuyo perfil de Nez incluye esta fragancia'
+    : 'todos los clientes con marketing activo';
+
+  preview.style.display = 'block';
+  preview.innerHTML =
+    '<strong style="color:var(--gold)">Vista previa:</strong><br/>' +
+    (prod ? '📦 <strong style="color:var(--cream)">'+prod.brand+' '+prod.name+'</strong><br/>' : '') +
+    '👥 Destinatarios: '+audienceLabel+'<br/>' +
+    '📧 Asunto: ' + (prod ? '"'+prod.brand+' '+prod.name+' ahora tiene precio especial"' : '—');
+}
+
+function sendSaleEmail(){
+  var pid      = document.getElementById('saleEmailProduct').value;
+  var audience = document.querySelector('input[name="saleAudience"]:checked')?.value || 'favorites';
+  var message  = document.getElementById('saleEmailMsg').value.trim();
+  var btn      = document.getElementById('saleEmailBtn');
+  var msg      = document.getElementById('saleEmailMsg2') || document.getElementById('saleEmailMsg');
+
+  if(!pid){ alert('Selecciona una fragancia.'); return; }
+  if(!confirm('¿Enviar el email de oferta ahora?')) return;
+
+  btn.disabled = true;
+  btn.textContent = 'Enviando...';
+
+  adminFetch(API+'/admin/sale-email', {
+    method:'POST',
+    headers:{'Content-Type':'application/json'},
+    body: JSON.stringify({ productId: parseInt(pid), audience: audience, message: message })
+  })
+  .then(function(r){ if(!r) throw new Error('401'); return r.json(); })
+  .then(function(res){
+    btn.disabled = false;
+    btn.textContent = 'Enviar Email de Oferta';
+    if(res.ok){
+      var statusEl = document.getElementById('saleEmailMsg');
+      if(statusEl && statusEl.tagName === 'SPAN') statusEl.textContent = '✓ Enviado a '+res.sent+' clientes';
+      toast('Email enviado', res.sent+' destinatarios', 'ok');
+    } else {
+      toast('Error', res.error || 'No se pudo enviar', '');
+    }
+  })
+  .catch(function(){
+    btn.disabled = false;
+    btn.textContent = 'Enviar Email de Oferta';
+    toast('Error', 'Error de conexión', '');
+  });
+}
+
+// ── DECANT INVENTORY ─────────────────────────────────
+var _decantState = {}; // productId -> { sizeMl -> { stock, low_stock_threshold } }
+
+function renderDecantInventory(){
+  var container = document.getElementById('decantInventoryList');
+  if(!container) return;
+  container.innerHTML = '<p style="color:var(--muted);font-size:0.7rem;padding:1rem 0">Cargando...</p>';
+
+  Promise.all([
+    adminFetch(API+'/catalogue',{}).then(function(r){ return r?r.json():[]; }),
+    adminFetch(API+'/decant-inventory/all',{}).then(function(r){ return r?r.json():[]; })
+  ]).then(function(results){
+    var catalogue = results[0] || [];
+    var decants   = results[1] || [];
+
+    // Build state map
+    _decantState = {};
+    decants.forEach(function(d){
+      if(!_decantState[d.product_id]) _decantState[d.product_id] = {};
+      _decantState[d.product_id][String(parseFloat(d.size_ml))] = {
+        stock: d.stock, low: d.low_stock_threshold
+      };
+    });
+
+    // Only show products with decant pricing
+    var decantProds = catalogue.filter(function(p){ return p.decantPrice || p.luxury; });
+
+    if(!decantProds.length){
+      container.innerHTML = '<p style="color:var(--muted);font-size:0.7rem;padding:2rem 0;text-align:center">No hay productos con decant configurado.</p>';
+      return;
+    }
+
+    container.innerHTML = `
+      <div style="margin-bottom:1rem;padding:0.8rem 1rem;background:rgba(184,149,90,0.06);border:1px solid rgba(184,149,90,0.2);font-size:0.65rem;color:var(--muted);line-height:1.7">
+        Gestiona el stock físico de decants pre-embotellados. Si no hay registro para un tamaño, se considera disponible sin límite.
+      </div>
+      <div style="overflow-x:auto">
+        <table style="width:100%;border-collapse:collapse;min-width:600px">
+          <thead>
+            <tr style="background:rgba(255,255,255,0.03)">
+              <th style="padding:10px 12px;text-align:left;font-size:0.55rem;letter-spacing:0.15em;text-transform:uppercase;color:var(--muted);border-bottom:1px solid var(--border-light)">Fragancia</th>
+              <th style="padding:10px 12px;text-align:center;font-size:0.55rem;letter-spacing:0.15em;text-transform:uppercase;color:var(--muted);border-bottom:1px solid var(--border-light)">10ml Stock</th>
+              <th style="padding:10px 12px;text-align:center;font-size:0.55rem;letter-spacing:0.15em;text-transform:uppercase;color:var(--muted);border-bottom:1px solid var(--border-light)">10ml Alerta</th>
+              <th style="padding:10px 12px;text-align:center;font-size:0.55rem;letter-spacing:0.15em;text-transform:uppercase;color:var(--muted);border-bottom:1px solid var(--border-light)">5ml Stock</th>
+              <th style="padding:10px 12px;text-align:center;font-size:0.55rem;letter-spacing:0.15em;text-transform:uppercase;color:var(--muted);border-bottom:1px solid var(--border-light)">5ml Alerta</th>
+            </tr>
+          </thead>
+          <tbody id="decantTbody">
+          ${decantProds.map(function(p){
+            var d10 = (_decantState[p.id]||{})['10'] || { stock:'', low:3 };
+            var d5  = (_decantState[p.id]||{})['5']  || { stock:'', low:3 };
+            var hasLow10 = d10.stock !== '' && parseInt(d10.stock) <= parseInt(d10.low) && parseInt(d10.stock) > 0;
+            var hasOut10 = d10.stock !== '' && parseInt(d10.stock) === 0;
+            var hasLow5  = d5.stock  !== '' && parseInt(d5.stock)  <= parseInt(d5.low)  && parseInt(d5.stock)  > 0;
+            var hasOut5  = d5.stock  !== '' && parseInt(d5.stock)  === 0;
+            return '<tr data-pid="'+p.id+'" style="border-bottom:1px solid rgba(255,255,255,0.04)">'+
+              '<td style="padding:10px 12px">'+
+                '<div style="font-size:0.58rem;letter-spacing:0.12em;text-transform:uppercase;color:var(--gold)">'+esc(p.brand)+'</div>'+
+                '<div style="font-family:\'Cormorant Garamond\',serif;font-size:1rem;color:var(--cream)">'+esc(p.name)+'</div>'+
+              '</td>'+
+              // 10ml stock
+              '<td style="padding:10px 12px;text-align:center">'+
+                '<input type="number" min="0" class="di-stock di-10ml" data-pid="'+p.id+'" data-size="10" value="'+(d10.stock!==''?d10.stock:'')+'" placeholder="∞"'+
+                ' style="width:60px;background:rgba(255,255,255,0.06);border:1px solid '+(hasOut10?'var(--error)':hasLow10?'var(--warn)':'rgba(184,149,90,0.2)')+';color:var(--cream);text-align:center;padding:0.35rem;outline:none;font-family:\'Jost\',sans-serif;font-size:0.8rem"/>'+
+              '</td>'+
+              // 10ml alert threshold
+              '<td style="padding:10px 12px;text-align:center">'+
+                '<input type="number" min="1" class="di-low di-10ml-low" data-pid="'+p.id+'" data-size="10" value="'+d10.low+'"'+
+                ' style="width:50px;background:rgba(255,255,255,0.04);border:1px solid rgba(184,149,90,0.12);color:var(--muted);text-align:center;padding:0.35rem;outline:none;font-family:\'Jost\',sans-serif;font-size:0.75rem"/>'+
+              '</td>'+
+              // 5ml stock (only if luxury)
+              (p.luxury ?
+                '<td style="padding:10px 12px;text-align:center">'+
+                  '<input type="number" min="0" class="di-stock di-5ml" data-pid="'+p.id+'" data-size="5" value="'+(d5.stock!==''?d5.stock:'')+'" placeholder="∞"'+
+                  ' style="width:60px;background:rgba(255,255,255,0.06);border:1px solid '+(hasOut5?'var(--error)':hasLow5?'var(--warn)':'rgba(184,149,90,0.2)')+';color:var(--cream);text-align:center;padding:0.35rem;outline:none;font-family:\'Jost\',sans-serif;font-size:0.8rem"/>'+
+                '</td>'+
+                '<td style="padding:10px 12px;text-align:center">'+
+                  '<input type="number" min="1" class="di-low di-5ml-low" data-pid="'+p.id+'" data-size="5" value="'+d5.low+'"'+
+                  ' style="width:50px;background:rgba(255,255,255,0.04);border:1px solid rgba(184,149,90,0.12);color:var(--muted);text-align:center;padding:0.35rem;outline:none;font-family:\'Jost\',sans-serif;font-size:0.75rem"/>'+
+                '</td>'
+              :
+                '<td colspan="2" style="text-align:center;color:rgba(255,255,255,0.15);font-size:0.65rem;padding:10px 12px">N/A</td>'
+              )+
+            '</tr>';
+          }).join('')}
+          </tbody>
+        </table>
+      </div>`;
+  }).catch(function(){
+    container.innerHTML = '<p style="color:var(--error);font-size:0.7rem;padding:2rem 0;text-align:center">Error al cargar inventario de decants.</p>';
+  });
+}
+
+function saveDecantInventory(){
+  var items = [];
+  document.querySelectorAll('#decantTbody tr[data-pid]').forEach(function(row){
+    var pid = parseInt(row.dataset.pid);
+    var inputs10stock = row.querySelector('.di-10ml');
+    var inputs10low   = row.querySelector('.di-10ml-low');
+    var inputs5stock  = row.querySelector('.di-5ml');
+    var inputs5low    = row.querySelector('.di-5ml-low');
+
+    if(inputs10stock && inputs10stock.value !== ''){
+      items.push({ productId:pid, sizeMl:10, stock:parseInt(inputs10stock.value)||0, lowStockThreshold:parseInt(inputs10low?.value)||3 });
+    }
+    if(inputs5stock && inputs5stock.value !== ''){
+      items.push({ productId:pid, sizeMl:5, stock:parseInt(inputs5stock.value)||0, lowStockThreshold:parseInt(inputs5low?.value)||3 });
+    }
+  });
+
+  if(!items.length){ toast('Sin cambios','No hay valores para guardar',''); return; }
+
+  adminFetch(API+'/decant-inventory/batch', {
+    method:'PATCH', headers:{'Content-Type':'application/json'},
+    body: JSON.stringify({ items: items })
+  }).then(function(r){ return r?r.json():null; })
+  .then(function(res){
+    if(res && res.ok){ toast('Guardado','Inventario de decants actualizado','ok'); renderDecantInventory(); }
+    else { toast('Error','No se pudo guardar',''); }
+  }).catch(function(){ toast('Error','Error de conexión',''); });
 }
 
 // ── BOTTLE INVENTORY ─────────────────────────────────
