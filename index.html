@@ -2361,6 +2361,16 @@ function loadViaREST() {
       var _cleanUrl = window.location.pathname + window.location.hash;
       window.history.replaceState(null, '', _cleanUrl);
     }
+    // Open product from /fragancia/brand-name slug URL
+    var _fragSlug = window.location.pathname.match(/^\/fragancia\/(.+)/);
+    if(_fragSlug){
+      var _slug = _fragSlug[1];
+      var _match = (P||[]).find(function(p){ return slugify(p.brand+'-'+p.name) === _slug; });
+      if(_match){
+        setTimeout(function(){ openDetail(_match.id); }, 400);
+        window.history.replaceState(null, '', '/');
+      }
+    }
     var _urlBundle = new URLSearchParams(window.location.search).get('bundle');
     if(_urlBundle){
       var _bid = parseInt(_urlBundle);
@@ -2369,6 +2379,16 @@ function loadViaREST() {
         if(found) openBundleDetail(found);
       }, 600); // slightly longer delay to ensure bundles are loaded
       window.history.replaceState(null, '', window.location.pathname);
+    }
+    // Open bundle from /bundle/bundle-name slug URL
+    var _bundleSlug = window.location.pathname.match(/^\/bundle\/(.+)/);
+    if(_bundleSlug){
+      var _bslug = _bundleSlug[1];
+      setTimeout(function(){
+        var found = (window._allBundles||[]).find(function(b){ return slugify(b.name) === _bslug; });
+        if(found) openBundleDetail(found);
+      }, 700);
+      window.history.replaceState(null, '', '/');
     }
   }).catch(function() {
     setConn('offline', 'Sin conexión');
