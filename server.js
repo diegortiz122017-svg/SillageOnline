@@ -1058,10 +1058,28 @@ app.get('/gsap-animations.js', (req, res) => {
 });
 
 app.use(express.static(__dirname, {
-  maxAge: '1d',        // cache static assets for 1 day
+  maxAge: '1d',
   etag:   true,
   lastModified: true,
+  index: false,
+  setHeaders: (res, filePath) => {
+    const blocked = ['claud-admin-server.html', 'claud-perfumes-server.html', '.env', 'npmrc'];
+    const fileName = require('path').basename(filePath);
+    if (blocked.some(b => fileName.toLowerCase() === b.toLowerCase())) {
+      res.status(403).end('Forbidden');
+    }
+  }
 }));
+
+// Admin panel — served from a secret path defined in env (ADMIN_PATH)
+// Falls back to /claud-admin-server.html if not set, but that should be set in production
+const ADMIN_ROUTE = process.env.ADMIN_PATH || '/claud-admin-server.html';
+app.get(ADMIN_ROUTE, (req, res) => {
+  const fs = require('fs');
+  const file = path.join(__dirname, 'claud-admin-server.html');
+  if (fs.existsSync(file)) return res.sendFile(file);
+  res.status(404).send('Not found');
+});
 app.get('/', async (req, res) => {
   const fs   = require('fs');
   const index = path.join(__dirname, 'index.html');
