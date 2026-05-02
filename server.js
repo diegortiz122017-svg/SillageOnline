@@ -826,6 +826,7 @@ function rateLimit(max, windowMs) {
 const orderLimiter     = rateLimit(20, 60 * 60 * 1000);   // 20/hour
 const sommelierLimiter = rateLimit(30, 60 * 60 * 1000);   // 30/hour
 const sommelierBurst   = rateLimit(8,  60 * 1000);        // 8/min (was 5, too aggressive)
+const btcpayRenewLimiter = rateLimit(5, 15 * 60 * 1000);  // 5 attempts per 15 min
 // ─── Anon session registry — server-issued sessionIds ────────────────────────
 // Prevents bots from inventing arbitrary sessionIds to bypass per-session limits
 const _anonSessions = new Map();
@@ -1037,6 +1038,29 @@ app.use(express.json({
 }));
 app.use(security.securityHeaders);
 app.use(security.rateLimit());                         // global rate limit
+
+// Additional security headers not covered by middleware
+app.use(function(req, res, next) {
+  res.setHeader('X-Content-Type-Options',  'nosniff');
+  res.setHeader('X-Frame-Options',         'SAMEORIGIN');
+  res.setHeader('Referrer-Policy',         'strict-origin-when-cross-origin');
+  res.setHeader('Permissions-Policy',      'camera=(), microphone=(), geolocation=()');
+  res.setHeader('X-XSS-Protection',        '1; mode=block');
+  next();
+});
+
+// Block access to sensitive files that express.static might serve
+app.use(function(req, res, next) {
+  const blocked = [
+    '/package.json', '/package-lock.json', '/.env',
+    '/npmrc', '/.npmrc', '/README.md',
+    '/claud-admin-server.html', '/claud-perfumes-server.html',
+  ];
+  if (blocked.includes(req.path.toLowerCase())) {
+    return res.status(404).end();
+  }
+  next();
+});
 // Explicit route for JS files that must not fall through to index.html
 app.get('/gsap-animations.js', (req, res) => {
   const gsapFile = path.resolve(process.cwd(), 'gsap-animations.js');
@@ -2807,8 +2831,8 @@ app.post('/api/btcpay/webhook', async (req, res) => {
         .update(`btcpay-renew:${invoiceId}:${pending.order_id}`)
         .digest('hex');
 
-      // Extend the pending record TTL by 48h so it survives until user clicks
-      const newExpiry = new Date(Date.now() + 48 * 60 * 60 * 1000);
+      // Extend the pending record TTL by 24h so it survives until user clicks
+      const newExpiry = new Date(Date.now() + 24 * 60 * 60 * 1000);
       await db.execute(
         'UPDATE btcpay_pending SET renew_token=?, renew_email_sent=1, expires_at=? WHERE invoice_id=?',
         [renewToken, newExpiry, invoiceId]
@@ -3078,7 +3102,7 @@ app.get('/api/btcpay/qr/:invoiceId', (req, res) => {
 // ── BTCPay: renew expired invoice ────────────────────────────────────────────
 // GET /api/btcpay/renew?token=<renew_token>
 // Validates the token, creates a new invoice for the same order, returns invoiceId.
-app.get('/api/btcpay/renew', async (req, res) => {
+app.get('/api/btcpay/renew', btcpayRenewLimiter, async (req, res) => {
   const { token } = req.query;
   if (!token || !/^[a-f0-9]{64}$/.test(token)) {
     return res.status(400).json({ error: 'Token inválido' });
@@ -3095,7 +3119,7 @@ app.get('/api/btcpay/renew', async (req, res) => {
   const pending  = rows[0];
   const orderObj = JSON.parse(pending.order_data);
 
-  // Check the 48h window hasn't passed
+  // Check the 24h window hasn't passed
   if (new Date(pending.expires_at) < new Date()) {
     return res.status(410).json({ error: 'Este link ya expiró. Realiza tu pedido nuevamente.' });
   }
