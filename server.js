@@ -2298,14 +2298,14 @@ app.post('/api/orders', orderLimiter, async (req, res) => {
       return res.status(400).json({ error: 'El número de teléfono es requerido para pago contra entrega.' });
     }
 
-    // 2. Valid SV phone — normalize and extract 8 digits
+    // 2. Valid phone — at least 7 digits regardless of country format
     const phoneDigits = rawPhone.replace(/\D/g, '');
-    const svPhone = phoneDigits.startsWith('503') && phoneDigits.length === 11
-      ? phoneDigits.slice(3)
-      : phoneDigits;
-    if (!/^\d{8}$/.test(svPhone)) {
-      return res.status(400).json({ error: 'Ingresa un número de teléfono válido de El Salvador (8 dígitos), ej: +503-7500-1234.' });
+    if (phoneDigits.length < 7) {
+      return res.status(400).json({ error: 'Ingresa un número de teléfono válido.' });
     }
+    const svPhone = phoneDigits; // used for blocklist matching below
+    // Normalize to +503-XXXX-XXXX before saving
+    req.body.phone = '+503-' + svPhone.slice(0,4) + '-' + svPhone.slice(4);
 
     // 3. Minimum order value for COD
     const COD_MIN = parseFloat(await getSetting('cod_min_order', '25')) || 25;
@@ -2314,11 +2314,14 @@ app.post('/api/orders', orderLimiter, async (req, res) => {
       return res.status(400).json({ error: `El pedido mínimo para pago contra entrega es $${COD_MIN}.` });
     }
 
-    // 4. Check blocklist (email or phone)
-    const normalizedPhone = '+503' + svPhone;
+    // 4. Check blocklist (email or phone — match by digits to avoid format mismatch)
+    const normalizedPhone = '+503-' + svPhone.slice(-8, -4) + '-' + svPhone.slice(-4);
     const [blocked] = await db.execute(
-      'SELECT id, reason FROM cod_blocklist WHERE email=? OR phone=? LIMIT 1',
-      [rawEmail, normalizedPhone]
+      `SELECT id, reason FROM cod_blocklist
+       WHERE email=?
+         OR REPLACE(REPLACE(REPLACE(REPLACE(phone,' ',''),'-',''),'+',''),'(','') LIKE ?
+       LIMIT 1`,
+      [rawEmail, '%' + svPhone.slice(-8) + '%']
     );
     if (blocked.length) {
       return res.status(403).json({
@@ -2331,9 +2334,9 @@ app.post('/api/orders', orderLimiter, async (req, res) => {
       `SELECT id FROM orders
        WHERE payment_method='cod'
          AND status NOT IN ('Entregado','Cancelado','No Entregado')
-         AND (LOWER(email)=? OR phone LIKE ?)
+         AND (LOWER(email)=? OR REPLACE(REPLACE(REPLACE(phone,' ',''),'-',''),'+','') LIKE ?)
        LIMIT 1`,
-      [rawEmail, '%' + svPhone + '%']
+      [rawEmail, '%' + svPhone.slice(-8) + '%']
     );
     if (pendingCOD.length) {
       return res.status(400).json({
