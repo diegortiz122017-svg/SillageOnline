@@ -1932,7 +1932,7 @@ footer{background:var(--dark);padding:3.5rem 4rem;text-align:center;border-top:1
         </div>
         <div class="f-row full"><div class="f-field"><label>Nombre Completo</label><input type="text" id="fn" placeholder="Alexandra Beaumont"/><div class="f-hint" id="en"></div></div></div>
         <div class="f-row full"><div class="f-field"><label>Correo Electrónico</label><input type="email" id="fe" placeholder="alex@example.com"/><div class="f-hint" id="ee"></div><p id="checkoutConsentNotice" style="font-size:0.6rem;color:#5a5248;margin-top:0.3rem;line-height:1.6">Al continuar aceptas recibir comunicaciones relacionadas con tu pedido. Puedes cancelar en cualquier momento.</p></div></div>
-        <div class="f-row full"><div class="f-field"><label>Teléfono <span style="font-size:0.55rem;color:var(--muted)">(opcional)</span></label><input type="tel" id="fph" placeholder="+503 7000-0000"/></div></div>
+        <div class="f-row full"><div class="f-field"><label>Teléfono <span style="font-size:0.55rem;color:var(--muted)">(opcional)</span></label><input type="tel" id="fph" placeholder="+503-XXXX-XXXX" oninput="formatSVPhone(this)" onblur="normalizeSVPhone(this)"/><div style="font-size:0.56rem;color:var(--muted);margin-top:0.3rem">Requerido para pago contra entrega. Ej: +503-7500-1234</div></div></div>
         <div class="f-row full"><div class="f-field"><label>Dirección</label><input type="text" id="fa" placeholder="123 Main Street"/><div class="f-hint" id="ea"></div></div></div>
         <div class="f-row tri">
           <div class="f-field"><label>Ciudad</label><input type="text" id="fc" placeholder="Paris"/><div class="f-hint" id="ec"></div></div>
@@ -3938,6 +3938,28 @@ document.getElementById('mClose').addEventListener('click',closeCheckout);
 function gv(id){var el=document.getElementById(id);return el?el.value.trim():'';}
 function se(id,msg){var el=document.getElementById(id);if(el)el.textContent=msg;}
 function sfe(id,has){var el=document.getElementById(id);if(el)el.classList.toggle('err',has);}
+
+// ── SV phone normalization ────────────────────────────
+function normalizeSVPhone(input){
+  if(!input||!input.value.trim()) return;
+  // Extract only digits
+  var digits = input.value.replace(/\D/g,'');
+  // Strip leading 503 if present (country code)
+  if(digits.startsWith('503') && digits.length === 11) digits = digits.slice(3);
+  // Must be exactly 8 digits to be a valid SV number
+  if(digits.length === 8){
+    input.value = '+503-' + digits.slice(0,4) + '-' + digits.slice(4);
+    input.style.borderColor = '';
+  } else if(digits.length > 0){
+    // Non-empty but not 8 digits — show error hint
+    input.style.borderColor = 'var(--error)';
+  }
+}
+
+function formatSVPhone(input){
+  // Clear error color on input
+  input.style.borderColor = '';
+}
 function v1(){
   var ok=true;
   [['fn','en'],['fe','ee'],['fa','ea'],['fc','ec'],['fco','eco']].forEach(function(pair){
