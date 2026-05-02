@@ -2329,18 +2329,17 @@ app.post('/api/orders', orderLimiter, async (req, res) => {
       });
     }
 
-    // 5. Max 1 pending COD order per email or phone
+    // 5. Max 2 pending COD orders per email or phone
     const [pendingCOD] = await db.execute(
-      `SELECT id FROM orders
+      `SELECT COUNT(*) as cnt FROM orders
        WHERE payment_method='cod'
          AND status NOT IN ('Entregado','Cancelado','No Entregado')
-         AND (LOWER(email)=? OR REPLACE(REPLACE(REPLACE(phone,' ',''),'-',''),'+','') LIKE ?)
-       LIMIT 1`,
+         AND (LOWER(email)=? OR REPLACE(REPLACE(REPLACE(phone,' ',''),'-',''),'+','') LIKE ?)`,
       [rawEmail, '%' + svPhone.slice(-8) + '%']
     );
-    if (pendingCOD.length) {
+    if ((pendingCOD[0]?.cnt || 0) >= 2) {
       return res.status(400).json({
-        error: 'Ya tienes un pedido contra entrega pendiente. Espera a que sea entregado antes de hacer otro.'
+        error: 'Ya tienes 2 pedidos contra entrega pendientes. Espera a que sean entregados antes de hacer otro.'
       });
     }
 
