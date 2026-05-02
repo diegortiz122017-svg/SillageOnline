@@ -1791,15 +1791,17 @@ app.get('/api/orders/:id/invoice', async (req, res) => {
 
   // Try customer token (header or query param)
   if (!authorized) {
-    const custToken = req.headers['x-customer-token'] || req.query.token;
+    const custToken = req.headers['x-customer-token'] || req.query.token || req.query.ctoken;
     if (custToken) {
       try {
         const payload = jwt.verify(custToken, JWT_SECRET);
         const customerId = payload.user?.id;
+        const customerEmail = payload.user?.email;
         if (customerId) {
-          // Verify this order belongs to this customer
+          // Match by customer_id or by email (covers guest orders linked post-purchase)
           const [rows] = await db.execute(
-            'SELECT * FROM orders WHERE id=? AND customer_id=?', [orderId, customerId]
+            'SELECT * FROM orders WHERE id=? AND (customer_id=? OR email=?)',
+            [orderId, customerId, customerEmail || '']
           );
           if (rows.length) { authorized = true; orderRow = rows[0]; }
         }
