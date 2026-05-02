@@ -778,6 +778,7 @@ tr:hover td{background:rgba(255,255,255,0.02)}
         <button class="nav-btn" data-page="bundles"><span class="nav-icon">🎁</span>Bundles</button>
         <button class="nav-btn" data-page="collections"><span class="nav-icon">🗂️</span>Colecciones</button>
         <button class="nav-btn" data-page="decants"><span class="nav-icon">🧪</span>Decants</button>
+        <button class="nav-btn" data-page="cod"><span class="nav-icon">🛡️</span>COD</button>
         <div class="sb-section">Clientes</div>
         <button class="nav-btn" data-page="clientes"><span class="nav-icon">👤</span>Clientes</button>
       </div>
@@ -1132,6 +1133,61 @@ tr:hover td{background:rgba(255,255,255,0.02)}
         <div id="decantInventoryList"></div>
       </div>
 
+      <!-- COD ABUSE PAGE -->
+      <div id="page-cod" class="page">
+        <div class="page-title">Control COD</div>
+        <div class="page-sub" style="margin-bottom:1.5rem">Prevención de abuso en pedidos contra entrega</div>
+
+        <!-- Settings -->
+        <div style="background:rgba(255,255,255,0.03);border:1px solid var(--border-light);padding:1.2rem;margin-bottom:1.5rem">
+          <div style="font-size:0.6rem;letter-spacing:0.2em;text-transform:uppercase;color:var(--gold);margin-bottom:1rem">Configuración COD</div>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:1rem;max-width:420px;margin-bottom:1rem">
+            <div>
+              <label style="font-size:0.55rem;letter-spacing:0.15em;text-transform:uppercase;color:var(--muted);display:block;margin-bottom:0.4rem">Mínimo de orden ($)</label>
+              <input type="number" id="codMinOrder" min="0" style="width:100%;background:var(--card);border:1px solid var(--border-light);color:var(--cream);font-family:'Jost',sans-serif;font-size:0.8rem;padding:0.5rem 0.7rem;outline:none"/>
+            </div>
+            <div>
+              <label style="font-size:0.55rem;letter-spacing:0.15em;text-transform:uppercase;color:var(--muted);display:block;margin-bottom:0.4rem">No-shows para bloqueo</label>
+              <input type="number" id="codNoshowLimit" min="1" max="10" style="width:100%;background:var(--card);border:1px solid var(--border-light);color:var(--cream);font-family:'Jost',sans-serif;font-size:0.8rem;padding:0.5rem 0.7rem;outline:none"/>
+            </div>
+          </div>
+          <button onclick="saveCODSettings()" class="save-btn" style="width:auto;padding:0.5rem 1.2rem">Guardar</button>
+          <span id="codSettingsMsg" style="font-size:0.65rem;color:var(--muted);margin-left:1rem"></span>
+        </div>
+
+        <!-- Manual block -->
+        <div style="background:rgba(255,255,255,0.03);border:1px solid var(--border-light);padding:1.2rem;margin-bottom:1.5rem">
+          <div style="font-size:0.6rem;letter-spacing:0.2em;text-transform:uppercase;color:var(--gold);margin-bottom:1rem">Bloquear Contacto</div>
+          <div style="display:flex;gap:0.8rem;flex-wrap:wrap;align-items:flex-end">
+            <div>
+              <label style="font-size:0.55rem;letter-spacing:0.12em;text-transform:uppercase;color:var(--muted);display:block;margin-bottom:0.3rem">Email</label>
+              <input type="email" id="blockEmail" placeholder="cliente@correo.com" style="background:var(--card);border:1px solid var(--border-light);color:var(--cream);font-family:'Jost',sans-serif;font-size:0.75rem;padding:0.5rem 0.7rem;outline:none;width:200px"/>
+            </div>
+            <div>
+              <label style="font-size:0.55rem;letter-spacing:0.12em;text-transform:uppercase;color:var(--muted);display:block;margin-bottom:0.3rem">Teléfono</label>
+              <input type="text" id="blockPhone" placeholder="+503 7000-0000" style="background:var(--card);border:1px solid var(--border-light);color:var(--cream);font-family:'Jost',sans-serif;font-size:0.75rem;padding:0.5rem 0.7rem;outline:none;width:160px"/>
+            </div>
+            <div>
+              <label style="font-size:0.55rem;letter-spacing:0.12em;text-transform:uppercase;color:var(--muted);display:block;margin-bottom:0.3rem">Razón</label>
+              <input type="text" id="blockReason" placeholder="Motivo del bloqueo" style="background:var(--card);border:1px solid var(--border-light);color:var(--cream);font-family:'Jost',sans-serif;font-size:0.75rem;padding:0.5rem 0.7rem;outline:none;width:200px"/>
+            </div>
+            <button onclick="addCODBlock()" style="background:#b8955a;border:none;color:#0e0c0a;font-family:'Jost',sans-serif;font-size:0.6rem;letter-spacing:0.15em;text-transform:uppercase;padding:0.55rem 1rem;cursor:pointer">Bloquear</button>
+          </div>
+        </div>
+
+        <!-- Blocklist -->
+        <div style="margin-bottom:1.5rem">
+          <div style="font-size:0.6rem;letter-spacing:0.2em;text-transform:uppercase;color:var(--gold);margin-bottom:0.8rem">Lista Negra COD</div>
+          <div id="codBlocklist"><p style="color:var(--muted);font-size:0.7rem">Cargando...</p></div>
+        </div>
+
+        <!-- No-shows -->
+        <div>
+          <div style="font-size:0.6rem;letter-spacing:0.2em;text-transform:uppercase;color:var(--gold);margin-bottom:0.8rem">Historial de No-Shows</div>
+          <div id="codNoshows"><p style="color:var(--muted);font-size:0.7rem">Cargando...</p></div>
+        </div>
+      </div>
+
     </div>
   </div>
   <!-- Mobile bottom nav -->
@@ -1153,6 +1209,7 @@ tr:hover td{background:rgba(255,255,255,0.02)}
       <button class="mob-drawer-item" data-page="bundles" onclick="navToFromDrawer('bundles')"><span class="mob-icon">🎁</span>Bundles</button>
       <button class="mob-drawer-item" data-page="collections" onclick="navToFromDrawer('collections')"><span class="mob-icon">🗂️</span>Colecciones</button>
       <button class="mob-drawer-item" data-page="decants" onclick="navToFromDrawer('decants')"><span class="mob-icon">🧪</span>Decants</button>
+      <button class="mob-drawer-item" data-page="cod" onclick="navToFromDrawer('cod')"><span class="mob-icon">🛡️</span>COD</button>
       <button class="mob-drawer-item" data-page="clientes" onclick="navToFromDrawer('clientes')"><span class="mob-icon">👤</span>Clientes</button>
     </div>
   </div>
@@ -1673,6 +1730,7 @@ function navTo(page){
   if(page==='bundles'){ renderBundles(); }
   if(page==='collections'){ renderCollections(); }
   if(page==='decants'){     renderDecantInventory(); }
+  if(page==='cod'){         renderCODPage(); }
   if(page==='clientes')  loadClientes();
 }
 document.querySelectorAll('.nav-btn,.mob-tab').forEach(function(b){
@@ -2107,12 +2165,15 @@ function renderOrdersList(list, banner){
       '<div class="oc-items">'+(o.items||[]).map(function(i){return esc(i.name)+' ×'+i.qty+' ($'+i.total+')';}).join(' · ')+'</div>'+
       '<div class="oc-bottom">'+
         '<select class="status-sel" data-oid="'+o.id+'">'+
-          [['Pendiente de Pago','Pendiente de Pago'],['Procesando','Procesando'],['Empaquetado','Empaquetado'],['Enviado','Enviado'],['Entregado','Entregado']].map(function(s){return'<option value="'+s[0]+'"'+(o.status===s[0]?' selected':'')+'>'+s[1]+'</option>';}).join('')+
+          [['Pendiente de Pago','Pendiente de Pago'],['Procesando','Procesando'],['Empaquetado','Empaquetado'],['Enviado','Enviado'],['Entregado','Entregado'],['No Entregado','No Entregado'],['Cancelado','Cancelado']].map(function(s){return'<option value="'+s[0]+'"'+(o.status===s[0]?' selected':'')+'>'+s[1]+'</option>';}).join('')+
         '</select>'+
         '<input class="tracking-input" id="trk-'+o.id+'" placeholder="N° seguimiento" value="'+(o.tracking_number||'')+'" data-oid="'+o.id+'" title="Número de seguimiento — se incluye en el email de envío"/>'+
         '<span class="sc '+scls+'">'+o.status+'</span>'+
         '<span class="pay-chip pay-'+(o.paymentStatus==='Pagado'?'ok':o.paymentStatus==='Fallido'?'err':'pend')+'">'+pmLabel+'</span>'+
         '<span class="oc-total">$'+parseFloat(o.total||0).toFixed(2)+'</span>'+
+        (o.payment_method==='cod'&&o.status!=='Entregado'&&o.status!=='No Entregado'?
+          '<button onclick="markNoShow(\''+o.id+'\')" title="Marcar como no entregado y registrar no-show" style="background:rgba(192,80,74,0.12);border:1px solid rgba(192,80,74,0.3);color:#c0504a;font-family:\'Jost\',sans-serif;font-size:0.55rem;letter-spacing:0.1em;text-transform:uppercase;padding:0.25rem 0.6rem;cursor:pointer">No Entregado</button>'
+          :'')+
       '</div>';
     container.appendChild(div);
   });
@@ -3960,6 +4021,150 @@ function sendSaleEmail(){
     btn.disabled = false;
     btn.textContent = 'Enviar Email de Oferta';
     toast('Error', 'Error de conexión', '');
+  });
+}
+
+// ── COD ABUSE MANAGEMENT ─────────────────────────────
+function renderCODPage(){
+  // Load settings
+  adminFetch(API+'/admin/cod-settings',{})
+    .then(function(r){ return r?r.json():{}; })
+    .then(function(s){
+      var mo = document.getElementById('codMinOrder');
+      var nl = document.getElementById('codNoshowLimit');
+      if(mo) mo.value = s.minOrder || 25;
+      if(nl) nl.value = s.noshowLimit || 2;
+    });
+
+  // Load blocklist
+  renderCODBlocklist();
+  // Load no-shows
+  renderCODNoshows();
+}
+
+function saveCODSettings(){
+  var minOrder    = parseFloat(document.getElementById('codMinOrder').value)||25;
+  var noshowLimit = parseInt(document.getElementById('codNoshowLimit').value)||2;
+  var msg         = document.getElementById('codSettingsMsg');
+  adminFetch(API+'/admin/cod-settings',{
+    method:'POST', headers:{'Content-Type':'application/json'},
+    body: JSON.stringify({ minOrder, noshowLimit })
+  }).then(function(r){ return r?r.json():null; })
+  .then(function(res){
+    if(res&&res.ok){ msg.textContent='✓ Guardado'; setTimeout(function(){ msg.textContent=''; },2000); }
+    else { msg.style.color='var(--error)'; msg.textContent='Error al guardar.'; }
+  });
+}
+
+function renderCODBlocklist(){
+  var container = document.getElementById('codBlocklist');
+  if(!container) return;
+  adminFetch(API+'/admin/cod-blocklist',{})
+    .then(function(r){ return r?r.json():[]; })
+    .then(function(rows){
+      if(!rows.length){
+        container.innerHTML='<p style="color:var(--muted);font-size:0.7rem">Sin contactos bloqueados.</p>';
+        return;
+      }
+      container.innerHTML='<table style="width:100%;border-collapse:collapse">'+
+        '<thead><tr>'+
+          ['Email','Teléfono','Razón','Bloqueado por','Fecha',''].map(function(h){
+            return '<th style="padding:8px 10px;text-align:left;font-size:0.52rem;letter-spacing:0.12em;text-transform:uppercase;color:var(--muted);border-bottom:1px solid var(--border-light)">'+h+'</th>';
+          }).join('')+
+        '</tr></thead><tbody>'+
+        rows.map(function(r){
+          var date = new Date(r.created_at).toLocaleDateString('es-ES',{day:'numeric',month:'short',year:'numeric'});
+          return '<tr style="border-bottom:1px solid rgba(255,255,255,0.04)">'+
+            '<td style="padding:8px 10px;font-size:0.7rem;color:var(--cream)">'+esc(r.email||'—')+'</td>'+
+            '<td style="padding:8px 10px;font-size:0.7rem;color:var(--cream)">'+esc(r.phone||'—')+'</td>'+
+            '<td style="padding:8px 10px;font-size:0.68rem;color:var(--muted)">'+esc(r.reason||'')+'</td>'+
+            '<td style="padding:8px 10px;font-size:0.65rem;color:var(--muted)">'+esc(r.blocked_by||'')+'</td>'+
+            '<td style="padding:8px 10px;font-size:0.65rem;color:var(--muted)">'+date+'</td>'+
+            '<td style="padding:8px 10px">'+
+              '<button onclick="removeCODBlock('+r.id+')" style="background:none;border:1px solid rgba(192,80,74,0.3);color:#c0504a;font-family:\'Jost\',sans-serif;font-size:0.55rem;letter-spacing:0.1em;text-transform:uppercase;padding:0.2rem 0.6rem;cursor:pointer">Desbloquear</button>'+
+            '</td>'+
+          '</tr>';
+        }).join('')+
+        '</tbody></table>';
+    });
+}
+
+function addCODBlock(){
+  var email  = document.getElementById('blockEmail').value.trim();
+  var phone  = document.getElementById('blockPhone').value.trim();
+  var reason = document.getElementById('blockReason').value.trim();
+  if(!email && !phone){ alert('Ingresa email o teléfono.'); return; }
+  adminFetch(API+'/admin/cod-blocklist',{
+    method:'POST', headers:{'Content-Type':'application/json'},
+    body: JSON.stringify({ email, phone, reason })
+  }).then(function(r){ return r?r.json():null; })
+  .then(function(res){
+    if(res&&res.ok){
+      document.getElementById('blockEmail').value='';
+      document.getElementById('blockPhone').value='';
+      document.getElementById('blockReason').value='';
+      renderCODBlocklist();
+      toast('Bloqueado','Contacto bloqueado para COD','ok');
+    }
+  });
+}
+
+function removeCODBlock(id){
+  if(!confirm('¿Desbloquear este contacto?')) return;
+  adminFetch(API+'/admin/cod-blocklist/'+id,{ method:'DELETE' })
+    .then(function(){ renderCODBlocklist(); toast('Desbloqueado','','ok'); });
+}
+
+function renderCODNoshows(){
+  var container = document.getElementById('codNoshows');
+  if(!container) return;
+  adminFetch(API+'/admin/cod-noshows',{})
+    .then(function(r){ return r?r.json():[]; })
+    .then(function(rows){
+      if(!rows.length){
+        container.innerHTML='<p style="color:var(--muted);font-size:0.7rem">Sin no-shows registrados.</p>';
+        return;
+      }
+      container.innerHTML='<table style="width:100%;border-collapse:collapse">'+
+        '<thead><tr>'+
+          ['Email','Teléfono','No-shows','Último','Pedidos','Acción'].map(function(h){
+            return '<th style="padding:8px 10px;text-align:left;font-size:0.52rem;letter-spacing:0.12em;text-transform:uppercase;color:var(--muted);border-bottom:1px solid var(--border-light)">'+h+'</th>';
+          }).join('')+
+        '</tr></thead><tbody>'+
+        rows.map(function(r){
+          var date = new Date(r.last_noshow).toLocaleDateString('es-ES',{day:'numeric',month:'short',year:'numeric'});
+          var orders = (r.order_ids||'').split(',').slice(0,3).join(', ');
+          return '<tr style="border-bottom:1px solid rgba(255,255,255,0.04)">'+
+            '<td style="padding:8px 10px;font-size:0.7rem;color:var(--cream)">'+esc(r.email||'—')+'</td>'+
+            '<td style="padding:8px 10px;font-size:0.7rem;color:var(--cream)">'+esc(r.phone||'—')+'</td>'+
+            '<td style="padding:8px 10px;text-align:center"><span style="background:rgba(192,80,74,0.15);color:#c0504a;padding:0.2rem 0.6rem;font-size:0.75rem">'+r.total+'</span></td>'+
+            '<td style="padding:8px 10px;font-size:0.65rem;color:var(--muted)">'+date+'</td>'+
+            '<td style="padding:8px 10px;font-size:0.62rem;color:var(--muted)">'+esc(orders)+'</td>'+
+            '<td style="padding:8px 10px">'+
+              '<button onclick="blockFromNoshow(\''+esc(r.email||'')+'\',\''+esc(r.phone||'')+'\')" style="background:rgba(192,80,74,0.1);border:1px solid rgba(192,80,74,0.3);color:#c0504a;font-family:\'Jost\',sans-serif;font-size:0.55rem;letter-spacing:0.1em;text-transform:uppercase;padding:0.2rem 0.6rem;cursor:pointer">Bloquear</button>'+
+            '</td>'+
+          '</tr>';
+        }).join('')+
+        '</tbody></table>';
+    });
+}
+
+function blockFromNoshow(email, phone){
+  if(!confirm('¿Bloquear este contacto para COD?')) return;
+  adminFetch(API+'/admin/cod-blocklist',{
+    method:'POST', headers:{'Content-Type':'application/json'},
+    body: JSON.stringify({ email, phone, reason:'Bloqueado manualmente desde no-shows' })
+  }).then(function(){ renderCODBlocklist(); renderCODNoshows(); toast('Bloqueado','','ok'); });
+}
+
+function markNoShow(orderId){
+  if(!confirm('¿Marcar como No Entregado? Se registrará un no-show para este contacto.')) return;
+  adminFetch(API+'/orders/'+orderId, {
+    method:'PATCH', headers:{'Content-Type':'application/json'},
+    body: JSON.stringify({ status:'No Entregado' })
+  }).then(function(r){ return r?r.json():null; })
+  .then(function(res){
+    if(res&&res.ok){ fetchAllData(); toast('Registrado','No-show registrado','ok'); }
   });
 }
 
