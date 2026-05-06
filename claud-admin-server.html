@@ -4345,8 +4345,10 @@ function renderDecantInventory(){
       };
     });
 
-    // Only show products with decant pricing
-    var decantProds = catalogue.filter(function(p){ return p.decantPrice || p.luxury; });
+    // Show all products — the store offers decants for every product
+    var decantProds = catalogue.slice().sort(function(a,b){
+      return (a.brand+' '+a.name).localeCompare(b.brand+' '+b.name);
+    });
 
     if(!decantProds.length){
       container.innerHTML = '<p style="color:var(--muted);font-size:0.7rem;padding:2rem 0;text-align:center">No hay productos con decant configurado.</p>';
@@ -4391,8 +4393,8 @@ function renderDecantInventory(){
                 '<input type="number" min="1" class="di-low di-10ml-low" data-pid="'+p.id+'" data-size="10" value="'+d10.low+'"'+
                 ' style="width:50px;background:rgba(255,255,255,0.04);border:1px solid rgba(184,149,90,0.12);color:var(--muted);text-align:center;padding:0.35rem;outline:none;font-family:\'Jost\',sans-serif;font-size:0.75rem"/>'+
               '</td>'+
-              // 5ml stock (only if luxury)
-              (p.luxury ?
+              // 5ml stock — show if product has explicit 5ml price or is luxury
+              (p.decantPrice5 || p.luxury ?
                 '<td style="padding:10px 12px;text-align:center">'+
                   '<input type="number" min="0" class="di-stock di-5ml" data-pid="'+p.id+'" data-size="5" value="'+(d5.stock!==''?d5.stock:'')+'" placeholder="∞"'+
                   ' style="width:60px;background:rgba(255,255,255,0.06);border:1px solid '+(hasOut5?'var(--error)':hasLow5?'var(--warn)':'rgba(184,149,90,0.2)')+';color:var(--cream);text-align:center;padding:0.35rem;outline:none;font-family:\'Jost\',sans-serif;font-size:0.8rem"/>'+
