@@ -983,6 +983,27 @@ tr:hover td{background:rgba(255,255,255,0.02)}
           </div>
         </div>
 
+        <!-- ADMIN ORDER NOTIFICATIONS -->
+        <div style="margin-top:2.5rem;padding-top:2rem;border-top:1px solid var(--border)">
+          <div class="page-title" style="font-size:1.2rem;margin-bottom:0.3rem">Notificaciones de Pedidos</div>
+          <div class="page-sub" style="margin-bottom:1.5rem">Estos correos recibirán un email por cada nuevo pedido confirmado.</div>
+          <div style="max-width:480px">
+            <div style="display:flex;gap:0.8rem;margin-bottom:1rem;flex-wrap:wrap;align-items:flex-end">
+              <div style="flex:1;min-width:160px">
+                <label style="font-size:0.55rem;letter-spacing:0.15em;text-transform:uppercase;color:var(--muted);display:block;margin-bottom:0.4rem">Nombre</label>
+                <input type="text" id="notifName" placeholder="Diego" style="width:100%;box-sizing:border-box;background:var(--card);border:1px solid var(--border-light);color:var(--cream);font-family:'Jost',sans-serif;font-size:0.75rem;padding:0.5rem 0.7rem;outline:none"/>
+              </div>
+              <div style="flex:2;min-width:200px">
+                <label style="font-size:0.55rem;letter-spacing:0.15em;text-transform:uppercase;color:var(--muted);display:block;margin-bottom:0.4rem">Email *</label>
+                <input type="email" id="notifEmail" placeholder="admin@correo.com" style="width:100%;box-sizing:border-box;background:var(--card);border:1px solid var(--border-light);color:var(--cream);font-family:'Jost',sans-serif;font-size:0.75rem;padding:0.5rem 0.7rem;outline:none"/>
+              </div>
+              <button onclick="addNotifEmail()" style="background:#b8955a;border:none;color:#0e0c0a;font-family:'Jost',sans-serif;font-size:0.6rem;letter-spacing:0.15em;text-transform:uppercase;padding:0.55rem 1rem;cursor:pointer;white-space:nowrap">+ Agregar</button>
+            </div>
+            <div id="notifEmailErr" style="font-size:0.65rem;color:var(--error);min-height:1rem;margin-bottom:0.5rem"></div>
+            <div id="notifEmailList"></div>
+          </div>
+        </div>
+
         <!-- SALE EMAIL BLAST -->
         <div style="margin-top:2.5rem;padding-top:2rem;border-top:1px solid var(--border)">
           <div class="page-title" style="font-size:1.2rem;margin-bottom:0.3rem">Email de Oferta</div>
@@ -1724,7 +1745,7 @@ function navTo(page){
   // Render page content
   if(page==='overview')  renderOverview();
   if(page==='inventory'){ renderInventory(); loadBottleInventory(); if(!catalogFragrances.length) adminFetch(API+'/catalogue',{}).then(function(r){return r?r.json():[];}).then(function(d){catalogFragrances=d||[];}); }
-  if(page==='pricing'){  renderPricing(); loadShippingConfig(); setTimeout(initSaleEmailUI, 800); }
+  if(page==='pricing'){  renderPricing(); loadShippingConfig(); setTimeout(initSaleEmailUI, 800); loadNotifEmails(); }
   if(page==='orders'){   renderOrders(); fetchAllData(); }
   if(page==='catalogo')  loadCatalogue();
   if(page==='bundles'){ renderBundles(); }
@@ -3942,6 +3963,71 @@ function deleteCollection(id){
   if(!confirm('¿Eliminar esta colección?')) return;
   adminFetch(API+'/collections/'+id,{method:'DELETE'})
     .then(function(r){ if(!r)return; renderCollections(); toast('Colección eliminada','','ok'); });
+}
+
+// ── ADMIN ORDER NOTIFICATIONS ────────────────────────
+function loadNotifEmails(){
+  var container = document.getElementById('notifEmailList');
+  if(!container) return;
+  adminFetch(API+'/admin/notification-emails',{})
+    .then(function(r){ return r?r.json():[]; })
+    .then(function(rows){
+      if(!rows.length){
+        container.innerHTML='<p style="color:var(--muted);font-size:0.68rem">Ningún email configurado aún.</p>';
+        return;
+      }
+      container.innerHTML='<div style="display:flex;flex-direction:column;gap:0.5rem">'+
+        rows.map(function(r){
+          return '<div style="display:flex;align-items:center;justify-content:space-between;padding:0.6rem 0.9rem;background:rgba(255,255,255,0.03);border:1px solid '+(r.active?'rgba(184,149,90,0.2)':'rgba(255,255,255,0.06)')+'">'+
+            '<div>'+
+              (r.name?'<span style="font-size:0.7rem;color:var(--cream);margin-right:0.5rem">'+esc(r.name)+'</span>':'')+
+              '<span style="font-size:0.68rem;color:var(--muted)">'+esc(r.email)+'</span>'+
+            '</div>'+
+            '<div style="display:flex;gap:0.5rem;align-items:center">'+
+              '<span style="font-size:0.52rem;letter-spacing:0.1em;text-transform:uppercase;padding:0.15rem 0.5rem;'+(r.active?'background:rgba(90,154,106,0.12);color:#5a9a6a':'background:rgba(255,255,255,0.05);color:var(--muted)')+'">'+(r.active?'Activo':'Inactivo')+'</span>'+
+              '<button onclick="toggleNotif('+r.id+','+(r.active?0:1)+')" style="background:none;border:1px solid rgba(184,149,90,0.2);color:var(--muted);font-family:\'Jost\',sans-serif;font-size:0.52rem;letter-spacing:0.1em;text-transform:uppercase;padding:0.2rem 0.5rem;cursor:pointer">'+(r.active?'Pausar':'Activar')+'</button>'+
+              '<button onclick="removeNotif('+r.id+')" style="background:none;border:1px solid rgba(192,80,74,0.2);color:#c0504a;font-family:\'Jost\',sans-serif;font-size:0.52rem;padding:0.2rem 0.5rem;cursor:pointer">✕</button>'+
+            '</div>'+
+          '</div>';
+        }).join('')+
+      '</div>';
+    })
+    .catch(function(){ if(container) container.innerHTML='<p style="color:var(--error);font-size:0.68rem">Error al cargar.</p>'; });
+}
+
+function addNotifEmail(){
+  var email = document.getElementById('notifEmail').value.trim();
+  var name  = document.getElementById('notifName').value.trim();
+  var err   = document.getElementById('notifEmailErr');
+  err.textContent = '';
+  if(!email){ err.textContent='Email requerido.'; return; }
+  adminFetch(API+'/admin/notification-emails',{
+    method:'POST', headers:{'Content-Type':'application/json'},
+    body: JSON.stringify({ email, name })
+  }).then(function(r){ return r?r.json():null; })
+  .then(function(res){
+    if(res&&res.ok){
+      document.getElementById('notifEmail').value='';
+      document.getElementById('notifName').value='';
+      loadNotifEmails();
+      toast('Agregado',email+' recibirá notificaciones de pedidos','ok');
+    } else {
+      err.textContent = (res&&res.error)||'Error al guardar.';
+    }
+  });
+}
+
+function toggleNotif(id, active){
+  adminFetch(API+'/admin/notification-emails/'+id,{
+    method:'PATCH', headers:{'Content-Type':'application/json'},
+    body: JSON.stringify({ active })
+  }).then(function(){ loadNotifEmails(); });
+}
+
+function removeNotif(id){
+  if(!confirm('¿Eliminar este email de notificaciones?')) return;
+  adminFetch(API+'/admin/notification-emails/'+id,{ method:'DELETE' })
+    .then(function(){ loadNotifEmails(); toast('Eliminado','','ok'); });
 }
 
 // ── SALE EMAIL BLAST ──────────────────────────────────
