@@ -267,6 +267,16 @@ async function initDB() {
   `);
 
   await db.execute(`
+    CREATE TABLE IF NOT EXISTS admin_notification_emails (
+      id         INT AUTO_INCREMENT PRIMARY KEY,
+      email      VARCHAR(255) NOT NULL UNIQUE,
+      name       VARCHAR(100),
+      active     TINYINT(1) DEFAULT 1,
+      created_at DATETIME NOT NULL
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
+  `);
+
+  await db.execute(`
     CREATE TABLE IF NOT EXISTS btcpay_pending (
       invoice_id   VARCHAR(100) PRIMARY KEY,
       order_id     VARCHAR(40)  NOT NULL,
@@ -578,6 +588,93 @@ Termina con: — Nez. Sin "tu sommelier". Escribe en español.`
   } catch(e) {
     console.warn('Nez note generation failed:', e.message);
     return null;
+  }
+}
+
+async function notifyAdmins(order) {
+  try {
+    const [admins] = await db.execute(
+      'SELECT email, name FROM admin_notification_emails WHERE active=1'
+    );
+    if (!admins.length) return;
+
+    const items = (order.items || []);
+    const itemsHtml = items.map(i =>
+      `<tr>
+        <td style="padding:6px 10px;border-bottom:1px solid #f0e6d0;font-size:13px;color:#1a1714">${escHtml(i.name)}</td>
+        <td style="padding:6px 10px;border-bottom:1px solid #f0e6d0;font-size:13px;color:#1a1714;text-align:center">×${i.qty}</td>
+        <td style="padding:6px 10px;border-bottom:1px solid #f0e6d0;font-size:13px;color:#1a1714;text-align:right">$${parseFloat(i.total||0).toFixed(2)}</td>
+      </tr>`
+    ).join('');
+
+    const pmLabels = { wompi:'Tarjeta (Wompi)', btcpay:'Bitcoin/Lightning', cod:'Contra Entrega' };
+    const pmLabel  = pmLabels[order.paymentMethod || order.payment_method] || order.paymentMethod || '—';
+    const pmColor  = (order.paymentMethod||order.payment_method) === 'cod' ? '#d4901a' : '#5a9a6a';
+    const BASE     = process.env.BASE_URL || 'https://sillage-sv.com';
+    const adminUrl = `${BASE}${process.env.ADMIN_PATH || '/claud-admin-server.html'}`;
+
+    const html = `<!DOCTYPE html><html lang="es"><head><meta charset="UTF-8"/></head>
+<body style="margin:0;padding:0;background:#f5f0e8;font-family:Helvetica,Arial,sans-serif">
+<div style="max-width:520px;margin:32px auto;background:#fff;border:1px solid #e8d8b8">
+  <div style="background:#0e0c0a;padding:20px 32px;display:flex;justify-content:space-between;align-items:center">
+    <div style="font-family:Georgia,serif;font-size:20px;font-weight:300;letter-spacing:6px;color:#b8955a;text-transform:uppercase">Sillage</div>
+    <div style="font-size:10px;letter-spacing:3px;color:#8a7f72;text-transform:uppercase">Nuevo Pedido</div>
+  </div>
+  <div style="padding:24px 32px">
+    <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:20px;padding-bottom:16px;border-bottom:1px solid #f0e6d0">
+      <div>
+        <div style="font-size:11px;letter-spacing:2px;text-transform:uppercase;color:#b8955a;margin-bottom:4px">Pedido</div>
+        <div style="font-family:Georgia,serif;font-size:18px;font-weight:300;color:#1a1714">${escHtml(order.id)}</div>
+      </div>
+      <div style="text-align:right">
+        <div style="font-size:11px;letter-spacing:2px;text-transform:uppercase;color:#b8955a;margin-bottom:4px">Método</div>
+        <div style="font-size:13px;font-weight:500;color:${pmColor}">${escHtml(pmLabel)}</div>
+      </div>
+    </div>
+    <div style="margin-bottom:16px">
+      <div style="font-size:10px;letter-spacing:2px;text-transform:uppercase;color:#b8955a;margin-bottom:6px">Cliente</div>
+      <div style="font-size:13px;color:#1a1714">${escHtml(order.customer)}</div>
+      <div style="font-size:12px;color:#8a7f72">${escHtml(order.email)}</div>
+      ${order.phone ? `<div style="font-size:12px;color:#8a7f72">${escHtml(order.phone)}</div>` : ''}
+    </div>
+    <div style="margin-bottom:16px">
+      <div style="font-size:10px;letter-spacing:2px;text-transform:uppercase;color:#b8955a;margin-bottom:6px">Enviar a</div>
+      <div style="font-size:13px;color:#1a1714">${escHtml(order.address || '')}, ${escHtml(order.city || '')}${order.state ? ', '+escHtml(order.state) : ''}, ${escHtml(order.country || '')}</div>
+    </div>
+    <table width="100%" cellpadding="0" cellspacing="0" style="margin-bottom:16px;border:1px solid #e8d8b8">
+      <thead>
+        <tr style="background:#f5f0e8">
+          <th style="padding:6px 10px;text-align:left;font-size:10px;letter-spacing:2px;text-transform:uppercase;color:#8a7f72;font-weight:400">Producto</th>
+          <th style="padding:6px 10px;text-align:center;font-size:10px;letter-spacing:2px;text-transform:uppercase;color:#8a7f72;font-weight:400">Cant.</th>
+          <th style="padding:6px 10px;text-align:right;font-size:10px;letter-spacing:2px;text-transform:uppercase;color:#8a7f72;font-weight:400">Total</th>
+        </tr>
+      </thead>
+      <tbody>${itemsHtml}</tbody>
+    </table>
+    <div style="display:flex;justify-content:flex-end;margin-bottom:24px">
+      <div style="text-align:right">
+        <div style="font-size:10px;letter-spacing:2px;text-transform:uppercase;color:#8a7f72;margin-bottom:4px">Total</div>
+        <div style="font-family:Georgia,serif;font-size:24px;font-weight:300;color:#1a1714">$${parseFloat(order.total||0).toFixed(2)}</div>
+      </div>
+    </div>
+    <a href="${adminUrl}" style="display:block;text-align:center;padding:12px;background:#b8955a;color:#0e0c0a;text-decoration:none;font-size:11px;letter-spacing:3px;text-transform:uppercase">
+      Ver en Panel Admin →
+    </a>
+  </div>
+</div>
+</body></html>`;
+
+    // Send to all active admin notification emails
+    for (const admin of admins) {
+      await sendEmail({
+        to:      admin.email,
+        subject: `🛍️ Nuevo pedido ${escHtml(order.id)} — ${escHtml(order.customer)} ($${parseFloat(order.total||0).toFixed(2)})`,
+        html,
+        from:    `Sillage Pedidos <${EMAIL_PEDIDOS || EMAIL_HOLA}>`
+      });
+    }
+  } catch(e) {
+    console.error('notifyAdmins error:', e.message); // non-fatal
   }
 }
 
@@ -2620,6 +2717,7 @@ app.post('/api/orders', orderLimiter, async (req, res) => {
   broadcastAdmin('new_order', order);
   await logActivity(`Nuevo pedido ${escHtml(order.id)} de ${escHtml(order.customer)} — $${parseFloat(order.total||0).toFixed(2)}`);
   try { await sendOrderConfirmation(order); } catch(e) {}
+  try { await notifyAdmins(order); } catch(e) {}
   res.json({ ok: true, order, wompiUrl: null, btcpayUrl: null, btcpayInvoiceId: null });
 });
 
@@ -2779,6 +2877,7 @@ app.post('/api/wompi/webhook', express.json(), async (req, res) => {
     broadcastAdmin('new_order', fullOrder);
     await logActivity(`Pago Wompi confirmado — pedido ${orderObj.id} de ${orderObj.customer} — $${parseFloat(orderObj.total||0).toFixed(2)}`);
     try { await sendOrderConfirmation(fullOrder); } catch(e) { console.error('Wompi confirm email error:', e.message); }
+    try { await notifyAdmins(fullOrder); } catch(e) {}
     console.log(`Wompi order created on payment: ${orderObj.id} — ref ${reference}`);
   } catch(e) {
     console.error('Wompi webhook processing error:', e.message);
@@ -3127,6 +3226,7 @@ app.post('/api/btcpay/webhook', async (req, res) => {
       broadcastAdmin('new_order', fullOrder);
       await logActivity(`Pago BTCPay confirmado (${type}) — pedido ${orderObj.id} de ${orderObj.customer} — $${parseFloat(orderObj.total||0).toFixed(2)}`);
       try { await sendOrderConfirmation(fullOrder); } catch(e) { console.error('BTCPay confirmation email error:', e.message); }
+      try { await notifyAdmins(fullOrder); } catch(e) {}
       console.log(`BTCPay order created on payment: ${orderObj.id} — invoice ${invoiceId}`);
 
     } else {
@@ -4726,6 +4826,45 @@ app.delete('/api/catalogue/:id', requireAdmin, async (req, res) => {
   await saveCatalogue(catalogue);
   broadcast('catalogue', catalogue);
   await logActivity(`Fragancia eliminada: ${frag.brand} ${frag.name}`);
+  res.json({ ok: true });
+});
+
+// ── ADMIN NOTIFICATION EMAILS ────────────────────────────────────────────────
+
+app.get('/api/admin/notification-emails', requireAdmin, async (req, res) => {
+  const [rows] = await db.execute('SELECT * FROM admin_notification_emails ORDER BY created_at ASC');
+  res.json(rows);
+});
+
+app.post('/api/admin/notification-emails', requireAdmin, async (req, res) => {
+  const { email, name } = req.body;
+  if (!email) return res.status(400).json({ error: 'Email requerido.' });
+  const re = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/;
+  if (!re.test(email)) return res.status(400).json({ error: 'Correo inválido.' });
+  try {
+    await db.execute(
+      'INSERT INTO admin_notification_emails (email, name, active, created_at) VALUES (?,?,1,?)',
+      [email.toLowerCase().trim(), name?.trim() || null, new Date()]
+    );
+    await logActivity(`Notificación de pedidos activada para: ${email}`);
+    res.json({ ok: true });
+  } catch(e) {
+    if (e.code === 'ER_DUP_ENTRY') return res.status(400).json({ error: 'Este email ya está registrado.' });
+    res.status(500).json({ error: e.message });
+  }
+});
+
+app.patch('/api/admin/notification-emails/:id', requireAdmin, async (req, res) => {
+  const { active } = req.body;
+  await db.execute('UPDATE admin_notification_emails SET active=? WHERE id=?', [active ? 1 : 0, req.params.id]);
+  res.json({ ok: true });
+});
+
+app.delete('/api/admin/notification-emails/:id', requireAdmin, async (req, res) => {
+  const [rows] = await db.execute('SELECT email FROM admin_notification_emails WHERE id=?', [req.params.id]);
+  if (!rows.length) return res.status(404).json({ error: 'No encontrado.' });
+  await db.execute('DELETE FROM admin_notification_emails WHERE id=?', [req.params.id]);
+  await logActivity(`Notificación de pedidos eliminada: ${rows[0].email}`);
   res.json({ ok: true });
 });
 
