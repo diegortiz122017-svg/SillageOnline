@@ -3474,6 +3474,11 @@ document.addEventListener('click', function(e) {
   e.stopPropagation();
 });
 
+// Close tooltip on scroll (fixed positioning means it floats when page scrolls)
+document.addEventListener('scroll', function(){
+  document.querySelectorAll('.notes-info-tip').forEach(function(t){ t.style.display='none'; });
+}, true); // capture phase to catch scroll on any scrollable container
+
 function dismissPrivacyBanner(){
   var banner = document.getElementById('privacyBanner');
   if(banner) banner.style.display = 'none';
