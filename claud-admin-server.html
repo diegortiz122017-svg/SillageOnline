@@ -68,6 +68,11 @@ body{background:var(--bg);color:var(--cream);font-family:'Jost',sans-serif;font-
 .page.active{display:block}
 .page-title{font-family:'Cormorant Garamond',serif;font-size:2rem;font-weight:300;color:var(--cream);margin-bottom:0.3rem}
 .page-sub{font-size:0.65rem;color:var(--muted);letter-spacing:0.1em;margin-bottom:2rem}
+.inner-tabs{display:flex;border-bottom:1px solid var(--border-light);margin-bottom:2rem;gap:0}
+.inner-tab{background:none;border:none;border-bottom:2px solid transparent;color:var(--muted);font-family:'Jost',sans-serif;font-size:0.6rem;letter-spacing:0.2em;text-transform:uppercase;padding:0.7rem 1.2rem;cursor:pointer;transition:all 0.2s;margin-bottom:-1px}
+.inner-tab:hover{color:var(--cream)}
+.inner-tab.active{color:var(--gold);border-bottom-color:var(--gold)}
+.inner-tab-section{display:none}.inner-tab-section.active{display:block}
 
 .stats-row{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:1rem;margin-bottom:2rem}
 .stat-card{background:var(--card);border:1px solid var(--border-light);padding:1rem 1.2rem;min-width:0;overflow:hidden;cursor:pointer;transition:border-color 0.25s,background 0.25s}
@@ -772,11 +777,8 @@ tr:hover td{background:rgba(255,255,255,0.02)}
         <button class="nav-btn" data-page="orders"><span class="nav-icon">🧾</span>Pedidos</button>
         <div class="sb-section">Inventario</div>
         <button class="nav-btn" data-page="inventory"><span class="nav-icon">📦</span>Inventario</button>
-        <button class="nav-btn" data-page="pricing"><span class="nav-icon">💲</span>Precios</button>
         <div class="sb-section">Catálogo</div>
         <button class="nav-btn" data-page="catalogo"><span class="nav-icon">🌸</span>Catálogo</button>
-        <button class="nav-btn" data-page="bundles"><span class="nav-icon">🎁</span>Bundles</button>
-        <button class="nav-btn" data-page="collections"><span class="nav-icon">🗂️</span>Colecciones</button>
         <button class="nav-btn" data-page="decants"><span class="nav-icon">🧪</span>Decants</button>
         <button class="nav-btn" data-page="cod"><span class="nav-icon">🛡️</span>COD</button>
         <div class="sb-section">Clientes</div>
@@ -916,7 +918,14 @@ tr:hover td{background:rgba(255,255,255,0.02)}
         <div class="act-wrap"><div class="act-title">Actividad Reciente</div><div id="actList"></div></div>
       </div>
       <div class="page" id="page-inventory">
-        <div class="page-title">Control de Inventario</div>
+        <div class="page-title">Inventario</div>
+        <div class="inner-tabs">
+          <button class="inner-tab active" onclick="switchInnerTab('inventory','stock',this)">📦 Stock</button>
+          <button class="inner-tab" onclick="switchInnerTab('inventory','pricing',this)">💲 Precios</button>
+        </div>
+
+        <!-- TAB: STOCK -->
+        <div class="inner-tab-section active" id="inv-tab-stock">
         <div class="page-sub">Los cambios se sincronizan con la tienda al instante</div>
         <div class="tbl-wrap">
           <table>
@@ -941,9 +950,9 @@ tr:hover td{background:rgba(255,255,255,0.02)}
           </div>
           <div id="bottleGrid" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:1rem"></div>
         </div>
-      </div>
-      <div class="page" id="page-pricing">
-        <div class="page-title">Precios y Ofertas</div>
+        </div><!-- end inv-tab-stock -->
+        <!-- TAB: PRICING -->
+        <div class="inner-tab-section" id="inv-tab-pricing">
         <div class="page-sub">Los cambios se sincronizan con la tienda al instante</div>
         <div class="tbl-wrap">
           <table>
@@ -1062,13 +1071,22 @@ tr:hover td{background:rgba(255,255,255,0.02)}
             </div>
           </div>
         </div>
-      </div>
+        </div><!-- end inv-tab-pricing -->
+      </div><!-- end page-inventory -->
 
       <!-- CATÁLOGO -->
       <div class="page" id="page-catalogo">
+        <div class="page-title">Catálogo</div>
+        <div class="inner-tabs">
+          <button class="inner-tab active" onclick="switchInnerTab('catalogo','productos',this)">🌸 Productos</button>
+          <button class="inner-tab" onclick="switchInnerTab('catalogo','bundles',this)">🎁 Bundles</button>
+          <button class="inner-tab" onclick="switchInnerTab('catalogo','colecciones',this)">🗂️ Colecciones</button>
+        </div>
+        <!-- TAB: PRODUCTOS -->
+        <div class="inner-tab-section active" id="cat-tab-productos">
         <div style="display:flex;align-items:flex-start;justify-content:space-between;flex-wrap:wrap;gap:1rem;margin-bottom:1.5rem">
           <div>
-            <div class="page-title">Catálogo</div>
+            <div class="page-title" style="font-size:1.2rem">Catálogo</div>
             <div class="page-sub" style="margin-bottom:0">Agrega, edita o elimina fragancias. Los badges se pueden asignar manualmente o calcular automáticamente.</div>
           </div>
           <button class="auto-badge-btn" id="autoBadgeBtn" onclick="autoAssignBestsellers()">&#9733; Auto Bestsellers</button>
@@ -1120,27 +1138,33 @@ tr:hover td{background:rgba(255,255,255,0.02)}
         <div id="ordersContainer"></div>
       </div>
       <!-- BUNDLES PAGE -->
-      <div id="page-bundles" class="page">
+        </div><!-- end cat-tab-productos -->
+      </div><!-- end page-catalogo -->
+
+        <!-- TAB: BUNDLES (inside page-catalogo) -->
+        <div class="inner-tab-section" id="cat-tab-bundles">
         <div class="page-hdr">
           <div>
-            <div class="page-title">Bundles de Decants</div>
+            <div class="page-title" style="font-size:1.2rem">Bundles de Decants</div>
             <div class="page-sub">Crea y gestiona paquetes de decants con precios especiales</div>
           </div>
           <button class="add-btn-lg" onclick="openBundleModal(null)">+ Nuevo Bundle</button>
         </div>
         <div id="bundlesList" class="bundles-list"></div>
-      </div>
+        </div><!-- end cat-tab-bundles -->
 
-      <div id="page-collections" class="page">
+        <!-- TAB: COLECCIONES (inside page-catalogo) -->
+        <div class="inner-tab-section" id="cat-tab-colecciones">
         <div class="page-hdr">
           <div>
-            <div class="page-title">Colecciones Curadas</div>
+            <div class="page-title" style="font-size:1.2rem">Colecciones Curadas</div>
             <div class="page-sub">Gestiona las colecciones visibles en la tienda. Arrastra para reordenar.</div>
           </div>
           <button class="add-btn-lg" onclick="openCollectionModal(null)">+ Nueva Colección</button>
         </div>
         <div id="collectionsList" class="bundles-list"></div>
-      </div>
+        </div><!-- end cat-tab-colecciones -->
+      </div><!-- end page-catalogo-wrapper -->
 
       <!-- DECANT INVENTORY PAGE -->
       <div id="page-decants" class="page">
@@ -1226,9 +1250,8 @@ tr:hover td{background:rgba(255,255,255,0.02)}
     <div class="mob-drawer">
       <div class="mob-drawer-handle"></div>
       <div class="mob-drawer-title">Más opciones</div>
-      <button class="mob-drawer-item" data-page="pricing" onclick="navToFromDrawer('pricing')"><span class="mob-icon">💲</span>Precios</button>
-      <button class="mob-drawer-item" data-page="bundles" onclick="navToFromDrawer('bundles')"><span class="mob-icon">🎁</span>Bundles</button>
-      <button class="mob-drawer-item" data-page="collections" onclick="navToFromDrawer('collections')"><span class="mob-icon">🗂️</span>Colecciones</button>
+      <button class="mob-drawer-item" data-page="pricing" onclick="navToFromDrawer('inventory')"><span class="mob-icon">💲</span>Inventario</button>
+      <button class="mob-drawer-item" data-page="bundles" onclick="navToFromDrawer('catalogo')"><span class="mob-icon">🎁</span>Catálogo</button>
       <button class="mob-drawer-item" data-page="decants" onclick="navToFromDrawer('decants')"><span class="mob-icon">🧪</span>Decants</button>
       <button class="mob-drawer-item" data-page="cod" onclick="navToFromDrawer('cod')"><span class="mob-icon">🛡️</span>COD</button>
       <button class="mob-drawer-item" data-page="clientes" onclick="navToFromDrawer('clientes')"><span class="mob-icon">👤</span>Clientes</button>
@@ -1733,6 +1756,30 @@ document.getElementById('logoutBtn').addEventListener('click',function(){
 
 // ── NAVIGATION ────────────────────────────────────
 var currentPage='overview';
+function switchInnerTab(pageId, tabId, btn){
+  var page = document.getElementById('page-'+pageId);
+  if(!page) return;
+  // Deactivate all inner tabs and sections in this page
+  page.querySelectorAll('.inner-tab').forEach(function(t){ t.classList.remove('active'); });
+  page.querySelectorAll('.inner-tab-section').forEach(function(s){ s.classList.remove('active'); });
+  // Activate selected
+  var section = document.getElementById(pageId.split('-')[0]+'-tab-'+tabId) ||
+                document.getElementById('inv-tab-'+tabId) ||
+                document.getElementById('cat-tab-'+tabId);
+  if(section) section.classList.add('active');
+  if(btn) btn.classList.add('active');
+}
+
+function switchToPage(page){
+  // Activate the page in the nav without triggering full navTo reload
+  document.querySelectorAll('.nav-btn,.mob-tab').forEach(function(b){ b.classList.remove('active'); });
+  var btn = document.querySelector('[data-page="'+page+'"]');
+  if(btn) btn.classList.add('active');
+  document.querySelectorAll('.page').forEach(function(p){ p.classList.remove('active'); });
+  var pageEl = document.getElementById('page-'+page);
+  if(pageEl) pageEl.classList.add('active');
+}
+
 function navTo(page){
   currentPage=page;
   // Close quick-view panel
@@ -1744,12 +1791,34 @@ function navTo(page){
   document.getElementById('content').scrollTop=0;
   // Render page content
   if(page==='overview')  renderOverview();
-  if(page==='inventory'){ renderInventory(); loadBottleInventory(); if(!catalogFragrances.length) adminFetch(API+'/catalogue',{}).then(function(r){return r?r.json():[];}).then(function(d){catalogFragrances=d||[];}); }
+  if(page==='inventory'){
+    renderInventory(); loadBottleInventory();
+    if(!catalogFragrances.length) adminFetch(API+'/catalogue',{}).then(function(r){return r?r.json():[];}).then(function(d){catalogFragrances=d||[];});
+  }
+  if(page==='pricing'){
+    switchToPage('inventory');
+    setTimeout(function(){
+      switchInnerTab('inventory','pricing',document.querySelector('#page-inventory .inner-tab:nth-child(2)'));
+      renderPricing(); loadShippingConfig(); setTimeout(initSaleEmailUI,800); loadNotifEmails();
+    },50); return;
+  }
   if(page==='pricing'){  renderPricing(); loadShippingConfig(); setTimeout(initSaleEmailUI, 800); loadNotifEmails(); }
   if(page==='orders'){   renderOrders(); fetchAllData(); }
-  if(page==='catalogo')  loadCatalogue();
-  if(page==='bundles'){ renderBundles(); }
-  if(page==='collections'){ renderCollections(); }
+  if(page==='catalogo'){ loadCatalogue(); }
+  if(page==='bundles'){
+    switchToPage('catalogo');
+    setTimeout(function(){
+      switchInnerTab('catalogo','bundles',document.querySelector('#page-catalogo .inner-tab:nth-child(2)'));
+      renderBundles();
+    },50); return;
+  }
+  if(page==='collections'){
+    switchToPage('catalogo');
+    setTimeout(function(){
+      switchInnerTab('catalogo','colecciones',document.querySelector('#page-catalogo .inner-tab:nth-child(3)'));
+      renderCollections();
+    },50); return;
+  }
   if(page==='decants'){     renderDecantInventory(); }
   if(page==='cod'){         renderCODPage(); }
   if(page==='clientes')  loadClientes();
