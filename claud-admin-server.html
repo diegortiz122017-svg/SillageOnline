@@ -1094,7 +1094,33 @@ tr:hover td{background:rgba(255,255,255,0.02)}
         <div class="auto-badge-result" id="autoBadgeResult" style="display:none"></div>
         <button class="add-frag-btn" onclick="openFragModal()">&#43; Agregar Fragancia</button>
         <div class="cat-grid" id="catGrid"></div>
-      </div>
+        </div><!-- end cat-tab-productos -->
+
+        <!-- TAB: BUNDLES -->
+        <div class="inner-tab-section" id="cat-tab-bundles">
+          <div class="page-hdr">
+            <div>
+              <div class="page-title" style="font-size:1.2rem">Bundles de Decants</div>
+              <div class="page-sub">Crea y gestiona paquetes de decants con precios especiales</div>
+            </div>
+            <button class="add-btn-lg" onclick="openBundleModal(null)">+ Nuevo Bundle</button>
+          </div>
+          <div id="bundlesList" class="bundles-list"></div>
+        </div><!-- end cat-tab-bundles -->
+
+        <!-- TAB: COLECCIONES -->
+        <div class="inner-tab-section" id="cat-tab-colecciones">
+          <div class="page-hdr">
+            <div>
+              <div class="page-title" style="font-size:1.2rem">Colecciones Curadas</div>
+              <div class="page-sub">Gestiona las colecciones visibles en la tienda. Arrastra para reordenar.</div>
+            </div>
+            <button class="add-btn-lg" onclick="openCollectionModal(null)">+ Nueva Colección</button>
+          </div>
+          <div id="collectionsList" class="bundles-list"></div>
+        </div><!-- end cat-tab-colecciones -->
+
+      </div><!-- end page-catalogo -->
 
       <!-- CLIENTES -->
       <div class="page" id="page-clientes">
@@ -1759,15 +1785,16 @@ var currentPage='overview';
 function switchInnerTab(pageId, tabId, btn){
   var page = document.getElementById('page-'+pageId);
   if(!page) return;
-  // Deactivate all inner tabs and sections in this page
   page.querySelectorAll('.inner-tab').forEach(function(t){ t.classList.remove('active'); });
   page.querySelectorAll('.inner-tab-section').forEach(function(s){ s.classList.remove('active'); });
-  // Activate selected
-  var section = document.getElementById(pageId.split('-')[0]+'-tab-'+tabId) ||
-                document.getElementById('inv-tab-'+tabId) ||
-                document.getElementById('cat-tab-'+tabId);
+  var prefix = pageId === 'inventory' ? 'inv' : 'cat';
+  var section = document.getElementById(prefix+'-tab-'+tabId);
   if(section) section.classList.add('active');
   if(btn) btn.classList.add('active');
+  // Load data for the activated tab
+  if(pageId==='inventory' && tabId==='pricing'){ renderPricing(); loadShippingConfig(); setTimeout(initSaleEmailUI,800); loadNotifEmails(); }
+  if(pageId==='catalogo'  && tabId==='bundles'){     renderBundles(); }
+  if(pageId==='catalogo'  && tabId==='colecciones'){ renderCollections(); }
 }
 
 function switchToPage(page){
