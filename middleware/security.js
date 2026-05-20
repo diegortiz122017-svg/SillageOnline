@@ -25,12 +25,12 @@ function cors(req, res, next) {
 function securityHeaders(req, res, next) {
   res.setHeader('Content-Security-Policy',
     "default-src 'self'; " +
-    "script-src 'self' 'unsafe-inline' https://fonts.googleapis.com https://cdnjs.cloudflare.com https://static.cloudflareinsights.com https://checkout.wompi.sv https://copilot-production-0dff.up.railway.app; " +
+    "script-src 'self' 'unsafe-inline' https://fonts.googleapis.com https://cdnjs.cloudflare.com https://static.cloudflareinsights.com https://checkout.wompi.sv https://teyko.app; " +
     "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com https://fonts.gstatic.com; " +
     "font-src 'self' https://fonts.gstatic.com; " +
     "img-src 'self' data: https://res.cloudinary.com https://btcpay.davidcoen.it; " +
     "frame-src https://checkout.wompi.sv; " +
-    "connect-src 'self' wss://sillage-sv.com wss: https://api.wompi.sv https://id.wompi.sv https://checkout.wompi.sv https://cloudflareinsights.com https://api.openai.com https://api.teyko.app wss://api.teyko.app; " +
+    "connect-src 'self' wss://sillage-sv.com wss: https://api.wompi.sv https://id.wompi.sv https://checkout.wompi.sv https://cloudflareinsights.com https://api.openai.com https://api.teyko.app wss://api.teyko.app https://gentle-rebirth-production.up.railway.app wss://gentle-rebirth-production.up.railway.app; " +
     "frame-ancestors 'none'; " +
     "base-uri 'self'; " +
     "form-action 'self' https://checkout.wompi.sv; " +
@@ -63,7 +63,6 @@ const _rlStore = new Map();
 
 function rateLimit({ max = cfg.RATE_LIMIT_MAX, window = cfg.RATE_LIMIT_WINDOW } = {}) {
   return (req, res, next) => {
-    // Use last Cloudflare-appended IP for accuracy
     const forwarded = req.headers['x-forwarded-for'];
     const ip = forwarded
       ? forwarded.split(',').map(s => s.trim()).pop()
@@ -86,10 +85,8 @@ function rateLimit({ max = cfg.RATE_LIMIT_MAX, window = cfg.RATE_LIMIT_WINDOW } 
   };
 }
 
-// Aggressive rate limiter for auth endpoints
 const authLimiter = rateLimit({ max: 10, window: 15 * 60 * 1000 });
 
-// Cleanup RL store every 10 minutes
 setInterval(() => {
   const cutoff = Date.now() - cfg.RATE_LIMIT_WINDOW;
   for (const [ip, entry] of _rlStore) {
@@ -109,7 +106,6 @@ function getIp(req) {
 }
 
 // Customer auth limiter — keyed by EMAIL not IP.
-// Prevents shared IPs (Cloudflare, offices) from triggering 429 for other users.
 const _customerRlStore = new Map();
 function customerAuthLimiter(req, res, next) {
   const email  = String((req.body && req.body.email) || '').toLowerCase().trim();
