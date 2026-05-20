@@ -30,7 +30,7 @@ function securityHeaders(req, res, next) {
     "font-src 'self' https://fonts.gstatic.com; " +
     "img-src 'self' data: https://res.cloudinary.com https://btcpay.davidcoen.it; " +
     "frame-src https://checkout.wompi.sv; " +
-    "connect-src 'self' wss://sillage-sv.com wss: https://api.wompi.sv https://id.wompi.sv https://checkout.wompi.sv https://cloudflareinsights.com https://api.openai.com https://gentle-rebirth-production.up.railway.app wss://gentle-rebirth-production.up.railway.app; " +
+    "connect-src 'self' wss://sillage-sv.com wss: https://api.wompi.sv https://id.wompi.sv https://checkout.wompi.sv https://cloudflareinsights.com https://api.openai.com https://api.teyko.app wss://api.teyko.app; " +
     "frame-ancestors 'none'; " +
     "base-uri 'self'; " +
     "form-action 'self' https://checkout.wompi.sv; " +
