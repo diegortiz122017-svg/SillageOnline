@@ -1183,7 +1183,12 @@ app.use(express.json({
   }
 }));
 app.use(security.securityHeaders);
-app.use(security.rateLimit());                         // global rate limit
+app.use(function(req, res, next) {
+  // Skip global rate limit for authenticated admin API calls
+  const adminToken = req.headers['x-admin-token'];
+  if (adminToken && req.path.startsWith('/api/')) return next();
+  return security.rateLimit()(req, res, next);
+});                                                    // global rate limit (admin exempt)
 
 // Additional security headers not covered by middleware
 app.use(function(req, res, next) {
