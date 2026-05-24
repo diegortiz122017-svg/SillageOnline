@@ -1013,47 +1013,58 @@ footer{background:var(--dark);padding:3.5rem 4rem;text-align:center;border-top:1
 .new-arrivals-line{display:none}
 
 /* ── New arrivals — scrolltelling ── */
-.new-arrivals-section{margin-bottom:0;border-top:1px solid rgba(184,149,90,0.12);border-bottom:1px solid rgba(184,149,90,0.12);background:var(--warm-white);margin-top:0}
+/* ── New arrivals — scrolltelling, Option A (full-width stacked rows) ── */
+.new-arrivals-section{margin-bottom:0;border-top:1px solid rgba(184,149,90,0.12);background:var(--warm-white);margin-top:0}
 .new-arrivals-hdr{text-align:center;margin-bottom:2rem}
 .new-arrivals-title{font-size:0.65rem;letter-spacing:0.35em;text-transform:uppercase;color:var(--gold);font-weight:400;display:block;margin-bottom:0.8rem}
 .new-arrivals-heading{font-family:'Cormorant Garamond',serif;font-size:clamp(2.5rem,5vw,4rem);font-weight:300;color:var(--charcoal);line-height:1.1}
 .new-arrivals-heading em{font-style:italic;color:var(--gold)}
 .new-arrivals-line{display:none}
-/* Sticky wrapper — scroll room is 2× viewport height */
-.na-sticky-wrap{position:relative;height:200vh}
-.na-sticky{position:sticky;top:0;height:100vh;overflow:hidden;background:var(--warm-white);padding:4rem 4rem 3rem;display:flex;flex-direction:column;justify-content:center}
-.na-progress-bar{position:absolute;bottom:0;left:0;height:2px;background:linear-gradient(to right,var(--gold),#d4b87a);width:0;pointer-events:none;z-index:10}
-.na-grid{display:grid;grid-template-columns:1.6fr 1fr;gap:10px}
-.na-card{background:var(--warm-white);border:1px solid rgba(184,149,90,0.12);overflow:hidden;cursor:pointer;transition:border-color 0.3s;will-change:transform,opacity}
-.na-card:hover{border-color:rgba(184,149,90,0.4)}
-.na-card.na-large{grid-row:1/3}
-.na-card-img{background:linear-gradient(135deg,rgba(184,149,90,0.05),rgba(184,149,90,0.02));display:flex;align-items:center;justify-content:center;position:relative;overflow:hidden}
-.na-card.na-large .na-card-img{height:300px}
-.na-card.na-small .na-card-img{height:145px}
-.na-card-img img{max-height:85%;max-width:80%;object-fit:contain;position:relative;z-index:1;will-change:transform}
+/* Sticky wrapper — extra scroll room per product */
+.na-sticky-wrap{position:relative;height:220vh}
+.na-sticky{position:sticky;top:0;height:100vh;overflow:hidden;background:var(--warm-white);padding:3rem 4rem 2.5rem;display:flex;flex-direction:column;justify-content:center}
+.na-progress-bar{position:absolute;top:0;left:0;height:2px;background:linear-gradient(to right,var(--gold),#d4b87a);width:0;pointer-events:none;z-index:10}
+/* Full-width row: image half | text half */
+.na-grid{display:flex;flex-direction:column;gap:0}
+.na-card{display:grid;grid-template-columns:1fr 1fr;cursor:pointer;transition:background 0.3s;will-change:transform,opacity;border-bottom:1px solid rgba(184,149,90,0.1)}
+.na-card:last-child{border-bottom:none}
+.na-card:hover{background:rgba(184,149,90,0.02)}
+/* Alternate image side */
+.na-card:nth-child(even) .na-card-img{order:2}
+.na-card:nth-child(even) .na-card-body{order:1;text-align:right}
+.na-card:nth-child(even) .na-card-chords{justify-content:flex-end}
+.na-card:nth-child(even) .na-card-footer{justify-content:flex-end}
+.na-card-img{height:320px;background:rgba(184,149,90,0.04);display:flex;align-items:center;justify-content:center;position:relative;overflow:hidden}
+.na-card-img img{max-height:80%;max-width:70%;object-fit:contain;position:relative;z-index:1;will-change:transform}
 .na-card-img .na-svg{position:relative;z-index:1;will-change:transform}
-.na-card-badge{position:absolute;top:12px;left:12px;background:var(--gold);color:var(--dark);font-size:0.42rem;letter-spacing:0.2em;text-transform:uppercase;padding:3px 8px;opacity:0;z-index:2;will-change:opacity,transform}
-.na-card-body{padding:1rem 1.25rem 1.25rem}
-.na-card.na-large .na-card-body{padding:1.25rem 1.5rem 1.5rem}
-.na-card-brand{font-size:0.48rem;letter-spacing:0.2em;text-transform:uppercase;color:var(--gold);margin-bottom:3px;opacity:0;will-change:opacity,transform}
-.na-card-name{font-family:'Cormorant Garamond',serif;font-size:1.5rem;font-weight:300;color:var(--charcoal);margin-bottom:5px;opacity:0;will-change:opacity,transform}
-.na-card.na-large .na-card-name{font-size:clamp(1.6rem,3vw,2.2rem)}
-.na-card-tagline{font-size:0.7rem;color:var(--muted);font-style:italic;line-height:1.7;margin-bottom:1rem;opacity:0;will-change:opacity}
-.na-card-chords{display:flex;flex-wrap:wrap;gap:4px;margin-bottom:1rem}
-.na-card-chord{font-size:0.44rem;letter-spacing:0.12em;text-transform:uppercase;color:var(--muted);border:1px solid rgba(184,149,90,0.25);padding:2px 8px;opacity:0;will-change:opacity,transform}
-.na-card-footer{display:flex;align-items:center;gap:1rem;padding-top:0.8rem;border-top:1px solid rgba(184,149,90,0.1);opacity:0;will-change:opacity}
-.na-card-price{font-family:'Cormorant Garamond',serif;font-size:1.3rem;font-weight:300;color:var(--charcoal)}
-.na-card-cta{font-size:0.48rem;letter-spacing:0.18em;text-transform:uppercase;color:var(--muted);border-bottom:1px solid rgba(184,149,90,0.3);padding-bottom:1px;transition:color 0.2s,border-color 0.2s}
+.na-card-badge{position:absolute;top:14px;left:14px;background:var(--gold);color:var(--dark);font-size:0.42rem;letter-spacing:0.2em;text-transform:uppercase;padding:3px 9px;opacity:0;z-index:2;will-change:opacity,transform}
+.na-card:nth-child(even) .na-card-badge{left:auto;right:14px}
+.na-card-body{padding:2.5rem 3rem;display:flex;flex-direction:column;justify-content:center}
+.na-card-brand{font-size:0.5rem;letter-spacing:0.22em;text-transform:uppercase;color:var(--gold);margin-bottom:0.4rem;opacity:0;will-change:opacity,transform}
+.na-card-name{font-family:'Cormorant Garamond',serif;font-size:clamp(2rem,3.5vw,3rem);font-weight:300;color:var(--charcoal);line-height:1.1;margin-bottom:0.6rem;opacity:0;will-change:opacity,transform}
+.na-card-tagline{font-size:0.75rem;color:var(--muted);font-style:italic;line-height:1.7;margin-bottom:1.2rem;opacity:0;will-change:opacity}
+.na-card-chords{display:flex;flex-wrap:wrap;gap:5px;margin-bottom:1.4rem}
+.na-card-chord{font-size:0.46rem;letter-spacing:0.12em;text-transform:uppercase;color:var(--muted);border:1px solid rgba(184,149,90,0.25);padding:3px 9px;opacity:0;will-change:opacity,transform}
+.na-card-footer{display:flex;align-items:center;gap:1.2rem;padding-top:1rem;border-top:1px solid rgba(184,149,90,0.12);opacity:0;will-change:opacity}
+.na-card-price{font-family:'Cormorant Garamond',serif;font-size:1.5rem;font-weight:300;color:var(--charcoal)}
+.na-card-cta{font-size:0.5rem;letter-spacing:0.2em;text-transform:uppercase;color:var(--muted);border-bottom:1px solid rgba(184,149,90,0.3);padding-bottom:1px;transition:color 0.2s,border-color 0.2s}
 .na-card:hover .na-card-cta{color:var(--gold);border-color:var(--gold)}
-.na-orb{position:absolute;border-radius:50%;filter:blur(45px);pointer-events:none;will-change:transform,opacity}
-@media(max-width:600px){
-  .na-sticky-wrap{height:250vh}
-  .na-sticky{padding:3rem 1rem 2rem}
-  .na-grid{grid-template-columns:1fr}
-  .na-card.na-large{grid-row:auto}
-  .na-card.na-large .na-card-img{height:220px}
-  .na-card.na-small .na-card-img{height:150px}
-  .new-arrivals-heading{font-size:2rem}
+.na-orb{position:absolute;border-radius:50%;filter:blur(50px);pointer-events:none;will-change:transform,opacity}
+@media(max-width:768px){
+  .na-sticky{padding:2rem 1.2rem 2rem}
+  .na-sticky-wrap{height:300vh}
+  /* Stack vertically on mobile */
+  .na-card{grid-template-columns:1fr}
+  .na-card-img{height:220px;order:-1!important}
+  .na-card-body{order:1!important;padding:1.5rem 1.2rem 2rem;text-align:left!important}
+  .na-card-chords{justify-content:flex-start!important}
+  .na-card-footer{justify-content:flex-start!important}
+  .na-card-badge{left:12px!important;right:auto!important}
+  .na-card-name{font-size:2rem}
+  /* Header always visible on mobile */
+  .new-arrivals-title{font-size:0.6rem}
+  .new-arrivals-heading{font-size:1.8rem}
+  .new-arrivals-hdr{margin-bottom:1.2rem}
 }
 
 .ap-order{background:rgba(255,255,255,0.03);border:1px solid rgba(184,149,90,0.12);
@@ -2737,25 +2748,23 @@ function buildGrid(){
       var ep  = pr.onSale && pr.salePrice ? parseFloat(pr.salePrice).toFixed(0) : parseFloat(p.price).toFixed(0);
       var c0  = p.c && p.c[0] ? p.c[0] : '#d4b87a';
       var c1  = p.c && p.c[1] ? p.c[1] : '#b8955a';
-      var isLarge = idx === 0;
-      var cardCls = 'na-card ' + (isLarge ? 'na-large' : 'na-small');
       var orbs =
-        '<div class="na-orb" style="width:55%;padding-bottom:55%;top:-10%;right:-10%;background:'+c0+';opacity:0"></div>'+
-        '<div class="na-orb" style="width:38%;padding-bottom:38%;bottom:-8%;left:-8%;background:'+c1+';opacity:0"></div>';
+        '<div class="na-orb" style="width:55%;padding-bottom:55%;top:-15%;right:-10%;background:'+c0+';opacity:0"></div>'+
+        '<div class="na-orb" style="width:38%;padding-bottom:38%;bottom:-10%;left:-8%;background:'+c1+';opacity:0"></div>';
       var bottleHtml = p.photos && p.photos.length
         ? '<img class="na-svg" src="'+esc(cdnImg(p.photos[0],600))+'" alt="'+esc(p.brand+' '+p.name)+'" style="opacity:0">'
-        : '<div class="na-svg" style="opacity:0">'+svg(p.c, p.s, isLarge ? 'lg' : 'md')+'</div>';
+        : '<div class="na-svg" style="opacity:0">'+svg(p.c, p.s, 'xl')+'</div>';
       var chordHtml = (p.chords||[]).slice(0,4).map(function(c){
         return '<span class="na-card-chord">'+esc(c)+'</span>';
       }).join('');
-      return '<div class="'+cardCls+'" data-pid="'+p.id+'" onclick="openDetail('+p.id+')" style="opacity:0">'+
+      return '<div class="na-card" data-pid="'+p.id+'" onclick="openDetail('+p.id+')" style="opacity:0">'+
         '<div class="na-card-img">'+orbs+bottleHtml+
           '<span class="na-card-badge" style="opacity:0">Nueva llegada</span>'+
         '</div>'+
         '<div class="na-card-body">'+
           '<div class="na-card-brand" style="opacity:0">'+esc(p.brand)+'</div>'+
           '<div class="na-card-name" style="opacity:0">'+esc(p.name)+'</div>'+
-          (isLarge && p.tagline ? '<div class="na-card-tagline" style="opacity:0">'+esc(p.tagline)+'</div>' : '')+
+          (p.tagline ? '<div class="na-card-tagline" style="opacity:0">'+esc(p.tagline)+'</div>' : '')+
           (chordHtml ? '<div class="na-card-chords">'+chordHtml+'</div>' : '')+
           '<div class="na-card-footer" style="opacity:0">'+
             '<span class="na-card-price">$'+ep+'</span>'+
@@ -2770,6 +2779,10 @@ function buildGrid(){
       '<h2 class="new-arrivals-heading" id="naHeading" style="opacity:0">Lo nuevo en <em>Sillage</em></h2>'+
     '</div>'+
     '<div class="na-grid" id="naCardGrid">'+cardsHtml+'</div>';
+
+    // Dynamic height: more scroll room per extra product
+    var scrollH = Math.max(200, 150 + newArrivals.length * 60);
+    naSticky.style.height = scrollH + 'vh';
 
     naSticky.appendChild(naPanel);
     naWrap.appendChild(naSticky);
@@ -2811,69 +2824,79 @@ function buildGrid(){
       function applyProgress(p){
         if(bar) bar.style.width = (p*100)+'%';
 
-        // MEDIUM timing — phases spread across 0→1 with comfortable overlap
-
-        // Header (eyebrow + heading together, slight stagger)
+        // MEDIUM timing — Option A full-width rows
+        // Phase 0→0.18: header (eyebrow + heading together, slightly staggered)
         var pEy = ease(prog(p, 0.0, 0.18));
         var pHd = ease(prog(p, 0.04, 0.22));
         setEl(eyebrow, { opacity:pEy, y:lerp(10,0,pEy) });
         setEl(heading,  { opacity:pHd, y:lerp(14,0,pHd) });
 
-        // Cards slide up together
+        // Cards: each row reveals in sequence
         cards.forEach(function(c,i){
-          var pC = ease(prog(p, 0.10+i*0.05, 0.30+i*0.05));
-          setEl(c, { opacity:pC, y:lerp(35,0,pC) });
+          var start = 0.12 + i*0.18;
+          var pC = ease(prog(p, start, start+0.20));
+          setEl(c, { opacity:pC, y:lerp(30,0,pC) });
         });
 
-        // Orbs — very subtle
+        // Orbs — very subtle per card
         orbs.forEach(function(o,i){
-          var pO = ease(prog(p, 0.22+i*0.04, 0.42+i*0.04));
+          var cardIdx = Math.floor(i/2);
+          var start = 0.20 + cardIdx*0.18;
+          var pO = ease(prog(p, start, start+0.18));
           o.style.opacity = lerp(0, i%2===0?0.07:0.05, pO);
         });
 
-        // Bottles spring (simulated elastic with lerp + overshoot)
+        // Bottles
         bottles.forEach(function(b,i){
-          var pB = ease(prog(p, 0.28+i*0.06, 0.50+i*0.06));
-          var overshoot = pB < 0.85 ? 0 : Math.sin((pB-0.85)/0.15*Math.PI)*3;
-          setEl(b, { opacity:pB, y:lerp(22,0,pB)-overshoot, scale:lerp(0.88,1,pB) });
+          var start = 0.26 + i*0.18;
+          var pB = ease(prog(p, start, start+0.22));
+          var overshoot = pB > 0.85 ? Math.sin((pB-0.85)/0.15*Math.PI)*4 : 0;
+          setEl(b, { opacity:pB, y:lerp(24,0,pB)-overshoot, scale:lerp(0.88,1,pB) });
         });
 
         // Badges
         badges.forEach(function(bg,i){
-          var pBg = ease(prog(p, 0.42+i*0.04, 0.58+i*0.04));
+          var start = 0.38 + i*0.18;
+          var pBg = ease(prog(p, start, start+0.14));
           setEl(bg, { opacity:pBg, x:lerp(-8,0,pBg) });
         });
 
         // Brand + name
         brands.forEach(function(br,i){
-          var pT = ease(prog(p, 0.52+i*0.04, 0.66+i*0.04));
+          var start = 0.44 + i*0.18;
+          var pT = ease(prog(p, start, start+0.14));
           setEl(br, { opacity:pT, y:lerp(6,0,pT) });
         });
         names.forEach(function(nm,i){
-          var pN = ease(prog(p, 0.56+i*0.04, 0.70+i*0.04));
+          var start = 0.48 + i*0.18;
+          var pN = ease(prog(p, start, start+0.14));
           setEl(nm, { opacity:pN, y:lerp(6,0,pN) });
         });
 
         // Tagline + chords
-        taglines.forEach(function(tg){
-          tg.style.opacity = ease(prog(p, 0.64, 0.76));
+        taglines.forEach(function(tg,i){
+          tg.style.opacity = ease(prog(p, 0.54+i*0.18, 0.66+i*0.18));
         });
         chords.forEach(function(ch,i){
-          var pCh = ease(prog(p, 0.68+i*0.025, 0.80+i*0.025));
+          var cardIdx = Math.floor(i/4);
+          var chIdx   = i%4;
+          var start = 0.58 + cardIdx*0.18 + chIdx*0.02;
+          var pCh = ease(prog(p, start, start+0.12));
           setEl(ch, { opacity:pCh, scale:lerp(0.85,1,pCh) });
         });
 
         // Footers
         footers.forEach(function(ft,i){
-          ft.style.opacity = ease(prog(p, 0.78+i*0.04, 0.90+i*0.04));
+          ft.style.opacity = ease(prog(p, 0.68+i*0.18, 0.80+i*0.18));
         });
 
         // Floating bottles — additive sine on top of scroll position
         var t = Date.now()*0.001;
         bottles.forEach(function(b,i){
-          var pB = ease(prog(p, 0.28+i*0.06, 0.50+i*0.06));
+          var start = 0.26 + i*0.18;
+          var pB = ease(prog(p, start, start+0.22));
           if(pB > 0.5){
-            var baseY = lerp(22,0,pB);
+            var baseY = lerp(24,0,pB);
             setEl(b, { opacity:pB, y:baseY+Math.sin(t*0.9+i*1.2)*5, scale:lerp(0.88,1,pB) });
           }
         });
@@ -2890,7 +2913,8 @@ function buildGrid(){
           // Keep float running even when not scrolling
           var t = Date.now()*0.001;
           bottles.forEach(function(b,i){
-            var pB = ease(prog(lastP, 0.28+i*0.06, 0.50+i*0.06));
+            var start = 0.26 + i*0.18;
+            var pB = ease(prog(lastP, start, start+0.22));
             if(pB > 0.5) setEl(b, { opacity:pB, y:Math.sin(t*0.9+i*1.2)*5, scale:lerp(0.88,1,pB) });
           });
         }
