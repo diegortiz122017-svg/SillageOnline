@@ -29,6 +29,7 @@ const auth         = require('./middleware/auth');
 // ─── Aliases for backwards compatibility within this file ──────────────────
 const { getCatalogue, saveCatalogue, getInventoryMap, invalidateInventory, getPricingMap, getActivity, getSetting, setSetting, getBrandHierarchy } = catalogueSvc;
 const { calcIntensity } = require('./services/noteIntensity');
+const { calcChords }    = require('./services/chords');
 
 // logActivity also broadcasts to admin WebSocket clients
 async function logActivity(msg) {
@@ -4790,6 +4791,10 @@ app.post('/api/catalogue', requireAdmin, async (req, res) => {
   const catalogue = await getCatalogue();
   const maxId = catalogue.reduce((m, p) => Math.max(m, p.id || 0), 0);
   const newFrag = { ...req.body, id: maxId + 1, ...calcIntensity(req.body) };
+  // Auto-generate chords unless manually overridden
+  if (!newFrag.chords_override) {
+    newFrag.chords = calcChords(newFrag);
+  }
   catalogue.push(newFrag);
   await saveCatalogue(catalogue);
   broadcast('catalogue', catalogue);
@@ -4816,6 +4821,10 @@ app.put('/api/catalogue/:id', requireAdmin, async (req, res) => {
   const idx = catalogue.findIndex(p => p.id === id);
   if (idx === -1) return res.status(404).json({ error: 'Fragancia no encontrada' });
   catalogue[idx] = { ...req.body, id, ...calcIntensity(req.body) };
+  // Recalculate chords unless manually overridden
+  if (!catalogue[idx].chords_override) {
+    catalogue[idx].chords = calcChords(catalogue[idx]);
+  }
   await saveCatalogue(catalogue);
   broadcast('catalogue', catalogue);
   await logActivity(`Fragancia actualizada: ${catalogue[idx].brand} ${catalogue[idx].name}`);
@@ -5054,6 +5063,22 @@ app.post('/api/admin/sale-email', requireAdmin, async (req, res) => {
     console.error('Sale email error:', e.message);
     res.status(500).json({ error: e.message });
   }
+});
+
+// POST /api/admin/backfill-chords — recalculate chords for all products missing them
+app.post('/api/admin/backfill-chords', requireAdmin, async (req, res) => {
+  const catalogue = await getCatalogue();
+  let updated = 0;
+  for (const p of catalogue) {
+    if (!p.chords_override && (!p.chords || !p.chords.length)) {
+      p.chords = calcChords(p);
+      updated++;
+    }
+  }
+  await saveCatalogue(catalogue);
+  broadcast('catalogue', catalogue);
+  await logActivity(`Chords recalculados: ${updated} productos actualizados`);
+  res.json({ ok: true, updated });
 });
 
 // POST /api/admin/migrate-note-intensity
