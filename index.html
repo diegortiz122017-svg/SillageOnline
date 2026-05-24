@@ -1012,37 +1012,47 @@ footer{background:var(--dark);padding:3.5rem 4rem;text-align:center;border-top:1
 .new-arrivals-heading em{font-style:italic;color:var(--gold)}
 .new-arrivals-line{display:none}
 
-/* ── New arrivals grid ── */
+/* ── New arrivals — scrolltelling ── */
+.new-arrivals-section{margin-bottom:0;border-top:1px solid rgba(184,149,90,0.12);border-bottom:1px solid rgba(184,149,90,0.12);background:var(--warm-white);margin-top:0}
+.new-arrivals-hdr{text-align:center;margin-bottom:2rem}
+.new-arrivals-title{font-size:0.65rem;letter-spacing:0.35em;text-transform:uppercase;color:var(--gold);font-weight:400;display:block;margin-bottom:0.8rem}
+.new-arrivals-heading{font-family:'Cormorant Garamond',serif;font-size:clamp(2.5rem,5vw,4rem);font-weight:300;color:var(--charcoal);line-height:1.1}
+.new-arrivals-heading em{font-style:italic;color:var(--gold)}
+.new-arrivals-line{display:none}
+/* Sticky wrapper — scroll room is 2× viewport height */
+.na-sticky-wrap{position:relative;height:200vh}
+.na-sticky{position:sticky;top:0;height:100vh;overflow:hidden;background:var(--warm-white);padding:4rem 4rem 3rem;display:flex;flex-direction:column;justify-content:center}
+.na-progress-bar{position:absolute;bottom:0;left:0;height:2px;background:linear-gradient(to right,var(--gold),#d4b87a);width:0;pointer-events:none;z-index:10}
 .na-grid{display:grid;grid-template-columns:1.6fr 1fr;gap:10px}
-.na-card{background:var(--warm-white);border:1px solid rgba(184,149,90,0.12);overflow:hidden;cursor:pointer;transition:border-color 0.3s;opacity:0}
+.na-card{background:var(--warm-white);border:1px solid rgba(184,149,90,0.12);overflow:hidden;cursor:pointer;transition:border-color 0.3s;will-change:transform,opacity}
 .na-card:hover{border-color:rgba(184,149,90,0.4)}
 .na-card.na-large{grid-row:1/3}
-.na-card-img{background:linear-gradient(135deg,rgba(184,149,90,0.06),rgba(184,149,90,0.02));display:flex;align-items:center;justify-content:center;position:relative;overflow:hidden}
-.na-card.na-large .na-card-img{height:340px}
-.na-card.na-small .na-card-img{height:170px}
+.na-card-img{background:linear-gradient(135deg,rgba(184,149,90,0.05),rgba(184,149,90,0.02));display:flex;align-items:center;justify-content:center;position:relative;overflow:hidden}
+.na-card.na-large .na-card-img{height:300px}
+.na-card.na-small .na-card-img{height:145px}
 .na-card-img img{max-height:85%;max-width:80%;object-fit:contain;position:relative;z-index:1;will-change:transform}
 .na-card-img .na-svg{position:relative;z-index:1;will-change:transform}
-.na-card-badge{position:absolute;top:12px;left:12px;background:var(--gold);color:var(--dark);font-size:0.42rem;letter-spacing:0.2em;text-transform:uppercase;padding:3px 8px;opacity:0;z-index:2}
+.na-card-badge{position:absolute;top:12px;left:12px;background:var(--gold);color:var(--dark);font-size:0.42rem;letter-spacing:0.2em;text-transform:uppercase;padding:3px 8px;opacity:0;z-index:2;will-change:opacity,transform}
 .na-card-body{padding:1rem 1.25rem 1.25rem}
 .na-card.na-large .na-card-body{padding:1.25rem 1.5rem 1.5rem}
-.na-card-brand{font-size:0.48rem;letter-spacing:0.2em;text-transform:uppercase;color:var(--gold);margin-bottom:3px;opacity:0}
-.na-card-name{font-family:'Cormorant Garamond',serif;font-size:1.5rem;font-weight:300;color:var(--charcoal);margin-bottom:5px;opacity:0}
+.na-card-brand{font-size:0.48rem;letter-spacing:0.2em;text-transform:uppercase;color:var(--gold);margin-bottom:3px;opacity:0;will-change:opacity,transform}
+.na-card-name{font-family:'Cormorant Garamond',serif;font-size:1.5rem;font-weight:300;color:var(--charcoal);margin-bottom:5px;opacity:0;will-change:opacity,transform}
 .na-card.na-large .na-card-name{font-size:clamp(1.6rem,3vw,2.2rem)}
-.na-card-tagline{font-size:0.7rem;color:var(--muted);font-style:italic;line-height:1.7;margin-bottom:1rem;opacity:0}
+.na-card-tagline{font-size:0.7rem;color:var(--muted);font-style:italic;line-height:1.7;margin-bottom:1rem;opacity:0;will-change:opacity}
 .na-card-chords{display:flex;flex-wrap:wrap;gap:4px;margin-bottom:1rem}
-.na-card-chord{font-size:0.44rem;letter-spacing:0.12em;text-transform:uppercase;color:var(--muted);border:1px solid rgba(184,149,90,0.25);padding:2px 8px;opacity:0;transform:scale(0.85)}
-.na-card-footer{display:flex;align-items:center;gap:1rem;padding-top:0.8rem;border-top:1px solid rgba(184,149,90,0.1);opacity:0}
+.na-card-chord{font-size:0.44rem;letter-spacing:0.12em;text-transform:uppercase;color:var(--muted);border:1px solid rgba(184,149,90,0.25);padding:2px 8px;opacity:0;will-change:opacity,transform}
+.na-card-footer{display:flex;align-items:center;gap:1rem;padding-top:0.8rem;border-top:1px solid rgba(184,149,90,0.1);opacity:0;will-change:opacity}
 .na-card-price{font-family:'Cormorant Garamond',serif;font-size:1.3rem;font-weight:300;color:var(--charcoal)}
 .na-card-cta{font-size:0.48rem;letter-spacing:0.18em;text-transform:uppercase;color:var(--muted);border-bottom:1px solid rgba(184,149,90,0.3);padding-bottom:1px;transition:color 0.2s,border-color 0.2s}
 .na-card:hover .na-card-cta{color:var(--gold);border-color:var(--gold)}
-.na-orb{position:absolute;border-radius:50%;filter:blur(50px);pointer-events:none;will-change:transform}
-
+.na-orb{position:absolute;border-radius:50%;filter:blur(45px);pointer-events:none;will-change:transform,opacity}
 @media(max-width:600px){
+  .na-sticky-wrap{height:250vh}
+  .na-sticky{padding:3rem 1rem 2rem}
   .na-grid{grid-template-columns:1fr}
   .na-card.na-large{grid-row:auto}
   .na-card.na-large .na-card-img{height:220px}
-  .na-card.na-small .na-card-img{height:160px}
-  .new-arrivals-section{padding:3rem 1rem 2.5rem}
+  .na-card.na-small .na-card-img{height:150px}
   .new-arrivals-heading{font-size:2rem}
 }
 
@@ -2704,38 +2714,50 @@ function buildGrid(){
     return p.arrivedAt && new Date(p.arrivedAt).getTime() > thirtyDaysAgo;
   });
   if(newArrivals.length){
-    var naSection = document.createElement('div');
-    naSection.id = 'newArrivalsSection';
-    naSection.className = 'new-arrivals-section';
+    // ── Build sticky wrapper for scrolltelling ──
+    var naWrap = document.createElement('div');
+    naWrap.id = 'newArrivalsSection';
+    naWrap.className = 'new-arrivals-section';
 
-    var bannersHtml = newArrivals.map(function(p, idx){
+    var naSticky = document.createElement('div');
+    naSticky.className = 'na-sticky-wrap';
+
+    var naPanel = document.createElement('div');
+    naPanel.className = 'na-sticky';
+
+    // Progress bar
+    var naBar = document.createElement('div');
+    naBar.className = 'na-progress-bar';
+    naBar.id = 'naProgressBar';
+    naPanel.appendChild(naBar);
+
+    // Cards HTML — medium timing
+    var cardsHtml = newArrivals.map(function(p, idx){
       var pr  = getPr(p.id);
       var ep  = pr.onSale && pr.salePrice ? parseFloat(pr.salePrice).toFixed(0) : parseFloat(p.price).toFixed(0);
       var c0  = p.c && p.c[0] ? p.c[0] : '#d4b87a';
       var c1  = p.c && p.c[1] ? p.c[1] : '#b8955a';
       var isLarge = idx === 0;
       var cardCls = 'na-card ' + (isLarge ? 'na-large' : 'na-small');
-      var imgH    = isLarge ? '340px' : '170px';
       var orbs =
-        '<div class="na-orb" style="width:55%;padding-bottom:55%;top:-10%;right:-10%;background:'+c0+';opacity:0.18"></div>'+
-        '<div class="na-orb" style="width:38%;padding-bottom:38%;bottom:-8%;left:-8%;background:'+c1+';opacity:0.13"></div>';
+        '<div class="na-orb" style="width:55%;padding-bottom:55%;top:-10%;right:-10%;background:'+c0+';opacity:0"></div>'+
+        '<div class="na-orb" style="width:38%;padding-bottom:38%;bottom:-8%;left:-8%;background:'+c1+';opacity:0"></div>';
       var bottleHtml = p.photos && p.photos.length
-        ? '<img class="na-svg" src="'+esc(cdnImg(p.photos[0],600))+'" alt="'+esc(p.brand+' '+p.name)+'">'
-        : '<div class="na-svg">'+svg(p.c, p.s, isLarge ? 'lg' : 'md')+'</div>';
+        ? '<img class="na-svg" src="'+esc(cdnImg(p.photos[0],600))+'" alt="'+esc(p.brand+' '+p.name)+'" style="opacity:0">'
+        : '<div class="na-svg" style="opacity:0">'+svg(p.c, p.s, isLarge ? 'lg' : 'md')+'</div>';
       var chordHtml = (p.chords||[]).slice(0,4).map(function(c){
         return '<span class="na-card-chord">'+esc(c)+'</span>';
       }).join('');
-      return '<div class="'+cardCls+'" data-pid="'+p.id+'" onclick="openDetail('+p.id+')">'+
-        '<div class="na-card-img" style="height:'+imgH+'">'+
-          orbs+bottleHtml+
-          '<span class="na-card-badge">Nueva llegada</span>'+
+      return '<div class="'+cardCls+'" data-pid="'+p.id+'" onclick="openDetail('+p.id+')" style="opacity:0">'+
+        '<div class="na-card-img">'+orbs+bottleHtml+
+          '<span class="na-card-badge" style="opacity:0">Nueva llegada</span>'+
         '</div>'+
         '<div class="na-card-body">'+
-          '<div class="na-card-brand">'+esc(p.brand)+'</div>'+
-          '<div class="na-card-name">'+esc(p.name)+'</div>'+
-          (isLarge && p.tagline ? '<div class="na-card-tagline">'+esc(p.tagline)+'</div>' : '')+
+          '<div class="na-card-brand" style="opacity:0">'+esc(p.brand)+'</div>'+
+          '<div class="na-card-name" style="opacity:0">'+esc(p.name)+'</div>'+
+          (isLarge && p.tagline ? '<div class="na-card-tagline" style="opacity:0">'+esc(p.tagline)+'</div>' : '')+
           (chordHtml ? '<div class="na-card-chords">'+chordHtml+'</div>' : '')+
-          '<div class="na-card-footer">'+
+          '<div class="na-card-footer" style="opacity:0">'+
             '<span class="na-card-price">$'+ep+'</span>'+
             '<span class="na-card-cta">Descubrir</span>'+
           '</div>'+
@@ -2743,55 +2765,139 @@ function buildGrid(){
       '</div>';
     }).join('');
 
-    naSection.innerHTML =
-      '<div class="new-arrivals-hdr">'+
-        '<span class="new-arrivals-title">Recién llegado</span>'+
-        '<h2 class="new-arrivals-heading">Lo nuevo en <em>Sillage</em></h2>'+
-      '</div>'+
-      '<div class="na-grid">'+bannersHtml+'</div>';
+    naPanel.innerHTML += '<div class="new-arrivals-hdr">'+
+      '<span class="new-arrivals-title" id="naEyebrow" style="opacity:0">Recién llegado</span>'+
+      '<h2 class="new-arrivals-heading" id="naHeading" style="opacity:0">Lo nuevo en <em>Sillage</em></h2>'+
+    '</div>'+
+    '<div class="na-grid" id="naCardGrid">'+cardsHtml+'</div>';
+
+    naSticky.appendChild(naPanel);
+    naWrap.appendChild(naSticky);
 
     var shopSection = document.getElementById('shop');
-    shopSection.parentNode.insertBefore(naSection, shopSection);
+    shopSection.parentNode.insertBefore(naWrap, shopSection);
 
-    // ── GSAP entrance animation on scroll ──
+    // ── Scroll-driven animation — medium timing ──
     (function(){
-      if(typeof gsap === 'undefined') return;
-      var cards   = naSection.querySelectorAll('.na-card');
-      var bottles = naSection.querySelectorAll('.na-svg');
-      var badges  = naSection.querySelectorAll('.na-card-badge');
-      var orbs    = naSection.querySelectorAll('.na-orb');
-      var brands  = naSection.querySelectorAll('.na-card-brand');
-      var names   = naSection.querySelectorAll('.na-card-name');
-      var taglines= naSection.querySelectorAll('.na-card-tagline');
-      var chords  = naSection.querySelectorAll('.na-card-chord');
-      var footers = naSection.querySelectorAll('.na-card-footer');
-      var heading = naSection.querySelector('.new-arrivals-heading');
-      var eyebrow = naSection.querySelector('.new-arrivals-title');
-      var io = new IntersectionObserver(function(entries){
-        if(!entries[0].isIntersecting) return;
-        io.disconnect();
-        var tl = gsap.timeline({ defaults:{ ease:'power3.out' } });
-        tl.fromTo(eyebrow, { opacity:0, y:10 }, { opacity:1, y:0, duration:0.5 })
-          .fromTo(heading,  { opacity:0, y:18 }, { opacity:1, y:0, duration:0.65 }, '-=0.3')
-          .fromTo(cards,    { opacity:0, y:40 }, { opacity:1, y:0, duration:0.7, stagger:0.14, ease:'power2.out' }, '-=0.2')
-          .fromTo(orbs,     { opacity:0, scale:0.4 }, { opacity:1, scale:1, duration:1.2, stagger:0.08, ease:'power2.out' }, '-=0.55')
-          .fromTo(bottles,  { opacity:0, y:28, scale:0.88 }, { opacity:1, y:0, scale:1, duration:1, stagger:0.12, ease:'elastic.out(1, 0.55)' }, '-=0.85')
-          .fromTo(badges,   { opacity:0, x:-10 }, { opacity:1, x:0, duration:0.4, stagger:0.1 }, '-=0.5')
-          .fromTo(brands,   { opacity:0, y:6 }, { opacity:1, y:0, duration:0.35, stagger:0.1 }, '-=0.35')
-          .fromTo(names,    { opacity:0, y:6 }, { opacity:1, y:0, duration:0.4, stagger:0.1 }, '-=0.25')
-          .fromTo(taglines, { opacity:0 }, { opacity:1, duration:0.4 }, '-=0.25')
-          .fromTo(chords,   { opacity:0, scale:0.82 }, { opacity:1, scale:1, duration:0.3, stagger:0.06, ease:'back.out(1.4)' }, '-=0.2')
-          .fromTo(footers,  { opacity:0, y:5 }, { opacity:1, y:0, duration:0.35, stagger:0.1 }, '-=0.15')
-          .add(function(){
-            bottles.forEach(function(b, i){
-              gsap.to(b, { y:-7, duration:2.4+i*0.4, repeat:-1, yoyo:true, ease:'sine.inOut', delay:i*0.5 });
-            });
-            orbs.forEach(function(o, i){
-              gsap.to(o, { scale:1.08, duration:3.5+i*0.6, repeat:-1, yoyo:true, ease:'sine.inOut', delay:i*0.8 });
-            });
+      var wrap     = document.getElementById('newArrivalsSection');
+      var bar      = document.getElementById('naProgressBar');
+      var eyebrow  = document.getElementById('naEyebrow');
+      var heading  = document.getElementById('naHeading');
+      var grid     = document.getElementById('naCardGrid');
+      if(!wrap || !grid) return;
+
+      var cards   = grid.querySelectorAll('.na-card');
+      var bottles = grid.querySelectorAll('.na-svg');
+      var badges  = grid.querySelectorAll('.na-card-badge');
+      var orbs    = grid.querySelectorAll('.na-orb');
+      var brands  = grid.querySelectorAll('.na-card-brand');
+      var names   = grid.querySelectorAll('.na-card-name');
+      var taglines= grid.querySelectorAll('.na-card-tagline');
+      var chords  = grid.querySelectorAll('.na-card-chord');
+      var footers = grid.querySelectorAll('.na-card-footer');
+
+      function lerp(a,b,t){ return a+(b-a)*Math.max(0,Math.min(1,t)); }
+      function prog(t,from,to){ return Math.max(0,Math.min(1,(t-from)/(to-from))); }
+      function ease(t){ return t<0.5?2*t*t:-1+(4-2*t)*t; }
+
+      function setEl(el, props){
+        if(!el) return;
+        if(props.opacity!==undefined) el.style.opacity = props.opacity;
+        var tx=props.x||0, ty=props.y||0, sc=props.scale!==undefined?props.scale:1;
+        if(props.x!==undefined||props.y!==undefined||props.scale!==undefined)
+          el.style.transform='translate('+tx+'px,'+ty+'px) scale('+sc+')';
+      }
+
+      function applyProgress(p){
+        if(bar) bar.style.width = (p*100)+'%';
+
+        // MEDIUM timing — phases spread across 0→1 with comfortable overlap
+
+        // Header (eyebrow + heading together, slight stagger)
+        var pEy = ease(prog(p, 0.0, 0.18));
+        var pHd = ease(prog(p, 0.04, 0.22));
+        setEl(eyebrow, { opacity:pEy, y:lerp(10,0,pEy) });
+        setEl(heading,  { opacity:pHd, y:lerp(14,0,pHd) });
+
+        // Cards slide up together
+        cards.forEach(function(c,i){
+          var pC = ease(prog(p, 0.10+i*0.05, 0.30+i*0.05));
+          setEl(c, { opacity:pC, y:lerp(35,0,pC) });
+        });
+
+        // Orbs — very subtle
+        orbs.forEach(function(o,i){
+          var pO = ease(prog(p, 0.22+i*0.04, 0.42+i*0.04));
+          o.style.opacity = lerp(0, i%2===0?0.07:0.05, pO);
+        });
+
+        // Bottles spring (simulated elastic with lerp + overshoot)
+        bottles.forEach(function(b,i){
+          var pB = ease(prog(p, 0.28+i*0.06, 0.50+i*0.06));
+          var overshoot = pB < 0.85 ? 0 : Math.sin((pB-0.85)/0.15*Math.PI)*3;
+          setEl(b, { opacity:pB, y:lerp(22,0,pB)-overshoot, scale:lerp(0.88,1,pB) });
+        });
+
+        // Badges
+        badges.forEach(function(bg,i){
+          var pBg = ease(prog(p, 0.42+i*0.04, 0.58+i*0.04));
+          setEl(bg, { opacity:pBg, x:lerp(-8,0,pBg) });
+        });
+
+        // Brand + name
+        brands.forEach(function(br,i){
+          var pT = ease(prog(p, 0.52+i*0.04, 0.66+i*0.04));
+          setEl(br, { opacity:pT, y:lerp(6,0,pT) });
+        });
+        names.forEach(function(nm,i){
+          var pN = ease(prog(p, 0.56+i*0.04, 0.70+i*0.04));
+          setEl(nm, { opacity:pN, y:lerp(6,0,pN) });
+        });
+
+        // Tagline + chords
+        taglines.forEach(function(tg){
+          tg.style.opacity = ease(prog(p, 0.64, 0.76));
+        });
+        chords.forEach(function(ch,i){
+          var pCh = ease(prog(p, 0.68+i*0.025, 0.80+i*0.025));
+          setEl(ch, { opacity:pCh, scale:lerp(0.85,1,pCh) });
+        });
+
+        // Footers
+        footers.forEach(function(ft,i){
+          ft.style.opacity = ease(prog(p, 0.78+i*0.04, 0.90+i*0.04));
+        });
+
+        // Floating bottles — additive sine on top of scroll position
+        var t = Date.now()*0.001;
+        bottles.forEach(function(b,i){
+          var pB = ease(prog(p, 0.28+i*0.06, 0.50+i*0.06));
+          if(pB > 0.5){
+            var baseY = lerp(22,0,pB);
+            setEl(b, { opacity:pB, y:baseY+Math.sin(t*0.9+i*1.2)*5, scale:lerp(0.88,1,pB) });
+          }
+        });
+      }
+
+      var lastP = -1;
+      function tick(){
+        var rect     = naWrap.getBoundingClientRect();
+        var scrolled = -rect.top;
+        var total    = naWrap.offsetHeight - window.innerHeight;
+        var p = total > 0 ? Math.max(0,Math.min(1,scrolled/total)) : 0;
+        if(Math.abs(p-lastP) > 0.0005){ lastP=p; applyProgress(p); }
+        else if(lastP > 0.25){
+          // Keep float running even when not scrolling
+          var t = Date.now()*0.001;
+          bottles.forEach(function(b,i){
+            var pB = ease(prog(lastP, 0.28+i*0.06, 0.50+i*0.06));
+            if(pB > 0.5) setEl(b, { opacity:pB, y:Math.sin(t*0.9+i*1.2)*5, scale:lerp(0.88,1,pB) });
           });
-      }, { threshold: 0.1 });
-      io.observe(naSection);
+        }
+        requestAnimationFrame(tick);
+      }
+      applyProgress(0);
+      tick();
     })();
   }
 
