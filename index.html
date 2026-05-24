@@ -1013,40 +1013,56 @@ footer{background:var(--dark);padding:3.5rem 4rem;text-align:center;border-top:1
 .new-arrivals-line{display:none}
 
 /* ── New arrivals — scrolltelling ── */
-/* ── New arrivals — Option A, intersection-triggered ── */
-.new-arrivals-section{margin-bottom:0;border-top:1px solid rgba(184,149,90,0.12);background:var(--warm-white);margin-top:0}
-.na-sticky-once-wrap{position:relative}
-.na-sticky-once{position:sticky;top:0;background:var(--warm-white);z-index:1;padding:4rem 4rem 3rem}
-.na-sticky-once.released{position:relative}
-.new-arrivals-hdr{text-align:center;margin-bottom:2.5rem}
-.new-arrivals-title{font-size:0.65rem;letter-spacing:0.35em;text-transform:uppercase;color:var(--gold);font-weight:400;display:block;margin-bottom:0.8rem}
-.new-arrivals-heading{font-family:'Cormorant Garamond',serif;font-size:clamp(2.5rem,5vw,4rem);font-weight:300;color:var(--charcoal);line-height:1.1}
+/* ── New arrivals — scrolltelling, producto a producto ── */
+.new-arrivals-section{position:relative;border-top:1px solid rgba(184,149,90,0.12);background:var(--warm-white)}
+/* Sticky container — height set dynamically by JS */
+.na-sticky-wrap{position:relative}
+.na-sticky{position:sticky;top:0;height:100vh;overflow:hidden;background:var(--warm-white)}
+/* Header state */
+.na-header-state{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:0.6rem;will-change:opacity,transform}
+.new-arrivals-title{font-size:0.65rem;letter-spacing:0.35em;text-transform:uppercase;color:var(--gold);font-weight:400;display:block}
+.new-arrivals-heading{font-family:'Cormorant Garamond',serif;font-size:clamp(2.8rem,5vw,4.5rem);font-weight:300;color:var(--charcoal);line-height:1.1;text-align:center}
 .new-arrivals-heading em{font-style:italic;color:var(--gold)}
-.new-arrivals-line{display:none}
-.na-grid{display:flex;flex-direction:column;gap:0}
-.na-card{display:grid;grid-template-columns:1fr 1fr;cursor:pointer;border-bottom:1px solid rgba(184,149,90,0.1);will-change:transform,opacity;transition:background 0.3s}
-.na-card:last-child{border-bottom:none}
-.na-card:hover{background:rgba(184,149,90,0.02)}
-.na-card:nth-child(even) .na-card-img{order:2}
-.na-card:nth-child(even) .na-card-body{order:1;text-align:right}
-.na-card:nth-child(even) .na-card-chords{justify-content:flex-end}
-.na-card:nth-child(even) .na-card-footer{justify-content:flex-end}
-.na-card-img{height:320px;background:var(--warm-white);display:flex;align-items:center;justify-content:center;position:relative;overflow:hidden}
-.na-card-img img{max-height:80%;max-width:70%;object-fit:contain;position:relative;z-index:1;will-change:transform}
-.na-card-img .na-svg{position:relative;z-index:1;will-change:transform}
-.na-card-badge{position:absolute;top:14px;left:14px;background:var(--gold);color:var(--dark);font-size:0.42rem;letter-spacing:0.2em;text-transform:uppercase;padding:3px 9px;z-index:2;will-change:opacity,transform}
-.na-card:nth-child(even) .na-card-badge{left:auto;right:14px}
-.na-card-body{padding:2.5rem 3rem;display:flex;flex-direction:column;justify-content:center}
-.na-card-brand{font-size:0.5rem;letter-spacing:0.22em;text-transform:uppercase;color:var(--gold);margin-bottom:0.4rem;will-change:opacity,transform}
-.na-card-name{font-family:'Cormorant Garamond',serif;font-size:clamp(2rem,3.5vw,3rem);font-weight:300;color:var(--charcoal);line-height:1.1;margin-bottom:0.6rem;will-change:opacity,transform}
-.na-card-tagline{font-size:0.75rem;color:var(--muted);font-style:italic;line-height:1.7;margin-bottom:1.2rem;will-change:opacity}
-.na-card-chords{display:flex;flex-wrap:wrap;gap:5px;margin-bottom:1.4rem}
-.na-card-chord{font-size:0.46rem;letter-spacing:0.12em;text-transform:uppercase;color:var(--muted);border:1px solid rgba(184,149,90,0.25);padding:3px 9px;will-change:opacity,transform}
-.na-card-footer{display:flex;align-items:center;gap:1.2rem;padding-top:1rem;border-top:1px solid rgba(184,149,90,0.12);will-change:opacity}
-.na-card-price{font-family:'Cormorant Garamond',serif;font-size:1.5rem;font-weight:300;color:var(--charcoal)}
-.na-card-cta{font-size:0.5rem;letter-spacing:0.2em;text-transform:uppercase;color:var(--muted);border-bottom:1px solid rgba(184,149,90,0.3);padding-bottom:1px;transition:color 0.2s,border-color 0.2s}
-.na-card:hover .na-card-cta{color:var(--gold);border-color:var(--gold)}
-.na-orb{position:absolute;border-radius:50%;filter:blur(50px);pointer-events:none;will-change:transform,opacity}
+/* Product full state */
+.na-product-state{position:absolute;inset:0;display:grid;grid-template-columns:1fr 1fr;will-change:opacity,transform}
+.na-prod-img{display:flex;align-items:center;justify-content:center;background:var(--warm-white);position:relative;overflow:hidden}
+.na-prod-body{display:flex;flex-direction:column;justify-content:center;padding:3rem 4rem;background:var(--warm-white)}
+.na-prod-badge{font-size:0.42rem;letter-spacing:0.2em;text-transform:uppercase;color:var(--gold);margin-bottom:0.8rem}
+.na-prod-brand{font-size:0.52rem;letter-spacing:0.22em;text-transform:uppercase;color:var(--gold);margin-bottom:0.3rem}
+.na-prod-name{font-family:'Cormorant Garamond',serif;font-size:clamp(2.8rem,5vw,4.5rem);font-weight:300;color:var(--charcoal);line-height:1;margin-bottom:0.8rem}
+.na-prod-tagline{font-size:0.75rem;color:var(--muted);font-style:italic;line-height:1.7;margin-bottom:1.4rem}
+.na-prod-chords{display:flex;flex-wrap:wrap;gap:5px;margin-bottom:1.6rem}
+.na-prod-chord{font-size:0.46rem;letter-spacing:0.12em;text-transform:uppercase;color:var(--muted);border:1px solid rgba(184,149,90,0.25);padding:3px 10px}
+.na-prod-footer{display:flex;align-items:center;gap:1.2rem;padding-top:1rem;border-top:1px solid rgba(184,149,90,0.12)}
+.na-prod-price{font-family:'Cormorant Garamond',serif;font-size:2rem;font-weight:300;color:var(--charcoal)}
+.na-prod-cta{font-size:0.5rem;letter-spacing:0.2em;text-transform:uppercase;color:var(--muted);border-bottom:1px solid rgba(184,149,90,0.3);padding-bottom:1px;cursor:pointer;transition:color 0.2s,border-color 0.2s}
+.na-product-state:hover .na-prod-cta{color:var(--gold);border-color:var(--gold)}
+.na-orb{position:absolute;border-radius:50%;filter:blur(55px);pointer-events:none;will-change:opacity}
+/* Progress dots */
+.na-dots{position:absolute;right:2rem;top:50%;transform:translateY(-50%);display:flex;flex-direction:column;gap:6px;z-index:10}
+.na-dot{width:4px;height:4px;border-radius:50%;background:rgba(184,149,90,0.25);transition:background 0.3s,transform 0.3s}
+.na-dot.active{background:var(--gold);transform:scale(1.4)}
+/* Grid finale */
+.na-grid-state{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;padding:3rem 4rem;will-change:opacity,transform}
+.na-grid-inner{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:10px;width:100%;max-width:900px}
+.na-mini-card{background:var(--warm-white);border:1px solid rgba(184,149,90,0.12);cursor:pointer;transition:border-color 0.3s}
+.na-mini-card:hover{border-color:rgba(184,149,90,0.4)}
+.na-mini-img{height:160px;background:var(--warm-white);display:flex;align-items:center;justify-content:center;position:relative;overflow:hidden}
+.na-mini-body{padding:0.8rem 1rem 1rem}
+.na-mini-brand{font-size:0.44rem;letter-spacing:0.18em;text-transform:uppercase;color:var(--gold);margin-bottom:2px}
+.na-mini-name{font-family:'Cormorant Garamond',serif;font-size:1.1rem;font-weight:300;color:var(--charcoal);margin-bottom:6px}
+.na-mini-footer{display:flex;align-items:center;gap:0.8rem}
+.na-mini-price{font-family:'Cormorant Garamond',serif;font-size:1rem;color:var(--charcoal)}
+.na-mini-cta{font-size:0.44rem;letter-spacing:0.16em;text-transform:uppercase;color:var(--muted);border-bottom:1px solid rgba(184,149,90,0.25);padding-bottom:1px}
+@media(max-width:768px){
+  .na-prod-body{padding:1.5rem 1.2rem}
+  .na-prod-name{font-size:2.4rem}
+  .na-product-state{grid-template-columns:1fr;grid-template-rows:1fr auto}
+  .na-prod-img{order:-1}
+  .na-dots{right:0.8rem}
+  .na-grid-state{padding:1.5rem 1rem}
+  .new-arrivals-heading{font-size:2.2rem}
+}
 /* Hover: bottle 3D tilt */
 .na-card-img{perspective:800px}
 .na-card:hover .na-svg,.na-card:hover .na-card-img img{transform:rotateY(8deg) translateY(-4px) scale(1.04);transition:transform 0.5s cubic-bezier(0.34,1.2,0.64,1)}
@@ -2738,162 +2754,218 @@ function buildGrid(){
     return p.arrivedAt && new Date(p.arrivedAt).getTime() > thirtyDaysAgo;
   });
   if(newArrivals.length){
-    // ── Build new arrivals section ──
+    // ── New arrivals — scrolltelling, one product per scroll beat ──
     var naSection = document.createElement('div');
     naSection.id = 'newArrivalsSection';
     naSection.className = 'new-arrivals-section';
 
-    // Sticky-once wrapper — anchors while user scrolls through, then releases
-    var naStickyWrap = document.createElement('div');
-    naStickyWrap.className = 'na-sticky-once-wrap';
+    var naWrap = document.createElement('div');
+    naWrap.className = 'na-sticky-wrap';
     var naSticky = document.createElement('div');
-    naSticky.className = 'na-sticky-once';
-    naStickyWrap.appendChild(naSticky);
-    naSection.appendChild(naStickyWrap);
+    naSticky.className = 'na-sticky';
+    naWrap.appendChild(naSticky);
+    naSection.appendChild(naWrap);
 
-    var cardsHtml = newArrivals.map(function(p, idx){
+    // ── Build HTML ──
+    // Header
+    var headerHtml =
+      '<div class="na-header-state" id="naHeaderState">'+
+        '<span class="new-arrivals-title">Recién llegado</span>'+
+        '<h2 class="new-arrivals-heading">Lo nuevo en <em>Sillage</em></h2>'+
+      '</div>';
+
+    // One full-screen state per product
+    var productsHtml = newArrivals.map(function(p, idx){
       var pr  = getPr(p.id);
       var ep  = pr.onSale && pr.salePrice ? parseFloat(pr.salePrice).toFixed(0) : parseFloat(p.price).toFixed(0);
       var c0  = p.c && p.c[0] ? p.c[0] : '#d4b87a';
       var c1  = p.c && p.c[1] ? p.c[1] : '#b8955a';
+      var isEven = idx % 2 === 1;
+
       var orbs =
-        '<div class="na-orb" style="width:55%;padding-bottom:55%;top:-15%;right:-10%;background:'+c0+';opacity:0.06"></div>'+
-        '<div class="na-orb" style="width:38%;padding-bottom:38%;bottom:-10%;left:-8%;background:'+c1+';opacity:0.04"></div>';
+        '<div class="na-orb" style="width:60%;padding-bottom:60%;top:-15%;right:-10%;background:'+c0+';opacity:0.07"></div>'+
+        '<div class="na-orb" style="width:40%;padding-bottom:40%;bottom:-10%;left:-5%;background:'+c1+';opacity:0.05"></div>';
+
       var bottleHtml = p.photos && p.photos.length
-        ? '<img class="na-svg" src="'+esc(cdnImg(p.photos[0],600))+'" alt="'+esc(p.brand+' '+p.name)+'">'
-        : '<div class="na-svg">'+svg(p.c, p.s, 'xl')+'</div>';
+        ? '<img src="'+esc(cdnImg(p.photos[0],700))+'" alt="'+esc(p.brand+' '+p.name)+'" style="max-height:75%;max-width:65%;object-fit:contain;position:relative;z-index:1;will-change:transform">'
+        : '<div style="position:relative;z-index:1;will-change:transform">'+svg(p.c, p.s, 'xl')+'</div>';
+
       var chordHtml = (p.chords||[]).slice(0,4).map(function(c){
-        return '<span class="na-card-chord">'+esc(c)+'</span>';
+        return '<span class="na-prod-chord">'+esc(c)+'</span>';
       }).join('');
-      return '<div class="na-card" data-pid="'+p.id+'" onclick="openDetail('+p.id+')">'+
-        '<div class="na-card-img">'+orbs+bottleHtml+
-          '<span class="na-card-badge">Nueva llegada</span>'+
+
+      var imgCol  = '<div class="na-prod-img">'+orbs+bottleHtml+'</div>';
+      var bodyCol = '<div class="na-prod-body"'+(isEven?' style="text-align:right"':'')+'>'+
+        '<div class="na-prod-badge">Nueva llegada</div>'+
+        '<div class="na-prod-brand">'+esc(p.brand)+'</div>'+
+        '<div class="na-prod-name">'+esc(p.name)+'</div>'+
+        (p.tagline ? '<div class="na-prod-tagline">'+esc(p.tagline)+'</div>' : '')+
+        (chordHtml ? '<div class="na-prod-chords"'+(isEven?' style="justify-content:flex-end"':'')+'>'+chordHtml+'</div>' : '')+
+        '<div class="na-prod-footer"'+(isEven?' style="justify-content:flex-end"':'')+'>'+
+          '<span class="na-prod-price">$'+ep+'</span>'+
+          '<span class="na-prod-cta">Descubrir</span>'+
         '</div>'+
-        '<div class="na-card-body">'+
-          '<div class="na-card-brand">'+esc(p.brand)+'</div>'+
-          '<div class="na-card-name">'+esc(p.name)+'</div>'+
-          (p.tagline ? '<div class="na-card-tagline">'+esc(p.tagline)+'</div>' : '')+
-          (chordHtml ? '<div class="na-card-chords">'+chordHtml+'</div>' : '')+
-          '<div class="na-card-footer">'+
-            '<span class="na-card-price">$'+ep+'</span>'+
-            '<span class="na-card-cta">Descubrir</span>'+
-          '</div>'+
-        '</div>'+
+      '</div>';
+
+      return '<div class="na-product-state" id="naProd'+idx+'" onclick="openDetail('+p.id+')">'+
+        (isEven ? bodyCol+imgCol : imgCol+bodyCol)+
       '</div>';
     }).join('');
 
-    naSticky.innerHTML =
-      '<div class="new-arrivals-hdr">'+
-        '<span class="new-arrivals-title">Recién llegado</span>'+
-        '<h2 class="new-arrivals-heading">Lo nuevo en <em>Sillage</em></h2>'+
+    // Grid finale
+    var gridHtml = '<div class="na-grid-state" id="naGridState">'+
+      '<div class="na-grid-inner">'+
+      newArrivals.map(function(p, idx){
+        var pr  = getPr(p.id);
+        var ep  = pr.onSale && pr.salePrice ? parseFloat(pr.salePrice).toFixed(0) : parseFloat(p.price).toFixed(0);
+        var c0  = p.c && p.c[0] ? p.c[0] : '#d4b87a';
+        var bottleHtml = p.photos && p.photos.length
+          ? '<img src="'+esc(cdnImg(p.photos[0],300))+'" alt="'+esc(p.name)+'" style="max-height:80%;max-width:70%;object-fit:contain">'
+          : svg(p.c, p.s, 'md');
+        return '<div class="na-mini-card" onclick="openDetail('+p.id+')">'+
+          '<div class="na-mini-img">'+
+            '<div style="position:absolute;width:70%;height:70%;top:-10%;right:-10%;border-radius:50%;background:'+c0+';filter:blur(35px);opacity:0.07"></div>'+
+            bottleHtml+
+          '</div>'+
+          '<div class="na-mini-body">'+
+            '<div class="na-mini-brand">'+esc(p.brand)+'</div>'+
+            '<div class="na-mini-name">'+esc(p.name)+'</div>'+
+            '<div class="na-mini-footer">'+
+              '<span class="na-mini-price">$'+ep+'</span>'+
+              '<span class="na-mini-cta">Descubrir</span>'+
+            '</div>'+
+          '</div>'+
+        '</div>';
+      }).join('')+
       '</div>'+
-      '<div class="na-grid">'+cardsHtml+'</div>';
+    '</div>';
+
+    // Progress dots (one per product + header + grid)
+    var totalStates = newArrivals.length + 2; // header + products + grid
+    var dotsHtml = '<div class="na-dots">'+
+      Array.from({length:totalStates}).map(function(_,i){
+        return '<div class="na-dot'+(i===0?' active':'')+'" id="naDot'+i+'"></div>';
+      }).join('')+
+    '</div>';
+
+    naSticky.innerHTML = headerHtml + productsHtml + gridHtml + dotsHtml;
 
     var shopSection = document.getElementById('shop');
     shopSection.parentNode.insertBefore(naSection, shopSection);
 
-    // Release sticky after user has scrolled through the full section
-    // Height = naSticky natural height + viewport so it "sticks" for one full scroll
+    // ── Scroll-driven reveal ──
     (function(){
-      var released = false;
-      function checkRelease(){
-        if(released) return;
-        var rect = naSection.getBoundingClientRect();
-        var stickyH = naSticky.offsetHeight;
-        // Release when bottom of section exits viewport
-        if(rect.bottom <= window.innerHeight + stickyH * 0.1){
-          naSticky.classList.add('released');
-          released = true;
+      var n      = newArrivals.length;
+      var states = n + 2; // header + n products + grid
+      // Each state gets equal scroll room
+      // Total wrap height = states * 80vh (so each beat = ~80vh of scroll)
+      var beatVh = 85;
+      naWrap.style.height = (states * beatVh) + 'vh';
+
+      var headerEl = document.getElementById('naHeaderState');
+      var gridEl   = document.getElementById('naGridState');
+      var prodEls  = newArrivals.map(function(_,i){ return document.getElementById('naProd'+i); });
+      var dotEls   = Array.from({length:states}).map(function(_,i){ return document.getElementById('naDot'+i); });
+
+      // Set all states invisible initially
+      function reset(){
+        gsap.set(headerEl, { opacity:0, y:0 });
+        prodEls.forEach(function(el){ gsap.set(el, { opacity:0, y:60 }); });
+        gsap.set(gridEl, { opacity:0, scale:0.96 });
+      }
+
+      function lerp(a,b,t){ return a+(b-a)*Math.max(0,Math.min(1,t)); }
+      function prog(t,from,to){ return Math.max(0,Math.min(1,(t-from)/(to-from))); }
+      function ease(t){ return t<0.5?2*t*t:-1+(4-2*t)*t; }
+
+      // Floating animation on visible bottle
+      var floatTweens = [];
+      function startFloat(el){
+        floatTweens.forEach(function(t){ t.kill(); });
+        floatTweens = [];
+        if(!el) return;
+        var bottle = el.querySelector('img,svg');
+        if(bottle) floatTweens.push(
+          gsap.to(bottle, { y:-10, duration:2.8, repeat:-1, yoyo:true, ease:'sine.inOut' })
+        );
+      }
+
+      var lastState = -1;
+
+      function applyProgress(p){
+        // p: 0→1 across the full wrap height
+        // State boundaries: each state occupies 1/states of the scroll
+        var stateF  = p * states;           // 0 → states (float)
+        var stateI  = Math.floor(stateF);   // current discrete state
+        var stateProg = stateF - stateI;    // 0→1 within this state
+
+        // Update dots
+        var dotIdx = Math.min(stateI, states-1);
+        if(dotIdx !== lastState){
+          dotEls.forEach(function(d,i){ d.classList.toggle('active', i===dotIdx); });
+          lastState = dotIdx;
+        }
+
+        // ── Header: state 0 ──
+        var hIn  = ease(prog(stateProg, 0.0, 0.4));   // fade in
+        var hOut = stateI >= 1 ? ease(prog(stateProg, 0.0, 0.5)) : 0;
+        if(stateI === 0){
+          gsap.set(headerEl, { opacity: hIn, y: lerp(20,0,hIn) });
+        } else if(stateI === 1){
+          gsap.set(headerEl, { opacity: lerp(1,0,ease(prog(stateProg,0.0,0.4))), y: lerp(0,-30,ease(prog(stateProg,0.0,0.4))) });
+        } else {
+          gsap.set(headerEl, { opacity:0 });
+        }
+
+        // ── Products: states 1..n ──
+        prodEls.forEach(function(el, i){
+          var myState = i + 1;
+          if(stateI === myState){
+            // Entering
+            var inP = ease(prog(stateProg, 0.0, 0.45));
+            gsap.set(el, { opacity:inP, y:lerp(50,0,inP) });
+          } else if(stateI === myState + 1){
+            // Exiting — slides up and fades
+            var outP = ease(prog(stateProg, 0.0, 0.45));
+            gsap.set(el, { opacity:lerp(1,0,outP), y:lerp(0,-50,outP) });
+          } else if(stateI < myState){
+            gsap.set(el, { opacity:0, y:50 });
+          } else {
+            gsap.set(el, { opacity:0, y:-50 });
+          }
+        });
+
+        // ── Grid: last state ──
+        var gridState = n + 1;
+        if(stateI === gridState){
+          var gIn = ease(prog(stateProg, 0.0, 0.55));
+          gsap.set(gridEl, { opacity:gIn, scale:lerp(0.96,1,gIn) });
+        } else if(stateI < gridState){
+          gsap.set(gridEl, { opacity:0, scale:0.96 });
+        } else {
+          gsap.set(gridEl, { opacity:1, scale:1 });
+        }
+
+        // Start float on active product
+        if(stateI >= 1 && stateI <= n && stateI !== lastState){
+          startFloat(prodEls[stateI-1]);
         }
       }
-      // Set wrapper height to sticky height + extra scroll room
-      function setWrapHeight(){
-        naStickyWrap.style.minHeight = (naSticky.offsetHeight + window.innerHeight * 0.3) + 'px';
+
+      reset();
+      applyProgress(0);
+
+      // rAF loop
+      var lastP = -1;
+      function tick(){
+        var rect     = naWrap.getBoundingClientRect();
+        var scrolled = -rect.top;
+        var total    = naWrap.offsetHeight - window.innerHeight;
+        var p = total > 0 ? Math.max(0, Math.min(1, scrolled/total)) : 0;
+        if(Math.abs(p - lastP) > 0.0003){ lastP = p; applyProgress(p); }
+        requestAnimationFrame(tick);
       }
-      setTimeout(setWrapHeight, 100);
-      window.addEventListener('scroll', checkRelease, { passive:true });
-      window.addEventListener('resize', setWrapHeight, { passive:true });
-    })();
-
-    // ── GSAP — IntersectionObserver triggered, no fake scroll height ──
-    (function(){
-      if(typeof gsap === 'undefined') return;
-
-      var hdr     = naSticky.querySelector('.new-arrivals-hdr');
-      var cards   = naSticky.querySelectorAll('.na-card');
-
-      // Set initial states
-      gsap.set(hdr, { opacity:0, y:20 });
-      cards.forEach(function(card, i){
-        var fromLeft = i % 2 === 0;
-        gsap.set(card, { opacity:0, x: fromLeft ? -50 : 50 });
-        gsap.set(card.querySelectorAll('.na-svg, .na-card-img img'), { opacity:0, y:20, scale:0.9 });
-        gsap.set(card.querySelectorAll('.na-card-badge'), { opacity:0, x:-8 });
-        gsap.set(card.querySelectorAll('.na-card-brand,.na-card-name,.na-card-tagline'), { opacity:0, y:10 });
-        gsap.set(card.querySelectorAll('.na-card-chord'), { opacity:0, scale:0.85 });
-        gsap.set(card.querySelectorAll('.na-card-footer'), { opacity:0 });
-      });
-
-      var io = new IntersectionObserver(function(entries){
-        if(!entries[0].isIntersecting) return;
-        io.disconnect();
-
-        var tl = gsap.timeline({ defaults:{ ease:'power3.out' } });
-
-        // Header
-        tl.to(hdr, { opacity:1, y:0, duration:0.6 });
-
-        // Cards slide in from alternating sides, staggered
-        cards.forEach(function(card, i){
-          var fromLeft = i % 2 === 0;
-          var t = '>-0.3'; // overlap with previous
-
-          // Card frame
-          tl.to(card, { opacity:1, x:0, duration:0.65, ease:'power2.out' }, i===0 ? '-=0.2' : t)
-
-          // Bottle springs up
-          .to(card.querySelectorAll('.na-svg,.na-card-img img'),
-            { opacity:1, y:0, scale:1, duration:0.9, ease:'elastic.out(1,0.55)' },
-            '>-0.4')
-
-          // Badge slides in
-          .to(card.querySelectorAll('.na-card-badge'),
-            { opacity:1, x:0, duration:0.35 },
-            '>-0.5')
-
-          // Brand + name cascade
-          .to(card.querySelectorAll('.na-card-brand'),
-            { opacity:1, y:0, duration:0.3 },
-            '>-0.3')
-          .to(card.querySelectorAll('.na-card-name'),
-            { opacity:1, y:0, duration:0.4 },
-            '>-0.15')
-          .to(card.querySelectorAll('.na-card-tagline'),
-            { opacity:1, duration:0.35 },
-            '>-0.15')
-
-          // Chords pop in
-          .to(card.querySelectorAll('.na-card-chord'),
-            { opacity:1, scale:1, duration:0.25, stagger:0.06, ease:'back.out(1.6)' },
-            '>-0.2')
-
-          // Footer
-          .to(card.querySelectorAll('.na-card-footer'),
-            { opacity:1, duration:0.3 },
-            '>-0.1');
-        });
-
-        // Float on bottles
-        tl.add(function(){
-          naSticky.querySelectorAll('.na-svg,.na-card-img img').forEach(function(b,i){
-            gsap.to(b, { y:-6, duration:2.4+i*0.5, repeat:-1, yoyo:true,
-              ease:'sine.inOut', delay:i*0.6, overwrite:false });
-          });
-        });
-
-      }, { threshold: 0.12 });
-
-      io.observe(naSection);
+      tick();
     })();
   }
 
