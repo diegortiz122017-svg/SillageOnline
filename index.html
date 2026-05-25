@@ -3350,7 +3350,7 @@ function buildGrid(){
               applyMobileActive(+entry.target.dataset.idx || 0);
             });
           }, { threshold:0, rootMargin:'-48% 0px -48% 0px' });
-          // IO for text reveals — fires when card enters the lower viewport
+          // IO for text reveals — fires when ~50% of card visible (text area entering screen)
           var mobileRevealObserver = new IntersectionObserver(function(entries){
             entries.forEach(function(entry){
               if(!entry.isIntersecting) return;
@@ -3358,7 +3358,7 @@ function buildGrid(){
               var slot = card.querySelector('.na-text-slot');
               if(slot) revealSlot(slot);
             });
-          }, { threshold:0, rootMargin:'0px 0px -10% 0px' });
+          }, { threshold:0.45 });
           mobileCards.forEach(function(card){
             activeObserver.observe(card);
             mobileRevealObserver.observe(card);
@@ -3375,8 +3375,7 @@ function buildGrid(){
       // Reveal first slot's text immediately when section enters — IO threshold
       // means localP is 0 at entry so setInner won't fire; force it here
       if(textSlots[0]) setTimeout(function(){ revealSlot(textSlots[0]); }, 320);
-      // Mobile: reveal first card text on init
-      if(mobileCards[0]){ var _ms0 = mobileCards[0].querySelector('.na-text-slot'); if(_ms0) setTimeout(function(){ revealSlot(_ms0); }, 350); }
+      // Mobile: first card is below the sticky fold, IO will handle its reveal
       compute();
       window.addEventListener('scroll', onScroll, {passive:true});
       window.addEventListener('resize', function(){ compute(); mobileFallbackActive(); });
