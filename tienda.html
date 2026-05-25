@@ -2790,7 +2790,8 @@ function buildGrid(){
     return parseArrivalDate(a.arrivedAt).getTime() - parseArrivalDate(b.arrivedAt).getTime();
   }).slice(0,4);
 
-  if(newArrivals.length){
+  var naAnchorEl = document.getElementById('na-anchor');
+  if(newArrivals.length && naAnchorEl){
     var naWrap = document.createElement('div');
     naWrap.id = 'newArrivalsSection';
     naWrap.className = 'new-arrivals-section';
@@ -2898,13 +2899,8 @@ function buildGrid(){
     naSticky.appendChild(naPanel);
     naWrap.appendChild(naSticky);
 
-    // NA section not shown on tienda — skip insertion, continue to build grid
-    var shopSection = document.getElementById('shop');
-    if(shopSection) {
-      // Only insert on homepage (has #na-anchor)
-      var naAnchor = document.getElementById('na-anchor');
-      if(naAnchor) naAnchor.parentNode.insertBefore(naWrap, naAnchor);
-    }
+    // Insert NA section (we're on homepage — na-anchor exists)
+    naAnchorEl.parentNode.insertBefore(naWrap, naAnchorEl);
 
     var bottleZone = document.getElementById('naBottleZone');
     var textZone = document.getElementById('naTextZone');

@@ -3106,7 +3106,8 @@ function buildGrid(){
     return parseArrivalDate(a.arrivedAt).getTime() - parseArrivalDate(b.arrivedAt).getTime();
   }).slice(0,4);
 
-  if(newArrivals.length){
+  var naAnchorEl = document.getElementById('na-anchor');
+  if(newArrivals.length && naAnchorEl){
     var naWrap = document.createElement('div');
     naWrap.id = 'newArrivalsSection';
     naWrap.className = 'new-arrivals-section';
@@ -3224,9 +3225,8 @@ function buildGrid(){
     naWrap.appendChild(naMobileCarouselEl);
     naWrap.appendChild(naRailEl);
 
-    // Insert NA only on homepage (has #na-anchor), not on tienda
-    var naAnchor = document.getElementById('na-anchor');
-    if(naAnchor) naAnchor.parentNode.insertBefore(naWrap, naAnchor);
+    // Insert NA (naAnchorEl confirmed at block entry)
+    naAnchorEl.parentNode.insertBefore(naWrap, naAnchorEl);
 
     var bottleZone = document.getElementById('naBottleZone');
     var textZone = document.getElementById('naTextZone');
