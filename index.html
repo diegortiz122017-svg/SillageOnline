@@ -2823,9 +2823,17 @@ function buildGrid(){
   var existingNA = document.getElementById('newArrivalsSection');
   if(existingNA) existingNA.remove();
   var thirtyDaysAgo = Date.now() - 30*24*60*60*1000;
+  function parseArrivalDate(value){
+    if(!value) return null;
+    var d = value instanceof Date ? value : new Date(String(value));
+    return isNaN(d.getTime()) ? null : d;
+  }
   var newArrivals = (P||[]).filter(function(p){
-    return p.arrivedAt && new Date(p.arrivedAt).getTime() > thirtyDaysAgo;
-  }).sort(function(a,b){ return new Date(a.arrivedAt)-new Date(b.arrivedAt); }).slice(0,4);
+    var d = parseArrivalDate(p.arrivedAt);
+    return d && d.getTime() > thirtyDaysAgo;
+  }).sort(function(a,b){
+    return parseArrivalDate(a.arrivedAt).getTime() - parseArrivalDate(b.arrivedAt).getTime();
+  }).slice(0,4);
 
   if(newArrivals.length){
     var naWrap = document.createElement('div');
@@ -2850,22 +2858,34 @@ function buildGrid(){
       var A = naHexToRgb(a), B = naHexToRgb(b);
       return 'rgb('+Math.round(A.r+(B.r-A.r)*t)+','+Math.round(A.g+(B.g-A.g)*t)+','+Math.round(A.b+(B.b-A.b)*t)+')';
     }
-    function naSoftTint(hex){ return naLerpColor(hex || '#b8955a', '#faf8f4', 0.85); }
+    function naSoftTint(hex){ return naLerpColor(hex || '#b8955a', '#faf8f4', 0.88); }
+    function naSafeBgTint(p){
+      var tint = p.bgTint || '';
+      if(/^#[0-9a-f]{6}$/i.test(tint)){
+        var rgb = naHexToRgb(tint);
+        var max = Math.max(rgb.r,rgb.g,rgb.b), min = Math.min(rgb.r,rgb.g,rgb.b);
+        if(max - min < 70 && (rgb.r + rgb.g + rgb.b) > 620) return tint;
+      }
+      return naSoftTint(p.c && p.c[0]);
+    }
+    function naOrbTint(hex){ return naLerpColor(hex || '#b8955a', '#faf8f4', 0.62); }
     function naNotes(v){
       if(Array.isArray(v)) return v;
       return String(v || '').split(',').map(function(x){ return x.trim(); }).filter(Boolean);
     }
     function naDateLabel(p){
       if(p.drop) return p.drop;
-      if(!p.arrivedAt) return 'Recién llegado';
-      var d = new Date(p.arrivedAt + 'T00:00:00');
+      var d = parseArrivalDate(p.arrivedAt);
+      if(!d) return 'Recién llegado';
       var months = ['enero','febrero','marzo','abril','mayo','junio','julio','agosto','septiembre','octubre','noviembre','diciembre'];
       return 'Llegado el ' + d.getDate() + ' de ' + months[d.getMonth()];
     }
     function naWeekLabel(){
-      var newest = newArrivals.slice().sort(function(a,b){ return new Date(b.arrivedAt)-new Date(a.arrivedAt); })[0];
-      if(!newest || !newest.arrivedAt) return 'Semana 22';
-      var d = new Date(newest.arrivedAt + 'T00:00:00');
+      var newest = newArrivals.slice().sort(function(a,b){
+        return parseArrivalDate(b.arrivedAt).getTime() - parseArrivalDate(a.arrivedAt).getTime();
+      })[0];
+      var d = newest ? parseArrivalDate(newest.arrivedAt) : null;
+      if(!d) return 'Semana 22';
       var onejan = new Date(d.getFullYear(),0,1);
       var week = Math.ceil((((d - onejan) / 86400000) + onejan.getDay() + 1) / 7);
       return 'Semana ' + String(week).padStart(2,'0');
@@ -2885,7 +2905,9 @@ function buildGrid(){
         base:naNotes(p.base),
         sillage:p.sillage || 'Moderate',
         long:p.long || p.longevity || '8+ Hours',
-        bgTint:p.bgTint || naSoftTint(p.c && p.c[0]),
+        bgTint:naSafeBgTint(p),
+        orbA:naOrbTint(p.c && p.c[0]),
+        orbB:naOrbTint(p.c && p.c[2]),
         c:p.c || ['#f0e6d0','#d4af7a','#b8955a'],
         s:p.s || 'classic'
       };
@@ -3025,8 +3047,8 @@ function buildGrid(){
         var next = diary[activeIdx+1] || active;
         var mix = activeIdx < N-1 && localP > 0.5 ? naEase((localP - 0.5) / 0.5) : 0;
         stick.style.background = naLerpColor(active.bgTint, next.bgTint, mix);
-        orbA.style.background = naLerpColor(active.c[0], next.c[0], mix);
-        orbB.style.background = naLerpColor(active.c[2], next.c[2], mix);
+        orbA.style.background = naLerpColor(active.orbA, next.orbA, mix);
+        orbB.style.background = naLerpColor(active.orbB, next.orbB, mix);
 
         bottleSlots.forEach(function(slot,i){
           var segStart = i*segLen;
@@ -3082,7 +3104,7 @@ function buildGrid(){
           var idx = Math.round(mobileCarousel.scrollLeft / Math.max(1, mobileCarousel.clientWidth));
           if(railFill) railFill.style.width = (idx / Math.max(1,N-1) * 100).toFixed(2)+'%';
           var active = diary[Math.max(0, Math.min(N-1, idx))];
-          if(active){ stick.style.background = active.bgTint; orbA.style.background = active.c[0]; orbB.style.background = active.c[2]; }
+          if(active){ stick.style.background = active.bgTint; orbA.style.background = active.orbA; orbB.style.background = active.orbB; }
         }, {passive:true});
       }
       apply(0);
