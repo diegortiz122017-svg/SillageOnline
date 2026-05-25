@@ -1075,6 +1075,8 @@ footer{background:var(--dark);padding:3.5rem 4rem;text-align:center;border-top:1
   .na-grid-closing-title{font-size:1.6rem}
   .new-arrivals-heading{font-size:2rem}
   .na-header-state{padding:0 1.5rem}
+  /* Offset sticky top by nav bar height so content never sits under it */
+  .na-sticky{padding-top:calc(60px + 2rem)}
 }
 /* Hover: bottle 3D tilt */
 .na-card-img{perspective:800px}
@@ -2871,7 +2873,7 @@ function buildGrid(){
     (function(){
       var n      = newArrivals.length;
       var states = n + 2; // header + n products + grid
-      var beatVh = 120;   // more scroll room = slower transitions
+      var beatVh = 140;   // more time per product
       naWrap.style.height = (states * beatVh) + 'vh';
 
       var headerEl = document.getElementById('naHeaderState');
@@ -2916,7 +2918,6 @@ function buildGrid(){
       function releaseStickyOnce(){
         if(released) return;
         released = true;
-        // Ensure grid is fully visible before releasing
         gsap.set(gridEl, { opacity:1, scale:1 });
         gsap.set(headerEl, { opacity:0 });
         prodEls.forEach(function(el){
@@ -2925,10 +2926,13 @@ function buildGrid(){
         });
         var dots = naSticky.querySelector('.na-dots');
         if(dots) dots.style.display = 'none';
-        // Small delay before releasing sticky so grid renders fully
         setTimeout(function(){
+          // Collapse the sticky to its natural content height
           naSticky.style.position = 'relative';
           naSticky.style.height = 'auto';
+          // Collapse the wrap height so no blank space remains
+          naWrap.style.height = 'auto';
+          naWrap.style.minHeight = '0';
         }, 60);
       }
 
@@ -2968,21 +2972,21 @@ function buildGrid(){
         prodEls.forEach(function(el, i){
           var myState = i + 1;
           if(stateI === myState){
-            var frameIn  = easeOut(prog(stateProg, 0.0, 0.55));
-            var nameRevP = easeInOut(prog(stateProg, 0.25, 0.80));
-            var bottleIn = easeOut(prog(stateProg, 0.10, 0.60));
+            var frameIn  = easeOut(prog(stateProg, 0.0, 0.50));
+            var nameRevP = easeInOut(prog(stateProg, 0.20, 0.80)); // name reveal
+            var bottleIn = easeOut(prog(stateProg, 0.08, 0.55));
             gsap.set(el, { opacity:frameIn, y:lerp(55,0,frameIn) });
             var bottle = el.querySelector('.na-prod-img img, .na-prod-img svg');
             if(bottle) gsap.set(bottle, { opacity:bottleIn, y:lerp(18,0,bottleIn), scale:lerp(0.9,1,bottleIn) });
             ['.na-prod-badge','.na-prod-brand','.na-prod-tagline','.na-prod-chords','.na-prod-footer'].forEach(function(sel,si){
               var tEl = el.querySelector(sel);
-              if(tEl) tEl.style.opacity = easeOut(prog(stateProg, 0.15+si*0.04, 0.60+si*0.04));
+              if(tEl) tEl.style.opacity = easeOut(prog(stateProg, 0.12+si*0.05, 0.58+si*0.05));
             });
             setNameReveal(el, nameRevP);
             if(frameIn > 0.6) startFloat(i);
           } else if(stateI === myState + 1){
-            var outP    = easeInOut(prog(stateProg, 0.0, 0.50));
-            var nameOut = easeInOut(prog(stateProg, 0.0, 0.35));
+            var outP    = easeInOut(prog(stateProg, 0.0, 0.45));
+            var nameOut = easeInOut(prog(stateProg, 0.0, 0.30));
             gsap.set(el, { opacity:lerp(1,0,outP), y:lerp(0,-45,outP) });
             setNameReveal(el, lerp(1,0,nameOut));
           } else if(stateI < myState){
