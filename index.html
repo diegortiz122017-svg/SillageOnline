@@ -1089,54 +1089,28 @@ footer{background:var(--dark);padding:3.5rem 4rem;text-align:center;border-top:1
   body{min-width:0}
   header,.hero,#shop,footer,.new-arrivals-section{width:100%;max-width:100%;box-sizing:border-box}
 
-  /* ── Scrolltelling layout ──────────────────────────────
-     Structure:
-       na-sticky-wrap (flow container)
-         ├── na-sticky (position:sticky, bottle lives here)
-         ├── na-mobile-carousel (scrolls under sticky)
-         └── na-rail-bot (sticky at bottom of screen)
+  /* ── Mobile NA: no sticky panel, pure card scroll ─────
+     The sticky bottle experiment caused blank space and
+     rendering issues. Mobile uses full-height cards with
+     IO-driven text reveals. Clean, no blank space.
   ─────────────────────────────────────────────────────── */
   .na-sticky-wrap{height:auto;position:relative}
-
-  /* Sticky bottle panel — stays visible while carousel scrolls under it */
   .na-sticky{
-    position:sticky;top:50px;
-    height:32svh;min-height:180px;
-    overflow:visible;
-    background:var(--warm-white);
-    transition:background 0.75s ease;
-    z-index:2;
-    pointer-events:none;
+    display:none; /* Hidden on mobile — no blank panel */
   }
-
   .na-stage{display:none}
   .na-toc{display:none}
   .na-text-zone{display:none}
-  .na-corner-stamp{top:0.8rem;left:1.2rem;font-size:0.44rem;z-index:3}
-
-  .na-bg-orb{width:480px;height:480px;filter:blur(80px);opacity:0.12}
-
-  .na-bottle-zone{
-    position:absolute;inset:0;
-    display:flex;align-items:center;justify-content:center;
-  }
-  /* On mobile, first bottle visible by default — JS swaps on scroll */
-  .na-bottle-slot{opacity:0;transition:opacity 0.45s ease,transform 0.45s ease;pointer-events:none}
-  .na-bottle-slot:first-child{opacity:1}
-  .na-bottle-mark{
-    position:absolute;bottom:0.3rem;right:1rem;
-    font-family:'Cormorant Garamond',serif;font-style:italic;
-    font-size:4.5rem;font-weight:300;line-height:1;
-    letter-spacing:-0.03em;color:var(--charcoal);
-    opacity:0.05;pointer-events:none;
-    top:auto;left:auto;transform:none;
-  }
-  .na-bottle-svg{--na-bottle-scale:0.6}
-  .na-bottle-slot svg{
-    filter:drop-shadow(0 18px 36px rgba(0,0,0,0.15)) drop-shadow(0 3px 8px rgba(0,0,0,0.07));
+  .na-bg-orb{display:none}
+  .na-corner-stamp{
+    display:block;
+    position:relative;top:auto;left:auto;
+    padding:1.8rem 1.4rem 0.8rem;
+    font-size:0.5rem;letter-spacing:0.3em;
+    z-index:1;
   }
 
-  /* Progress rail — sticky at bottom of screen */
+  /* Rail */
   .na-rail-bot{
     display:flex;
     position:sticky;bottom:0;
@@ -1152,51 +1126,43 @@ footer{background:var(--dark);padding:3.5rem 4rem;text-align:center;border-top:1
   }
   .na-rail-track{flex:1;margin:0 0.8rem;height:44px}
 
-  /* Mobile carousel — sibling of na-sticky, scrolls naturally */
+  /* Mobile carousel */
   .na-mobile-carousel{
     display:flex;flex-direction:column;
-    width:100%;
-    position:relative;
-    z-index:1;
-    margin-top:0;
+    width:100%;position:relative;z-index:1;
   }
 
-  /* Each card — full-height, text anchors to bottom half */
+  /* Each card: bottle top half, text bottom half */
   .na-mobile-card{
     width:100%;
-    min-height:72svh;
-    padding:1.5rem 1.4rem 4.5rem;
-    display:flex;flex-direction:column;justify-content:flex-end;
+    min-height:100svh;
+    padding:0;
+    display:flex;flex-direction:column;
     box-sizing:border-box;
     border-bottom:1px solid var(--border-light);
-    background:transparent;
+    background:var(--warm-white);
     position:relative;
   }
-  .na-mobile-card::before{
-    content:'';
-    position:absolute;inset:0;
-    background:linear-gradient(
-      to bottom,
-      transparent 0%,
-      transparent 10%,
-      rgba(250,248,244,0.5) 32%,
-      rgba(250,248,244,0.93) 55%,
-      var(--warm-white) 72%
-    );
-    pointer-events:none;z-index:0;
-    transition:background 0.75s ease;
+  .na-mobile-bottle{
+    display:flex;
+    align-items:center;justify-content:center;
+    height:45svh;min-height:200px;
+    flex-shrink:0;
+    position:relative;
   }
+  /* Tint behind each bottle from product color */
   .na-mobile-card .na-text-slot{
+    flex:1;
     position:relative;z-index:1;
-    display:flex;flex-direction:column;justify-content:flex-end;
+    display:flex;flex-direction:column;justify-content:flex-start;
+    padding:1.6rem 1.4rem 5rem;
     opacity:1;
   }
-  .na-mobile-bottle{display:none}
 
   /* Text sizing */
   .na-mobile-card .na-stamp{margin-bottom:0.5rem;font-size:0.44rem;letter-spacing:0.2em}
   .na-mobile-card .na-brand{font-size:0.48rem;letter-spacing:0.26em;margin-bottom:0.3rem}
-  .na-mobile-card .na-name{font-size:clamp(1.8rem,9vw,2.3rem);line-height:0.95;margin-bottom:0.6rem;overflow-wrap:anywhere}
+  .na-mobile-card .na-name{font-size:clamp(1.9rem,9vw,2.4rem);line-height:0.95;margin-bottom:0.7rem;overflow-wrap:anywhere}
   .na-mobile-card .na-line{font-size:0.88rem;line-height:1.4;margin-bottom:0.9rem;max-width:100%}
   .na-mobile-card .na-pyramid{gap:0.6rem;margin-bottom:0.9rem}
   .na-mobile-card .na-py-head{margin-bottom:0.28rem}
@@ -1208,9 +1174,9 @@ footer{background:var(--dark);padding:3.5rem 4rem;text-align:center;border-top:1
   .na-mobile-card .na-price{font-size:1.3rem}
   .na-mobile-card .na-price-cap{font-size:0.44rem;letter-spacing:0.18em}
   .na-mobile-card .na-meta{font-size:0.46rem;letter-spacing:0.12em}
-  .na-mobile-card .na-cta{margin-left:0;width:100%;padding:0.7rem 1rem;pointer-events:all}
+  .na-mobile-card .na-cta{margin-left:0;width:100%;padding:0.7rem 1rem}
 
-  /* IO-driven reveals via .na-el-in (same system as desktop) */
+  /* IO-driven reveals via .na-el-in */
   .na-mobile-card .na-stamp,
   .na-mobile-card .na-brand,
   .na-mobile-card .na-name,
@@ -1237,6 +1203,7 @@ footer{background:var(--dark);padding:3.5rem 4rem;text-align:center;border-top:1
   .na-mobile-card .na-py-row.na-el-in,
   .na-mobile-card .na-foot.na-el-in{opacity:1;transform:none}
 }
+
 @media(min-width:769px){
   .na-mobile-carousel{display:none}
 }
@@ -3257,8 +3224,8 @@ function buildGrid(){
     naWrap.appendChild(naMobileCarouselEl);
     naWrap.appendChild(naRailEl);
 
-    // Insert NA before anchor (homepage) or before #shop (tienda), whichever exists
-    var naAnchor = document.getElementById('na-anchor') || document.getElementById('shop');
+    // Insert NA only on homepage (has #na-anchor), not on tienda
+    var naAnchor = document.getElementById('na-anchor');
     if(naAnchor) naAnchor.parentNode.insertBefore(naWrap, naAnchor);
 
     var bottleZone = document.getElementById('naBottleZone');
@@ -3459,17 +3426,14 @@ function buildGrid(){
         mobileActiveIdx = idx;
         var active = diary[idx];
         if(!active) return;
-        stick.style.background = active.bgTint;
-        orbA.style.background = active.orbA;
-        orbB.style.background = active.orbB;
+        // Update rail
         if(railFill) railFill.style.width = (idx / Math.max(1,N-1) * 100).toFixed(2)+'%';
-        if(bottleMark) bottleMark.textContent = String(idx+1).padStart(2,'0');
-        bottleSlots.forEach(function(slot,i){
-          var on = i === idx;
-          slot.style.opacity = on ? 1 : 0;
-          slot.style.transform = on ? 'translate(0,0) rotate(0deg) scale(1)' : 'translate(0,14px) rotate(-3deg) scale(0.92)';
+        // Tint the bottle background of each card
+        mobileCards.forEach(function(card,i){
+          card.classList.toggle('is-active', i === idx);
+          var bottleEl = card.querySelector('.na-mobile-bottle');
+          if(bottleEl) bottleEl.style.background = diary[i] ? diary[i].bgTint : '';
         });
-        mobileCards.forEach(function(card,i){ card.classList.toggle('is-active', i === idx); });
       }
       function mobileFallbackActive(){
         if(window.innerWidth > 768 || !mobileCards.length) return;
@@ -3499,8 +3463,8 @@ function buildGrid(){
               if(!entry.isIntersecting) return;
               applyMobileActive(+entry.target.dataset.idx || 0);
             });
-          }, { threshold:0, rootMargin:'-48% 0px -48% 0px' });
-          // IO for text reveals — fires when ~50% of card visible (text area entering screen)
+          }, { threshold:0, rootMargin:'-30% 0px -30% 0px' });
+          // IO for text reveals — fires when card text area enters viewport
           var mobileRevealObserver = new IntersectionObserver(function(entries){
             entries.forEach(function(entry){
               if(!entry.isIntersecting) return;
@@ -3508,7 +3472,7 @@ function buildGrid(){
               var slot = card.querySelector('.na-text-slot');
               if(slot) revealSlot(slot);
             });
-          }, { threshold:0.45 });
+          }, { threshold:0.3 });
           mobileCards.forEach(function(card){
             activeObserver.observe(card);
             mobileRevealObserver.observe(card);

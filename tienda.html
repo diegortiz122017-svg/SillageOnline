@@ -2898,8 +2898,10 @@ function buildGrid(){
     naSticky.appendChild(naPanel);
     naWrap.appendChild(naSticky);
 
+    // NA section not shown on tienda — skip insertion
     var shopSection = document.getElementById('shop');
-    shopSection.parentNode.insertBefore(naWrap, shopSection);
+    if(!shopSection) return; // guard
+    // Don't insert NA on tienda page
 
     var bottleZone = document.getElementById('naBottleZone');
     var textZone = document.getElementById('naTextZone');
