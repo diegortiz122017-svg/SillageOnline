@@ -86,7 +86,7 @@
 html{scroll-behavior:smooth}
 body{background:var(--dark);color:var(--cream);font-family:'Jost',sans-serif;font-weight:300;overflow-x:hidden}
 
-header{position:sticky;top:0;width:100%;z-index:1000;display:flex;align-items:center;justify-content:space-between;padding:1.4rem 4rem;background:rgba(14,12,10,0.95);backdrop-filter:blur(12px);border-bottom:1px solid var(--border)}
+header{position:fixed;top:0;width:100%;z-index:1000;display:flex;align-items:center;justify-content:space-between;padding:1.4rem 4rem;background:rgba(14,12,10,0.95);backdrop-filter:blur(12px);border-bottom:1px solid var(--border)}
 .logo{font-family:Cormorant Garamond,serif;font-size:2rem;font-weight:300;letter-spacing:0.35em;color:var(--gold);text-transform:uppercase;flex:1}
 .logo span{font-style:italic;color:var(--cream)}
 nav{display:flex;gap:2.5rem;flex:1;justify-content:center}
@@ -126,7 +126,7 @@ nav a:hover{color:var(--gold)}
 .scroll-line{width:1px;height:40px;background:linear-gradient(to bottom,var(--gold),transparent);animation:spulse 2s ease-in-out infinite}
 @keyframes spulse{0%,100%{opacity:0.3}50%{opacity:1}}
 
-#shop{padding:4rem 4rem 6rem;background:var(--warm-white);color:var(--charcoal);scroll-margin-top:0}
+#shop{padding:4rem 4rem 6rem;background:var(--warm-white);color:var(--charcoal);scroll-margin-top:80px}
 .section-header{text-align:center;margin-bottom:3rem}
 .section-eyebrow{font-size:0.65rem;letter-spacing:0.35em;text-transform:uppercase;color:var(--gold);margin-bottom:0.8rem}
 .section-title{font-family:Cormorant Garamond,serif;font-size:clamp(3rem,5.5vw,4.5rem);font-weight:300;color:var(--charcoal);line-height:1.1}
@@ -1793,7 +1793,7 @@ footer{background:var(--dark);padding:3.5rem 4rem;text-align:center;border-top:1
 
 /* ── Store Nez bottom access — integrated with shop section ─────────────── */
 .store-nez-access{
-  scroll-margin-top:0;
+  scroll-margin-top:110px;
   background:var(--warm-white);
   color:var(--charcoal);
   padding:4.25rem 4rem 4.75rem;
@@ -1853,7 +1853,7 @@ footer{background:var(--dark);padding:3.5rem 4rem;text-align:center;border-top:1
 }
 @media(max-width:680px){
   .store-nez-access{
-    scroll-margin-top:0;
+    scroll-margin-top:96px;
     padding:3.3rem 1rem 3.8rem;
   }
   .store-nez-title{
@@ -1870,14 +1870,26 @@ footer{background:var(--dark);padding:3.5rem 4rem;text-align:center;border-top:1
 }
 
 
-/* Header flow fix: sticky header participates in layout, so content no longer slides underneath it */
+/* ── Fixed header layout safety ───────────────────────────────
+   Header remains visible while scrolling, while page content reserves
+   space so section titles do not hide underneath it. */
+:root{--site-header-height:76px}
+body{padding-top:var(--site-header-height);overflow-x:hidden}
 header{
-  position:sticky !important;
+  position:fixed !important;
   top:0;
+  left:0;
+  right:0;
+  width:100%;
   z-index:1000;
 }
-body{
-  overflow-x:hidden;
+html{scroll-padding-top:calc(var(--site-header-height) + 16px)}
+#shop,.store-nez-access{scroll-margin-top:calc(var(--site-header-height) + 16px)}
+@media(max-width:680px){
+  :root{--site-header-height:73px}
+  body{padding-top:var(--site-header-height)}
+  html{scroll-padding-top:calc(var(--site-header-height) + 12px)}
+  #shop,.store-nez-access{scroll-margin-top:calc(var(--site-header-height) + 12px)}
 }
 
 </style>
@@ -7740,6 +7752,6 @@ document.addEventListener('DOMContentLoaded', function(){
 
 <!-- VERIFY: /api inventory/pricing/catalogue/decant/order/wompi/btcpay/customer/sommelier calls preserved from source file. -->
 
-<!-- BUILD FIX: header changed from fixed to sticky; overlap compensation removed -->
+<!-- BUILD FIX: fixed header retained; body padding reserves header space; scroll offsets applied -->
 </body>
 </html>
