@@ -1137,16 +1137,21 @@ footer{background:var(--dark);padding:3.5rem 4rem;text-align:center;border-top:1
   body{min-width:0}
   header,.hero,#shop,footer,.new-arrivals-section{width:100%;max-width:100%;box-sizing:border-box}
   .na-sticky-wrap{height:auto}
-  .na-sticky{position:relative;height:auto;min-height:0;overflow:visible;background:var(--warm-white)!important}
-  .na-stage{display:none}
+  .na-sticky{position:relative;height:auto;min-height:0;overflow:visible;background:var(--warm-white)}
+  .na-stage{position:sticky;top:0;height:44svh;min-height:270px;display:block;padding:3.4rem 1.2rem 1.8rem;width:100%;max-width:100vw;box-sizing:border-box;z-index:4;overflow:hidden}
   .na-toc{display:none}
   .na-corner-stamp{top:1rem;left:1.2rem}
   .na-bg-orb{width:620px;height:620px;filter:blur(90px);opacity:0.12}
-  .na-bottle-zone,.na-text-zone{display:none}
+  .na-bottle-zone{position:absolute;inset:0;display:flex;align-items:center;justify-content:center}
+  .na-text-zone{display:none}
+  .na-bottle-mark{font-size:12rem}
+  .na-bottle-svg{--na-bottle-scale:0.68}
+  .na-bottle-slot{pointer-events:auto}
+  .na-bottle-slot svg{filter:drop-shadow(0 28px 55px rgba(0,0,0,0.18)) drop-shadow(0 4px 12px rgba(0,0,0,0.08))}
   .na-mobile-carousel{display:flex;flex-direction:column;overflow:visible;width:100%;max-width:100%;position:relative;z-index:3}
-  .na-mobile-card{width:100%;min-height:100svh;padding:4rem 1.25rem 3.5rem;display:flex;flex-direction:column;justify-content:center;box-sizing:border-box;border-bottom:1px solid var(--border-light)}
-  .na-mobile-bottle{height:clamp(180px,32svh,260px);display:flex;align-items:center;justify-content:center;flex:0 0 auto}
-  .na-mobile-bottle svg{filter:drop-shadow(0 28px 55px rgba(0,0,0,0.18)) drop-shadow(0 4px 12px rgba(0,0,0,0.08))}
+  .na-mobile-card{width:100%;min-height:62svh;padding:2.3rem 1.25rem 2.8rem;display:flex;flex-direction:column;justify-content:center;box-sizing:border-box;border-bottom:1px solid var(--border-light);transition:background 0.5s ease}
+  .na-mobile-card.is-active{background:rgba(255,255,255,0.18)}
+  .na-mobile-bottle{display:none}
   .na-mobile-card .na-text-slot{position:relative;inset:auto;display:flex;justify-content:flex-start;opacity:1;transform:none;will-change:auto}
   .na-mobile-card .na-stamp{margin-bottom:0.65rem;font-size:0.46rem;letter-spacing:0.2em}
   .na-mobile-card .na-brand{font-size:0.5rem;letter-spacing:0.26em;margin-bottom:0.35rem}
@@ -3087,6 +3092,7 @@ function buildGrid(){
       }
 
       function compute(){
+        if(window.innerWidth <= 768) return;
         var rect = wrap.getBoundingClientRect();
         var total = wrap.offsetHeight - window.innerHeight;
         var scrolled = -rect.top;
@@ -3097,6 +3103,27 @@ function buildGrid(){
         if(raf) return;
         raf = requestAnimationFrame(function(){ raf = 0; compute(); });
       }
+      var mobileActiveIdx = -1;
+      var mobileCards = mobileCarousel ? mobileCarousel.querySelectorAll('.na-mobile-card') : [];
+      function applyMobileActive(idx){
+        if(window.innerWidth > 768) return;
+        idx = Math.max(0, Math.min(N-1, idx));
+        if(idx === mobileActiveIdx) return;
+        mobileActiveIdx = idx;
+        var active = diary[idx];
+        if(!active) return;
+        stick.style.background = active.bgTint;
+        orbA.style.background = active.orbA;
+        orbB.style.background = active.orbB;
+        if(railFill) railFill.style.width = (idx / Math.max(1,N-1) * 100).toFixed(2)+'%';
+        if(bottleMark) bottleMark.textContent = String(idx+1).padStart(2,'0');
+        bottleSlots.forEach(function(slot,i){
+          var on = i === idx;
+          slot.style.opacity = on ? 1 : 0;
+          slot.style.transform = on ? 'translate(0,0) rotate(0deg) scale(1)' : 'translate(0,14px) rotate(-3deg) scale(0.92)';
+        });
+        mobileCards.forEach(function(card,i){ card.classList.toggle('is-active', i === idx); });
+      }
       tocItems.forEach(function(t,i){
         t.addEventListener('click', function(){
           var total = wrap.offsetHeight - window.innerHeight;
@@ -3106,15 +3133,20 @@ function buildGrid(){
         });
       });
       if(mobileCarousel){
-        mobileCarousel.addEventListener('scroll', function(){
-          if(window.innerWidth > 768) return;
-          var idx = Math.round(mobileCarousel.scrollLeft / Math.max(1, mobileCarousel.clientWidth));
-          if(railFill) railFill.style.width = (idx / Math.max(1,N-1) * 100).toFixed(2)+'%';
-          var active = diary[Math.max(0, Math.min(N-1, idx))];
-          if(active){ stick.style.background = active.bgTint; orbA.style.background = active.orbA; orbB.style.background = active.orbB; }
-        }, {passive:true});
+        if('IntersectionObserver' in window){
+          var mobileObserver = new IntersectionObserver(function(entries){
+            var best = null;
+            entries.forEach(function(entry){
+              if(!entry.isIntersecting) return;
+              if(!best || entry.intersectionRatio > best.intersectionRatio) best = entry;
+            });
+            if(best) applyMobileActive(+best.target.dataset.idx || 0);
+          }, { threshold:[0.25,0.45,0.65], rootMargin:'-38% 0px -32% 0px' });
+          mobileCards.forEach(function(card){ mobileObserver.observe(card); });
+        }
       }
       apply(0);
+      applyMobileActive(0);
       compute();
       window.addEventListener('scroll', onScroll, {passive:true});
       window.addEventListener('resize', compute);
