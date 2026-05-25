@@ -1013,61 +1013,6 @@ footer{background:var(--dark);padding:3.5rem 4rem;text-align:center;border-top:1
 .new-arrivals-line{display:none}
 
 /* ── New arrivals — scrolltelling ── */
-/* ── New arrivals — scrolltelling, Option A (full-width stacked rows) ── */
-.new-arrivals-section{margin-bottom:0;border-top:1px solid rgba(184,149,90,0.12);background:var(--warm-white);margin-top:0}
-.new-arrivals-hdr{text-align:center;margin-bottom:2rem}
-.new-arrivals-title{font-size:0.65rem;letter-spacing:0.35em;text-transform:uppercase;color:var(--gold);font-weight:400;display:block;margin-bottom:0.8rem}
-.new-arrivals-heading{font-family:'Cormorant Garamond',serif;font-size:clamp(2.5rem,5vw,4rem);font-weight:300;color:var(--charcoal);line-height:1.1}
-.new-arrivals-heading em{font-style:italic;color:var(--gold)}
-.new-arrivals-line{display:none}
-/* Sticky wrapper — extra scroll room per product */
-.na-sticky-wrap{position:relative;height:220vh}
-.na-sticky{position:sticky;top:0;height:100vh;overflow:hidden;background:var(--warm-white);padding:3rem 4rem 2.5rem;display:flex;flex-direction:column;justify-content:center}
-.na-progress-bar{position:absolute;top:0;left:0;height:2px;background:linear-gradient(to right,var(--gold),#d4b87a);width:0;pointer-events:none;z-index:10}
-/* Full-width row: image half | text half */
-.na-grid{display:flex;flex-direction:column;gap:0}
-.na-card{display:grid;grid-template-columns:1fr 1fr;cursor:pointer;transition:background 0.3s;will-change:transform,opacity;border-bottom:1px solid rgba(184,149,90,0.1)}
-.na-card:last-child{border-bottom:none}
-.na-card:hover{background:rgba(184,149,90,0.02)}
-/* Alternate image side */
-.na-card:nth-child(even) .na-card-img{order:2}
-.na-card:nth-child(even) .na-card-body{order:1;text-align:right}
-.na-card:nth-child(even) .na-card-chords{justify-content:flex-end}
-.na-card:nth-child(even) .na-card-footer{justify-content:flex-end}
-.na-card-img{height:320px;background:rgba(184,149,90,0.04);display:flex;align-items:center;justify-content:center;position:relative;overflow:hidden}
-.na-card-img img{max-height:80%;max-width:70%;object-fit:contain;position:relative;z-index:1;will-change:transform}
-.na-card-img .na-svg{position:relative;z-index:1;will-change:transform}
-.na-card-badge{position:absolute;top:14px;left:14px;background:var(--gold);color:var(--dark);font-size:0.42rem;letter-spacing:0.2em;text-transform:uppercase;padding:3px 9px;opacity:0;z-index:2;will-change:opacity,transform}
-.na-card:nth-child(even) .na-card-badge{left:auto;right:14px}
-.na-card-body{padding:2.5rem 3rem;display:flex;flex-direction:column;justify-content:center}
-.na-card-brand{font-size:0.5rem;letter-spacing:0.22em;text-transform:uppercase;color:var(--gold);margin-bottom:0.4rem;opacity:0;will-change:opacity,transform}
-.na-card-name{font-family:'Cormorant Garamond',serif;font-size:clamp(2rem,3.5vw,3rem);font-weight:300;color:var(--charcoal);line-height:1.1;margin-bottom:0.6rem;opacity:0;will-change:opacity,transform}
-.na-card-tagline{font-size:0.75rem;color:var(--muted);font-style:italic;line-height:1.7;margin-bottom:1.2rem;opacity:0;will-change:opacity}
-.na-card-chords{display:flex;flex-wrap:wrap;gap:5px;margin-bottom:1.4rem}
-.na-card-chord{font-size:0.46rem;letter-spacing:0.12em;text-transform:uppercase;color:var(--muted);border:1px solid rgba(184,149,90,0.25);padding:3px 9px;opacity:0;will-change:opacity,transform}
-.na-card-footer{display:flex;align-items:center;gap:1.2rem;padding-top:1rem;border-top:1px solid rgba(184,149,90,0.12);opacity:0;will-change:opacity}
-.na-card-price{font-family:'Cormorant Garamond',serif;font-size:1.5rem;font-weight:300;color:var(--charcoal)}
-.na-card-cta{font-size:0.5rem;letter-spacing:0.2em;text-transform:uppercase;color:var(--muted);border-bottom:1px solid rgba(184,149,90,0.3);padding-bottom:1px;transition:color 0.2s,border-color 0.2s}
-.na-card:hover .na-card-cta{color:var(--gold);border-color:var(--gold)}
-.na-orb{position:absolute;border-radius:50%;filter:blur(50px);pointer-events:none;will-change:transform,opacity}
-@media(max-width:768px){
-  .na-sticky{padding:2rem 1.2rem 2rem}
-  .na-sticky-wrap{height:300vh}
-  /* Stack vertically on mobile */
-  .na-card{grid-template-columns:1fr}
-  .na-card-img{height:220px;order:-1!important}
-  .na-card-body{order:1!important;padding:1.5rem 1.2rem 2rem;text-align:left!important}
-  .na-card-chords{justify-content:flex-start!important}
-  .na-card-footer{justify-content:flex-start!important}
-  .na-card-badge{left:12px!important;right:auto!important}
-  .na-card-name{font-size:2rem}
-  /* Header always visible on mobile */
-  .new-arrivals-title{font-size:0.6rem}
-  .new-arrivals-heading{font-size:1.8rem}
-.new-arrivals-hdr{margin-bottom:1.2rem}
-}
-
-/* New arrivals editorial scrolltelling */
 .new-arrivals-section{position:relative;margin:0;border-top:1px solid rgba(184,149,90,0.12);border-bottom:1px solid rgba(184,149,90,0.12);background:var(--warm-white);color:var(--charcoal)}
 .na-sticky-wrap{position:relative;height:520vh}
 .na-sticky{position:sticky;top:0;height:100vh;overflow:hidden;background:var(--warm-white);transition:background 0.9s ease;padding:0;display:block}
@@ -1190,6 +1135,8 @@ footer{background:var(--dark);padding:3.5rem 4rem;text-align:center;border-top:1
 @media(min-width:769px){
   .na-mobile-carousel{display:none}
 }
+
+
 
 .ap-order{background:rgba(255,255,255,0.03);border:1px solid rgba(184,149,90,0.12);
   cursor:pointer;transition:border-color 0.2s}
@@ -2683,7 +2630,7 @@ function effectivePrice(p) {
 var P=[
   {id:1,brand:'Chanel',name:'N\u00b05',g:'F',price:185,size:'100ml',badge:'bestseller',notes:'Aldehyde \u00b7 Ylang-Ylang \u00b7 Rose \u00b7 Sandalwood',top:'Aldehyde, Neroli, Ylang-Ylang',mid:'Iris, Rose, Lily of the Valley',base:'Sandalwood, Vetiver, Amber, Musk',tagline:'The original icon of feminine elegance',desc:'Launched in 1921 by Coco Chanel, N\u00b05 shattered fragrance conventions. Revolutionary, abstract, and forever modern.',conc:'Eau de Parfum',season:'All Seasons',sillage:'Moderate',long:'8+ Hours',c:['#f5e6c8','#e8d0a0','#d4b87a'],s:'classic'},
   {id:2,brand:'Chanel',name:'Bleu de Chanel',g:'M',price:145,size:'100ml',badge:'bestseller',notes:'Grapefruit \u00b7 Labdanum \u00b7 Sandalwood \u00b7 Cedar',top:'Grapefruit, Lemon, Mint',mid:'Ginger, Nutmeg, Jasmine',base:'Labdanum, Sandalwood, Cedar, Patchouli',tagline:'Freedom without apology',desc:'Bold declaration of masculine independence. Crisp citrus opens to a spiced heart before settling into deep, sensual woods.',conc:'Eau de Parfum',season:'Fall / Winter',sillage:'Strong',long:'10+ Hours',c:['#c8d5e8','#9ab0cc','#5a7a9a'],s:'rect'},
-  {id:3,brand:'Chanel',name:'Chance Eau Tendre',g:'F',price:165,size:'100ml',badge:'new',arrivedAt:'2026-05-14',bgTint:'#f7e6ec',drop:'Llegado el 14 de mayo',line:'Una nube luminosa que se asienta sobre la piel sin pedir permiso.',notes:'Grapefruit \u00b7 Jasmine \u00b7 White Musk \u00b7 Iris',top:'Grapefruit, Quince',mid:'Hyacinth, Jasmine',base:'Iris, White Musk, Ambergris',tagline:'A cloud of luminous femininity',desc:'Luminous, airy, and transparent \u2014 all citrus brightness and powdery petals.',conc:'Eau de Toilette',season:'Spring / Summer',sillage:'Light',long:'6+ Hours',c:['#f0c8d8','#e0a0b8','#c87090'],s:'round'},
+  {id:3,brand:'Chanel',name:'Chance Eau Tendre',g:'F',price:165,size:'100ml',badge:'new',notes:'Grapefruit \u00b7 Jasmine \u00b7 White Musk \u00b7 Iris',top:'Grapefruit, Quince',mid:'Hyacinth, Jasmine',base:'Iris, White Musk, Ambergris',tagline:'A cloud of luminous femininity',desc:'Luminous, airy, and transparent \u2014 all citrus brightness and powdery petals.',conc:'Eau de Toilette',season:'Spring / Summer',sillage:'Light',long:'6+ Hours',c:['#f0c8d8','#e0a0b8','#c87090'],s:'round'},
   {id:4,brand:'Chanel',name:'Coco Mademoiselle',g:'F',price:175,size:'100ml',badge:null,notes:'Orange \u00b7 Patchouli \u00b7 Vetiver \u00b7 Rose',top:'Orange, Bergamot, Grapefruit',mid:'Rose, Jasmine, Ylang-Ylang',base:'Patchouli, Vetiver, Vanilla, White Musk',tagline:'The spirit of a free, modern woman',desc:'Sparkling citrus gives way to an Oriental floral heart, then a provocative patchouli-laced dry-down.',conc:'Eau de Parfum',season:'All Seasons',sillage:'Moderate',long:'8+ Hours',c:['#e8c8a0','#c8a070','#9a7040'],s:'classic'},
   {id:5,brand:'Dior',name:'Sauvage',g:'M',price:135,size:'100ml',badge:'bestseller',notes:'Bergamot \u00b7 Ambroxan \u00b7 Pepper \u00b7 Vetiver',top:'Calabrian Bergamot, Pepper',mid:'Sichuan Pepper, Lavender',base:'Ambroxan, Vetiver, Patchouli',tagline:'Wild, noble, free',desc:'Radically fresh and noble at once. Ambroxan creates an unprecedented magnetic sillage.',conc:'Eau de Parfum',season:'All Seasons',sillage:'Very Strong',long:'12+ Hours',c:['#8090a8','#5a6878','#3a4858'],s:'rect'},
   {id:6,brand:'Dior',name:'Miss Dior',g:'F',price:155,size:'100ml',badge:null,notes:'Peony \u00b7 Rose \u00b7 Lily-of-the-Valley \u00b7 Musk',top:'Peony, Lily-of-the-Valley, Bergamot',mid:'Rose, Peony',base:'Musk, Patchouli, Sandalwood',tagline:'Love, rewritten for every generation',desc:'Sun-kissed florals wrapped in a silky, skin-close finish.',conc:'Eau de Parfum',season:'Spring / Summer',sillage:'Moderate',long:'7+ Hours',c:['#f5c8d0','#e0a0b0','#c87888'],s:'round'},
@@ -2691,9 +2638,9 @@ var P=[
   {id:8,brand:'Dior',name:'Dior Homme',g:'M',price:140,size:'100ml',badge:null,notes:'Iris \u00b7 Leather \u00b7 Lavender \u00b7 Amber',top:'Lavender, Iris',mid:'Iris Root, Ambrette, Grey Amber',base:'Virginia Cedar, Vetiver, White Musks',tagline:'Iris as no one has ever worn it before',desc:'Daring use of iris creates a powdery, unapologetically sensual archetype.',conc:'Eau de Toilette',season:'Fall / Winter',sillage:'Moderate',long:'7+ Hours',c:['#b0a0c8','#8878a8','#605878'],s:'rect'},
   {id:9,brand:'Hermes',name:"Terre d'Hermes",g:'M',price:175,size:'100ml',badge:null,notes:'Flint \u00b7 Orange \u00b7 Cedar \u00b7 Vetiver',top:'Grapefruit, Orange',mid:'Pepper, Pelargonium',base:'Vetiver, Flint, Benzoin, Cedar',tagline:'Man between earth and sky',desc:'Maps the elemental tension between earth and sky. Flint gives an almost electric, mineral quality.',conc:'Eau de Toilette',season:'Spring / Fall',sillage:'Moderate',long:'8+ Hours',c:['#c8a070','#a07840','#785028'],s:'round'},
   {id:10,brand:'Hermes',name:"Twilly d'Hermes",g:'F',price:185,size:'50ml',badge:'new',notes:'Ginger \u00b7 Rose \u00b7 Sandalwood \u00b7 Tuberose',top:'Ginger',mid:'Tuberose, Rose',base:'Sandalwood',tagline:'The scent of young, joyful audacity',desc:'Playful ginger top, lush tuberose heart, smooth sandalwood base.',conc:'Eau de Parfum',season:'All Seasons',sillage:'Moderate',long:'7+ Hours',c:['#f8d8a8','#e8b878','#d09048'],s:'classic'},
-  {id:11,brand:'Hermes',name:'H24',g:'M',price:160,size:'100ml',badge:'new',arrivedAt:'2026-05-18',bgTint:'#ecf0e6',drop:'Llegado el 18 de mayo',line:'El olor de una camisa blanca reci\u00e9n planchada bajo un sol vegetal.',notes:'Narcissus \u00b7 Clary Sage \u00b7 Cedar \u00b7 Rosewood',top:'Narcissus, Clary Sage',mid:'Sclarene, Metal Tree',base:'Rosewood, Cedar',tagline:'A living tree \u2014 rooted, growing, breathing',desc:'Metal Tree conjures the fresh, sappy smell of a cut branch. Narcissus adds a green medicinal bloom.',conc:'Eau de Toilette',season:'Spring / Summer',sillage:'Light to Moderate',long:'6+ Hours',c:['#b8d8b8','#88b088','#588858'],s:'rect'},
+  {id:11,brand:'Hermes',name:'H24',g:'M',price:160,size:'100ml',badge:'new',notes:'Narcissus \u00b7 Clary Sage \u00b7 Cedar \u00b7 Rosewood',top:'Narcissus, Clary Sage',mid:'Sclarene, Metal Tree',base:'Rosewood, Cedar',tagline:'A living tree \u2014 rooted, growing, breathing',desc:'Metal Tree conjures the fresh, sappy smell of a cut branch. Narcissus adds a green medicinal bloom.',conc:'Eau de Toilette',season:'Spring / Summer',sillage:'Light to Moderate',long:'6+ Hours',c:['#b8d8b8','#88b088','#588858'],s:'rect'},
   {id:12,brand:'Tom Ford',name:'Black Orchid',g:'U',price:195,size:'100ml',badge:'limited',notes:'Black Truffle \u00b7 Orchid \u00b7 Patchouli \u00b7 Vetiver',top:'Black Truffle, Ylang-Ylang',mid:'Black Orchid, Spice',base:'Patchouli, Vetiver, Dark Chocolate',tagline:'Darkness, desire, and dark flowers',desc:'Black truffle, dark chocolate, and a lush orchid accord weave into something primordial.',conc:'Eau de Parfum',season:'Fall / Winter',sillage:'Very Strong',long:'12+ Hours',c:['#3a2838','#5a3858','#7a4878'],s:'rect'},
-  {id:13,brand:'Tom Ford',name:'Oud Wood',g:'U',price:285,size:'100ml',badge:'limited',arrivedAt:'2026-05-21',bgTint:'#f1e7d0',drop:'Llegado el 21 de mayo',line:'Bosque al amanecer. La luz a\u00fan no llega a las hojas m\u00e1s bajas.',notes:'Oud \u00b7 Rosewood \u00b7 Cardamom \u00b7 Vetiver',top:'Rosewood, Cardamom, Chinese Pepper',mid:'Oud, Sandalwood, Vetiver',base:'Tonka Bean, Amber, Vanilla',tagline:'The most precious wood, made wearable',desc:'Tom Ford tamed oud into something smoky, smooth, and addictively luxurious.',conc:'Eau de Parfum',season:'Fall / Winter',sillage:'Strong',long:'10+ Hours',c:['#5a3818','#7a5030','#9a6840'],s:'classic'},
+  {id:13,brand:'Tom Ford',name:'Oud Wood',g:'U',price:285,size:'100ml',badge:'limited',notes:'Oud \u00b7 Rosewood \u00b7 Cardamom \u00b7 Vetiver',top:'Rosewood, Cardamom, Chinese Pepper',mid:'Oud, Sandalwood, Vetiver',base:'Tonka Bean, Amber, Vanilla',tagline:'The most precious wood, made wearable',desc:'Tom Ford tamed oud into something smoky, smooth, and addictively luxurious.',conc:'Eau de Parfum',season:'Fall / Winter',sillage:'Strong',long:'10+ Hours',c:['#5a3818','#7a5030','#9a6840'],s:'classic'},
   {id:14,brand:'Tom Ford',name:'Rose Prick',g:'U',price:265,size:'100ml',badge:null,notes:'Turkish Rose \u00b7 Geranium \u00b7 Clove \u00b7 Oud',top:'Turkish Rose, Geranium',mid:'Damask Rose, Clove, Cinnamon',base:'Oud, Patchouli, Incense',tagline:'The rose stripped of its politeness',desc:'Turkish and Damask roses paired with oud reveals the thorns that make the rose so compelling.',conc:'Eau de Parfum',season:'All Seasons',sillage:'Strong',long:'10+ Hours',c:['#b84868','#983050','#781838'],s:'round'},
   {id:15,brand:'Tom Ford',name:'Tobacco Vanille',g:'U',price:275,size:'50ml',badge:'bestseller',notes:'Tobacco \u00b7 Vanilla \u00b7 Cocoa \u00b7 Toasted Spice',top:'Tobacco Leaf, Spices',mid:'Vanilla, Cacao, Tonka Bean',base:'Dried Fruit, Wood Sap',tagline:'A whiskey lounge on a winter\u2019s night',desc:'Tobacco Leaf softened by ambrosial vanilla and rich cocoa. Irresistible warmth.',conc:'Eau de Parfum',season:'Fall / Winter',sillage:'Very Strong',long:'12+ Hours',c:['#8a5828','#6a3e18','#4a2808'],s:'classic'},
   {id:16,brand:'Maison Margiela',name:'Replica - Beach Walk',g:'U',price:175,size:'100ml',badge:null,notes:'Bergamot \u00b7 Coconut \u00b7 Cedar \u00b7 Ambergris',top:'Bergamot, Lemon',mid:'Heliotrope, Coconut, Iris',base:'Cedar, Musk, Ambergris',tagline:'Salt air. Sun-warmed skin. Everything perfect.',desc:'Sunscreen-sweet heliotrope, breezy bergamot and driftwood cedar.',conc:'Eau de Toilette',season:'Spring / Summer',sillage:'Light',long:'5+ Hours',c:['#e8d8b8','#c8b888','#a89858'],s:'round'},
@@ -2701,7 +2648,7 @@ var P=[
   {id:18,brand:'Maison Margiela',name:'Replica - Flower Market',g:'F',price:175,size:'100ml',badge:null,notes:'Rose \u00b7 Iris \u00b7 Peony \u00b7 Musk',top:'Green Leaves, Rose, Peony',mid:'Iris, Muguet',base:'White Musk, Sandalwood',tagline:'Dawn at a Paris flower stall',desc:'Damp, luminous green of a Parisian flower market at dawn.',conc:'Eau de Toilette',season:'Spring',sillage:'Light',long:'5+ Hours',c:['#d8c8d8','#b8a0b8','#987898'],s:'round'},
   {id:19,brand:'Jo Malone',name:'Peony & Blush Suede',g:'F',price:155,size:'100ml',badge:null,notes:'Peony \u00b7 Apple \u00b7 Suede \u00b7 Jasmine',top:'Red Apple',mid:'Peony, Jasmine',base:'Suede',tagline:'The most luxurious thing to touch your skin',desc:'The delicate blush of a peony with the whisper-soft warmth of suede.',conc:'Cologne',season:'Spring / Summer',sillage:'Moderate',long:'6+ Hours',c:['#f0c0c8','#d89098','#b86070'],s:'classic'},
   {id:20,brand:'Jo Malone',name:'Wood Sage & Sea Salt',g:'U',price:155,size:'100ml',badge:null,notes:'Sea Salt \u00b7 Ambrette Seed \u00b7 Sage \u00b7 Driftwood',top:'Ambrette Seed, Sea Salt',mid:'Sage',base:'Driftwood, Mineral Musk',tagline:'Standing at the cliff\u2019s edge, alive',desc:'Sea salt and sage create an almost tangible Atlantic breeze.',conc:'Cologne',season:'Spring / Summer',sillage:'Light to Moderate',long:'5+ Hours',c:['#b8c8b8','#889888','#587058'],s:'rect'},
-  {id:21,brand:'Jo Malone',name:'Pomegranate Noir',g:'U',price:155,size:'100ml',badge:'new',arrivedAt:'2026-05-23',bgTint:'#f6e2e4',drop:'Llegado el 23 de mayo',line:'Una habitaci\u00f3n con cortinas pesadas y una fruta abierta sobre la mesa.',notes:'Pomegranate \u00b7 Pink Pepper \u00b7 Guaiac Wood \u00b7 Patchouli',top:'Pomegranate, Raspberry, Pink Pepper',mid:'Guaiac Wood, Patchouli',base:'Cassis, Red Berries',tagline:'Jewel-bright, mysterious, unapologetic',desc:'Crimson pomegranate and pink pepper sharpened by guaiac wood\u2019s smokiness.',conc:'Cologne',season:'Fall / Winter',sillage:'Moderate',long:'6+ Hours',c:['#c84838','#a02820','#780810'],s:'round'},
+  {id:21,brand:'Jo Malone',name:'Pomegranate Noir',g:'U',price:155,size:'100ml',badge:'new',notes:'Pomegranate \u00b7 Pink Pepper \u00b7 Guaiac Wood \u00b7 Patchouli',top:'Pomegranate, Raspberry, Pink Pepper',mid:'Guaiac Wood, Patchouli',base:'Cassis, Red Berries',tagline:'Jewel-bright, mysterious, unapologetic',desc:'Crimson pomegranate and pink pepper sharpened by guaiac wood\u2019s smokiness.',conc:'Cologne',season:'Fall / Winter',sillage:'Moderate',long:'6+ Hours',c:['#c84838','#a02820','#780810'],s:'round'},
   {id:22,brand:'Creed',name:'Aventus',g:'M',price:420,size:'100ml',badge:'bestseller',notes:'Blackcurrant \u00b7 Birch \u00b7 Musk \u00b7 Ambergris',top:'Pineapple, Blackcurrant, Bergamot',mid:'Birch, Patchouli, Rose',base:'Musk, Oak Moss, Ambergris, Vanilla',tagline:'Inspired by the strength of Napoleon',desc:'Creed\u2019s crown jewel. Its triumphant pineapple-and-birch opening is a fragrance benchmark.',conc:'Eau de Parfum',season:'All Seasons',sillage:'Very Strong',long:'12+ Hours',c:['#d8e8d0','#a8c098','#788860'],s:'rect'},
   {id:23,brand:'Creed',name:'Silver Mountain Water',g:'M',price:395,size:'100ml',badge:null,notes:'Bergamot \u00b7 Black Currant \u00b7 Green Tea \u00b7 Musk',top:'Mandarin, Bergamot',mid:'Black Currant, Green Tea, Neroli',base:'Musk, Sandalwood',tagline:'Alpine clarity, distilled into a breath',desc:'Bergamot and green tea create an almost synesthetic freshness.',conc:'Eau de Parfum',season:'Spring / Summer',sillage:'Moderate',long:'8+ Hours',c:['#c8d8e8','#98b0c8','#6888a8'],s:'round'},
   {id:24,brand:'Creed',name:'Love in White',g:'F',price:385,size:'100ml',badge:'limited',notes:'Iris \u00b7 Rice Paddy \u00b7 Vanilla \u00b7 Cedarwood',top:'Calabrian Bergamot, Mandarin',mid:'Iris, Rice Paddy, Florals',base:'Virginia Cedarwood, Vanilla, Musk',tagline:'A poem written in petals and silk',desc:'Inspired by white rice paddies, wedding garments, and first snow.',conc:'Eau de Parfum',season:'Spring / Summer',sillage:'Moderate',long:'8+ Hours',c:['#f8f0e0','#e8d8c0','#d0c0a0'],s:'classic'}
@@ -2712,7 +2659,7 @@ var P=[
 // ════════════════════════════════════════════
 function svg(c,s,sz){
   var id='b'+Math.random().toString(36).substr(2,5);
-  var sc=typeof sz==='number'?sz:({sm:0.42,md:0.72,lg:1.35}[sz]||0.72);
+  var sc={sm:0.42,md:0.72,lg:1.35}[sz]||0.72;
   var w=Math.round(100*sc),h=Math.round(180*sc);
   if(s==='rect')return'<svg class="bottle-svg" width="'+w+'" height="'+h+'" viewBox="0 0 100 180"><defs><linearGradient id="'+id+'" x1="0" y1="0" x2="1" y2="1"><stop offset="0%" stop-color="'+c[0]+'"/><stop offset="100%" stop-color="'+c[2]+'"/></linearGradient></defs><rect x="36" y="8" width="28" height="18" rx="2" fill="'+c[2]+'"/><rect x="42" y="24" width="16" height="18" fill="'+c[1]+'"/><rect x="22" y="42" width="56" height="116" rx="4" fill="url(#'+id+')"/><rect x="27" y="50" width="6" height="90" rx="3" fill="rgba(255,255,255,0.2)"/><rect x="28" y="90" width="44" height="40" rx="2" fill="rgba(255,255,255,0.12)"/></svg>';
   if(s==='round')return'<svg class="bottle-svg" width="'+w+'" height="'+h+'" viewBox="0 0 100 180"><defs><radialGradient id="'+id+'" cx="35%" cy="35%" r="65%"><stop offset="0%" stop-color="'+c[0]+'"/><stop offset="60%" stop-color="'+c[1]+'"/><stop offset="100%" stop-color="'+c[2]+'"/></radialGradient></defs><ellipse cx="50" cy="20" rx="14" ry="12" fill="'+c[2]+'"/><rect x="44" y="30" width="12" height="18" fill="'+c[1]+'"/><ellipse cx="50" cy="115" rx="34" ry="42" fill="url(#'+id+')"/><ellipse cx="38" cy="98" rx="8" ry="12" fill="rgba(255,255,255,0.2)"/></svg>';
@@ -2841,22 +2788,14 @@ function buildGrid(){
   var empty=document.getElementById('emptyState');
   if(!grid)return;
 
-  // New Arrivals Section - editorial diary scrolltelling
+  // ── New Arrivals Section — products added within last 30 days ──
   var existingNA = document.getElementById('newArrivalsSection');
   if(existingNA) existingNA.remove();
   var thirtyDaysAgo = Date.now() - 30*24*60*60*1000;
-  function parseArrivalDate(value){
-    if(!value) return null;
-    var d = value instanceof Date ? value : new Date(String(value));
-    return isNaN(d.getTime()) ? null : d;
-  }
   var newArrivals = (P||[]).filter(function(p){
-    var d = parseArrivalDate(p.arrivedAt);
-    return d && d.getTime() > thirtyDaysAgo;
-  }).sort(function(a,b){
-    return parseArrivalDate(a.arrivedAt).getTime() - parseArrivalDate(b.arrivedAt).getTime();
-  }).slice(0,4);
-
+    return p.arrivedAt && new Date(p.arrivedAt).getTime() > thirtyDaysAgo;
+  });
+  if(newArrivals.length){
   if(newArrivals.length){
     var naWrap = document.createElement('div');
     naWrap.id = 'newArrivalsSection';
@@ -3209,11 +3148,11 @@ function buildGrid(){
       window.addEventListener('resize', function(){ compute(); mobileFallbackActive(); });
     })();
   }
+  }
+
   // ── Main toast for newest product if user hasn't seen it ──
   (function(){
-    var newest = newArrivals.slice().sort(function(a,b){
-      return parseArrivalDate(b.arrivedAt).getTime() - parseArrivalDate(a.arrivedAt).getTime();
-    })[0];
+    var newest = newArrivals.sort(function(a,b){ return new Date(b.arrivedAt)-new Date(a.arrivedAt); })[0];
     if(!newest) return;
     var seenKey = 'sillage_seen_new_'+newest.id;
     try { if(localStorage.getItem(seenKey)) return; } catch(e){ return; }
@@ -3931,7 +3870,7 @@ function bundleUrl(b){
 
 function slugify(str){
   return String(str).toLowerCase()
-    .normalize('NFD').replace(/[\u0300-\u036f]/g,'')
+    .normalize('NFD').replace(/[̀-ͯ]/g,'')
     .replace(/[^a-z0-9\s-]/g,'').trim()
     .replace(/\s+/g,'-').replace(/-+/g,'-');
 }
@@ -7111,7 +7050,7 @@ function sommelierSendToAPI(primeText){
 
       // Step 2: always try name matching from **bold** text to fill remaining slots
       // Normalize accents for comparison
-      function norm(s){ return (s||'').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,''); }
+      function norm(s){ return (s||'').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g,''); }
       var boldNames = [];
       var boldRe = /\*\*([^*]+)\*\*/g;
       var bm;
