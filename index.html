@@ -313,6 +313,13 @@ nav a:hover{color:var(--gold)}
 .fav-brand{font-size:0.52rem;letter-spacing:0.18em;text-transform:uppercase;color:var(--gold);margin-bottom:0.25rem}
 .fav-name{font-family:Cormorant Garamond,serif;font-size:1.25rem;line-height:1.1;color:var(--cream);margin-bottom:0.45rem}
 .fav-notes{font-size:0.62rem;line-height:1.6;color:var(--muted);min-height:2rem}
+#favoritesSection{background:var(--warm-white);color:var(--charcoal);border-top:0;border-bottom:1px solid rgba(184,149,90,0.12)}
+#favoritesSection::before{background:rgba(184,149,90,0.10)}
+#favoritesSection .ed-title{color:var(--charcoal)}
+#favoritesSection .ed-copy,#favoritesSection .fav-notes{color:var(--muted)}
+#favoritesSection .fav-card{background:rgba(255,255,255,0.58);border-color:rgba(184,149,90,0.18);box-shadow:0 18px 42px rgba(58,45,31,0.05)}
+#favoritesSection .fav-card:hover{background:#fff;border-color:var(--gold)}
+#favoritesSection .fav-name{color:var(--charcoal)}
 .store-gateway{background:linear-gradient(145deg,#100d0a 0%,#1a1410 58%,#0e0c0a 100%);padding:6rem 4rem 7rem;text-align:center;position:relative;overflow:hidden}
 .store-gateway::before{content:'';position:absolute;inset:12% 15%;border:1px solid rgba(184,149,90,0.14);pointer-events:none}
 .store-gateway-inner{position:relative;z-index:1;max-width:760px;margin:0 auto}
@@ -324,6 +331,7 @@ nav a:hover{color:var(--gold)}
 body.store-route .home-page-only{display:none!important}
 body:not(.store-route) #shop{display:none!important}
 body.store-route #shop{display:block;padding-top:7rem}
+.store-page .new-arrivals-section{display:none!important}
 @media(max-width:768px){.editorial-row{padding:3.5rem 1rem}.ed-head{display:block}.ed-copy{margin-top:1rem}.fav-card{min-width:185px;width:185px}.fav-img{height:135px}.store-gateway{padding:4.5rem 1.2rem 6rem}.store-gateway::before{inset:8% 1rem}body.store-route #shop{padding-top:5rem}}
 
 .suggestions{background:var(--charcoal);padding:3.5rem 4rem}
@@ -1847,7 +1855,7 @@ footer{background:var(--dark);padding:3.5rem 4rem;text-align:center;border-top:1
   <nav>
     <a href="#home">Inicio</a>
     <a href="#" onclick="openCollections();return false;">Colecciones</a>
-    <a href="#store">Tienda</a>
+    <a href="/store.html">Tienda</a>
     <a href="/nosotros">Nosotros</a>
   </nav>
   <div class="header-right">
@@ -1919,7 +1927,7 @@ footer{background:var(--dark);padding:3.5rem 4rem;text-align:center;border-top:1
     <p class="ed-kicker">La tienda completa</p>
     <h2>Explora el <em>archivo</em></h2>
     <p>Filtros por casa, género y notas para encontrar exactamente lo que estás buscando.</p>
-    <a href="#store" class="store-link-btn">Ir a la tienda</a>
+    <a href="/store.html" class="store-link-btn">Ir a la tienda</a>
   </div>
 </section>
 
@@ -2860,11 +2868,12 @@ function renderEditorialFavorites(){
 }
 function applySillageRoute(){
   var hash = (location.hash || '').replace('#','');
-  var store = hash === 'store' || hash === 'shop';
+  var path = (location.pathname || '').toLowerCase();
+  var isStorePage = /(^|\/)store(\.html)?\/?$/.test(path);
+  var store = isStorePage || hash === 'store' || hash === 'shop';
   document.body.classList.toggle('store-route', store);
-  if(store){
-    var el = document.getElementById('shop');
-    if(el) setTimeout(function(){ el.scrollIntoView({block:'start'}); }, 0);
+  if(store && !isStorePage){
+    window.location.href = '/store.html';
   }
 }
 window.addEventListener('hashchange', applySillageRoute);
@@ -7545,7 +7554,7 @@ document.addEventListener('DOMContentLoaded', function(){
       </svg>
     </span>Colecciones
   </button>
-  <a href="#store" class="mob-nav-btn">
+  <a href="/store.html" class="mob-nav-btn">
     <span class="mob-nav-icon">
       <svg viewBox="0 0 24 24" fill="none" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
         <circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>

@@ -1,0 +1,265 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Sillage — Store</title>
+
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+
+  <style>
+    *{
+      margin:0;
+      padding:0;
+      box-sizing:border-box;
+    }
+
+    body{
+      font-family:'Inter',sans-serif;
+      background:#f6f3ee;
+      color:#111;
+    }
+
+    header{
+      position:sticky;
+      top:0;
+      z-index:100;
+      background:rgba(246,243,238,.82);
+      backdrop-filter:blur(12px);
+      border-bottom:1px solid rgba(0,0,0,.06);
+    }
+
+    .nav{
+      max-width:1400px;
+      margin:auto;
+      padding:1.2rem 2rem;
+      display:flex;
+      align-items:center;
+      justify-content:space-between;
+    }
+
+    .logo{
+      letter-spacing:.24rem;
+      font-size:.92rem;
+    }
+
+    .nav-links{
+      display:flex;
+      gap:2rem;
+      font-size:.85rem;
+      text-transform:uppercase;
+      letter-spacing:.08rem;
+    }
+
+    .nav-links a{
+      text-decoration:none;
+      color:#111;
+    }
+
+    .hero{
+      padding:8rem 2rem 5rem;
+      max-width:1400px;
+      margin:auto;
+    }
+
+    .hero p{
+      max-width:680px;
+      color:#666;
+      line-height:1.7;
+      margin-top:1.5rem;
+      font-size:1.05rem;
+    }
+
+    .eyebrow{
+      text-transform:uppercase;
+      letter-spacing:.16rem;
+      font-size:.72rem;
+      color:#777;
+      margin-bottom:1rem;
+    }
+
+    h1{
+      font-size:clamp(3rem,7vw,6rem);
+      line-height:.95;
+      font-weight:500;
+      letter-spacing:-0.18rem;
+      max-width:900px;
+    }
+
+    .store-grid{
+      max-width:1400px;
+      margin:auto;
+      padding:0 2rem 6rem;
+      display:grid;
+      grid-template-columns:repeat(auto-fit,minmax(260px,1fr));
+      gap:1.5rem;
+    }
+
+    .card{
+      background:white;
+      border-radius:24px;
+      overflow:hidden;
+      transition:.35s ease;
+      cursor:pointer;
+    }
+
+    .card:hover{
+      transform:translateY(-6px);
+    }
+
+    .card-image{
+      aspect-ratio:1/1.15;
+      background:#ece7df;
+      display:flex;
+      align-items:center;
+      justify-content:center;
+      font-size:.85rem;
+      color:#666;
+    }
+
+    .card-content{
+      padding:1.25rem;
+    }
+
+    .card h3{
+      font-size:1rem;
+      margin-bottom:.45rem;
+      font-weight:500;
+    }
+
+    .card p{
+      color:#777;
+      font-size:.9rem;
+      margin-bottom:1rem;
+    }
+
+    .price-row{
+      display:flex;
+      justify-content:space-between;
+      align-items:center;
+    }
+
+    .price{
+      font-size:.95rem;
+    }
+
+    button{
+      border:none;
+      background:#111;
+      color:white;
+      padding:.7rem 1rem;
+      border-radius:999px;
+      cursor:pointer;
+      font-size:.82rem;
+    }
+
+    @media(max-width:768px){
+      .nav{
+        padding:1rem 1.2rem;
+      }
+
+      .hero{
+        padding:6rem 1.2rem 4rem;
+      }
+
+      .store-grid{
+        padding:0 1.2rem 5rem;
+      }
+
+      .nav-links{
+        gap:1rem;
+        font-size:.72rem;
+      }
+    }
+  </style>
+</head>
+<body>
+
+<header>
+  <div class="nav">
+    <div class="logo">SILLAGE</div>
+
+    <div class="nav-links">
+      <a href="/">Home</a>
+      <a href="#">New Arrivals</a>
+      <a href="#">Collections</a>
+    </div>
+  </div>
+</header>
+
+<section class="hero">
+  <div class="eyebrow">Store</div>
+
+  <h1>
+    Rare fragrances curated with intention.
+  </h1>
+
+  <p>
+    Discover niche fragrances, timeless compositions, and modern signatures selected for people who notice details.
+  </p>
+</section>
+
+<section class="store-grid">
+
+  <div class="card">
+    <div class="card-image">Fragrance Visual</div>
+
+    <div class="card-content">
+      <h3>Bleu de Chanel</h3>
+      <p>Fresh woody aromatic</p>
+
+      <div class="price-row">
+        <div class="price">$84</div>
+        <button>Add to Cart</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-image">Fragrance Visual</div>
+
+    <div class="card-content">
+      <h3>Layton</h3>
+      <p>Warm spicy vanilla</p>
+
+      <div class="price-row">
+        <div class="price">$129</div>
+        <button>Add to Cart</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-image">Fragrance Visual</div>
+
+    <div class="card-content">
+      <h3>Imagination</h3>
+      <p>Citrus tea amber</p>
+
+      <div class="price-row">
+        <div class="price">$164</div>
+        <button>Add to Cart</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-image">Fragrance Visual</div>
+
+    <div class="card-content">
+      <h3>Angels’ Share</h3>
+      <p>Boozy cinnamon gourmand</p>
+
+      <div class="price-row">
+        <div class="price">$142</div>
+        <button>Add to Cart</button>
+      </div>
+    </div>
+  </div>
+
+</section>
+
+</body>
+</html>
