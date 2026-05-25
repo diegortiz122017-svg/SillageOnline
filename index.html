@@ -1017,9 +1017,18 @@ footer{background:var(--dark);padding:3.5rem 4rem;text-align:center;border-top:1
 .new-arrivals-section{position:relative;border-top:1px solid rgba(184,149,90,0.12);background:var(--warm-white)}
 /* Sticky container — height set dynamically by JS */
 .na-sticky-wrap{position:relative}
-.na-sticky{position:sticky;top:0;height:100vh;overflow:hidden;background:var(--warm-white);isolation:isolate;z-index:1}
+.na-sticky{
+  position:sticky;
+  top:60px;               /* sit below the fixed nav, not under it */
+  height:calc(100vh - 60px);
+  overflow:hidden;
+  background:var(--warm-white);
+}
 @media(max-width:768px){
-  .na-sticky{top:50px;height:calc(100vh - 50px)}
+  .na-sticky{
+    top:50px;
+    height:calc(100vh - 50px);
+  }
 }
 /* Header state */
 .na-header-state{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:0.6rem;will-change:opacity,transform}
@@ -2926,12 +2935,12 @@ function buildGrid(){
         var dots = naSticky.querySelector('.na-dots');
         if(dots) dots.style.display = 'none';
         setTimeout(function(){
-          // Release sticky — content stays in flow at natural height
+          // Measure grid height BEFORE releasing sticky
+          var gridH = naSticky.scrollHeight;
           naSticky.style.position = 'relative';
-          naSticky.style.height = 'auto';
+          naSticky.style.height = gridH + 'px';
           naSticky.style.overflow = 'visible';
-          // Collapse the scroll room — set wrap to sticky's rendered height
-          naWrap.style.height = naSticky.offsetHeight + 'px';
+          naWrap.style.height = gridH + 'px';
         }, 80);
       }
 
