@@ -1090,90 +1090,105 @@ footer{background:var(--dark);padding:3.5rem 4rem;text-align:center;border-top:1
   header,.hero,#shop,footer,.new-arrivals-section{width:100%;max-width:100%;box-sizing:border-box}
 
   /* ── Scrolltelling layout ──────────────────────────────
-     na-sticky-wrap is the scroll container (height:auto, flows naturally).
-     na-sticky holds background + bottle zone — sticks to top while cards scroll.
-     na-mobile-carousel stacks below, each card ~70svh.
+     Structure:
+       na-sticky-wrap (flow container)
+         ├── na-sticky (position:sticky, bottle lives here)
+         ├── na-mobile-carousel (scrolls under sticky)
+         └── na-rail-bot (sticky at bottom of screen)
   ─────────────────────────────────────────────────────── */
   .na-sticky-wrap{height:auto;position:relative}
+
+  /* Sticky bottle panel — stays visible while carousel scrolls under it */
   .na-sticky{
-    position:sticky;top:0;
-    height:52svh;min-height:280px;
+    position:sticky;top:50px;
+    height:46svh;min-height:260px;
     overflow:hidden;
     background:var(--warm-white);
     transition:background 0.75s ease;
-    z-index:1;
+    z-index:2;
+    pointer-events:none;
   }
 
-  /* Stage hidden — we use the bottle zone directly */
   .na-stage{display:none}
   .na-toc{display:none}
   .na-text-zone{display:none}
-  .na-corner-stamp{top:0.9rem;left:1.2rem;font-size:0.44rem}
+  .na-corner-stamp{top:0.8rem;left:1.2rem;font-size:0.44rem;z-index:3}
 
-  /* Orbs — atmospheric, stay with sticky */
-  .na-bg-orb{width:500px;height:500px;filter:blur(80px);opacity:0.12}
+  .na-bg-orb{width:480px;height:480px;filter:blur(80px);opacity:0.12}
 
-  /* Bottle zone fills the sticky panel */
   .na-bottle-zone{
     position:absolute;inset:0;
     display:flex;align-items:center;justify-content:center;
   }
-  .na-bottle-mark{font-size:10rem;opacity:0.04}
-  .na-bottle-svg{--na-bottle-scale:0.68}
-  .na-bottle-slot{pointer-events:none;transition:opacity 0.5s ease,transform 0.5s ease}
-  .na-bottle-slot svg{filter:drop-shadow(0 24px 48px rgba(0,0,0,0.18)) drop-shadow(0 4px 12px rgba(0,0,0,0.08))}
-
-  /* Product number stamp bottom-right of sticky */
   .na-bottle-mark{
-    position:absolute;bottom:-0.6rem;right:1rem;
+    position:absolute;bottom:0.4rem;right:1.2rem;
     font-family:'Cormorant Garamond',serif;font-style:italic;
-    font-size:6rem;font-weight:300;line-height:1;
+    font-size:5rem;font-weight:300;line-height:1;
     letter-spacing:-0.03em;color:var(--charcoal);
-    opacity:0.05;pointer-events:none;
-    /* override the centered version for mobile */
+    opacity:0.06;pointer-events:none;
     top:auto;left:auto;transform:none;
   }
+  .na-bottle-svg{--na-bottle-scale:0.65}
+  .na-bottle-slot{
+    pointer-events:none;
+    transition:opacity 0.45s ease,transform 0.45s ease;
+  }
+  .na-bottle-slot svg{
+    filter:drop-shadow(0 20px 40px rgba(0,0,0,0.16)) drop-shadow(0 4px 10px rgba(0,0,0,0.08));
+  }
 
-  /* Rail — sticky just above fold */
+  /* Progress rail — sticky at bottom of screen */
   .na-rail-bot{
     display:flex;
     position:sticky;bottom:0;
-    margin:0;
     width:100%;
-    padding:0.5rem 1.2rem;
-    background:rgba(250,248,244,0.88);
-    backdrop-filter:blur(12px);
-    border-top:1px solid var(--border-light);
-    border-bottom:none;
+    padding:0.5rem 1.4rem;
+    background:rgba(250,248,244,0.92);
+    backdrop-filter:blur(14px);
+    border-top:1px solid rgba(184,149,90,0.12);
     box-sizing:border-box;
-    z-index:4;
+    z-index:10;
     justify-content:space-between;
+    align-items:center;
   }
   .na-rail-track{flex:1;margin:0 0.8rem;height:44px}
 
-  /* Mobile carousel — scrolls over the sticky bottle */
+  /* Mobile carousel — sibling of na-sticky, scrolls naturally */
   .na-mobile-carousel{
     display:flex;flex-direction:column;
-    width:100%;position:relative;z-index:2;
+    width:100%;
+    position:relative;
+    z-index:1;
+    /* Negative top margin pulls carousel up so it starts behind sticky */
+    margin-top:-2svh;
   }
 
-  /* Each card: text-only, ~70svh, with generous bottom padding */
+  /* Each card — full-height, text anchors to bottom half */
   .na-mobile-card{
     width:100%;
-    min-height:70svh;
-    padding:2rem 1.4rem 3rem;
+    min-height:80svh;
+    padding:2rem 1.4rem 4.5rem;
     display:flex;flex-direction:column;justify-content:flex-end;
     box-sizing:border-box;
     border-bottom:1px solid var(--border-light);
     background:transparent;
     position:relative;
   }
-  /* Gradient fade from transparent to section bg — blends card over bottle */
+  /* Gradient: card fades in from transparent top to solid bottom
+     Creates the illusion of text emerging from beneath the bottle */
   .na-mobile-card::before{
     content:'';
     position:absolute;inset:0;
-    background:linear-gradient(to bottom,transparent 0%,rgba(250,248,244,0.55) 28%,rgba(250,248,244,0.92) 60%,var(--warm-white) 100%);
+    background:linear-gradient(
+      to bottom,
+      transparent 0%,
+      transparent 20%,
+      rgba(250,248,244,0.6) 42%,
+      rgba(250,248,244,0.95) 62%,
+      var(--warm-white) 78%
+    );
     pointer-events:none;z-index:0;
+    transition:background 0.75s ease;
   }
   .na-mobile-card .na-text-slot{
     position:relative;z-index:1;
@@ -1186,20 +1201,20 @@ footer{background:var(--dark);padding:3.5rem 4rem;text-align:center;border-top:1
   .na-mobile-card .na-stamp{margin-bottom:0.5rem;font-size:0.44rem;letter-spacing:0.2em}
   .na-mobile-card .na-brand{font-size:0.48rem;letter-spacing:0.26em;margin-bottom:0.3rem}
   .na-mobile-card .na-name{font-size:clamp(1.8rem,9vw,2.3rem);line-height:0.95;margin-bottom:0.6rem;overflow-wrap:anywhere}
-  .na-mobile-card .na-line{font-size:0.9rem;line-height:1.4;margin-bottom:0.9rem;max-width:100%}
+  .na-mobile-card .na-line{font-size:0.88rem;line-height:1.4;margin-bottom:0.9rem;max-width:100%}
   .na-mobile-card .na-pyramid{gap:0.6rem;margin-bottom:0.9rem}
   .na-mobile-card .na-py-head{margin-bottom:0.28rem}
-  .na-mobile-card .na-py-text{font-size:0.85rem;line-height:1.32}
+  .na-mobile-card .na-py-text{font-size:0.83rem;line-height:1.32}
   .na-mobile-card .na-py-row[data-phase="0"] .na-py-text,
   .na-mobile-card .na-py-row[data-phase="1"] .na-py-text,
   .na-mobile-card .na-py-row[data-phase="2"] .na-py-text{max-width:100%}
   .na-mobile-card .na-foot{gap:0.6rem;align-items:flex-start;flex-wrap:wrap;padding-top:0.8rem}
-  .na-mobile-card .na-price{font-size:1.35rem}
+  .na-mobile-card .na-price{font-size:1.3rem}
   .na-mobile-card .na-price-cap{font-size:0.44rem;letter-spacing:0.18em}
   .na-mobile-card .na-meta{font-size:0.46rem;letter-spacing:0.12em}
-  .na-mobile-card .na-cta{margin-left:0;width:100%;padding:0.7rem 1rem}
+  .na-mobile-card .na-cta{margin-left:0;width:100%;padding:0.7rem 1rem;pointer-events:all}
 
-  /* IO-driven reveals — elements start hidden, .na-el-in fires them in */
+  /* IO-driven reveals via .na-el-in (same system as desktop) */
   .na-mobile-card .na-stamp,
   .na-mobile-card .na-brand,
   .na-mobile-card .na-name,
@@ -1219,7 +1234,6 @@ footer{background:var(--dark);padding:3.5rem 4rem;text-align:center;border-top:1
   .na-mobile-card .na-py-row[data-phase="2"]{transition-delay:0.44s}
   .na-mobile-card .na-foot{transform:translateY(8px);transition-delay:0.54s}
 
-  /* Revealed state — via .na-el-in on each element (same as desktop) */
   .na-mobile-card .na-stamp.na-el-in,
   .na-mobile-card .na-brand.na-el-in,
   .na-mobile-card .na-name.na-el-in,
@@ -3073,15 +3087,25 @@ function buildGrid(){
         '</aside>'+
         '<div class="na-bottle-zone" id="naBottleZone"><div class="na-bottle-mark" id="naBottleMark">01</div></div>'+
         '<div class="na-text-zone" id="naTextZone"></div>'+
-      '</div>'+
-      '<div class="na-mobile-carousel" id="naMobileCarousel"></div>'+
-      '<div class="na-rail-bot"><span>01</span><div class="na-rail-track">'+
-        '<div class="na-rail-line"></div><div class="na-rail-fill" id="naRailFill"></div>'+
-        diary.map(function(_,i){ return '<div class="na-rail-tick" style="left:'+(diary.length===1?0:(i/(diary.length-1))*100)+'%"></div>'; }).join('')+
-      '</div><span>'+lastNum+'</span></div>';
+      '</div>';
+
+    // Mobile carousel and rail are siblings of naSticky inside naWrap —
+    // this is what allows the carousel to scroll PAST the sticky bottle panel.
+    var naMobileCarouselEl = document.createElement('div');
+    naMobileCarouselEl.className = 'na-mobile-carousel';
+    naMobileCarouselEl.id = 'naMobileCarousel';
+
+    var naRailEl = document.createElement('div');
+    naRailEl.className = 'na-rail-bot';
+    naRailEl.innerHTML = '<span>01</span><div class="na-rail-track">'+
+      '<div class="na-rail-line"></div><div class="na-rail-fill" id="naRailFill"></div>'+
+      diary.map(function(_,i){ return '<div class="na-rail-tick" style="left:'+(diary.length===1?0:(i/(diary.length-1))*100)+'%"></div>'; }).join('')+
+    '</div><span>'+lastNum+'</span>';
 
     naSticky.appendChild(naPanel);
     naWrap.appendChild(naSticky);
+    naWrap.appendChild(naMobileCarouselEl);
+    naWrap.appendChild(naRailEl);
 
     // Insert NA before anchor (homepage) or before #shop (tienda), whichever exists
     var naAnchor = document.getElementById('na-anchor') || document.getElementById('shop');
@@ -3326,7 +3350,7 @@ function buildGrid(){
               applyMobileActive(+entry.target.dataset.idx || 0);
             });
           }, { threshold:0, rootMargin:'-48% 0px -48% 0px' });
-          // IO for text reveals — fires when card's bottom half enters viewport
+          // IO for text reveals — fires when card enters the lower viewport
           var mobileRevealObserver = new IntersectionObserver(function(entries){
             entries.forEach(function(entry){
               if(!entry.isIntersecting) return;
@@ -3334,7 +3358,7 @@ function buildGrid(){
               var slot = card.querySelector('.na-text-slot');
               if(slot) revealSlot(slot);
             });
-          }, { threshold:0, rootMargin:'0px 0px -20% 0px' });
+          }, { threshold:0, rootMargin:'0px 0px -10% 0px' });
           mobileCards.forEach(function(card){
             activeObserver.observe(card);
             mobileRevealObserver.observe(card);
