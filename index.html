@@ -1138,21 +1138,21 @@ footer{background:var(--dark);padding:3.5rem 4rem;text-align:center;border-top:1
   header,.hero,#shop,footer,.new-arrivals-section{width:100%;max-width:100%;box-sizing:border-box}
   .na-sticky-wrap{height:auto}
   .na-sticky{position:relative;height:auto;min-height:0;overflow:visible;background:var(--warm-white)}
-  .na-stage{position:sticky;top:0;height:44svh;min-height:270px;display:block;padding:3.4rem 1.2rem 1.8rem;width:100%;max-width:100vw;box-sizing:border-box;z-index:4;overflow:hidden}
+  .na-stage{position:sticky;top:0;height:100svh;min-height:560px;display:block;padding:3.4rem 1.2rem 1.8rem;width:100%;max-width:100vw;box-sizing:border-box;z-index:2;overflow:hidden}
   .na-toc{display:none}
   .na-corner-stamp{top:1rem;left:1.2rem}
   .na-bg-orb{width:620px;height:620px;filter:blur(90px);opacity:0.12}
-  .na-bottle-zone{position:absolute;inset:0;display:flex;align-items:center;justify-content:center}
+  .na-bottle-zone{position:absolute;inset:0 0 44svh;display:flex;align-items:center;justify-content:center}
   .na-text-zone{display:none}
-  .na-bottle-mark{font-size:12rem}
-  .na-bottle-svg{--na-bottle-scale:0.68}
+  .na-bottle-mark{font-size:13rem;opacity:0.035}
+  .na-bottle-svg{--na-bottle-scale:0.72}
   .na-bottle-slot{pointer-events:auto}
   .na-bottle-slot svg{filter:drop-shadow(0 28px 55px rgba(0,0,0,0.18)) drop-shadow(0 4px 12px rgba(0,0,0,0.08))}
-  .na-mobile-carousel{display:flex;flex-direction:column;overflow:visible;width:100%;max-width:100%;position:relative;z-index:3}
-  .na-mobile-card{width:100%;min-height:62svh;padding:2.3rem 1.25rem 2.8rem;display:flex;flex-direction:column;justify-content:center;box-sizing:border-box;border-bottom:1px solid var(--border-light);transition:background 0.5s ease}
-  .na-mobile-card.is-active{background:rgba(255,255,255,0.18)}
+  .na-mobile-carousel{display:flex;flex-direction:column;overflow:visible;width:100%;max-width:100%;position:relative;z-index:3;margin-top:-100svh}
+  .na-mobile-card{width:100%;min-height:100svh;padding:50svh 1.25rem 4.25rem;display:flex;flex-direction:column;justify-content:flex-end;box-sizing:border-box;border-bottom:1px solid var(--border-light);background:transparent}
+  .na-mobile-card.is-active .na-text-slot{transform:translateY(0)}
   .na-mobile-bottle{display:none}
-  .na-mobile-card .na-text-slot{position:relative;inset:auto;display:flex;justify-content:flex-start;opacity:1;transform:none;will-change:auto}
+  .na-mobile-card .na-text-slot{position:relative;inset:auto;display:flex;justify-content:flex-start;opacity:1;transform:translateY(12px);will-change:transform;transition:transform 0.55s ease}
   .na-mobile-card .na-stamp{margin-bottom:0.65rem;font-size:0.46rem;letter-spacing:0.2em}
   .na-mobile-card .na-brand{font-size:0.5rem;letter-spacing:0.26em;margin-bottom:0.35rem}
   .na-mobile-card .na-name{font-size:clamp(1.9rem,10vw,2.45rem);line-height:0.96;margin-bottom:0.75rem;overflow-wrap:anywhere}
@@ -1166,8 +1166,19 @@ footer{background:var(--dark);padding:3.5rem 4rem;text-align:center;border-top:1
   .na-mobile-card .na-price-cap{font-size:0.45rem;letter-spacing:0.18em}
   .na-mobile-card .na-meta{font-size:0.48rem;letter-spacing:0.12em}
   .na-mobile-card .na-cta{margin-left:0;width:100%;padding:0.72rem 1rem}
-  .na-mobile-card .na-stamp,.na-mobile-card .na-brand,.na-mobile-card .na-name,.na-mobile-card .na-line,.na-mobile-card .na-py-row,.na-mobile-card .na-foot{opacity:1;transform:none}
-  .na-rail-bot{display:none}
+  .na-mobile-card .na-stamp,.na-mobile-card .na-brand,.na-mobile-card .na-name,.na-mobile-card .na-line,.na-mobile-card .na-py-row,.na-mobile-card .na-foot{opacity:0;transition:opacity 0.55s ease,transform 0.55s ease}
+  .na-mobile-card .na-stamp{transform:translateY(8px);transition-delay:0.02s}
+  .na-mobile-card .na-brand{transform:translateY(6px);transition-delay:0.08s}
+  .na-mobile-card .na-name{transform:translateY(14px);transition-delay:0.14s}
+  .na-mobile-card .na-line{transform:translateY(10px);transition-delay:0.22s}
+  .na-mobile-card .na-py-row{transform:translateX(-16px)}
+  .na-mobile-card .na-py-row[data-phase="0"]{transition-delay:0.32s}
+  .na-mobile-card .na-py-row[data-phase="1"]{transition-delay:0.40s}
+  .na-mobile-card .na-py-row[data-phase="2"]{transition-delay:0.48s}
+  .na-mobile-card .na-foot{transform:translateY(10px);transition-delay:0.58s}
+  .na-mobile-card.is-visible .na-stamp,.na-mobile-card.is-visible .na-brand,.na-mobile-card.is-visible .na-name,.na-mobile-card.is-visible .na-line,.na-mobile-card.is-visible .na-py-row,.na-mobile-card.is-visible .na-foot{opacity:1;transform:none}
+  .na-rail-bot{display:flex;position:sticky;bottom:0.8rem;margin:-3.6rem auto 1.1rem;width:max-content;padding:0.45rem 0.75rem;background:rgba(250,248,244,0.72);backdrop-filter:blur(12px);border:1px solid var(--border-light)}
+  .na-rail-track{width:150px}
 }
 @media(min-width:769px){
   .na-mobile-carousel{display:none}
@@ -2998,7 +3009,6 @@ function buildGrid(){
       var mc = document.createElement('article');
       mc.className = 'na-mobile-card';
       mc.dataset.idx = i;
-      mc.style.background = p.bgTint;
       mc.innerHTML = '<div class="na-mobile-bottle">'+svg(p.c, p.s, 'lg')+'</div><div class="na-text-slot">'+textHtml(p)+'</div>';
       mobileCarousel.appendChild(mc);
     });
@@ -3124,6 +3134,19 @@ function buildGrid(){
         });
         mobileCards.forEach(function(card,i){ card.classList.toggle('is-active', i === idx); });
       }
+      function mobileFallbackActive(){
+        if(window.innerWidth > 768 || !mobileCards.length) return;
+        var center = window.innerHeight * 0.58;
+        var bestIdx = 0;
+        var bestDist = Infinity;
+        mobileCards.forEach(function(card,i){
+          var rect = card.getBoundingClientRect();
+          var cardCenter = rect.top + rect.height * 0.58;
+          var dist = Math.abs(cardCenter - center);
+          if(dist < bestDist){ bestDist = dist; bestIdx = i; }
+        });
+        applyMobileActive(bestIdx);
+      }
       tocItems.forEach(function(t,i){
         t.addEventListener('click', function(){
           var total = wrap.offsetHeight - window.innerHeight;
@@ -3134,22 +3157,34 @@ function buildGrid(){
       });
       if(mobileCarousel){
         if('IntersectionObserver' in window){
-          var mobileObserver = new IntersectionObserver(function(entries){
-            var best = null;
+          var activeObserver = new IntersectionObserver(function(entries){
             entries.forEach(function(entry){
               if(!entry.isIntersecting) return;
-              if(!best || entry.intersectionRatio > best.intersectionRatio) best = entry;
+              applyMobileActive(+entry.target.dataset.idx || 0);
             });
-            if(best) applyMobileActive(+best.target.dataset.idx || 0);
-          }, { threshold:[0.25,0.45,0.65], rootMargin:'-38% 0px -32% 0px' });
-          mobileCards.forEach(function(card){ mobileObserver.observe(card); });
+          }, { threshold:0, rootMargin:'-48% 0px -48% 0px' });
+          var revealObserver = new IntersectionObserver(function(entries){
+            entries.forEach(function(entry){
+              entry.target.classList.toggle('is-visible', entry.isIntersecting);
+            });
+          }, { threshold:[0.16,0.34], rootMargin:'-18% 0px -18% 0px' });
+          mobileCards.forEach(function(card){
+            activeObserver.observe(card);
+            revealObserver.observe(card);
+          });
+        } else {
+          window.addEventListener('scroll', function(){
+            if(raf) return;
+            raf = requestAnimationFrame(function(){ raf = 0; mobileFallbackActive(); });
+          }, {passive:true});
         }
       }
       apply(0);
       applyMobileActive(0);
+      if(mobileCards[0]) mobileCards[0].classList.add('is-visible');
       compute();
       window.addEventListener('scroll', onScroll, {passive:true});
-      window.addEventListener('resize', compute);
+      window.addEventListener('resize', function(){ compute(); mobileFallbackActive(); });
     })();
   }
   // ── Main toast for newest product if user hasn't seen it ──
