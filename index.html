@@ -1784,6 +1784,73 @@ footer{background:var(--dark);padding:3.5rem 4rem;text-align:center;border-top:1
   .hero-som-sub{font-size:0.65rem}
   .hero-spacer{max-height:0.8rem}
 }
+
+/* ── FAVORITES SECTION ──────────────────────────────── */
+.favorites-section{background:var(--warm-white);color:var(--charcoal);padding:5rem 4rem;overflow:hidden;position:relative;border-top:1px solid rgba(184,149,90,0.12)}
+.favorites-section::before{content:'';position:absolute;inset:0;background:radial-gradient(ellipse 70% 50% at 50% 100%,rgba(184,149,90,0.05) 0%,transparent 60%);pointer-events:none}
+.fav-header{text-align:center;margin-bottom:3rem;position:relative;z-index:1}
+.fav-eyebrow{display:block;font-size:0.62rem;letter-spacing:0.35em;text-transform:uppercase;color:var(--gold);margin-bottom:0.8rem;opacity:0;transform:translateY(16px);transition:opacity 0.6s ease,transform 0.6s ease}
+.fav-title{font-family:'Cormorant Garamond',serif;font-size:clamp(2.2rem,4.5vw,3.5rem);font-weight:300;color:var(--charcoal);line-height:1.1;opacity:0;transform:translateY(16px);transition:opacity 0.7s ease 0.1s,transform 0.7s ease 0.1s}
+.fav-title em{font-style:italic;color:var(--gold)}
+.fav-sub{font-size:0.75rem;color:var(--muted);margin-top:0.8rem;letter-spacing:0.05em;opacity:0;transform:translateY(12px);transition:opacity 0.6s ease 0.2s,transform 0.6s ease 0.2s}
+.favorites-section.fav-inview .fav-eyebrow,
+.favorites-section.fav-inview .fav-title,
+.favorites-section.fav-inview .fav-sub{opacity:1;transform:none}
+.fav-track-wrap{position:relative}
+.fav-track{display:flex;gap:1.5rem;overflow-x:auto;scroll-snap-type:x mandatory;-webkit-overflow-scrolling:touch;scrollbar-width:none;padding:0.5rem 0 1.5rem;cursor:grab;user-select:none}
+.fav-track::-webkit-scrollbar{display:none}
+.fav-track.is-grabbing{cursor:grabbing}
+.fav-card{flex:0 0 260px;scroll-snap-align:start;background:white;border:1px solid rgba(184,149,90,0.12);padding:1.5rem;cursor:pointer;transition:border-color 0.3s,transform 0.3s,box-shadow 0.3s;position:relative;overflow:hidden;opacity:0;transform:translateY(20px)}
+.fav-card.card-visible{opacity:1;transform:none;transition:opacity 0.5s ease,transform 0.5s ease,border-color 0.3s,box-shadow 0.3s}
+.fav-card:hover{border-color:rgba(184,149,90,0.4);box-shadow:0 12px 40px rgba(0,0,0,0.08);transform:translateY(-4px)}
+.fav-card-bottle{height:160px;display:flex;align-items:center;justify-content:center;margin-bottom:1.2rem}
+.fav-card-brand{font-size:0.52rem;letter-spacing:0.3em;text-transform:uppercase;color:var(--gold);margin-bottom:0.3rem}
+.fav-card-name{font-family:'Cormorant Garamond',serif;font-size:1.3rem;font-weight:300;color:var(--charcoal);line-height:1.2;margin-bottom:0.4rem}
+.fav-card-tagline{font-size:0.65rem;color:var(--muted);line-height:1.6;margin-bottom:1rem}
+.fav-card-price{font-family:'Cormorant Garamond',serif;font-size:1.1rem;color:var(--gold)}
+.fav-card-badge{position:absolute;top:1rem;right:1rem;background:var(--gold);color:white;font-size:0.45rem;letter-spacing:0.15em;text-transform:uppercase;padding:0.2rem 0.55rem}
+.fav-arrow{position:absolute;top:50%;transform:translateY(-50%);background:white;border:1px solid rgba(184,149,90,0.3);color:var(--muted);width:40px;height:40px;display:flex;align-items:center;justify-content:center;cursor:pointer;z-index:10;transition:all 0.25s;border-radius:0;box-shadow:0 2px 12px rgba(0,0,0,0.08)}
+.fav-arrow:hover{border-color:var(--gold);color:var(--gold)}
+.fav-arrow-l{left:-1px}
+.fav-arrow-r{right:-1px}
+@media(max-width:768px){
+  .favorites-section{padding:4rem 0;overflow:hidden}
+  .fav-header{padding:0 1.5rem}
+  .fav-track{padding-left:1.5rem;padding-right:1.5rem;gap:1rem}
+  .fav-card{flex:0 0 200px}
+  .fav-arrow{display:none}
+}
+
+/* ── STORE CTA SECTION ──────────────────────────────── */
+.store-cta-section{background:var(--warm-white);color:var(--charcoal);padding:6rem 4rem;border-top:1px solid rgba(184,149,90,0.12);position:relative;overflow:hidden}
+.store-cta-section::after{content:'';position:absolute;right:-10%;top:50%;transform:translateY(-50%);width:55%;height:130%;background:radial-gradient(ellipse at center,rgba(184,149,90,0.07) 0%,transparent 65%);pointer-events:none}
+.store-cta-inner{max-width:1200px;margin:0 auto;display:grid;grid-template-columns:1fr 1fr;gap:4rem;align-items:center}
+.store-cta-eyebrow{display:block;font-size:0.6rem;letter-spacing:0.35em;text-transform:uppercase;color:var(--gold);margin-bottom:1rem;opacity:0;transform:translateX(-20px);transition:opacity 0.6s ease,transform 0.6s ease}
+.store-cta-title{font-family:'Cormorant Garamond',serif;font-size:clamp(2.5rem,4.5vw,4rem);font-weight:300;color:var(--charcoal);line-height:1.1;margin-bottom:1.2rem;opacity:0;transform:translateX(-20px);transition:opacity 0.7s ease 0.1s,transform 0.7s ease 0.1s}
+.store-cta-title em{font-style:italic;color:var(--gold)}
+.store-cta-body{font-size:0.82rem;color:var(--muted);line-height:1.9;margin-bottom:2rem;max-width:400px;opacity:0;transform:translateX(-20px);transition:opacity 0.6s ease 0.2s,transform 0.6s ease 0.2s}
+.store-cta-btn{display:inline-flex;align-items:center;gap:0.6rem;padding:1rem 2.5rem;border:1px solid var(--gold);color:var(--gold);text-decoration:none;font-size:0.7rem;letter-spacing:0.2em;text-transform:uppercase;position:relative;overflow:hidden;transition:color 0.4s;opacity:0;transform:translateX(-20px);transition:opacity 0.6s ease 0.3s,transform 0.6s ease 0.3s,color 0.4s}
+.store-cta-btn::before{content:'';position:absolute;inset:0;background:var(--gold);transform:translateX(-101%);transition:transform 0.4s}
+.store-cta-btn:hover::before{transform:translateX(0)}
+.store-cta-btn:hover{color:var(--dark)}
+.store-cta-btn>*{position:relative;z-index:1}
+.store-cta-bottles{display:flex;align-items:flex-end;justify-content:center;gap:2rem;opacity:0;transform:translateX(20px);transition:opacity 0.8s ease 0.2s,transform 0.8s ease 0.2s}
+.store-cta-bottles .cta-bottle{display:flex;flex-direction:column;align-items:center;gap:0.5rem;transition:transform 0.4s ease}
+.store-cta-bottles .cta-bottle:hover{transform:translateY(-8px)}
+.store-cta-bottles .cta-bottle-label{font-size:0.5rem;letter-spacing:0.2em;text-transform:uppercase;color:var(--muted)}
+.store-cta-section.cta-inview .store-cta-eyebrow,
+.store-cta-section.cta-inview .store-cta-title,
+.store-cta-section.cta-inview .store-cta-body,
+.store-cta-section.cta-inview .store-cta-btn,
+.store-cta-section.cta-inview .store-cta-bottles{opacity:1;transform:none}
+@media(max-width:900px){
+  .store-cta-inner{grid-template-columns:1fr}
+  .store-cta-bottles{display:none}
+}
+@media(max-width:768px){
+  .store-cta-section{padding:4rem 1.5rem}
+  .store-cta-title{font-size:clamp(2rem,8vw,3rem)}
+}
 </style>
 <script type="application/ld+json">
 {
@@ -1816,7 +1883,7 @@ footer{background:var(--dark);padding:3.5rem 4rem;text-align:center;border-top:1
   <nav>
     <a href="#home">Inicio</a>
     <a href="#" onclick="openCollections();return false;">Colecciones</a>
-    <a href="#shop">Tienda</a>
+    <a href="/tienda">Tienda</a>
     <a href="/nosotros">Nosotros</a>
   </nav>
   <div class="header-right">
@@ -1844,7 +1911,7 @@ footer{background:var(--dark);padding:3.5rem 4rem;text-align:center;border-top:1
     <p class="hero-eyebrow">Sillage &middot; Est. 2026</p>
     <h1 class="hero-title">Tu Destino en<br><em>Alta Perfumería</em></h1>
     <p class="hero-sub">Fragancias seleccionadas de las casas de perfumería más admiradas del mundo, ahora accesibles.</p>
-    <a href="#shop" class="hero-cta"><span>Explorar la Colección</span></a>
+    <a href="/tienda" class="hero-cta"><span>Explorar la Colección</span></a>
 
     <div class="hero-spacer"></div>
     <div class="hero-som-divider"></div>
@@ -1871,29 +1938,38 @@ footer{background:var(--dark);padding:3.5rem 4rem;text-align:center;border-top:1
 </section>
 
 
-<section id="shop">
-  <div class="section-header">
-    <p class="section-eyebrow">Nuestra Selección</p>
-    <h2 class="section-title">La <em>Colección</em></h2>
+
+<!-- NA anchor: new arrivals inserts before this -->
+<div id="na-anchor"></div>
+
+<!-- EVERYONE'S FAVORITES -->
+<section id="favoritesSection" class="favorites-section">
+  <div class="fav-header">
+    <span class="fav-eyebrow">Los Más Queridos</span>
+    <h2 class="fav-title">Favoritos de <em>todos</em></h2>
+    <p class="fav-sub">Las fragancias que nuestros clientes eligen una y otra vez.</p>
   </div>
-  <div class="filters-bar">
-    <div class="filter-group" id="brandPills">
-      <button class="pill active" data-brand="all">Todos</button>
-    </div>
-    <div class="filter-group" id="genderPills">
-      <button class="pill active" data-gender="all">Todos</button>
-      <button class="pill" data-gender="F">Mujer</button>
-      <button class="pill" data-gender="M">Hombre</button>
-      <button class="pill" data-gender="U">Unisex</button>
-    </div>
-    <div class="search-wrap">
-      <span class="search-icon">&#128269;</span>
-      <input class="search-input" type="text" id="searchBox" placeholder="Buscar por nombre, marca o nota..."/>
-    </div>
+  <div class="fav-track-wrap">
+    <div class="fav-track" id="favTrack"></div>
+    <button class="fav-arrow fav-arrow-l" id="favArrowL" aria-label="Anterior" onclick="scrollFavTrack(-1)">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><polyline points="15 18 9 12 15 6"/></svg>
+    </button>
+    <button class="fav-arrow fav-arrow-r" id="favArrowR" aria-label="Siguiente" onclick="scrollFavTrack(1)">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><polyline points="9 18 15 12 9 6"/></svg>
+    </button>
   </div>
-  <p class="results-info">Mostrando <span id="resultCount">0</span> fragancias</p>
-  <div class="product-grid" id="productGrid">
-    <div class="empty-state" id="emptyState"><h3>No se encontraron fragancias</h3><p>Intenta ajustar los filtros</p></div>
+</section>
+
+<!-- GO TO STORE CTA -->
+<section class="store-cta-section" id="storeCtaSection">
+  <div class="store-cta-inner">
+    <div class="store-cta-left">
+      <span class="store-cta-eyebrow">La Colección Completa</span>
+      <h2 class="store-cta-title">24 fragancias<br><em>esperando por ti</em></h2>
+      <p class="store-cta-body">Filtra por marca, género o notas. Encuentra la que lleva tu nombre &mdash; o deja que Nez te guíe.</p>
+      <a href="/tienda" class="store-cta-btn"><span>Ir a la Tienda</span><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/></svg></a>
+    </div>
+    <div class="store-cta-bottles" id="storeCtaBottles"></div>
   </div>
 </section>
 
@@ -2786,7 +2862,7 @@ function dismissNewArrivalToast(btn, key){
 function buildGrid(){
   var grid=document.getElementById('productGrid');
   var empty=document.getElementById('emptyState');
-  if(!grid)return;
+  // Note: grid may not exist on homepage — NA section still builds
 
   // ── New Arrivals Section — products added within last 30 days ──
   var existingNA = document.getElementById('newArrivalsSection');
@@ -2912,8 +2988,9 @@ function buildGrid(){
     naSticky.appendChild(naPanel);
     naWrap.appendChild(naSticky);
 
-    var shopSection = document.getElementById('shop');
-    shopSection.parentNode.insertBefore(naWrap, shopSection);
+    // Insert NA before anchor (homepage) or before #shop (tienda), whichever exists
+    var naAnchor = document.getElementById('na-anchor') || document.getElementById('shop');
+    if(naAnchor) naAnchor.parentNode.insertBefore(naWrap, naAnchor);
 
     var bottleZone = document.getElementById('naBottleZone');
     var textZone = document.getElementById('naTextZone');
@@ -3192,6 +3269,12 @@ function buildGrid(){
     }, 3000);
   })();
 
+  // Homepage sections — run regardless of grid presence
+  buildFavoritesRow();
+  buildStoreCta();
+
+  // Card building — only on pages with a product grid
+  if(!grid){ return; }
   grid.querySelectorAll('.product-card').forEach(function(el){el.remove();});
   P.forEach(function(p){
     try{
@@ -3304,6 +3387,8 @@ function buildGrid(){
 
   applyFilters();
   injectProductSchema(P);
+  buildFavoritesRow();
+  buildStoreCta();
 
   // Re-apply scent profile order after every grid rebuild (survives polling)
   if(typeof _somProfile !== 'undefined' && _somProfile){
@@ -3366,17 +3451,17 @@ function applyFilters(){
     na.style.display = isFiltered ? 'none' : '';
   }
 }
-document.getElementById('brandPills').addEventListener('click',function(e){
+(function(){var _el=document.getElementById('brandPills');if(!_el)return;_el.addEventListener('click',function(e){
   var pill=e.target.closest('.pill');if(!pill)return;
   this.querySelectorAll('.pill').forEach(function(p){p.classList.remove('active');});
   pill.classList.add('active');fBrand=pill.dataset.brand;applyFilters();
-});
-document.getElementById('genderPills').addEventListener('click',function(e){
+});})();
+(function(){var _el=document.getElementById('genderPills');if(!_el)return;_el.addEventListener('click',function(e){
   var pill=e.target.closest('.pill');if(!pill)return;
   this.querySelectorAll('.pill').forEach(function(p){p.classList.remove('active');});
   pill.classList.add('active');fGender=pill.dataset.gender;applyFilters();
-});
-document.getElementById('searchBox').addEventListener('input',function(){fSearch=this.value.trim().toLowerCase();applyFilters();});
+});})();
+(function(){var sb=document.getElementById('searchBox');if(sb)sb.addEventListener('input',function(){fSearch=this.value.trim().toLowerCase();applyFilters();});})();
 
 // ════════════════════════════════════════════
 // DETAIL
@@ -5888,7 +5973,7 @@ function filterByBrand(brand){
   closeCollections();
   // Set brand filter
   fBrand = brand; fGender = 'all'; fSearch = '';
-  document.getElementById('searchBox').value = '';
+  var _sb1=document.getElementById('searchBox');if(_sb1)_sb1.value='';
   // Update brand pills
   document.querySelectorAll('#brandPills .pill').forEach(function(p){
     p.classList.toggle('active', p.dataset.brand === brand);
@@ -5908,7 +5993,7 @@ function filterByCurated(col){
   closeCollections();
   // Reset all filters and apply custom filter
   fBrand = 'all'; fGender = 'all'; fSearch = '';
-  document.getElementById('searchBox').value = '';
+  var _sb2=document.getElementById('searchBox');if(_sb2)_sb2.value='';
   // Reset pills
   document.querySelectorAll('#brandPills .pill').forEach(function(p){
     p.classList.toggle('active', p.dataset.brand === 'all');
@@ -7437,6 +7522,121 @@ document.addEventListener('DOMContentLoaded', function(){
   checkBtcpayRenew();
   checkResetToken();
 });
+
+// ════════════════════════════════════════════
+// HOMEPAGE: FAVORITES ROW + STORE CTA
+// ════════════════════════════════════════════
+function buildFavoritesRow(){
+  var track = document.getElementById('favTrack');
+  if(!track) return;
+  track.innerHTML = '';
+  var favorites = (P||[]).filter(function(p){ return p.badge === 'bestseller'; }).slice(0,8);
+  if(!favorites.length) favorites = (P||[]).slice(0,8);
+  favorites.forEach(function(p, i){
+    var inv = getInv(p.id);
+    var pr  = getPr(p.id);
+    var oos = inv.outOfStock;
+    var ep  = effectivePrice(p);
+    var card = document.createElement('div');
+    card.className = 'fav-card';
+    card.style.transitionDelay = (i * 0.07) + 's';
+    card.innerHTML =
+      (p.badge === 'bestseller' ? '<div class="fav-card-badge">Favorito</div>' : '') +
+      '<div class="fav-card-bottle">' + svg(p.c, p.s, 'md') + '</div>' +
+      '<div class="fav-card-brand">' + esc(p.brand) + '</div>' +
+      '<div class="fav-card-name">' + esc(p.name) + '</div>' +
+      '<div class="fav-card-tagline">' + esc(p.tagline || p.notes || '') + '</div>' +
+      '<div class="fav-card-price">$' + ep + '</div>';
+    card.addEventListener('click', function(){ openDetail(p.id); });
+    track.appendChild(card);
+  });
+
+  // Drag to scroll
+  var isDown = false, startX = 0, scrollLeft = 0;
+  track.addEventListener('mousedown', function(e){
+    isDown = true; track.classList.add('is-grabbing');
+    startX = e.pageX - track.offsetLeft; scrollLeft = track.scrollLeft;
+  });
+  track.addEventListener('mouseleave', function(){ isDown = false; track.classList.remove('is-grabbing'); });
+  track.addEventListener('mouseup',    function(){ isDown = false; track.classList.remove('is-grabbing'); });
+  track.addEventListener('mousemove',  function(e){
+    if(!isDown) return; e.preventDefault();
+    var x = e.pageX - track.offsetLeft;
+    track.scrollLeft = scrollLeft - (x - startX) * 1.4;
+  });
+
+  // IntersectionObserver for card reveals
+  if('IntersectionObserver' in window){
+    var cardObserver = new IntersectionObserver(function(entries){
+      entries.forEach(function(entry){
+        if(entry.isIntersecting) {
+          entry.target.classList.add('card-visible');
+          cardObserver.unobserve(entry.target);
+        }
+      });
+    }, { threshold: 0.15, rootMargin: '0px 0px -60px 0px' });
+    track.querySelectorAll('.fav-card').forEach(function(c){ cardObserver.observe(c); });
+  } else {
+    track.querySelectorAll('.fav-card').forEach(function(c){ c.classList.add('card-visible'); });
+  }
+
+  // Section IO reveal
+  var favSection = document.getElementById('favoritesSection');
+  if(favSection && 'IntersectionObserver' in window){
+    var favSectionObs = new IntersectionObserver(function(entries){
+      if(entries[0].isIntersecting){ favSection.classList.add('fav-inview'); favSectionObs.disconnect(); }
+    }, { threshold: 0.12 });
+    favSectionObs.observe(favSection);
+  }
+}
+
+function scrollFavTrack(dir){
+  var track = document.getElementById('favTrack');
+  if(!track) return;
+  var cardW = track.querySelector('.fav-card') ? track.querySelector('.fav-card').offsetWidth + 24 : 280;
+  track.scrollBy({ left: dir * cardW * 2, behavior: 'smooth' });
+}
+
+function buildStoreCta(){
+  var bottleWrap = document.getElementById('storeCtaBottles');
+  if(!bottleWrap || !P || !P.length) return;
+  // Pick 3 visually varied products
+  var picks = [];
+  var picked = {};
+  var candidates = (P||[]).filter(function(p){ return !getInv(p.id).outOfStock; });
+  // Try to get M, F, U variety
+  ['M','F','U'].forEach(function(g){
+    var match = candidates.find(function(p){ return p.g === g && !picked[p.id]; });
+    if(match){ picks.push(match); picked[match.id] = true; }
+  });
+  // Fill remaining with bestsellers
+  while(picks.length < 3){
+    var fill = candidates.find(function(p){ return !picked[p.id]; });
+    if(!fill) break;
+    picks.push(fill); picked[fill.id] = true;
+  }
+  bottleWrap.innerHTML = '';
+  var sizes = [0.9, 1.15, 0.85];
+  picks.forEach(function(p, i){
+    var div = document.createElement('div');
+    div.className = 'cta-bottle';
+    var sc = sizes[i];
+    var w = Math.round(100 * sc), h = Math.round(180 * sc);
+    div.innerHTML = '<div style="transform:scale(' + sc + ');transform-origin:bottom center">' + svg(p.c, p.s, 'lg') + '</div>' +
+      '<div class="cta-bottle-label">' + esc(p.brand) + '</div>';
+    div.addEventListener('click', function(){ window.location.href = '/tienda'; });
+    bottleWrap.appendChild(div);
+  });
+
+  // IO reveal for CTA section
+  var ctaSection = document.getElementById('storeCtaSection');
+  if(ctaSection && 'IntersectionObserver' in window){
+    var ctaObs = new IntersectionObserver(function(entries){
+      if(entries[0].isIntersecting){ ctaSection.classList.add('cta-inview'); ctaObs.disconnect(); }
+    }, { threshold: 0.15 });
+    ctaObs.observe(ctaSection);
+  }
+}
 </script>
 
 <!-- MOBILE BOTTOM NAV -->
@@ -7456,7 +7656,7 @@ document.addEventListener('DOMContentLoaded', function(){
       </svg>
     </span>Colecciones
   </button>
-  <a href="#shop" class="mob-nav-btn">
+  <a href="/tienda" class="mob-nav-btn">
     <span class="mob-nav-icon">
       <svg viewBox="0 0 24 24" fill="none" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
         <circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>
