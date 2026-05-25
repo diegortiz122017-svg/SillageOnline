@@ -1071,7 +1071,7 @@ footer{background:var(--dark);padding:3.5rem 4rem;text-align:center;border-top:1
 .new-arrivals-section{position:relative;margin:0;border-top:1px solid rgba(184,149,90,0.12);border-bottom:1px solid rgba(184,149,90,0.12);background:var(--warm-white);color:var(--charcoal)}
 .na-sticky-wrap{position:relative;height:520vh}
 .na-sticky{position:sticky;top:0;height:100vh;overflow:hidden;background:var(--warm-white);transition:background 0.9s ease;padding:0;display:block}
-.na-bg-orb{position:absolute;width:1100px;height:1100px;border-radius:50%;filter:blur(120px);opacity:0.35;pointer-events:none;transition:background 0.9s ease;z-index:1}
+.na-bg-orb{position:absolute;width:1100px;height:1100px;border-radius:50%;filter:blur(120px);opacity:0.10;pointer-events:none;transition:background 0.9s ease;z-index:1}
 .na-bg-orb.a{top:-20%;left:-15%}
 .na-bg-orb.b{bottom:-25%;right:-15%}
 .na-corner-stamp{position:absolute;top:1.4rem;left:2.2rem;font-size:0.5rem;letter-spacing:0.3em;text-transform:uppercase;color:var(--muted);z-index:5;display:flex;align-items:center;gap:0.6rem}
@@ -1154,11 +1154,11 @@ footer{background:var(--dark);padding:3.5rem 4rem;text-align:center;border-top:1
 @media(max-width:480px){
   .na-sticky-wrap{height:auto}
   .na-sticky{position:relative;height:auto;min-height:100vh;overflow:visible}
-  .na-stage{position:relative;display:block;padding:4rem 0 4.8rem}
-  .na-bg-orb{width:620px;height:620px;filter:blur(90px)}
+  .na-stage{display:none}
+  .na-bg-orb{width:620px;height:620px;filter:blur(90px);opacity:0.12}
   .na-bottle-zone,.na-text-zone{display:none}
   .na-mobile-carousel{display:flex;overflow-x:auto;scroll-snap-type:x mandatory;scroll-behavior:smooth;-webkit-overflow-scrolling:touch;gap:0;width:100%;position:relative;z-index:3}
-  .na-mobile-card{min-width:100%;scroll-snap-align:start;padding:0 1.15rem 1rem;display:flex;flex-direction:column}
+  .na-mobile-card{min-width:100%;scroll-snap-align:start;padding:4rem 1.15rem 5rem;display:flex;flex-direction:column}
   .na-mobile-bottle{height:270px;display:flex;align-items:center;justify-content:center}
   .na-mobile-bottle svg{filter:drop-shadow(0 28px 55px rgba(0,0,0,0.20)) drop-shadow(0 4px 12px rgba(0,0,0,0.1))}
   .na-mobile-card .na-name{font-size:2.25rem}
@@ -2850,15 +2850,22 @@ function buildGrid(){
     function naLerp(a,b,t){ return a + (b-a)*t; }
     function naEase(t){ return t<0.5 ? 2*t*t : 1 - Math.pow(-2*t+2,2)/2; }
     function naHexToRgb(hex){
+      if(/^rgb/i.test(hex || '')){
+        var parts = String(hex).match(/\d+/g) || [];
+        return { r:+parts[0]||250, g:+parts[1]||248, b:+parts[2]||244 };
+      }
       var h = (hex || '#faf8f4').replace('#','');
       if(h.length === 3) h = h.charAt(0)+h.charAt(0)+h.charAt(1)+h.charAt(1)+h.charAt(2)+h.charAt(2);
-      return { r:parseInt(h.slice(0,2),16)||250, g:parseInt(h.slice(2,4),16)||248, b:parseInt(h.slice(4,6),16)||244 };
+      var r = parseInt(h.slice(0,2),16);
+      var g = parseInt(h.slice(2,4),16);
+      var b = parseInt(h.slice(4,6),16);
+      return { r:isNaN(r)?250:r, g:isNaN(g)?248:g, b:isNaN(b)?244:b };
     }
     function naLerpColor(a,b,t){
       var A = naHexToRgb(a), B = naHexToRgb(b);
       return 'rgb('+Math.round(A.r+(B.r-A.r)*t)+','+Math.round(A.g+(B.g-A.g)*t)+','+Math.round(A.b+(B.b-A.b)*t)+')';
     }
-    function naSoftTint(hex){ return naLerpColor(hex || '#b8955a', '#faf8f4', 0.88); }
+    function naSoftTint(hex){ return naLerpColor(hex || '#b8955a', '#faf8f4', 0.94); }
     function naSafeBgTint(p){
       var tint = p.bgTint || '';
       if(/^#[0-9a-f]{6}$/i.test(tint)){
@@ -2868,7 +2875,7 @@ function buildGrid(){
       }
       return naSoftTint(p.c && p.c[0]);
     }
-    function naOrbTint(hex){ return naLerpColor(hex || '#b8955a', '#faf8f4', 0.62); }
+    function naOrbTint(bgTint, amount){ return naLerpColor(bgTint || '#faf8f4', '#faf8f4', amount); }
     function naNotes(v){
       if(Array.isArray(v)) return v;
       return String(v || '').split(',').map(function(x){ return x.trim(); }).filter(Boolean);
@@ -2906,8 +2913,8 @@ function buildGrid(){
         sillage:p.sillage || 'Moderate',
         long:p.long || p.longevity || '8+ Hours',
         bgTint:naSafeBgTint(p),
-        orbA:naOrbTint(p.c && p.c[0]),
-        orbB:naOrbTint(p.c && p.c[2]),
+        orbA:naOrbTint(naSafeBgTint(p), 0.18),
+        orbB:naOrbTint(naSafeBgTint(p), 0.36),
         c:p.c || ['#f0e6d0','#d4af7a','#b8955a'],
         s:p.s || 'classic'
       };
@@ -3115,7 +3122,9 @@ function buildGrid(){
   }
   // ── Main toast for newest product if user hasn't seen it ──
   (function(){
-    var newest = newArrivals.sort(function(a,b){ return new Date(b.arrivedAt)-new Date(a.arrivedAt); })[0];
+    var newest = newArrivals.slice().sort(function(a,b){
+      return parseArrivalDate(b.arrivedAt).getTime() - parseArrivalDate(a.arrivedAt).getTime();
+    })[0];
     if(!newest) return;
     var seenKey = 'sillage_seen_new_'+newest.id;
     try { if(localStorage.getItem(seenKey)) return; } catch(e){ return; }
