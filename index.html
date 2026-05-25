@@ -1018,6 +1018,10 @@ footer{background:var(--dark);padding:3.5rem 4rem;text-align:center;border-top:1
 /* Sticky container — height set dynamically by JS */
 .na-sticky-wrap{position:relative}
 .na-sticky{position:sticky;top:0;height:100vh;overflow:hidden;background:var(--warm-white)}
+@media(max-width:768px){
+  /* On mobile the fixed nav is ~50px — sticky should start below it */
+  .na-sticky{top:50px;height:calc(100vh - 50px)}
+}
 /* Header state */
 .na-header-state{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:0.6rem;will-change:opacity,transform}
 .new-arrivals-title{font-size:0.65rem;letter-spacing:0.35em;text-transform:uppercase;color:var(--gold);font-weight:400;display:block}
@@ -1075,8 +1079,6 @@ footer{background:var(--dark);padding:3.5rem 4rem;text-align:center;border-top:1
   .na-grid-closing-title{font-size:1.6rem}
   .new-arrivals-heading{font-size:2rem}
   .na-header-state{padding:0 1.5rem}
-  /* Offset sticky top by nav bar height so content never sits under it */
-  .na-sticky{padding-top:calc(60px + 2rem)}
 }
 /* Hover: bottle 3D tilt */
 .na-card-img{perspective:800px}
@@ -2873,8 +2875,32 @@ function buildGrid(){
     (function(){
       var n      = newArrivals.length;
       var states = n + 2; // header + n products + grid
-      var beatVh = 140;   // more time per product
-      naWrap.style.height = (states * beatVh) + 'vh';
+      // Last product gets extra beat before grid
+      var beatVh = 140;
+      // Total = states beats + 1 extra beat for last product pause
+      naWrap.style.height = ((states + 1) * beatVh) + 'vh';
+
+      // Remap progress: last product state occupies 2 beats instead of 1
+      function remapState(p){
+        // Total scroll units = states + 1
+        var totalUnits = states + 1;
+        var rawF = p * totalUnits;
+        // States 0..n-1 map normally (1 unit each)
+        // State n (last product) maps to 2 units
+        // State n+1 (grid) maps to 1 unit
+        var lastProdState = n; // 1-indexed last product
+        if(rawF <= lastProdState){
+          return { stateI: Math.floor(rawF), stateProg: rawF - Math.floor(rawF) };
+        } else if(rawF <= lastProdState + 2){
+          // Last product gets 2 units
+          var lp = rawF - lastProdState; // 0→2
+          return { stateI: lastProdState, stateProg: lp / 2 };
+        } else {
+          // Grid state
+          var gp = rawF - (lastProdState + 2); // 0→1
+          return { stateI: lastProdState + 1, stateProg: Math.min(gp, 1) };
+        }
+      }
 
       var headerEl = document.getElementById('naHeaderState');
       var gridEl   = document.getElementById('naGridState');
@@ -2927,13 +2953,13 @@ function buildGrid(){
         var dots = naSticky.querySelector('.na-dots');
         if(dots) dots.style.display = 'none';
         setTimeout(function(){
-          // Collapse the sticky to its natural content height
+          // Release sticky — content stays in flow at natural height
           naSticky.style.position = 'relative';
           naSticky.style.height = 'auto';
-          // Collapse the wrap height so no blank space remains
-          naWrap.style.height = 'auto';
-          naWrap.style.minHeight = '0';
-        }, 60);
+          naSticky.style.overflow = 'visible';
+          // Collapse the scroll room — set wrap to sticky's rendered height
+          naWrap.style.height = naSticky.offsetHeight + 'px';
+        }, 80);
       }
 
       var lastState = -1;
@@ -2942,9 +2968,9 @@ function buildGrid(){
       function applyProgress(p){
         if(released) return;
 
-        var stateF    = p * states;
-        var stateI    = Math.min(Math.floor(stateF), states - 1);
-        var stateProg = stateF - Math.floor(stateF);
+        var mapped    = remapState(p);
+        var stateI    = mapped.stateI;
+        var stateProg = mapped.stateProg;
 
         // Release only when p is truly at the end (not just grid state)
         if(p >= 0.98){
