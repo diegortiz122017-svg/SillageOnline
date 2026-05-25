@@ -1,4 +1,5 @@
 <!DOCTYPE html>
+<!-- BUILD: store_fresh_nez_bottom_v1 | source=store(4).html | New Arrivals disabled | Nez bottom | APIs preserved -->
 <html lang="es">
 <head>
 <meta charset="UTF-8"/>
@@ -126,63 +127,6 @@ nav a:hover{color:var(--gold)}
 @keyframes spulse{0%,100%{opacity:0.3}50%{opacity:1}}
 
 #shop{padding:4rem 4rem 6rem;background:var(--warm-white);color:var(--charcoal);scroll-margin-top:80px}
-
-.store-nez-access{
-  max-width:760px;
-  margin:0 auto 3.4rem;
-  padding:0 0 2.4rem;
-  text-align:center;
-  background:transparent;
-  color:var(--charcoal);
-  border-bottom:1px solid rgba(184,149,90,0.14);
-}
-.store-nez-kicker{
-  font-size:0.58rem;
-  letter-spacing:0.34em;
-  text-transform:uppercase;
-  color:var(--gold);
-  margin-bottom:0.85rem;
-}
-.store-nez-title{
-  font-family:Cormorant Garamond,serif;
-  font-size:clamp(2rem,5vw,3.4rem);
-  font-weight:300;
-  line-height:1.05;
-  color:var(--charcoal);
-  margin-bottom:0.85rem;
-}
-.store-nez-title em{font-style:italic;color:var(--gold)}
-.store-nez-copy{
-  max-width:560px;
-  margin:0 auto 1.4rem;
-  font-size:0.78rem;
-  line-height:1.9;
-  color:var(--muted);
-}
-.store-nez-btn{
-  display:inline-flex;
-  align-items:center;
-  justify-content:center;
-  gap:0.65rem;
-  border:1px solid rgba(184,149,90,0.52);
-  background:transparent;
-  color:var(--gold);
-  font-family:'Jost',sans-serif;
-  font-size:0.62rem;
-  letter-spacing:0.24em;
-  text-transform:uppercase;
-  padding:0.85rem 1.35rem;
-  cursor:pointer;
-  transition:all .25s ease;
-}
-.store-nez-btn:hover{background:rgba(184,149,90,0.08);border-color:var(--gold)}
-@media(max-width:680px){
-  .store-nez-access{margin-bottom:2.7rem;padding-bottom:2rem}
-  .store-nez-title{font-size:clamp(2rem,10vw,2.8rem)}
-  .store-nez-copy{font-size:0.72rem;line-height:1.85}
-  .store-nez-btn{width:100%;font-size:0.56rem;padding:0.82rem 1rem}
-}
-
 .section-header{text-align:center;margin-bottom:3rem}
 .section-eyebrow{font-size:0.65rem;letter-spacing:0.35em;text-transform:uppercase;color:var(--gold);margin-bottom:0.8rem}
 .section-title{font-family:Cormorant Garamond,serif;font-size:clamp(3rem,5.5vw,4.5rem);font-weight:300;color:var(--charcoal);line-height:1.1}
@@ -1846,6 +1790,85 @@ footer{background:var(--dark);padding:3.5rem 4rem;text-align:center;border-top:1
 .store-page #shop{padding-top:clamp(3.5rem,8vw,5rem);}
 .store-page .section-header{margin-bottom:2.8rem;}
 
+
+/* ── Store Nez bottom access — integrated with shop section ─────────────── */
+.store-nez-access{
+  scroll-margin-top:110px;
+  background:var(--warm-white);
+  color:var(--charcoal);
+  padding:4.25rem 4rem 4.75rem;
+  border-top:1px solid rgba(184,149,90,0.14);
+}
+.store-nez-inner{
+  max-width:980px;
+  margin:0 auto;
+  text-align:center;
+}
+.store-nez-kicker{
+  font-size:0.6rem;
+  letter-spacing:0.34em;
+  text-transform:uppercase;
+  color:var(--gold);
+  margin-bottom:0.9rem;
+}
+.store-nez-title{
+  font-family:Cormorant Garamond,serif;
+  font-size:clamp(2.6rem,6vw,4.8rem);
+  font-weight:300;
+  line-height:1;
+  color:var(--charcoal);
+  margin-bottom:1rem;
+}
+.store-nez-title em{
+  font-style:italic;
+  color:var(--gold);
+}
+.store-nez-copy{
+  max-width:620px;
+  margin:0 auto 1.8rem;
+  font-size:0.78rem;
+  line-height:1.9;
+  color:var(--muted);
+}
+.store-nez-btn{
+  display:inline-flex;
+  align-items:center;
+  justify-content:center;
+  gap:0.7rem;
+  min-width:min(100%,360px);
+  padding:0.95rem 2rem;
+  border:1px solid var(--gold);
+  background:transparent;
+  color:var(--gold);
+  font-family:'Jost',sans-serif;
+  font-size:0.65rem;
+  letter-spacing:0.22em;
+  text-transform:uppercase;
+  cursor:pointer;
+  transition:background 0.25s,color 0.25s,border-color 0.25s;
+}
+.store-nez-btn:hover{
+  background:var(--gold);
+  color:var(--dark);
+}
+@media(max-width:680px){
+  .store-nez-access{
+    scroll-margin-top:96px;
+    padding:3.3rem 1rem 3.8rem;
+  }
+  .store-nez-title{
+    font-size:clamp(2.35rem,11vw,3.45rem);
+  }
+  .store-nez-copy{
+    max-width:330px;
+    font-size:0.74rem;
+  }
+  .store-nez-btn{
+    width:100%;
+    padding:0.9rem 1rem;
+  }
+}
+
 </style>
 <script type="application/ld+json">
 {
@@ -1900,12 +1923,6 @@ footer{background:var(--dark);padding:3.5rem 4rem;text-align:center;border-top:1
 </button>
 
 <section id="shop">
-  <div class="store-nez-access" id="nezAccess">
-    <p class="store-nez-kicker">Sommelier IA</p>
-    <h2 class="store-nez-title">¿No sabes cuál elegir?</h2>
-    <p class="store-nez-copy">Habla con Nez para recibir recomendaciones según ocasión, notas, intensidad y presupuesto.</p>
-    <button class="store-nez-btn" type="button" onclick="openSommelierModal()">Consultar a Nez <span aria-hidden="true">→</span></button>
-  </div>
   <div class="section-header">
     <p class="section-eyebrow">Nuestra Selección</p>
     <h2 class="section-title">La <em>Colección</em></h2>
@@ -1955,6 +1972,21 @@ footer{background:var(--dark);padding:3.5rem 4rem;text-align:center;border-top:1
     </div>
   </div>
 </div>
+
+
+<section class="store-nez-access" id="nezAccess">
+  <div class="store-nez-inner">
+    <p class="store-nez-kicker">Sommelier IA</p>
+    <h2 class="store-nez-title">¿No sabes cuál <em>elegir?</em></h2>
+    <p class="store-nez-copy">
+      Habla con Nez para recibir recomendaciones según ocasión, notas, intensidad y presupuesto.
+    </p>
+    <button class="store-nez-btn" type="button" onclick="openSommelierModal()">
+      Consultar a Nez <span aria-hidden="true">→</span>
+    </button>
+  </div>
+</section>
+
 
 <footer>
   <div class="f-logo">Sillage</div>
@@ -2822,7 +2854,410 @@ function buildGrid(){
   var empty=document.getElementById('emptyState');
   if(!grid)return;
 
-  // Store page: New Arrivals is intentionally disabled here.
+  // ── New Arrivals Section — products added within last 30 days ──
+  var existingNA = document.getElementById('newArrivalsSection');
+  if(existingNA) existingNA.remove();
+  var thirtyDaysAgo = Date.now() - 30*24*60*60*1000;
+  function parseArrivalDate(value){
+    if(!value) return null;
+    var d = value instanceof Date ? value : new Date(String(value));
+    return isNaN(d.getTime()) ? null : d;
+  }
+  var newArrivals = (P||[]).filter(function(p){
+    var d = parseArrivalDate(p.arrivedAt);
+    return d && d.getTime() > thirtyDaysAgo;
+  }).sort(function(a,b){
+    return parseArrivalDate(a.arrivedAt).getTime() - parseArrivalDate(b.arrivedAt).getTime();
+  }).slice(0,4);
+
+  if(false && newArrivals.length){ /* disabled on dedicated store page */
+    var naWrap = document.createElement('div');
+    naWrap.id = 'newArrivalsSection';
+    naWrap.className = 'new-arrivals-section';
+
+    var naSticky = document.createElement('div');
+    naSticky.className = 'na-sticky-wrap';
+
+    var naPanel = document.createElement('div');
+    naPanel.className = 'na-sticky';
+
+    function naClamp(t){ return Math.max(0, Math.min(1, t)); }
+    function naLerp(a,b,t){ return a + (b-a)*t; }
+    function naEase(t){ return t<0.5 ? 2*t*t : 1 - Math.pow(-2*t+2,2)/2; }
+    function naHexToRgb(hex){
+      if(/^rgb/i.test(hex || '')){
+        var parts = String(hex).match(/\d+/g) || [];
+        return { r:+parts[0]||250, g:+parts[1]||248, b:+parts[2]||244 };
+      }
+      var h = (hex || '#faf8f4').replace('#','');
+      if(h.length === 3) h = h.charAt(0)+h.charAt(0)+h.charAt(1)+h.charAt(1)+h.charAt(2)+h.charAt(2);
+      var r = parseInt(h.slice(0,2),16);
+      var g = parseInt(h.slice(2,4),16);
+      var b = parseInt(h.slice(4,6),16);
+      return { r:isNaN(r)?250:r, g:isNaN(g)?248:g, b:isNaN(b)?244:b };
+    }
+    function naLerpColor(a,b,t){
+      var A = naHexToRgb(a), B = naHexToRgb(b);
+      return 'rgb('+Math.round(A.r+(B.r-A.r)*t)+','+Math.round(A.g+(B.g-A.g)*t)+','+Math.round(A.b+(B.b-A.b)*t)+')';
+    }
+    function naSoftTint(hex){ return naLerpColor(hex || '#b8955a', '#faf8f4', 0.94); }
+    function naSafeBgTint(p){
+      var tint = p.bgTint || '';
+      if(/^#[0-9a-f]{6}$/i.test(tint)){
+        var rgb = naHexToRgb(tint);
+        var max = Math.max(rgb.r,rgb.g,rgb.b), min = Math.min(rgb.r,rgb.g,rgb.b);
+        if(max - min < 70 && (rgb.r + rgb.g + rgb.b) > 620) return tint;
+      }
+      return naSoftTint(p.c && p.c[0]);
+    }
+    function naOrbTint(bgTint, amount){ return naLerpColor(bgTint || '#faf8f4', '#faf8f4', amount); }
+    function naNotes(v){
+      if(Array.isArray(v)) return v;
+      return String(v || '').split(',').map(function(x){ return x.trim(); }).filter(Boolean);
+    }
+    function naDateLabel(p){
+      if(p.drop) return p.drop;
+      var d = parseArrivalDate(p.arrivedAt);
+      if(!d) return 'Recién llegado';
+      var months = ['enero','febrero','marzo','abril','mayo','junio','julio','agosto','septiembre','octubre','noviembre','diciembre'];
+      return 'Llegado el ' + d.getDate() + ' de ' + months[d.getMonth()];
+    }
+    function naWeekLabel(){
+      var newest = newArrivals.slice().sort(function(a,b){
+        return parseArrivalDate(b.arrivedAt).getTime() - parseArrivalDate(a.arrivedAt).getTime();
+      })[0];
+      var d = newest ? parseArrivalDate(newest.arrivedAt) : null;
+      if(!d) return 'Semana 22';
+      var onejan = new Date(d.getFullYear(),0,1);
+      var week = Math.ceil((((d - onejan) / 86400000) + onejan.getDay() + 1) / 7);
+      return 'Semana ' + String(week).padStart(2,'0');
+    }
+    function naProductData(p){
+      var price = effectivePrice ? effectivePrice(p) : p.price;
+      return {
+        id:p.id,
+        brand:p.brand,
+        name:p.name,
+        price:Math.round(+price || +p.price || 0),
+        tagline:p.tagline || p.conc || 'Sillage',
+        line:p.line || p.desc || p.tagline || '',
+        drop:naDateLabel(p),
+        top:naNotes(p.top),
+        mid:naNotes(p.mid),
+        base:naNotes(p.base),
+        sillage:p.sillage || 'Moderate',
+        long:p.long || p.longevity || '8+ Hours',
+        bgTint:naSafeBgTint(p),
+        orbA:naOrbTint(naSafeBgTint(p), 0.18),
+        orbB:naOrbTint(naSafeBgTint(p), 0.36),
+        c:p.c || ['#f0e6d0','#d4af7a','#b8955a'],
+        s:p.s || 'classic'
+      };
+    }
+    var diary = newArrivals.map(naProductData);
+    var lastNum = String(diary.length).padStart(2,'0');
+
+    naPanel.innerHTML =
+      '<div class="na-bg-orb a" id="naOrbA"></div>'+
+      '<div class="na-bg-orb b" id="naOrbB"></div>'+
+      '<div class="na-corner-stamp">Diario &middot; <span>'+esc(naWeekLabel())+'</span></div>'+
+      '<div class="na-stage">'+
+        '<aside class="na-toc">'+
+          '<div class="na-toc-cap">CUATRO P\u00c1GINAS<b>de un mismo diario</b></div>'+
+          '<div class="na-toc-list" id="naTocList"></div>'+
+        '</aside>'+
+        '<div class="na-bottle-zone" id="naBottleZone"><div class="na-bottle-mark" id="naBottleMark">01</div></div>'+
+        '<div class="na-text-zone" id="naTextZone"></div>'+
+      '</div>'+
+      '<div class="na-mobile-carousel" id="naMobileCarousel"></div>'+
+      '<div class="na-rail-bot"><span>01</span><div class="na-rail-track">'+
+        '<div class="na-rail-line"></div><div class="na-rail-fill" id="naRailFill"></div>'+
+        diary.map(function(_,i){ return '<div class="na-rail-tick" style="left:'+(diary.length===1?0:(i/(diary.length-1))*100)+'%"></div>'; }).join('')+
+      '</div><span>'+lastNum+'</span></div>';
+
+    naSticky.appendChild(naPanel);
+    naWrap.appendChild(naSticky);
+
+    var shopSection = document.getElementById('shop');
+    shopSection.parentNode.insertBefore(naWrap, shopSection);
+
+    var bottleZone = document.getElementById('naBottleZone');
+    var textZone = document.getElementById('naTextZone');
+    var tocList = document.getElementById('naTocList');
+    var mobileCarousel = document.getElementById('naMobileCarousel');
+
+    function pyramidHtml(p){
+      return '<div class="na-pyramid">'+
+        '<div class="na-py-row" data-phase="0"><div class="na-py-head"><span class="na-py-num">I.</span><span class="na-py-label">SALIDA</span></div><div class="na-py-bar"></div><div class="na-py-text">'+esc(p.top.join(' \u00b7 '))+'</div></div>'+
+        '<div class="na-py-row" data-phase="1"><div class="na-py-head"><span class="na-py-num">II.</span><span class="na-py-label">CORAZ\u00d3N</span></div><div class="na-py-bar"></div><div class="na-py-text">'+esc(p.mid.join(' \u00b7 '))+'</div></div>'+
+        '<div class="na-py-row" data-phase="2"><div class="na-py-head"><span class="na-py-num">III.</span><span class="na-py-label">FONDO</span></div><div class="na-py-bar"></div><div class="na-py-text">'+esc(p.base.join(' \u00b7 '))+'</div></div>'+
+      '</div>';
+    }
+    function textHtml(p){
+      return '<div class="na-stamp"><span class="na-stamp-dot"></span>'+esc(p.drop)+'</div>'+
+        '<div class="na-brand">'+esc(p.brand)+'</div>'+
+        '<h2 class="na-name">'+esc(p.name)+'</h2>'+
+        '<p class="na-line">'+esc(p.line)+'</p>'+
+        pyramidHtml(p)+
+        '<div class="na-foot">'+
+          '<div class="na-price"><span class="na-price-cap">'+esc(p.tagline)+'</span>$'+p.price+'</div>'+
+          '<div class="na-meta"><span>Sillage <b>'+esc(p.sillage)+'</b></span><span>Durabilidad <b>'+esc(p.long)+'</b></span></div>'+
+          '<button class="na-cta" type="button" data-pid="'+p.id+'">Descubrir</button>'+
+        '</div>';
+    }
+
+    diary.forEach(function(p,i){
+      var num = String(i+1).padStart(2,'0');
+      var bs = document.createElement('div');
+      bs.className = 'na-bottle-slot';
+      bs.dataset.pid = p.id;
+      bs.innerHTML = '<div class="na-bottle-svg">'+svg(p.c, p.s, 2.0)+'</div>';
+      bottleZone.appendChild(bs);
+
+      var ts = document.createElement('div');
+      ts.className = 'na-text-slot';
+      ts.innerHTML = textHtml(p);
+      textZone.appendChild(ts);
+
+      var toc = document.createElement('button');
+      toc.className = 'na-toc-item';
+      toc.type = 'button';
+      toc.dataset.idx = i;
+      toc.innerHTML = '<span class="na-toc-num">'+num+'.</span><span class="na-toc-name">'+esc(p.name)+'</span><span class="na-toc-arrow">&rarr;</span>';
+      tocList.appendChild(toc);
+
+      var mc = document.createElement('article');
+      mc.className = 'na-mobile-card';
+      mc.dataset.idx = i;
+      mc.innerHTML = '<div class="na-mobile-bottle">'+svg(p.c, p.s, 'lg')+'</div><div class="na-text-slot">'+textHtml(p)+'</div>';
+      mobileCarousel.appendChild(mc);
+    });
+
+    naWrap.addEventListener('click', function(e){
+      var bottle = e.target.closest('.na-bottle-slot');
+      var cta = e.target.closest('.na-cta');
+      var target = cta || bottle;
+      if(target && target.dataset.pid) openDetail(+target.dataset.pid);
+    });
+
+    (function(){
+      var wrap = document.getElementById('newArrivalsSection');
+      var stick = wrap.querySelector('.na-sticky');
+      var railFill = document.getElementById('naRailFill');
+      var orbA = document.getElementById('naOrbA');
+      var orbB = document.getElementById('naOrbB');
+      var bottleMark = document.getElementById('naBottleMark');
+      var bottleSlots = bottleZone.querySelectorAll('.na-bottle-slot');
+      var textSlots = textZone.querySelectorAll('.na-text-slot');
+      var tocItems = tocList.querySelectorAll('.na-toc-item');
+      var N = diary.length;
+      var lastP = -1;
+      var raf = 0;
+      var sectionInView = true;
+
+      if('IntersectionObserver' in window){
+        var desktopSceneObserver = new IntersectionObserver(function(entries){
+          entries.forEach(function(entry){
+            sectionInView = entry.isIntersecting;
+            wrap.classList.toggle('na-inview', entry.isIntersecting);
+            if(entry.isIntersecting) compute();
+          });
+        }, { threshold:[0,0.12], rootMargin:'-12% 0px -12% 0px' });
+        desktopSceneObserver.observe(wrap);
+      } else {
+        wrap.classList.add('na-inview');
+      }
+
+      function setInner(slot, local){
+        var a1 = naEase(naClamp((local - 0.00) / 0.18));
+        var a2 = naEase(naClamp((local - 0.06) / 0.18));
+        var a3 = naEase(naClamp((local - 0.12) / 0.22));
+        var a4 = naEase(naClamp((local - 0.22) / 0.22));
+        var a5 = naEase(naClamp((local - 0.34) / 0.16));
+        var a6 = naEase(naClamp((local - 0.40) / 0.16));
+        var a7 = naEase(naClamp((local - 0.46) / 0.16));
+        var a8 = naEase(naClamp((local - 0.58) / 0.22));
+        var stamp = slot.querySelector('.na-stamp');
+        var brand = slot.querySelector('.na-brand');
+        var name = slot.querySelector('.na-name');
+        var line = slot.querySelector('.na-line');
+        var rows = slot.querySelectorAll('.na-py-row');
+        var foot = slot.querySelector('.na-foot');
+        if(stamp){ stamp.style.opacity = a1; stamp.style.transform = 'translateY('+((1-a1)*6)+'px)'; }
+        if(brand) brand.style.opacity = a2;
+        if(name){ name.style.opacity = a3; name.style.transform = 'translateY('+((1-a3)*14)+'px)'; }
+        if(line) line.style.opacity = a4;
+        if(rows[0]){ rows[0].style.opacity = a5; rows[0].style.transform = 'translateX('+((1-a5)*-12)+'px)'; }
+        if(rows[1]){ rows[1].style.opacity = a6; rows[1].style.transform = 'translateX('+((1-a6)*-18)+'px)'; }
+        if(rows[2]){ rows[2].style.opacity = a7; rows[2].style.transform = 'translateX('+((1-a7)*-24)+'px)'; }
+        if(foot) foot.style.opacity = a8;
+      }
+
+      function apply(p){
+        if(railFill) railFill.style.width = (p*100).toFixed(2)+'%';
+        var segLen = 1/N;
+        var fadeZone = 0.06;
+        var activeIdx = Math.min(N-1, Math.floor(p / segLen));
+        var localP = naClamp((p - activeIdx*segLen) / segLen);
+        var active = diary[activeIdx];
+        var next = diary[activeIdx+1] || active;
+        var mix = activeIdx < N-1 && localP > 0.5 ? naEase((localP - 0.5) / 0.5) : 0;
+        stick.style.background = naLerpColor(active.bgTint, next.bgTint, mix);
+        orbA.style.background = naLerpColor(active.orbA, next.orbA, mix);
+        orbB.style.background = naLerpColor(active.orbB, next.orbB, mix);
+
+        bottleSlots.forEach(function(slot,i){
+          var segStart = i*segLen;
+          var segEnd = (i+1)*segLen;
+          var opIn = naClamp((p - (segStart - fadeZone)) / fadeZone);
+          var opOut = i === N-1 ? 1 : 1 - naClamp((p - (segEnd - fadeZone)) / fadeZone);
+          var o = Math.min(opIn, opOut);
+          var rot = naLerp(-4,0,opIn) + naLerp(0,4,1-opOut);
+          var sc = naLerp(0.85,1,opIn) * (1 - (1-opOut)*0.12);
+          var ty = naLerp(20,0,opIn) + (1-opOut)*-15;
+          slot.style.opacity = o;
+          slot.style.transform = 'translate(0,'+ty+'px) rotate('+rot+'deg) scale('+sc+')';
+        });
+
+        textSlots.forEach(function(slot,i){
+          var segStart = i*segLen;
+          var segEnd = (i+1)*segLen;
+          var opIn = naClamp((p - (segStart - fadeZone)) / fadeZone);
+          var opOut = i === N-1 ? 1 : 1 - naClamp((p - (segEnd - fadeZone)) / fadeZone);
+          slot.style.opacity = Math.min(opIn, opOut);
+          setInner(slot, naClamp((p - segStart) / segLen));
+        });
+
+        tocItems.forEach(function(t,i){
+          t.classList.toggle('active', i === activeIdx);
+          t.classList.toggle('passed', i < activeIdx);
+        });
+        if(bottleMark) bottleMark.textContent = String(activeIdx+1).padStart(2,'0');
+      }
+
+      function compute(){
+        if(window.innerWidth <= 768) return;
+        if(!sectionInView) return;
+        var rect = wrap.getBoundingClientRect();
+        var total = wrap.offsetHeight - window.innerHeight;
+        var scrolled = -rect.top;
+        var p = total > 0 ? naClamp(scrolled / total) : 0;
+        if(Math.abs(p - lastP) > 0.0003){ lastP = p; apply(p); }
+      }
+      function onScroll(){
+        if(raf) return;
+        raf = requestAnimationFrame(function(){ raf = 0; compute(); });
+      }
+      var mobileActiveIdx = -1;
+      var mobileCards = mobileCarousel ? mobileCarousel.querySelectorAll('.na-mobile-card') : [];
+      function applyMobileActive(idx){
+        if(window.innerWidth > 768) return;
+        idx = Math.max(0, Math.min(N-1, idx));
+        if(idx === mobileActiveIdx) return;
+        mobileActiveIdx = idx;
+        var active = diary[idx];
+        if(!active) return;
+        stick.style.background = active.bgTint;
+        orbA.style.background = active.orbA;
+        orbB.style.background = active.orbB;
+        if(railFill) railFill.style.width = (idx / Math.max(1,N-1) * 100).toFixed(2)+'%';
+        if(bottleMark) bottleMark.textContent = String(idx+1).padStart(2,'0');
+        bottleSlots.forEach(function(slot,i){
+          var on = i === idx;
+          slot.style.opacity = on ? 1 : 0;
+          slot.style.transform = on ? 'translate(0,0) rotate(0deg) scale(1)' : 'translate(0,14px) rotate(-3deg) scale(0.92)';
+        });
+        mobileCards.forEach(function(card,i){ card.classList.toggle('is-active', i === idx); });
+      }
+      function mobileFallbackActive(){
+        if(window.innerWidth > 768 || !mobileCards.length) return;
+        var center = window.innerHeight * 0.58;
+        var bestIdx = 0;
+        var bestDist = Infinity;
+        mobileCards.forEach(function(card,i){
+          var rect = card.getBoundingClientRect();
+          var cardCenter = rect.top + rect.height * 0.58;
+          var dist = Math.abs(cardCenter - center);
+          if(dist < bestDist){ bestDist = dist; bestIdx = i; }
+        });
+        applyMobileActive(bestIdx);
+      }
+      tocItems.forEach(function(t,i){
+        t.addEventListener('click', function(){
+          var total = wrap.offsetHeight - window.innerHeight;
+          var segLen = 1/N;
+          var target = wrap.offsetTop + (segLen * i + segLen*0.5) * total;
+          window.scrollTo({top:target, behavior:'smooth'});
+        });
+      });
+      if(mobileCarousel){
+        if('IntersectionObserver' in window){
+          var activeObserver = new IntersectionObserver(function(entries){
+            entries.forEach(function(entry){
+              if(!entry.isIntersecting) return;
+              applyMobileActive(+entry.target.dataset.idx || 0);
+            });
+          }, { threshold:0, rootMargin:'-48% 0px -48% 0px' });
+          var revealObserver = new IntersectionObserver(function(entries){
+            entries.forEach(function(entry){
+              entry.target.classList.toggle('is-visible', entry.isIntersecting);
+            });
+          }, { threshold:[0.16,0.34], rootMargin:'-18% 0px -18% 0px' });
+          mobileCards.forEach(function(card){
+            activeObserver.observe(card);
+            revealObserver.observe(card);
+          });
+        } else {
+          window.addEventListener('scroll', function(){
+            if(raf) return;
+            raf = requestAnimationFrame(function(){ raf = 0; mobileFallbackActive(); });
+          }, {passive:true});
+        }
+      }
+      apply(0);
+      applyMobileActive(0);
+      if(mobileCards[0]) mobileCards[0].classList.add('is-visible');
+      compute();
+      window.addEventListener('scroll', onScroll, {passive:true});
+      window.addEventListener('resize', function(){ compute(); mobileFallbackActive(); });
+    })();
+  }
+
+  // ── Main toast for newest product if user hasn't seen it ──
+  (function(){
+    var newest = newArrivals.sort(function(a,b){ return new Date(b.arrivedAt)-new Date(a.arrivedAt); })[0];
+    if(!newest) return;
+    var seenKey = 'sillage_seen_new_'+newest.id;
+    try { if(localStorage.getItem(seenKey)) return; } catch(e){ return; }
+    setTimeout(function(){
+      var existing = document.getElementById('newArrivalToast');
+      if(existing) existing.remove();
+      var t = document.createElement('div');
+      t.id = 'newArrivalToast';
+      t.style.cssText = 'position:fixed;bottom:80px;left:50%;transform:translateX(-50%);'+
+        'background:#1a1714;border:1px solid rgba(184,149,90,0.3);padding:0.8rem 1.2rem;'+
+        'display:flex;align-items:center;gap:0.8rem;z-index:7000;cursor:pointer;'+
+        'box-shadow:0 4px 20px rgba(0,0,0,0.4);animation:fadeUp 0.4s ease;max-width:90vw';
+      t.innerHTML =
+        '<span style="font-size:0.52rem;letter-spacing:0.2em;text-transform:uppercase;color:#b8955a">Nuevo</span>'+
+        '<span style="font-size:0.72rem;color:var(--cream)">'+esc(newest.brand)+' '+esc(newest.name)+'</span>'+
+        '<span style="font-size:0.65rem;color:var(--gold)">→</span>'+
+        '<button onclick="event.stopPropagation();dismissNewArrivalToast(this,\''+seenKey+'\')" '+
+          'style="background:none;border:none;color:var(--muted);cursor:pointer;font-size:0.8rem;padding:0;margin-left:0.3rem">✕</button>';
+      t.onclick = function(){
+        openDetail(newest.id);
+        t.remove();
+        try{ localStorage.setItem(seenKey,'1'); }catch(e){}
+      };
+      document.body.appendChild(t);
+      // Auto-dismiss after 8 seconds
+      setTimeout(function(){
+        if(t.parentNode){ t.style.opacity='0'; t.style.transition='opacity 0.5s'; setTimeout(function(){ t.remove(); },500); }
+        try{ localStorage.setItem(seenKey,'1'); }catch(e){}
+      }, 8000);
+    }, 3000);
+  })();
+
   grid.querySelectorAll('.product-card').forEach(function(el){el.remove();});
   P.forEach(function(p){
     try{
@@ -7291,5 +7726,7 @@ document.addEventListener('DOMContentLoaded', function(){
     </div>
   </div>
 </div>
+
+<!-- VERIFY: /api inventory/pricing/catalogue/decant/order/wompi/btcpay/customer/sommelier calls preserved from source file. -->
 </body>
 </html>
