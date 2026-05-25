@@ -1128,6 +1128,13 @@ footer{background:var(--dark);padding:3.5rem 4rem;text-align:center;border-top:1
 .na-rail-line{position:absolute;top:50%;left:0;width:100%;height:1px;background:rgba(184,149,90,0.25)}
 .na-rail-fill{position:absolute;top:50%;left:0;height:1px;width:0;background:var(--gold)}
 .na-rail-tick{position:absolute;top:calc(50% - 3px);width:1px;height:7px;background:rgba(184,149,90,0.4)}
+@media(min-width:769px){
+  .new-arrivals-section .na-toc,.new-arrivals-section .na-bottle-zone,.new-arrivals-section .na-text-zone,.new-arrivals-section .na-rail-bot{opacity:0;transform:translateY(18px);transition:opacity 0.65s ease,transform 0.65s ease}
+  .new-arrivals-section.na-inview .na-toc,.new-arrivals-section.na-inview .na-bottle-zone,.new-arrivals-section.na-inview .na-text-zone,.new-arrivals-section.na-inview .na-rail-bot{opacity:1;transform:none}
+  .new-arrivals-section.na-inview .na-bottle-zone{transition-delay:0.08s}
+  .new-arrivals-section.na-inview .na-text-zone{transition-delay:0.16s}
+  .new-arrivals-section.na-inview .na-rail-bot{transition-delay:0.22s}
+}
 @media(max-width:1024px){
   .na-stage{grid-template-columns:220px 1fr 390px;padding:3.5rem 2rem 4.5rem;gap:2rem}
   .na-name{font-size:3rem}
@@ -1138,18 +1145,18 @@ footer{background:var(--dark);padding:3.5rem 4rem;text-align:center;border-top:1
   header,.hero,#shop,footer,.new-arrivals-section{width:100%;max-width:100%;box-sizing:border-box}
   .na-sticky-wrap{height:auto}
   .na-sticky{position:relative;height:auto;min-height:0;overflow:visible;background:var(--warm-white)}
-  .na-stage{position:sticky;top:0;height:100svh;min-height:560px;display:block;padding:3.4rem 1.2rem 1.8rem;width:100%;max-width:100vw;box-sizing:border-box;z-index:2;overflow:hidden}
+  .na-stage{display:none}
   .na-toc{display:none}
   .na-corner-stamp{top:1rem;left:1.2rem}
-  .na-bg-orb{width:620px;height:620px;filter:blur(90px);opacity:0.12}
+  .na-bg-orb{width:620px;height:620px;filter:blur(90px);opacity:0.10}
   .na-bottle-zone{position:absolute;inset:0 0 44svh;display:flex;align-items:center;justify-content:center}
   .na-text-zone{display:none}
   .na-bottle-mark{font-size:13rem;opacity:0.035}
   .na-bottle-svg{--na-bottle-scale:0.72}
   .na-bottle-slot{pointer-events:auto}
   .na-bottle-slot svg{filter:drop-shadow(0 28px 55px rgba(0,0,0,0.18)) drop-shadow(0 4px 12px rgba(0,0,0,0.08))}
-  .na-mobile-carousel{display:flex;flex-direction:column;overflow:visible;width:100%;max-width:100%;position:relative;z-index:3;margin-top:-100svh}
-  .na-mobile-card{width:100%;min-height:100svh;padding:50svh 1.25rem 4.25rem;display:flex;flex-direction:column;justify-content:flex-end;box-sizing:border-box;border-bottom:1px solid var(--border-light);background:transparent}
+  .na-mobile-carousel{display:flex;flex-direction:column;overflow:visible;width:100%;max-width:100%;position:relative;z-index:3}
+  .na-mobile-card{width:100%;min-height:92svh;padding:5.5rem 1.25rem 4.25rem;display:flex;flex-direction:column;justify-content:center;box-sizing:border-box;border-bottom:1px solid var(--border-light);background:transparent}
   .na-mobile-card.is-active .na-text-slot{transform:translateY(0)}
   .na-mobile-bottle{display:none}
   .na-mobile-card .na-text-slot{position:relative;inset:auto;display:flex;justify-content:flex-start;opacity:1;transform:translateY(12px);will-change:transform;transition:transform 0.55s ease}
@@ -3033,6 +3040,20 @@ function buildGrid(){
       var N = diary.length;
       var lastP = -1;
       var raf = 0;
+      var sectionInView = true;
+
+      if('IntersectionObserver' in window){
+        var desktopSceneObserver = new IntersectionObserver(function(entries){
+          entries.forEach(function(entry){
+            sectionInView = entry.isIntersecting;
+            wrap.classList.toggle('na-inview', entry.isIntersecting);
+            if(entry.isIntersecting) compute();
+          });
+        }, { threshold:[0,0.12], rootMargin:'-12% 0px -12% 0px' });
+        desktopSceneObserver.observe(wrap);
+      } else {
+        wrap.classList.add('na-inview');
+      }
 
       function setInner(slot, local){
         var a1 = naEase(naClamp((local - 0.00) / 0.18));
@@ -3103,6 +3124,7 @@ function buildGrid(){
 
       function compute(){
         if(window.innerWidth <= 768) return;
+        if(!sectionInView) return;
         var rect = wrap.getBoundingClientRect();
         var total = wrap.offsetHeight - window.innerHeight;
         var scrolled = -rect.top;
