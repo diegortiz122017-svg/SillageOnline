@@ -2898,10 +2898,13 @@ function buildGrid(){
     naSticky.appendChild(naPanel);
     naWrap.appendChild(naSticky);
 
-    // NA section not shown on tienda — skip insertion
+    // NA section not shown on tienda — skip insertion, continue to build grid
     var shopSection = document.getElementById('shop');
-    if(!shopSection) return; // guard
-    // Don't insert NA on tienda page
+    if(shopSection) {
+      // Only insert on homepage (has #na-anchor)
+      var naAnchor = document.getElementById('na-anchor');
+      if(naAnchor) naAnchor.parentNode.insertBefore(naWrap, naAnchor);
+    }
 
     var bottleZone = document.getElementById('naBottleZone');
     var textZone = document.getElementById('naTextZone');
