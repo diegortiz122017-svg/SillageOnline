@@ -2792,10 +2792,18 @@ function buildGrid(){
   var existingNA = document.getElementById('newArrivalsSection');
   if(existingNA) existingNA.remove();
   var thirtyDaysAgo = Date.now() - 30*24*60*60*1000;
+  function parseArrivalDate(value){
+    if(!value) return null;
+    var d = value instanceof Date ? value : new Date(String(value));
+    return isNaN(d.getTime()) ? null : d;
+  }
   var newArrivals = (P||[]).filter(function(p){
-    return p.arrivedAt && new Date(p.arrivedAt).getTime() > thirtyDaysAgo;
-  });
-  if(newArrivals.length){
+    var d = parseArrivalDate(p.arrivedAt);
+    return d && d.getTime() > thirtyDaysAgo;
+  }).sort(function(a,b){
+    return parseArrivalDate(a.arrivedAt).getTime() - parseArrivalDate(b.arrivedAt).getTime();
+  }).slice(0,4);
+
   if(newArrivals.length){
     var naWrap = document.createElement('div');
     naWrap.id = 'newArrivalsSection';
@@ -3147,7 +3155,6 @@ function buildGrid(){
       window.addEventListener('scroll', onScroll, {passive:true});
       window.addEventListener('resize', function(){ compute(); mobileFallbackActive(); });
     })();
-  }
   }
 
   // ── Main toast for newest product if user hasn't seen it ──
