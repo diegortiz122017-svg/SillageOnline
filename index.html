@@ -838,7 +838,7 @@ footer{background:var(--dark);padding:3.5rem 4rem;text-align:center;border-top:1
 .history-body{overflow-y:auto;padding:1.5rem 2rem;flex:1}
 .history-body::-webkit-scrollbar{width:3px}
 .history-body::-webkit-scrollbar-thumb{background:var(--border)}
-.h-order{background:white;border:1px solid rgba(184,149,90,0.15);padding:1.2rem;margin-bottom:1rem}
+.h-order{background:white;border:1px solid rgba(184,149,90,0.2);padding:1.2rem;margin-bottom:1rem}
 .h-order-top{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:0.6rem;flex-wrap:wrap;gap:0.5rem}
 .h-order-id{font-size:0.62rem;letter-spacing:0.2em;text-transform:uppercase;color:var(--gold)}
 .h-order-date{font-size:0.6rem;color:var(--muted)}
@@ -900,7 +900,7 @@ footer{background:var(--dark);padding:3.5rem 4rem;text-align:center;border-top:1
 
 /* Curated cards */
 .curated-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:0.8rem}
-.curated-card{border:1px solid rgba(184,149,90,0.15);padding:1.5rem 1.4rem;
+.curated-card{border:1px solid rgba(184,149,90,0.2);padding:1.5rem 1.4rem;
   cursor:pointer;transition:all 0.3s;position:relative;overflow:hidden;background:var(--dark)}
 .curated-card:hover{border-color:var(--gold);background:#15120e}
 .cc-icon{font-size:1.8rem;margin-bottom:0.8rem;display:block}
@@ -1019,8 +1019,8 @@ footer{background:var(--dark);padding:3.5rem 4rem;text-align:center;border-top:1
 .na-bg-orb{position:absolute;width:1100px;height:1100px;border-radius:50%;filter:blur(120px);opacity:0.10;pointer-events:none;transition:background 0.9s ease;z-index:1}
 .na-bg-orb.a{top:-20%;left:-15%}
 .na-bg-orb.b{bottom:-25%;right:-15%}
-.na-corner-stamp{position:absolute;top:1.4rem;left:2.2rem;font-size:0.5rem;letter-spacing:0.3em;text-transform:uppercase;color:var(--muted);z-index:5;display:flex;align-items:center;gap:0.6rem}
-.na-corner-stamp span{font-family:'Cormorant Garamond',serif;font-style:italic;font-size:0.95rem;letter-spacing:0.04em;text-transform:none;color:var(--gold)}
+.na-corner-stamp{position:absolute;top:1.4rem;left:2.2rem;font-size:0.5rem;letter-spacing:0.3em;text-transform:uppercase;color:var(--muted);z-index:5;display:flex;align-items:center;gap:0.4rem}
+.na-corner-stamp span{font-family:'Cormorant Garamond',serif;font-style:italic;font-size:1rem;letter-spacing:0.04em;text-transform:none;color:var(--gold)}
 .na-stage{position:absolute;inset:0;display:grid;grid-template-columns:280px 1fr 460px;gap:3rem;padding:4rem 4rem 4.5rem;z-index:2}
 .na-toc{display:flex;flex-direction:column;padding-top:1rem}
 .na-toc-cap{font-size:0.5rem;letter-spacing:0.3em;text-transform:uppercase;color:var(--muted);line-height:1.7}
@@ -1101,7 +1101,7 @@ footer{background:var(--dark);padding:3.5rem 4rem;text-align:center;border-top:1
   /* Sticky bottle panel — stays visible while carousel scrolls under it */
   .na-sticky{
     position:sticky;top:50px;
-    height:40svh;min-height:220px;
+    height:32svh;min-height:180px;
     overflow:visible;
     background:var(--warm-white);
     transition:background 0.75s ease;
@@ -1164,26 +1164,24 @@ footer{background:var(--dark);padding:3.5rem 4rem;text-align:center;border-top:1
   /* Each card — full-height, text anchors to bottom half */
   .na-mobile-card{
     width:100%;
-    min-height:80svh;
-    padding:2rem 1.4rem 4.5rem;
+    min-height:72svh;
+    padding:1.5rem 1.4rem 4.5rem;
     display:flex;flex-direction:column;justify-content:flex-end;
     box-sizing:border-box;
     border-bottom:1px solid var(--border-light);
     background:transparent;
     position:relative;
   }
-  /* Gradient: card fades in from transparent top to solid bottom
-     Creates the illusion of text emerging from beneath the bottle */
   .na-mobile-card::before{
     content:'';
     position:absolute;inset:0;
     background:linear-gradient(
       to bottom,
       transparent 0%,
-      transparent 20%,
-      rgba(250,248,244,0.6) 42%,
-      rgba(250,248,244,0.95) 62%,
-      var(--warm-white) 78%
+      transparent 10%,
+      rgba(250,248,244,0.5) 32%,
+      rgba(250,248,244,0.93) 55%,
+      var(--warm-white) 72%
     );
     pointer-events:none;z-index:0;
     transition:background 0.75s ease;
@@ -1441,7 +1439,7 @@ footer{background:var(--dark);padding:3.5rem 4rem;text-align:center;border-top:1
   padding:0.5rem 0;font-size:0.72rem;color:var(--muted)}
 .cart-shipping-row .csv{color:var(--cream)}
 .shipping-free{color:var(--success) !important;font-size:0.65rem;letter-spacing:0.08em}
-.shipping-bar{background:rgba(184,149,90,0.06);border:1px solid rgba(184,149,90,0.15);
+.shipping-bar{background:rgba(184,149,90,0.06);border:1px solid rgba(184,149,90,0.2);
   padding:0.55rem 0.8rem;font-size:0.62rem;color:var(--muted);margin-bottom:0.8rem;line-height:1.7}
 .shipping-bar strong{color:var(--gold-light)}
 .ms-shipping{display:flex;justify-content:space-between;padding:0.4rem 0;
@@ -1533,7 +1531,7 @@ footer{background:var(--dark);padding:3.5rem 4rem;text-align:center;border-top:1
 .bundle-modal{background:var(--dark);border:1px solid var(--border);max-width:520px;width:90%;max-height:85vh;overflow-y:auto;position:relative}
 .bundle-modal-hdr{padding:1.5rem;border-bottom:1px solid var(--border);display:flex;justify-content:space-between;align-items:flex-start}
 .bundle-modal-body{padding:1.5rem;display:flex;flex-direction:column;gap:0.8rem}
-.bundle-prod-row{display:flex;align-items:center;gap:1rem;padding:0.8rem;background:rgba(255,255,255,0.02);border:1px solid var(--border-light);cursor:pointer;transition:border-color 0.2s}
+.bundle-prod-row{display:flex;align-items:center;gap:1rem;padding:0.8rem;background:white;box-shadow:0 4px 24px rgba(0,0,0,0.06);border:1px solid var(--border-light);cursor:pointer;transition:border-color 0.2s}
 .bundle-prod-row:hover{border-color:var(--gold)}
 .bundle-prod-img{width:50px;height:50px;object-fit:cover;flex-shrink:0;background:rgba(255,255,255,0.03)}
 .bundle-prod-info{flex:1;min-width:0}
@@ -1660,7 +1658,7 @@ footer{background:var(--dark);padding:3.5rem 4rem;text-align:center;border-top:1
 .som-profile-tag{
   padding:0.18rem 0.5rem;
   font-size:0.5rem;
-  border:1px solid rgba(184,149,90,0.15);
+  border:1px solid rgba(184,149,90,0.2);
   border-radius:0;
   background:transparent;
   color:rgba(184,149,90,0.65);
@@ -1930,15 +1928,16 @@ footer{background:var(--dark);padding:3.5rem 4rem;text-align:center;border-top:1
 
 /* ── NEZ SOMMELIER SECTION ──────────────────────────── */
 .nez-section{
-  background:var(--dark);color:var(--cream);
+  background:var(--warm-white);color:var(--charcoal);
   padding:7rem 4rem;
   position:relative;overflow:hidden;
+  border-top:1px solid rgba(184,149,90,0.12);
 }
 .nez-section::before{
   content:'';position:absolute;inset:0;
   background:
-    radial-gradient(ellipse 60% 80% at 0% 50%, rgba(184,149,90,0.07) 0%, transparent 60%),
-    radial-gradient(ellipse 40% 60% at 100% 20%, rgba(184,149,90,0.04) 0%, transparent 50%);
+    radial-gradient(ellipse 60% 80% at 0% 50%, rgba(184,149,90,0.05) 0%, transparent 60%),
+    radial-gradient(ellipse 40% 60% at 100% 20%, rgba(184,149,90,0.03) 0%, transparent 50%);
   pointer-events:none;
 }
 .nez-inner{
@@ -1957,12 +1956,12 @@ footer{background:var(--dark);padding:3.5rem 4rem;text-align:center;border-top:1
 .nez-title{
   font-family:'Cormorant Garamond',serif;
   font-size:clamp(2.8rem,5vw,4.2rem);font-weight:300;
-  line-height:1.05;color:var(--cream);
+  line-height:1.05;color:var(--charcoal);
   margin-bottom:1.4rem;
   opacity:0;transform:translateY(16px);
   transition:opacity 0.7s ease 0.1s,transform 0.7s ease 0.1s;
 }
-.nez-title em{font-style:italic;color:var(--gold-light)}
+.nez-title em{font-style:italic;color:var(--gold)}
 .nez-body{
   font-size:0.82rem;color:var(--muted);line-height:1.9;
   max-width:38ch;margin-bottom:2.2rem;
@@ -2009,14 +2008,14 @@ footer{background:var(--dark);padding:3.5rem 4rem;text-align:center;border-top:1
 .nez-chat-preview{
   display:flex;flex-direction:column;gap:1.2rem;
   padding:2rem;
-  border:1px solid rgba(184,149,90,0.15);
-  background:rgba(255,255,255,0.02);
+  border:1px solid rgba(184,149,90,0.2);
+  background:white;box-shadow:0 4px 24px rgba(0,0,0,0.06);
   position:relative;
 }
 .nez-chat-preview::before{
   content:'Nez';
   position:absolute;top:-0.6rem;left:1.4rem;
-  background:var(--dark);
+  background:var(--warm-white);
   font-size:0.5rem;letter-spacing:0.3em;text-transform:uppercase;
   color:var(--gold);padding:0 0.5rem;
 }
@@ -2028,12 +2027,12 @@ footer{background:var(--dark);padding:3.5rem 4rem;text-align:center;border-top:1
 .nez-chat-bubble{
   font-family:'Cormorant Garamond',serif;
   font-size:1rem;font-weight:300;line-height:1.55;
-  color:var(--cream);
+  color:var(--charcoal);
 }
-.nez-chat-nez .nez-chat-bubble{color:var(--cream)}
+.nez-chat-nez .nez-chat-bubble{color:var(--charcoal)}
 .nez-chat-user{align-items:flex-end}
 .nez-chat-user .nez-chat-bubble{
-  color:rgba(184,149,90,0.7);font-style:italic;font-size:0.92rem;
+  color:var(--muted);font-style:italic;font-size:0.92rem;
   text-align:right;max-width:85%;
 }
 
@@ -3230,7 +3229,7 @@ function buildGrid(){
     naPanel.innerHTML =
       '<div class="na-bg-orb a" id="naOrbA"></div>'+
       '<div class="na-bg-orb b" id="naOrbB"></div>'+
-      '<div class="na-corner-stamp">Diario &middot; <span>'+esc(naWeekLabel())+'</span></div>'+
+      '<div class="na-corner-stamp">Recién <span>Llegados</span></div>'+
       '<div class="na-stage">'+
         '<aside class="na-toc">'+
           '<div class="na-toc-cap">CUATRO P\u00c1GINAS<b>de un mismo diario</b></div>'+
