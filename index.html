@@ -788,6 +788,10 @@ footer{background:var(--dark);padding:3.5rem 4rem;text-align:center;border-top:1
   .curated-grid{grid-template-columns:1fr}
   header{padding:0.8rem 1rem}
 }
+@media(max-width:430px){
+  #shop{padding-left:1rem;padding-right:1rem}
+  .product-grid{grid-template-columns:1fr;gap:1rem}
+}
 
 /* ── CUSTOMER AUTH ── */
 .auth-btn{background:none;border:1px solid var(--border);padding:0 0.9rem;height:2rem;color:var(--muted);font-family:'Jost',sans-serif;font-size:0.62rem;letter-spacing:0.15em;text-transform:uppercase;cursor:pointer;transition:all 0.25s;white-space:nowrap}
@@ -1133,6 +1137,9 @@ footer{background:var(--dark);padding:3.5rem 4rem;text-align:center;border-top:1
   .na-name{font-size:3rem}
 }
 @media(max-width:768px){
+  html,body{width:100%;max-width:100%;overflow-x:hidden}
+  body{min-width:0}
+  header,.hero,#shop,footer,.new-arrivals-section{width:100%;max-width:100%;box-sizing:border-box}
   .na-sticky-wrap{height:auto}
   .na-sticky{position:relative;height:auto;min-height:100svh;overflow:visible}
   .na-stage{display:none}
@@ -1140,9 +1147,9 @@ footer{background:var(--dark);padding:3.5rem 4rem;text-align:center;border-top:1
   .na-corner-stamp{top:1rem;left:1.2rem}
   .na-bg-orb{width:620px;height:620px;filter:blur(90px);opacity:0.12}
   .na-bottle-zone,.na-text-zone{display:none}
-  .na-mobile-carousel{display:flex;overflow-x:auto;scroll-snap-type:x mandatory;scroll-behavior:smooth;-webkit-overflow-scrolling:touch;gap:0;width:100%;position:relative;z-index:3}
+  .na-mobile-carousel{display:flex;overflow-x:auto;scroll-snap-type:x mandatory;scroll-behavior:smooth;-webkit-overflow-scrolling:touch;gap:0;width:100vw;max-width:100vw;margin-left:calc(50% - 50vw);position:relative;z-index:3}
   .na-mobile-carousel::-webkit-scrollbar{display:none}
-  .na-mobile-card{min-width:100%;scroll-snap-align:start;padding:4rem 1.25rem 5rem;display:flex;flex-direction:column;min-height:100svh;box-sizing:border-box}
+  .na-mobile-card{width:100vw;min-width:100vw;max-width:100vw;scroll-snap-align:start;padding:4rem 1.25rem 5rem;display:flex;flex-direction:column;min-height:100svh;box-sizing:border-box}
   .na-mobile-bottle{height:clamp(190px,34svh,285px);display:flex;align-items:center;justify-content:center;flex:0 0 auto}
   .na-mobile-bottle svg{filter:drop-shadow(0 28px 55px rgba(0,0,0,0.20)) drop-shadow(0 4px 12px rgba(0,0,0,0.1))}
   .na-mobile-card .na-text-slot{position:relative;inset:auto;display:flex;justify-content:flex-start;opacity:1;transform:none;will-change:auto}
