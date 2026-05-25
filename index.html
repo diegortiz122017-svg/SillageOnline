@@ -1029,7 +1029,7 @@ footer{background:var(--dark);padding:3.5rem 4rem;text-align:center;border-top:1
 .na-prod-body{display:flex;flex-direction:column;justify-content:center;padding:3rem 4rem;background:var(--warm-white)}
 .na-prod-badge{font-size:0.42rem;letter-spacing:0.2em;text-transform:uppercase;color:var(--gold);margin-bottom:0.8rem}
 .na-prod-brand{font-size:0.52rem;letter-spacing:0.22em;text-transform:uppercase;color:var(--gold);margin-bottom:0.3rem}
-.na-prod-name{font-family:'Cormorant Garamond',serif;font-size:clamp(2.8rem,5vw,4.5rem);font-weight:300;color:var(--charcoal);line-height:1;margin-bottom:0.8rem}
+.na-prod-name{font-family:'Cormorant Garamond',serif;font-size:clamp(2.8rem,5vw,4.5rem);font-weight:300;color:var(--charcoal);line-height:1;margin-bottom:0.8rem;will-change:clip-path,opacity;clip-path:inset(0 100% 0 0);overflow:visible}
 .na-prod-tagline{font-size:0.75rem;color:var(--muted);font-style:italic;line-height:1.7;margin-bottom:1.4rem}
 .na-prod-chords{display:flex;flex-wrap:wrap;gap:5px;margin-bottom:1.6rem}
 .na-prod-chord{font-size:0.46rem;letter-spacing:0.12em;text-transform:uppercase;color:var(--muted);border:1px solid rgba(184,149,90,0.25);padding:3px 10px}
@@ -1043,7 +1043,11 @@ footer{background:var(--dark);padding:3.5rem 4rem;text-align:center;border-top:1
 .na-dot{width:4px;height:4px;border-radius:50%;background:rgba(184,149,90,0.25);transition:background 0.3s,transform 0.3s}
 .na-dot.active{background:var(--gold);transform:scale(1.4)}
 /* Grid finale */
-.na-grid-state{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;padding:3rem 4rem;will-change:opacity,transform}
+.na-grid-state{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:3rem 4rem;will-change:opacity,transform;gap:2rem}
+.na-grid-closing-hdr{text-align:center}
+.na-grid-closing-eyebrow{font-size:0.6rem;letter-spacing:0.35em;text-transform:uppercase;color:var(--gold);font-family:'Jost',sans-serif;display:block;margin-bottom:0.6rem}
+.na-grid-closing-title{font-family:'Cormorant Garamond',serif;font-size:clamp(1.8rem,3vw,2.8rem);font-weight:300;color:var(--charcoal);line-height:1.1}
+.na-grid-closing-title em{font-style:italic;color:var(--gold)}
 .na-grid-inner{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:10px;width:100%;max-width:900px}
 .na-mini-card{background:var(--warm-white);border:1px solid rgba(184,149,90,0.12);cursor:pointer;transition:border-color 0.3s}
 .na-mini-card:hover{border-color:rgba(184,149,90,0.4)}
@@ -1055,13 +1059,22 @@ footer{background:var(--dark);padding:3.5rem 4rem;text-align:center;border-top:1
 .na-mini-price{font-family:'Cormorant Garamond',serif;font-size:1rem;color:var(--charcoal)}
 .na-mini-cta{font-size:0.44rem;letter-spacing:0.16em;text-transform:uppercase;color:var(--muted);border-bottom:1px solid rgba(184,149,90,0.25);padding-bottom:1px}
 @media(max-width:768px){
-  .na-prod-body{padding:1.5rem 1.2rem}
-  .na-prod-name{font-size:2.4rem}
-  .na-product-state{grid-template-columns:1fr;grid-template-rows:1fr auto}
-  .na-prod-img{order:-1}
-  .na-dots{right:0.8rem}
-  .na-grid-state{padding:1.5rem 1rem}
-  .new-arrivals-heading{font-size:2.2rem}
+  .na-prod-body{padding:1.2rem 1.4rem 1.6rem}
+  .na-prod-name{font-size:2.2rem}
+  .na-prod-tagline{font-size:0.68rem;margin-bottom:0.8rem}
+  .na-product-state{grid-template-columns:1fr;grid-template-rows:55% 45%}
+  .na-product-state .na-prod-img{order:-1!important}
+  .na-product-state .na-prod-body{order:1!important;text-align:left!important}
+  .na-product-state .na-prod-chords{justify-content:flex-start!important}
+  .na-product-state .na-prod-footer{justify-content:flex-start!important}
+  .na-dots{right:0.6rem}
+  .na-dot{width:3px;height:3px}
+  .na-grid-state{padding:1.2rem 1rem;gap:1.2rem}
+  .na-grid-inner{grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:6px}
+  .na-mini-img{height:110px}
+  .na-grid-closing-title{font-size:1.6rem}
+  .new-arrivals-heading{font-size:2rem}
+  .na-header-state{padding:0 1.5rem}
 }
 /* Hover: bottle 3D tilt */
 .na-card-img{perspective:800px}
@@ -2814,6 +2827,7 @@ function buildGrid(){
 
     // Grid finale
     var gridHtml = '<div class="na-grid-state" id="naGridState">'+
+      '<div class="na-grid-closing-hdr"><span class="na-grid-closing-eyebrow">Recién llegado</span><h2 class="na-grid-closing-title">Lo nuevo en <em>Sillage</em></h2></div>'+
       '<div class="na-grid-inner">'+
       newArrivals.map(function(p, idx){
         var pr  = getPr(p.id);
@@ -2853,13 +2867,11 @@ function buildGrid(){
     var shopSection = document.getElementById('shop');
     shopSection.parentNode.insertBefore(naSection, shopSection);
 
-    // ── Scroll-driven reveal ──
+    // ── Scroll-driven reveal — Option B + sticky-once ──
     (function(){
       var n      = newArrivals.length;
       var states = n + 2; // header + n products + grid
-      // Each state gets equal scroll room
-      // Total wrap height = states * 80vh (so each beat = ~80vh of scroll)
-      var beatVh = 85;
+      var beatVh = 100;   // more scroll room per beat = slower feel
       naWrap.style.height = (states * beatVh) + 'vh';
 
       var headerEl = document.getElementById('naHeaderState');
@@ -2867,52 +2879,88 @@ function buildGrid(){
       var prodEls  = newArrivals.map(function(_,i){ return document.getElementById('naProd'+i); });
       var dotEls   = Array.from({length:states}).map(function(_,i){ return document.getElementById('naDot'+i); });
 
-      // Set all states invisible initially
-      function reset(){
-        gsap.set(headerEl, { opacity:0, y:0 });
-        prodEls.forEach(function(el){ gsap.set(el, { opacity:0, y:60 }); });
-        gsap.set(gridEl, { opacity:0, scale:0.96 });
-      }
-
       function lerp(a,b,t){ return a+(b-a)*Math.max(0,Math.min(1,t)); }
       function prog(t,from,to){ return Math.max(0,Math.min(1,(t-from)/(to-from))); }
-      function ease(t){ return t<0.5?2*t*t:-1+(4-2*t)*t; }
+      function easeOut(t){ return 1-(1-t)*(1-t); }
+      function easeInOut(t){ return t<0.5?2*t*t:-1+(4-2*t)*t; }
 
-      // Floating animation on visible bottle
+      // Option B: clip-path reveal on product name + slower slide
+      // We reveal the name via clipPath left→right
+      function setNameReveal(el, pct){
+        var name = el.querySelector('.na-prod-name');
+        if(!name) return;
+        name.style.clipPath = 'inset(0 '+(100*(1-pct))+'% 0 0)';
+        name.style.webkitClipPath = 'inset(0 '+(100*(1-pct))+'% 0 0)';
+        name.style.opacity = pct > 0.02 ? '1' : '0';
+      }
+
+      // Set initial clip on all names
+      prodEls.forEach(function(el){
+        var name = el.querySelector('.na-prod-name');
+        if(name){ name.style.clipPath = 'inset(0 100% 0 0)'; name.style.opacity='0'; }
+      });
+
+      // Floating bottles
       var floatTweens = [];
-      function startFloat(el){
+      var currentFloatState = -1;
+      function startFloat(idx){
+        if(currentFloatState === idx) return;
+        currentFloatState = idx;
         floatTweens.forEach(function(t){ t.kill(); });
         floatTweens = [];
-        if(!el) return;
-        var bottle = el.querySelector('img,svg');
+        if(idx < 0 || idx >= prodEls.length) return;
+        var bottle = prodEls[idx].querySelector('.na-prod-img img, .na-prod-img svg');
         if(bottle) floatTweens.push(
-          gsap.to(bottle, { y:-10, duration:2.8, repeat:-1, yoyo:true, ease:'sine.inOut' })
+          gsap.to(bottle, { y:-10, duration:3.2, repeat:-1, yoyo:true, ease:'sine.inOut' })
         );
       }
 
+      // ── Sticky-once: release after user scrolls through all states ──
+      var released = false;
+      function releaseStickyOnce(){
+        if(released) return;
+        released = true;
+        // Keep grid visible statically, release sticky
+        gsap.set(gridEl, { opacity:1, scale:1 });
+        naSticky.style.position = 'relative';
+        naSticky.style.height = 'auto';
+        // Hide all other states, show only grid
+        gsap.set(headerEl, { opacity:0 });
+        prodEls.forEach(function(el){ gsap.set(el, { opacity:0 }); });
+        // Remove dots
+        var dots = naSticky.querySelector('.na-dots');
+        if(dots) dots.style.display = 'none';
+      }
+
       var lastState = -1;
+      var lastP = -1;
 
       function applyProgress(p){
-        // p: 0→1 across the full wrap height
-        // State boundaries: each state occupies 1/states of the scroll
-        var stateF  = p * states;           // 0 → states (float)
-        var stateI  = Math.floor(stateF);   // current discrete state
-        var stateProg = stateF - stateI;    // 0→1 within this state
+        if(released) return;
+
+        var stateF    = p * states;
+        var stateI    = Math.min(Math.floor(stateF), states - 1);
+        var stateProg = stateF - Math.floor(stateF);
+
+        // Release when grid state is fully revealed
+        if(stateI >= states - 1 && stateProg > 0.85){
+          releaseStickyOnce();
+          return;
+        }
 
         // Update dots
-        var dotIdx = Math.min(stateI, states-1);
-        if(dotIdx !== lastState){
-          dotEls.forEach(function(d,i){ d.classList.toggle('active', i===dotIdx); });
-          lastState = dotIdx;
+        if(stateI !== lastState){
+          dotEls.forEach(function(d,i){ d.classList.toggle('active', i===stateI); });
+          lastState = stateI;
         }
 
         // ── Header: state 0 ──
-        var hIn  = ease(prog(stateProg, 0.0, 0.4));   // fade in
-        var hOut = stateI >= 1 ? ease(prog(stateProg, 0.0, 0.5)) : 0;
         if(stateI === 0){
-          gsap.set(headerEl, { opacity: hIn, y: lerp(20,0,hIn) });
+          var hIn = easeOut(prog(stateProg, 0.0, 0.35));
+          gsap.set(headerEl, { opacity:hIn, y:lerp(24,0,hIn) });
         } else if(stateI === 1){
-          gsap.set(headerEl, { opacity: lerp(1,0,ease(prog(stateProg,0.0,0.4))), y: lerp(0,-30,ease(prog(stateProg,0.0,0.4))) });
+          var hOut = easeInOut(prog(stateProg, 0.0, 0.4));
+          gsap.set(headerEl, { opacity:lerp(1,0,hOut), y:lerp(0,-28,hOut) });
         } else {
           gsap.set(headerEl, { opacity:0 });
         }
@@ -2920,52 +2968,87 @@ function buildGrid(){
         // ── Products: states 1..n ──
         prodEls.forEach(function(el, i){
           var myState = i + 1;
+
           if(stateI === myState){
-            // Entering
-            var inP = ease(prog(stateProg, 0.0, 0.45));
-            gsap.set(el, { opacity:inP, y:lerp(50,0,inP) });
+            // ENTERING — slower, two phases:
+            // Phase 1 (0→0.5): frame slides in from below + brand/badge/chords/footer fade
+            // Phase 2 (0.3→0.85): name clip-path reveals left→right
+            var frameIn  = easeOut(prog(stateProg, 0.0, 0.55));
+            var nameRevP = easeInOut(prog(stateProg, 0.25, 0.80));
+            var textIn   = easeOut(prog(stateProg, 0.15, 0.65));
+            var bottleIn = easeOut(prog(stateProg, 0.10, 0.60));
+
+            gsap.set(el, { opacity:frameIn, y:lerp(55,0,frameIn) });
+
+            // Bottle enters slightly after frame
+            var bottle = el.querySelector('.na-prod-img img, .na-prod-img svg');
+            if(bottle) gsap.set(bottle, { opacity:bottleIn, y:lerp(18,0,bottleIn), scale:lerp(0.9,1,bottleIn) });
+
+            // Brand/badge/tagline/chords/footer
+            ['.na-prod-badge','.na-prod-brand','.na-prod-tagline','.na-prod-chords','.na-prod-footer'].forEach(function(sel,si){
+              var tDelay = 0.15 + si*0.04;
+              var tEl = el.querySelector(sel);
+              if(tEl) tEl.style.opacity = easeOut(prog(stateProg, tDelay, tDelay+0.45));
+            });
+
+            // Name clip reveal
+            setNameReveal(el, nameRevP);
+
+            // Start float once mostly visible
+            if(frameIn > 0.6) startFloat(i);
+
           } else if(stateI === myState + 1){
-            // Exiting — slides up and fades
-            var outP = ease(prog(stateProg, 0.0, 0.45));
-            gsap.set(el, { opacity:lerp(1,0,outP), y:lerp(0,-50,outP) });
+            // EXITING — slides up and fades, name collapses back
+            var outP    = easeInOut(prog(stateProg, 0.0, 0.50));
+            var nameOut = easeInOut(prog(stateProg, 0.0, 0.35));
+            gsap.set(el, { opacity:lerp(1,0,outP), y:lerp(0,-45,outP) });
+            setNameReveal(el, lerp(1,0,nameOut));
+
           } else if(stateI < myState){
-            gsap.set(el, { opacity:0, y:50 });
+            // Not yet reached
+            gsap.set(el, { opacity:0, y:55 });
+            setNameReveal(el, 0);
           } else {
-            gsap.set(el, { opacity:0, y:-50 });
+            // Already passed
+            gsap.set(el, { opacity:0, y:-45 });
+            setNameReveal(el, 0);
           }
         });
 
-        // ── Grid: last state ──
+        // ── Grid finale: last state ──
         var gridState = n + 1;
         if(stateI === gridState){
-          var gIn = ease(prog(stateProg, 0.0, 0.55));
+          var gIn = easeOut(prog(stateProg, 0.0, 0.65));
           gsap.set(gridEl, { opacity:gIn, scale:lerp(0.96,1,gIn) });
         } else if(stateI < gridState){
           gsap.set(gridEl, { opacity:0, scale:0.96 });
-        } else {
-          gsap.set(gridEl, { opacity:1, scale:1 });
-        }
-
-        // Start float on active product
-        if(stateI >= 1 && stateI <= n && stateI !== lastState){
-          startFloat(prodEls[stateI-1]);
         }
       }
 
-      reset();
+      // Initial state
+      gsap.set(headerEl, { opacity:0, y:24 });
+      prodEls.forEach(function(el){
+        gsap.set(el, { opacity:0, y:55 });
+        ['.na-prod-badge','.na-prod-brand','.na-prod-tagline','.na-prod-chords','.na-prod-footer'].forEach(function(sel){
+          var tEl = el.querySelector(sel);
+          if(tEl) tEl.style.opacity = '0';
+        });
+      });
+      gsap.set(gridEl, { opacity:0, scale:0.96 });
+
       applyProgress(0);
 
-      // rAF loop
-      var lastP = -1;
+      // rAF tick
       function tick(){
+        if(released){ return; } // stop polling once released
         var rect     = naWrap.getBoundingClientRect();
         var scrolled = -rect.top;
         var total    = naWrap.offsetHeight - window.innerHeight;
         var p = total > 0 ? Math.max(0, Math.min(1, scrolled/total)) : 0;
-        if(Math.abs(p - lastP) > 0.0003){ lastP = p; applyProgress(p); }
+        if(Math.abs(p - lastP) > 0.0002){ lastP = p; applyProgress(p); }
         requestAnimationFrame(tick);
       }
-      tick();
+      requestAnimationFrame(tick);
     })();
   }
 
