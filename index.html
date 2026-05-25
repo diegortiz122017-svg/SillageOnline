@@ -1041,8 +1041,7 @@ footer{background:var(--dark);padding:3.5rem 4rem;text-align:center;border-top:1
 .na-prod-body{display:flex;flex-direction:column;justify-content:center;padding:3rem 4rem;background:var(--warm-white)}
 .na-prod-badge{font-size:0.42rem;letter-spacing:0.2em;text-transform:uppercase;color:var(--gold);margin-bottom:0.8rem}
 .na-prod-brand{font-size:0.52rem;letter-spacing:0.22em;text-transform:uppercase;color:var(--gold);margin-bottom:0.3rem}
-.na-prod-name{font-family:'Cormorant Garamond',serif;font-size:clamp(2.8rem,5vw,4.5rem);font-weight:300;color:var(--charcoal);line-height:1;margin-bottom:0.8rem;will-change:clip-path,opacity;clip-path:inset(0 100% 0 0);overflow:visible}
-.na-prod-tagline{font-size:0.75rem;color:var(--muted);font-style:italic;line-height:1.7;margin-bottom:1.4rem}
+.na-prod-name{font-family:'Cormorant Garamond',serif;font-size:clamp(2.8rem,5vw,4.5rem);font-weight:300;color:var(--charcoal);line-height:1;margin-bottom:0.8rem;will-change:clip-path,opacity;clip-path:inset(0 100% 0 0);overflow:visible}.na-prod-tagline{font-size:0.75rem;color:var(--muted);font-style:italic;line-height:1.7;margin-bottom:1.4rem}
 .na-prod-chords{display:flex;flex-wrap:wrap;gap:5px;margin-bottom:1.6rem}
 .na-prod-chord{font-size:0.46rem;letter-spacing:0.12em;text-transform:uppercase;color:var(--muted);border:1px solid rgba(184,149,90,0.25);padding:3px 10px}
 .na-prod-footer{display:flex;align-items:center;gap:1.2rem;padding-top:1rem;border-top:1px solid rgba(184,149,90,0.12)}
@@ -2800,10 +2799,6 @@ function buildGrid(){
         '<div class="na-prod-name">'+esc(p.name)+'</div>'+
         (p.tagline ? '<div class="na-prod-tagline">'+esc(p.tagline)+'</div>' : '')+
         (chordHtml ? '<div class="na-prod-chords"'+(isEven?' style="justify-content:flex-end"':'')+'>'+chordHtml+'</div>' : '')+
-        '<div class="na-prod-footer"'+(isEven?' style="justify-content:flex-end"':'')+'>'+
-          '<span class="na-prod-price">$'+ep+'</span>'+
-          '<span class="na-prod-cta">Descubrir</span>'+
-        '</div>'+
       '</div>';
 
       return '<div class="na-product-state" id="naProd'+idx+'" onclick="openDetail('+p.id+')">'+
@@ -2857,32 +2852,48 @@ function buildGrid(){
     (function(){
       var n      = newArrivals.length;
       var states = n + 2; // header + n products + grid
-      // Last product gets extra beat before grid
-      var beatVh = 140;
-      // Total = states beats + 1 extra beat for last product pause
+      var beatVh = 90;    // tighter — less dead space
       naWrap.style.height = ((states + 1) * beatVh) + 'vh';
 
-      // Remap progress: last product state occupies 2 beats instead of 1
+      // Remap: last product gets 2× beat before grid
       function remapState(p){
-        // Total scroll units = states + 1
         var totalUnits = states + 1;
         var rawF = p * totalUnits;
-        // States 0..n-1 map normally (1 unit each)
-        // State n (last product) maps to 2 units
-        // State n+1 (grid) maps to 1 unit
-        var lastProdState = n; // 1-indexed last product
+        var lastProdState = n;
         if(rawF <= lastProdState){
           return { stateI: Math.floor(rawF), stateProg: rawF - Math.floor(rawF) };
         } else if(rawF <= lastProdState + 2){
-          // Last product gets 2 units
-          var lp = rawF - lastProdState; // 0→2
+          var lp = rawF - lastProdState;
           return { stateI: lastProdState, stateProg: lp / 2 };
         } else {
-          // Grid state
-          var gp = rawF - (lastProdState + 2); // 0→1
+          var gp = rawF - (lastProdState + 2);
           return { stateI: lastProdState + 1, stateProg: Math.min(gp, 1) };
         }
       }
+
+      // ── Name reveal via IntersectionObserver — fires once, not scroll-driven ──
+      var nameObserver = new IntersectionObserver(function(entries){
+        entries.forEach(function(entry){
+          if(!entry.isIntersecting) return;
+          var name = entry.target;
+          // GSAP clip-path reveal, medium speed, independent of scroll
+          gsap.fromTo(name,
+            { clipPath:'inset(0 100% 0 0)', webkitClipPath:'inset(0 100% 0 0)', opacity:0 },
+            { clipPath:'inset(0 0% 0 0)',   webkitClipPath:'inset(0 0% 0 0)',   opacity:1,
+              duration:1.1, ease:'power2.inOut', delay:0.15 }
+          );
+          nameObserver.unobserve(name);
+        });
+      }, { threshold: 0.3 });
+
+      // Observe names — will fire when product becomes visible
+      prodEls.forEach(function(el){
+        var name = el.querySelector('.na-prod-name');
+        if(name){
+          gsap.set(name, { clipPath:'inset(0 100% 0 0)', webkitClipPath:'inset(0 100% 0 0)', opacity:0 });
+          nameObserver.observe(name);
+        }
+      });
 
       var headerEl = document.getElementById('naHeaderState');
       var gridEl   = document.getElementById('naGridState');
@@ -2894,18 +2905,7 @@ function buildGrid(){
       function easeOut(t){ return 1-(1-t)*(1-t); }
       function easeInOut(t){ return t<0.5?2*t*t:-1+(4-2*t)*t; }
 
-      function setNameReveal(el, pct){
-        var name = el.querySelector('.na-prod-name');
-        if(!name) return;
-        name.style.clipPath = 'inset(0 '+(100*(1-pct))+'% 0 0)';
-        name.style.webkitClipPath = 'inset(0 '+(100*(1-pct))+'% 0 0)';
-        name.style.opacity = pct > 0.02 ? '1' : '0';
-      }
 
-      prodEls.forEach(function(el){
-        var name = el.querySelector('.na-prod-name');
-        if(name){ name.style.clipPath = 'inset(0 100% 0 0)'; name.style.opacity='0'; }
-      });
 
       var floatTweens = [];
       var currentFloatState = -1;
@@ -2981,28 +2981,22 @@ function buildGrid(){
           var myState = i + 1;
           if(stateI === myState){
             var frameIn  = easeOut(prog(stateProg, 0.0, 0.50));
-            var nameRevP = easeInOut(prog(stateProg, 0.20, 0.80)); // name reveal
             var bottleIn = easeOut(prog(stateProg, 0.08, 0.55));
             gsap.set(el, { opacity:frameIn, y:lerp(55,0,frameIn) });
             var bottle = el.querySelector('.na-prod-img img, .na-prod-img svg');
             if(bottle) gsap.set(bottle, { opacity:bottleIn, y:lerp(18,0,bottleIn), scale:lerp(0.9,1,bottleIn) });
-            ['.na-prod-badge','.na-prod-brand','.na-prod-tagline','.na-prod-chords','.na-prod-footer'].forEach(function(sel,si){
+            ['.na-prod-badge','.na-prod-brand','.na-prod-tagline','.na-prod-chords'].forEach(function(sel,si){
               var tEl = el.querySelector(sel);
               if(tEl) tEl.style.opacity = easeOut(prog(stateProg, 0.12+si*0.05, 0.58+si*0.05));
             });
-            setNameReveal(el, nameRevP);
             if(frameIn > 0.6) startFloat(i);
           } else if(stateI === myState + 1){
             var outP    = easeInOut(prog(stateProg, 0.0, 0.45));
-            var nameOut = easeInOut(prog(stateProg, 0.0, 0.30));
             gsap.set(el, { opacity:lerp(1,0,outP), y:lerp(0,-45,outP) });
-            setNameReveal(el, lerp(1,0,nameOut));
           } else if(stateI < myState){
             gsap.set(el, { opacity:0, y:55 });
-            setNameReveal(el, 0);
           } else {
             gsap.set(el, { opacity:0, y:-45 });
-            setNameReveal(el, 0);
           }
         });
 
@@ -3020,7 +3014,7 @@ function buildGrid(){
       gsap.set(headerEl, { opacity:0, y:24 });
       prodEls.forEach(function(el){
         gsap.set(el, { opacity:0, y:55 });
-        ['.na-prod-badge','.na-prod-brand','.na-prod-tagline','.na-prod-chords','.na-prod-footer'].forEach(function(sel){
+        ['.na-prod-badge','.na-prod-brand','.na-prod-tagline','.na-prod-chords'].forEach(function(sel){
           var tEl = el.querySelector(sel);
           if(tEl) tEl.style.opacity = '0';
         });
