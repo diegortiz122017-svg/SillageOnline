@@ -1017,9 +1017,8 @@ footer{background:var(--dark);padding:3.5rem 4rem;text-align:center;border-top:1
 .new-arrivals-section{position:relative;border-top:1px solid rgba(184,149,90,0.12);background:var(--warm-white)}
 /* Sticky container — height set dynamically by JS */
 .na-sticky-wrap{position:relative}
-.na-sticky{position:sticky;top:0;height:100vh;overflow:hidden;background:var(--warm-white)}
+.na-sticky{position:sticky;top:0;height:100vh;overflow:hidden;background:var(--warm-white);isolation:isolate;z-index:1}
 @media(max-width:768px){
-  /* On mobile the fixed nav is ~50px — sticky should start below it */
   .na-sticky{top:50px;height:calc(100vh - 50px)}
 }
 /* Header state */
@@ -1084,34 +1083,8 @@ footer{background:var(--dark);padding:3.5rem 4rem;text-align:center;border-top:1
 .na-card-img{perspective:800px}
 .na-card:hover .na-svg,.na-card:hover .na-card-img img{transform:rotateY(8deg) translateY(-4px) scale(1.04);transition:transform 0.5s cubic-bezier(0.34,1.2,0.64,1)}
 .na-card:nth-child(even):hover .na-svg,.na-card:nth-child(even):hover .na-card-img img{transform:rotateY(-8deg) translateY(-4px) scale(1.04)}
-@media(max-width:768px){
-  .na-sticky-once{padding:3rem 1.2rem 2rem}
-  .na-card{grid-template-columns:1fr}
-  .na-card-img{height:220px;order:-1!important}
-  .na-card-body{order:1!important;padding:1.5rem 1.2rem 2rem;text-align:left!important}
-  .na-card-chords{justify-content:flex-start!important}
-  .na-card-footer{justify-content:flex-start!important}
-  .na-card-badge{left:12px!important;right:auto!important}
-  .na-card-name{font-size:2rem}
-  .new-arrivals-title{font-size:0.6rem}
-  .new-arrivals-heading{font-size:1.8rem}
-}
-@media(max-width:768px){
-  .na-sticky{padding:2rem 1.2rem 2rem}
-  .na-sticky-wrap{height:300vh}
-  /* Stack vertically on mobile */
-  .na-card{grid-template-columns:1fr}
-  .na-card-img{height:220px;order:-1!important}
-  .na-card-body{order:1!important;padding:1.5rem 1.2rem 2rem;text-align:left!important}
-  .na-card-chords{justify-content:flex-start!important}
-  .na-card-footer{justify-content:flex-start!important}
-  .na-card-badge{left:12px!important;right:auto!important}
-  .na-card-name{font-size:2rem}
-  /* Header always visible on mobile */
-  .new-arrivals-title{font-size:0.6rem}
-  .new-arrivals-heading{font-size:1.8rem}
-  .new-arrivals-hdr{margin-bottom:1.2rem}
-}
+
+
 
 .ap-order{background:rgba(255,255,255,0.03);border:1px solid rgba(184,149,90,0.12);
   cursor:pointer;transition:border-color 0.2s}
