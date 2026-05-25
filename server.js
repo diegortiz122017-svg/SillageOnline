@@ -1340,6 +1340,13 @@ app.get('/', async (req, res) => {
 });
 
 app.get('/nosotros',    (req, res) => res.sendFile(path.join(__dirname, 'nosotros.html')));
+app.get('/tienda',      (req, res) => {
+  const fs   = require('fs');
+  const file = path.join(__dirname, 'tienda.html');
+  if (fs.existsSync(file)) return res.sendFile(file);
+  // Fallback: serve index.html if tienda.html not deployed yet
+  res.sendFile(path.join(__dirname, 'index.html'));
+});
 app.get('/envios', (req, res) => res.sendFile(path.join(__dirname, 'envios.html')));
 app.get('/terminos', (req, res) => res.sendFile(path.join(__dirname, 'terminos.html')));
 app.get('/devoluciones', (req, res) => res.sendFile(path.join(__dirname, 'devoluciones.html')));
