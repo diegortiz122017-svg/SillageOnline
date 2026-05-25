@@ -2871,7 +2871,7 @@ function buildGrid(){
     (function(){
       var n      = newArrivals.length;
       var states = n + 2; // header + n products + grid
-      var beatVh = 100;   // more scroll room per beat = slower feel
+      var beatVh = 120;   // more scroll room = slower transitions
       naWrap.style.height = (states * beatVh) + 'vh';
 
       var headerEl = document.getElementById('naHeaderState');
@@ -2884,8 +2884,6 @@ function buildGrid(){
       function easeOut(t){ return 1-(1-t)*(1-t); }
       function easeInOut(t){ return t<0.5?2*t*t:-1+(4-2*t)*t; }
 
-      // Option B: clip-path reveal on product name + slower slide
-      // We reveal the name via clipPath left→right
       function setNameReveal(el, pct){
         var name = el.querySelector('.na-prod-name');
         if(!name) return;
@@ -2894,13 +2892,11 @@ function buildGrid(){
         name.style.opacity = pct > 0.02 ? '1' : '0';
       }
 
-      // Set initial clip on all names
       prodEls.forEach(function(el){
         var name = el.querySelector('.na-prod-name');
         if(name){ name.style.clipPath = 'inset(0 100% 0 0)'; name.style.opacity='0'; }
       });
 
-      // Floating bottles
       var floatTweens = [];
       var currentFloatState = -1;
       function startFloat(idx){
@@ -2915,21 +2911,25 @@ function buildGrid(){
         );
       }
 
-      // ── Sticky-once: release after user scrolls through all states ──
+      // ── Sticky-once ──
       var released = false;
       function releaseStickyOnce(){
         if(released) return;
         released = true;
-        // Keep grid visible statically, release sticky
+        // Ensure grid is fully visible before releasing
         gsap.set(gridEl, { opacity:1, scale:1 });
-        naSticky.style.position = 'relative';
-        naSticky.style.height = 'auto';
-        // Hide all other states, show only grid
         gsap.set(headerEl, { opacity:0 });
-        prodEls.forEach(function(el){ gsap.set(el, { opacity:0 }); });
-        // Remove dots
+        prodEls.forEach(function(el){
+          gsap.set(el, { opacity:0 });
+          setNameReveal(el, 0);
+        });
         var dots = naSticky.querySelector('.na-dots');
         if(dots) dots.style.display = 'none';
+        // Small delay before releasing sticky so grid renders fully
+        setTimeout(function(){
+          naSticky.style.position = 'relative';
+          naSticky.style.height = 'auto';
+        }, 60);
       }
 
       var lastState = -1;
@@ -2942,13 +2942,12 @@ function buildGrid(){
         var stateI    = Math.min(Math.floor(stateF), states - 1);
         var stateProg = stateF - Math.floor(stateF);
 
-        // Release when grid state is fully revealed
-        if(stateI >= states - 1 && stateProg > 0.85){
+        // Release only when p is truly at the end (not just grid state)
+        if(p >= 0.98){
           releaseStickyOnce();
           return;
         }
 
-        // Update dots
         if(stateI !== lastState){
           dotEls.forEach(function(d,i){ d.classList.toggle('active', i===stateI); });
           lastState = stateI;
@@ -2968,54 +2967,34 @@ function buildGrid(){
         // ── Products: states 1..n ──
         prodEls.forEach(function(el, i){
           var myState = i + 1;
-
           if(stateI === myState){
-            // ENTERING — slower, two phases:
-            // Phase 1 (0→0.5): frame slides in from below + brand/badge/chords/footer fade
-            // Phase 2 (0.3→0.85): name clip-path reveals left→right
             var frameIn  = easeOut(prog(stateProg, 0.0, 0.55));
             var nameRevP = easeInOut(prog(stateProg, 0.25, 0.80));
-            var textIn   = easeOut(prog(stateProg, 0.15, 0.65));
             var bottleIn = easeOut(prog(stateProg, 0.10, 0.60));
-
             gsap.set(el, { opacity:frameIn, y:lerp(55,0,frameIn) });
-
-            // Bottle enters slightly after frame
             var bottle = el.querySelector('.na-prod-img img, .na-prod-img svg');
             if(bottle) gsap.set(bottle, { opacity:bottleIn, y:lerp(18,0,bottleIn), scale:lerp(0.9,1,bottleIn) });
-
-            // Brand/badge/tagline/chords/footer
             ['.na-prod-badge','.na-prod-brand','.na-prod-tagline','.na-prod-chords','.na-prod-footer'].forEach(function(sel,si){
-              var tDelay = 0.15 + si*0.04;
               var tEl = el.querySelector(sel);
-              if(tEl) tEl.style.opacity = easeOut(prog(stateProg, tDelay, tDelay+0.45));
+              if(tEl) tEl.style.opacity = easeOut(prog(stateProg, 0.15+si*0.04, 0.60+si*0.04));
             });
-
-            // Name clip reveal
             setNameReveal(el, nameRevP);
-
-            // Start float once mostly visible
             if(frameIn > 0.6) startFloat(i);
-
           } else if(stateI === myState + 1){
-            // EXITING — slides up and fades, name collapses back
             var outP    = easeInOut(prog(stateProg, 0.0, 0.50));
             var nameOut = easeInOut(prog(stateProg, 0.0, 0.35));
             gsap.set(el, { opacity:lerp(1,0,outP), y:lerp(0,-45,outP) });
             setNameReveal(el, lerp(1,0,nameOut));
-
           } else if(stateI < myState){
-            // Not yet reached
             gsap.set(el, { opacity:0, y:55 });
             setNameReveal(el, 0);
           } else {
-            // Already passed
             gsap.set(el, { opacity:0, y:-45 });
             setNameReveal(el, 0);
           }
         });
 
-        // ── Grid finale: last state ──
+        // ── Grid: last state ──
         var gridState = n + 1;
         if(stateI === gridState){
           var gIn = easeOut(prog(stateProg, 0.0, 0.65));
@@ -3025,7 +3004,7 @@ function buildGrid(){
         }
       }
 
-      // Initial state
+      // Init
       gsap.set(headerEl, { opacity:0, y:24 });
       prodEls.forEach(function(el){
         gsap.set(el, { opacity:0, y:55 });
@@ -3035,12 +3014,10 @@ function buildGrid(){
         });
       });
       gsap.set(gridEl, { opacity:0, scale:0.96 });
-
       applyProgress(0);
 
-      // rAF tick
       function tick(){
-        if(released){ return; } // stop polling once released
+        if(released) return;
         var rect     = naWrap.getBoundingClientRect();
         var scrolled = -rect.top;
         var total    = naWrap.offsetHeight - window.innerHeight;
