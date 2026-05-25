@@ -295,45 +295,6 @@ nav a:hover{color:var(--gold)}
 .d-wish-btn:hover{border-color:var(--gold)}
 .d-wish-btn.on{color:#e06060;border-color:#e06060}
 .inv-note{font-size:0.62rem;color:var(--warn);margin-top:0.5rem}
-
-/* ── Editorial homepage / store split ───────────────────────── */
-.home-editorial-anchor{height:0;background:var(--dark)}
-.editorial-row{background:var(--dark);padding:5rem 4rem;border-top:1px solid rgba(184,149,90,0.12);position:relative;overflow:hidden}
-.editorial-row::before{content:'';position:absolute;inset:auto 8% 10% auto;width:260px;height:260px;border-radius:50%;background:rgba(184,149,90,0.08);filter:blur(70px);pointer-events:none}
-.ed-head{display:flex;align-items:flex-end;justify-content:space-between;gap:2rem;margin-bottom:2rem;position:relative;z-index:1}
-.ed-kicker{font-size:0.58rem;letter-spacing:0.32em;text-transform:uppercase;color:var(--gold);margin-bottom:0.7rem}
-.ed-title{font-family:Cormorant Garamond,serif;font-size:clamp(2.5rem,5vw,4.5rem);font-weight:300;line-height:1;color:var(--cream)}
-.ed-title em{font-style:italic;color:var(--gold-light)}
-.ed-copy{max-width:420px;color:var(--muted);font-size:0.78rem;line-height:1.9;letter-spacing:0.05em}
-.fav-rail{display:flex;gap:1rem;overflow-x:auto;scroll-snap-type:x mandatory;padding:0.3rem 0 1rem;position:relative;z-index:1;-webkit-overflow-scrolling:touch}
-.fav-rail::-webkit-scrollbar{height:3px}.fav-rail::-webkit-scrollbar-thumb{background:rgba(184,149,90,0.35)}
-.fav-card{min-width:220px;width:220px;scroll-snap-align:start;background:rgba(255,255,255,0.035);border:1px solid rgba(184,149,90,0.15);padding:1rem;cursor:pointer;transition:transform .25s,border-color .25s,background .25s}
-.fav-card:hover{transform:translateY(-4px);border-color:var(--gold);background:rgba(184,149,90,0.06)}
-.fav-img{height:160px;display:flex;align-items:center;justify-content:center;margin-bottom:1rem}
-.fav-brand{font-size:0.52rem;letter-spacing:0.18em;text-transform:uppercase;color:var(--gold);margin-bottom:0.25rem}
-.fav-name{font-family:Cormorant Garamond,serif;font-size:1.25rem;line-height:1.1;color:var(--cream);margin-bottom:0.45rem}
-.fav-notes{font-size:0.62rem;line-height:1.6;color:var(--muted);min-height:2rem}
-#favoritesSection{background:var(--warm-white);color:var(--charcoal);border-top:0;border-bottom:1px solid rgba(184,149,90,0.12)}
-#favoritesSection::before{background:rgba(184,149,90,0.10)}
-#favoritesSection .ed-title{color:var(--charcoal)}
-#favoritesSection .ed-copy,#favoritesSection .fav-notes{color:var(--muted)}
-#favoritesSection .fav-card{background:rgba(255,255,255,0.58);border-color:rgba(184,149,90,0.18);box-shadow:0 18px 42px rgba(58,45,31,0.05)}
-#favoritesSection .fav-card:hover{background:#fff;border-color:var(--gold)}
-#favoritesSection .fav-name{color:var(--charcoal)}
-.store-gateway{background:linear-gradient(145deg,#100d0a 0%,#1a1410 58%,#0e0c0a 100%);padding:6rem 4rem 7rem;text-align:center;position:relative;overflow:hidden}
-.store-gateway::before{content:'';position:absolute;inset:12% 15%;border:1px solid rgba(184,149,90,0.14);pointer-events:none}
-.store-gateway-inner{position:relative;z-index:1;max-width:760px;margin:0 auto}
-.store-gateway h2{font-family:Cormorant Garamond,serif;font-size:clamp(3rem,7vw,6rem);font-weight:300;line-height:.95;color:var(--cream);margin-bottom:1.1rem}
-.store-gateway h2 em{font-style:italic;color:var(--gold-light)}
-.store-gateway p{color:var(--muted);font-size:.82rem;line-height:1.9;letter-spacing:.08em;max-width:520px;margin:0 auto 2rem}
-.store-link-btn{display:inline-block;text-decoration:none;border:1px solid var(--gold);color:var(--gold);padding:1rem 2.4rem;font-size:.64rem;letter-spacing:.22em;text-transform:uppercase;transition:all .25s}
-.store-link-btn:hover{background:var(--gold);color:var(--dark)}
-body.store-route .home-page-only{display:none!important}
-body:not(.store-route) #shop{display:none!important}
-body.store-route #shop{display:block;padding-top:7rem}
-.store-page .new-arrivals-section{display:none!important}
-@media(max-width:768px){.editorial-row{padding:3.5rem 1rem}.ed-head{display:block}.ed-copy{margin-top:1rem}.fav-card{min-width:185px;width:185px}.fav-img{height:135px}.store-gateway{padding:4.5rem 1.2rem 6rem}.store-gateway::before{inset:8% 1rem}body.store-route #shop{padding-top:5rem}}
-
 .suggestions{background:var(--charcoal);padding:3.5rem 4rem}
 .sugg-eyebrow{font-size:0.58rem;letter-spacing:0.3em;text-transform:uppercase;color:var(--gold);margin-bottom:0.4rem}
 .sugg-title{font-family:Cormorant Garamond,serif;font-size:1.8rem;font-weight:300;color:var(--cream);margin-bottom:2rem}
@@ -1855,7 +1816,7 @@ footer{background:var(--dark);padding:3.5rem 4rem;text-align:center;border-top:1
   <nav>
     <a href="#home">Inicio</a>
     <a href="#" onclick="openCollections();return false;">Colecciones</a>
-    <a href="/store.html">Tienda</a>
+    <a href="#shop">Tienda</a>
     <a href="/nosotros">Nosotros</a>
   </nav>
   <div class="header-right">
@@ -1883,7 +1844,7 @@ footer{background:var(--dark);padding:3.5rem 4rem;text-align:center;border-top:1
     <p class="hero-eyebrow">Sillage &middot; Est. 2026</p>
     <h1 class="hero-title">Tu Destino en<br><em>Alta Perfumería</em></h1>
     <p class="hero-sub">Fragancias seleccionadas de las casas de perfumería más admiradas del mundo, ahora accesibles.</p>
-    <a href="#newArrivalsSection" class="hero-cta"><span>Leer el Diario</span></a>
+    <a href="#shop" class="hero-cta"><span>Explorar la Colección</span></a>
 
     <div class="hero-spacer"></div>
     <div class="hero-som-divider"></div>
@@ -1907,28 +1868,6 @@ footer{background:var(--dark);padding:3.5rem 4rem;text-align:center;border-top:1
     </div>
   </div>
   <div class="scroll-indicator"><span>Descubrir</span><div class="scroll-line"></div></div>
-</section>
-
-<div id="homeEditorialAnchor" class="home-editorial-anchor home-page-only"></div>
-
-<section class="editorial-row home-page-only" id="favoritesSection">
-  <div class="ed-head">
-    <div>
-      <p class="ed-kicker">Favoritos de todos</p>
-      <h2 class="ed-title">Los que siempre <em>vuelven</em></h2>
-    </div>
-    <p class="ed-copy">Una fila curada para entrar rápido: fragancias con presencia, memoria y un rastro fácil de amar.</p>
-  </div>
-  <div class="fav-rail" id="favoritesRail" aria-label="Favoritos de Sillage"></div>
-</section>
-
-<section class="store-gateway home-page-only" id="storeGateway">
-  <div class="store-gateway-inner">
-    <p class="ed-kicker">La tienda completa</p>
-    <h2>Explora el <em>archivo</em></h2>
-    <p>Filtros por casa, género y notas para encontrar exactamente lo que estás buscando.</p>
-    <a href="/store.html" class="store-link-btn">Ir a la tienda</a>
-  </div>
 </section>
 
 
@@ -2844,46 +2783,10 @@ function dismissNewArrivalToast(btn, key){
   try{ localStorage.setItem(key,'1'); }catch(e){}
 }
 
-
-function renderEditorialFavorites(){
-  var rail = document.getElementById('favoritesRail');
-  if(!rail || !Array.isArray(P)) return;
-  var picks = P.filter(function(p){ return p.badge === 'bestseller' && !(getInv(p.id)||{}).outOfStock; }).slice(0,10);
-  if(picks.length < 6){
-    picks = picks.concat(P.filter(function(p){ return picks.indexOf(p) < 0; }).slice(0, 10 - picks.length));
-  }
-  rail.innerHTML = picks.map(function(p){
-    var price = Math.round(+(effectivePrice ? effectivePrice(p) : p.price) || 0);
-    return '<article class="fav-card" data-pid="'+p.id+'">'+
-      '<div class="fav-img">'+(p.photos&&p.photos.length?'<img src="'+esc(cdnImg(p.photos[0],360))+'" alt="'+esc(p.brand+' '+p.name)+'" style="width:100%;height:100%;object-fit:contain" loading="lazy"/>':svg(p.c,p.s,'md'))+'</div>'+
-      '<div class="fav-brand">'+esc(p.brand)+'</div>'+
-      '<div class="fav-name">'+esc(p.name)+'</div>'+
-      '<div class="fav-notes">'+esc(p.notes || p.tagline || '')+'</div>'+
-      '<div class="sugg-price" style="margin-top:.7rem">$'+price+'</div>'+
-    '</article>';
-  }).join('');
-  rail.querySelectorAll('.fav-card').forEach(function(card){
-    card.addEventListener('click', function(){ openDetail(+card.dataset.pid); });
-  });
-}
-function applySillageRoute(){
-  var hash = (location.hash || '').replace('#','');
-  var path = (location.pathname || '').toLowerCase();
-  var isStorePage = /(^|\/)store(\.html)?\/?$/.test(path);
-  var store = isStorePage || hash === 'store' || hash === 'shop';
-  document.body.classList.toggle('store-route', store);
-  if(store && !isStorePage){
-    window.location.href = '/store.html';
-  }
-}
-window.addEventListener('hashchange', applySillageRoute);
-
 function buildGrid(){
   var grid=document.getElementById('productGrid');
   var empty=document.getElementById('emptyState');
   if(!grid)return;
-  renderEditorialFavorites();
-  applySillageRoute();
 
   // ── New Arrivals Section — products added within last 30 days ──
   var existingNA = document.getElementById('newArrivalsSection');
@@ -3009,7 +2912,7 @@ function buildGrid(){
     naSticky.appendChild(naPanel);
     naWrap.appendChild(naSticky);
 
-    var shopSection = document.getElementById('homeEditorialAnchor') || document.getElementById('shop');
+    var shopSection = document.getElementById('shop');
     shopSection.parentNode.insertBefore(naWrap, shopSection);
 
     var bottleZone = document.getElementById('naBottleZone');
@@ -7533,7 +7436,6 @@ document.addEventListener('DOMContentLoaded', function(){
   // Handle URL params that require DOM — must run after all elements exist
   checkBtcpayRenew();
   checkResetToken();
-  applySillageRoute();
 });
 </script>
 
@@ -7554,7 +7456,7 @@ document.addEventListener('DOMContentLoaded', function(){
       </svg>
     </span>Colecciones
   </button>
-  <a href="/store.html" class="mob-nav-btn">
+  <a href="#shop" class="mob-nav-btn">
     <span class="mob-nav-icon">
       <svg viewBox="0 0 24 24" fill="none" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
         <circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>
