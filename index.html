@@ -3348,7 +3348,6 @@ function buildGrid(){
       }
       apply(0);
       applyMobileActive(0);
-      if(mobileCards[0]) mobileCards[0].classList.add('is-visible');
       // Reveal first slot's text immediately when section enters — IO threshold
       // means localP is 0 at entry so setInner won't fire; force it here
       if(textSlots[0]) setTimeout(function(){ revealSlot(textSlots[0]); }, 320);
