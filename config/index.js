@@ -52,8 +52,8 @@ const WOMPI_PUBLIC_KEY    = process.env.WOMPI_PUBLIC_KEY    || null; // pub_... 
 const OPENAI_API_KEY = process.env.OPENAI_API_KEY || null;
 
 // ─── Admin ────────────────────────────────────────────────────────────────────
-const ADMIN_USER = process.env.ADMIN_USER || null;
-const ADMIN_PASS = process.env.ADMIN_PASS || null;
+const ADMIN_USER = process.env.ADMIN_USER?.trim() || null;
+const ADMIN_PASS = process.env.ADMIN_PASS?.trim() || null;
 
 // ─── Cache TTLs ───────────────────────────────────────────────────────────────
 const CACHE_TTL_CATALOGUE  = 5  * 60 * 1000;  // 5 min
