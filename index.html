@@ -1372,6 +1372,11 @@ footer{background:var(--dark);padding:3.5rem 4rem;text-align:center;border-top:1
 /* ── MOBILE NAV BAR ── */
 .mob-nav{display:none}
 @media(max-width:680px){
+  .hero{
+    /* Fill exactly the space between header and bottom nav */
+    height:calc(100dvh - 56px - 64px);
+    min-height:480px;
+  }
   .mob-nav{
     display:flex;position:sticky;bottom:0;left:0;right:0;z-index:499;
     background:rgba(14,12,10,0.97);border-top:1px solid rgba(184,149,90,0.15);
