@@ -85,7 +85,7 @@
 html{scroll-behavior:smooth}
 body{background:var(--dark);color:var(--cream);font-family:'Jost',sans-serif;font-weight:300;overflow-x:hidden}
 
-header{position:fixed;top:0;width:100%;z-index:100;display:flex;align-items:center;justify-content:space-between;padding:1.4rem 4rem;background:rgba(14,12,10,0.95);backdrop-filter:blur(12px);border-bottom:1px solid var(--border)}
+header{position:sticky;top:0;width:100%;z-index:100;display:flex;align-items:center;justify-content:space-between;padding:1.4rem 4rem;background:rgba(14,12,10,0.95);backdrop-filter:blur(12px);border-bottom:1px solid var(--border)}
 .logo{font-family:Cormorant Garamond,serif;font-size:2rem;font-weight:300;letter-spacing:0.35em;color:var(--gold);text-transform:uppercase;flex:1}
 .logo span{font-style:italic;color:var(--cream)}
 nav{display:flex;gap:2.5rem;flex:1;justify-content:center}
@@ -1796,6 +1796,101 @@ footer{background:var(--dark);padding:3.5rem 4rem;text-align:center;border-top:1
 @media(max-width:768px){
   .tienda-header{padding:5rem 1.5rem 2rem}
 }
+
+/* ── TIENDA EDITORIAL COLLECTIONS ───────────────────────────────── */
+.tienda-collections{
+  background:var(--warm-white);
+  color:var(--charcoal);
+  padding:6rem 4rem 7rem;
+  border-top:1px solid rgba(184,149,90,0.12);
+  position:relative;
+}
+.tc-header{
+  max-width:600px;
+  margin:0 auto 4rem;
+  text-align:center;
+}
+.tc-eyebrow{
+  display:block;font-size:0.6rem;letter-spacing:0.35em;
+  text-transform:uppercase;color:var(--gold);margin-bottom:0.9rem;
+  opacity:0;transform:translateY(12px);
+  transition:opacity 0.6s ease,transform 0.6s ease;
+}
+.tc-title{
+  font-family:'Cormorant Garamond',serif;
+  font-size:clamp(2.2rem,4vw,3.2rem);font-weight:300;
+  color:var(--charcoal);line-height:1.1;margin-bottom:0.8rem;
+  opacity:0;transform:translateY(14px);
+  transition:opacity 0.7s ease 0.1s,transform 0.7s ease 0.1s;
+}
+.tc-title em{font-style:italic;color:var(--gold)}
+.tc-sub{
+  font-size:0.76rem;color:var(--muted);line-height:1.8;
+  opacity:0;transform:translateY(10px);
+  transition:opacity 0.6s ease 0.2s,transform 0.6s ease 0.2s;
+}
+.tienda-collections.tc-inview .tc-eyebrow,
+.tienda-collections.tc-inview .tc-title,
+.tienda-collections.tc-inview .tc-sub{opacity:1;transform:none}
+
+/* List */
+.tc-list{
+  max-width:900px;margin:0 auto;
+  display:flex;flex-direction:column;
+}
+.tc-row{
+  display:grid;
+  grid-template-columns:1fr auto;
+  align-items:center;
+  gap:2rem;
+  padding:2rem 0;
+  border-bottom:1px solid rgba(184,149,90,0.1);
+  cursor:pointer;
+  position:relative;
+  opacity:0;transform:translateX(-16px);
+  transition:opacity 0.55s ease,transform 0.55s ease,border-color 0.3s;
+}
+.tc-row:first-child{border-top:1px solid rgba(184,149,90,0.1)}
+.tc-row.tc-row-visible{opacity:1;transform:none}
+.tc-row:hover{border-color:rgba(184,149,90,0.35)}
+.tc-row:hover .tc-row-name{color:var(--gold)}
+.tc-row:hover .tc-row-arrow{transform:translateX(5px);color:var(--gold)}
+
+.tc-row-left{display:flex;flex-direction:column;gap:0.4rem}
+.tc-row-name{
+  font-family:'Cormorant Garamond',serif;
+  font-size:clamp(1.8rem,3.5vw,2.6rem);font-weight:300;
+  font-style:italic;color:var(--charcoal);
+  line-height:1;
+  transition:color 0.3s;
+}
+.tc-row-desc{
+  font-size:0.72rem;color:var(--muted);
+  letter-spacing:0.04em;line-height:1.6;
+}
+.tc-row-count{
+  font-size:0.52rem;letter-spacing:0.2em;
+  text-transform:uppercase;color:rgba(184,149,90,0.55);
+  margin-top:0.2rem;
+}
+
+.tc-row-right{
+  display:flex;align-items:center;gap:1rem;flex-shrink:0;
+}
+.tc-row-arrow{
+  width:40px;height:40px;
+  border:1px solid rgba(184,149,90,0.25);
+  display:flex;align-items:center;justify-content:center;
+  color:var(--muted);
+  transition:transform 0.3s,color 0.3s,border-color 0.3s;
+}
+
+@media(max-width:768px){
+  .tienda-collections{padding:4rem 1.5rem 5rem}
+  .tc-row{grid-template-columns:1fr auto;gap:1rem;padding:1.5rem 0}
+  .tc-row-name{font-size:clamp(1.6rem,7vw,2.2rem)}
+  .tc-row-desc{font-size:0.68rem}
+}
 </style>
 <script type="application/ld+json">
 {
@@ -1880,6 +1975,18 @@ footer{background:var(--dark);padding:3.5rem 4rem;text-align:center;border-top:1
   <p class="results-info">Mostrando <span id="resultCount">0</span> fragancias</p>
   <div class="product-grid" id="productGrid">
     <div class="empty-state" id="emptyState"><h3>No se encontraron fragancias</h3><p>Intenta ajustar los filtros</p></div>
+  </div>
+</section>
+
+<!-- EDITORIAL COLLECTIONS -->
+<section class="tienda-collections" id="tiendaCollections">
+  <div class="tc-header">
+    <span class="tc-eyebrow">Colecciones Curadas</span>
+    <h2 class="tc-title">Encuentra tu <em>siguiente fragancia</em></h2>
+    <p class="tc-sub">Cada colección reúne las fragancias que mejor encajan con un momento, un estado de ánimo, o una intención.</p>
+  </div>
+  <div class="tc-list" id="tcList">
+    <!-- Populated by buildTiendaCollections() -->
   </div>
 </section>
 
@@ -3291,6 +3398,10 @@ function buildGrid(){
 
   applyFilters();
   injectProductSchema(P);
+  // Build editorial collections section below grid
+  if(typeof buildTiendaCollections === 'function'){
+    loadCuratedFromDB(function(){ buildTiendaCollections(); });
+  }
 
   // Re-apply scent profile order after every grid rebuild (survives polling)
   if(typeof _somProfile !== 'undefined' && _somProfile){
@@ -7424,6 +7535,66 @@ document.addEventListener('DOMContentLoaded', function(){
   checkBtcpayRenew();
   checkResetToken();
 });
+
+// ── TIENDA EDITORIAL COLLECTIONS ─────────────────────────────────────────────
+function buildTiendaCollections(){
+  var list = document.getElementById('tcList');
+  if(!list || !CURATED || !CURATED.length) return;
+
+  list.innerHTML = '';
+
+  CURATED.forEach(function(col, i){
+    // Count matching products
+    var count = (P||[]).filter(function(p){
+      try{ return col.filter(p); } catch(e){ return false; }
+    }).length;
+    if(!count) return; // skip empty collections
+
+    var row = document.createElement('div');
+    row.className = 'tc-row';
+    row.style.transitionDelay = (i * 0.06) + 's';
+    row.innerHTML =
+      '<div class="tc-row-left">' +
+        '<div class="tc-row-name">' + esc(col.name) + '</div>' +
+        '<div class="tc-row-desc">' + esc(col.desc || '') + '</div>' +
+        '<div class="tc-row-count">' + count + ' ' + (count === 1 ? 'fragancia' : 'fragancias') + '</div>' +
+      '</div>' +
+      '<div class="tc-row-right">' +
+        '<div class="tc-row-arrow">' +
+          '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/></svg>' +
+        '</div>' +
+      '</div>';
+
+    row.addEventListener('click', function(){
+      filterByCurated(col);
+      // Scroll to top of shop grid
+      var shop = document.getElementById('shop');
+      if(shop) shop.scrollIntoView({ behavior:'smooth', block:'start' });
+    });
+
+    list.appendChild(row);
+  });
+
+  // IO reveal for header
+  var section = document.getElementById('tiendaCollections');
+  if(section && 'IntersectionObserver' in window){
+    var headerObs = new IntersectionObserver(function(entries){
+      if(entries[0].isIntersecting){ section.classList.add('tc-inview'); headerObs.disconnect(); }
+    }, { threshold:0.1 });
+    headerObs.observe(section);
+
+    // IO reveal per row
+    var rowObs = new IntersectionObserver(function(entries){
+      entries.forEach(function(entry){
+        if(entry.isIntersecting) entry.target.classList.add('tc-row-visible');
+      });
+    }, { threshold:0.15 });
+    list.querySelectorAll('.tc-row').forEach(function(r){ rowObs.observe(r); });
+  } else {
+    if(section) section.classList.add('tc-inview');
+    list.querySelectorAll('.tc-row').forEach(function(r){ r.classList.add('tc-row-visible'); });
+  }
+}
 </script>
 
 <!-- MOBILE BOTTOM NAV -->
