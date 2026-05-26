@@ -1113,7 +1113,7 @@ function checkRateLimit(ip) {
   const e = loginAttempts.get(ip);
   if (!e) return true;
   if (Date.now() - e.firstAttempt > 15 * 60 * 1000) { loginAttempts.delete(ip); return true; }
-  return e.count < 10;
+  return e.count < 8;
 }
 function recordFailed(ip) {
   const e = loginAttempts.get(ip) || { count: 0, firstAttempt: Date.now() };
@@ -1158,11 +1158,11 @@ function verifyAdminPassword(candidate, stored) {
       console.warn('⚠️  ADMIN_PASS is stored as plain text. Generate a hashed version with the instructions in server.js.');
       verifyAdminPassword._warnedPlain = true;
     }
+    // Hash both to equal-length buffers — avoids length-mismatch throws
     try {
-      return crypto.timingSafeEqual(
-        Buffer.from(candidate.padEnd(200)),
-        Buffer.from(stored.padEnd(200))
-      );
+      const a = crypto.createHash('sha256').update(candidate).digest();
+      const b = crypto.createHash('sha256').update(stored).digest();
+      return crypto.timingSafeEqual(a, b);
     } catch(e) { return false; }
   }
 }
@@ -1719,11 +1719,13 @@ app.post('/api/auth/login', authLimiter, async (req, res) => {
   let ok = false;
   try {
     // Username comparison stays timing-safe plain text (not a secret worth hashing)
-    const userOk = !!(username && ADMIN_USER &&
-      crypto.timingSafeEqual(
-        Buffer.from(username.padEnd(200)),
-        Buffer.from(ADMIN_USER.padEnd(200))
-      ));
+    // Constant-time username comparison — hash both to equal-length buffers
+    // so timingSafeEqual never throws on length mismatch
+    const userOk = !!(username && ADMIN_USER && (() => {
+      const a = crypto.createHash('sha256').update(username).digest();
+      const b = crypto.createHash('sha256').update(ADMIN_USER).digest();
+      return crypto.timingSafeEqual(a, b);
+    })());
     // Password: supports pbkdf2 hash or legacy plain text
     ok = userOk && verifyAdminPassword(password, ADMIN_PASS);
   } catch(e) {}
@@ -1731,15 +1733,17 @@ app.post('/api/auth/login', authLimiter, async (req, res) => {
   if (!ok) {
     recordFailed(ip);
     trackAbuse('login_burst', ip);
-    // Only persist to DB after 2+ failures — prevents a single typo from
-    // locking out the admin after a server restart
-    const currentCount = loginAttempts.get(ip)?.count || 0;
-    if (currentCount >= 2) await db.execute(
-      `INSERT INTO settings (key_name, value, updated_at)
-       VALUES (?, ?, ?)
-       ON DUPLICATE KEY UPDATE value=VALUES(value), updated_at=VALUES(updated_at)`,
-      [`auth_fail:${ip}`, loginAttempts.get(ip)?.count || 1, new Date()]
-    ).catch(() => {}); // non-fatal
+    // Only persist to DB after 2nd failure — one typo/autocapitalize won't
+    // survive a server restart and lock out the admin
+    const failCount = loginAttempts.get(ip)?.count || 1;
+    if (failCount >= 2) {
+      await db.execute(
+        `INSERT INTO settings (key_name, value, updated_at)
+         VALUES (?, ?, ?)
+         ON DUPLICATE KEY UPDATE value=VALUES(value), updated_at=VALUES(updated_at)`,
+        [`auth_fail:${ip}`, failCount, new Date()]
+      ).catch(() => {}); // non-fatal
+    }
     // Never reveal how many attempts remain — removes attacker intel
     return res.status(401).json({ error: 'Credenciales incorrectas.' });
   }

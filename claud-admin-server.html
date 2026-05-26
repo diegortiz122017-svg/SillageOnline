@@ -1671,13 +1671,15 @@ var sessionToken = (function(){
   return t||null;
 })();
 
+var _loginInFlight = false;
 function tryLogin(){
+  if(_loginInFlight) return; // prevent double-submit from mobile keyboard
   var u=document.getElementById('lu').value.trim();
   var p=document.getElementById('lp').value.trim();
   var err=document.getElementById('lerr');
   var btn=document.getElementById('loginBtn');
   if(!u||!p){err.textContent='Please enter your credentials.';return;}
-  btn.textContent='Iniciando sesión...';btn.disabled=true;err.textContent='';
+  _loginInFlight=true;btn.textContent='Iniciando sesión...';btn.disabled=true;err.textContent='';
   fetch('/api/auth/login',{
     method:'POST',
     headers:{'Content-Type':'application/json'},
@@ -1685,7 +1687,7 @@ function tryLogin(){
   })
   .then(function(r){return r.json().then(function(d){return{ok:r.ok,data:d};});})
   .then(function(res){
-    btn.textContent='Iniciar Sesión';btn.disabled=false;
+    _loginInFlight=false;btn.textContent='Iniciar Sesión';btn.disabled=false;
     if(res.ok&&res.data.token){
       sessionToken=res.data.token;
       localStorage.setItem('sillage_admin_token',sessionToken);
