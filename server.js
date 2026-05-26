@@ -1113,7 +1113,7 @@ function checkRateLimit(ip) {
   const e = loginAttempts.get(ip);
   if (!e) return true;
   if (Date.now() - e.firstAttempt > 15 * 60 * 1000) { loginAttempts.delete(ip); return true; }
-  return e.count < 8;
+  return e.count < 5;
 }
 function recordFailed(ip) {
   const e = loginAttempts.get(ip) || { count: 0, firstAttempt: Date.now() };
@@ -1158,11 +1158,11 @@ function verifyAdminPassword(candidate, stored) {
       console.warn('⚠️  ADMIN_PASS is stored as plain text. Generate a hashed version with the instructions in server.js.');
       verifyAdminPassword._warnedPlain = true;
     }
-    // Hash both to equal-length buffers — avoids length-mismatch throws
     try {
-      const a = crypto.createHash('sha256').update(candidate).digest();
-      const b = crypto.createHash('sha256').update(stored).digest();
-      return crypto.timingSafeEqual(a, b);
+      return crypto.timingSafeEqual(
+        Buffer.from(candidate.padEnd(200)),
+        Buffer.from(stored.padEnd(200))
+      );
     } catch(e) { return false; }
   }
 }
@@ -1340,6 +1340,7 @@ app.get('/', async (req, res) => {
 });
 
 app.get('/nosotros',    (req, res) => res.sendFile(path.join(__dirname, 'nosotros.html')));
+app.get('/tienda',      (req, res) => res.sendFile(path.join(__dirname, 'tienda.html')));
 app.get('/envios', (req, res) => res.sendFile(path.join(__dirname, 'envios.html')));
 app.get('/terminos', (req, res) => res.sendFile(path.join(__dirname, 'terminos.html')));
 app.get('/devoluciones', (req, res) => res.sendFile(path.join(__dirname, 'devoluciones.html')));
@@ -1719,13 +1720,11 @@ app.post('/api/auth/login', authLimiter, async (req, res) => {
   let ok = false;
   try {
     // Username comparison stays timing-safe plain text (not a secret worth hashing)
-    // Constant-time username comparison — hash both to equal-length buffers
-    // so timingSafeEqual never throws on length mismatch
-    const userOk = !!(username && ADMIN_USER && (() => {
-      const a = crypto.createHash('sha256').update(username).digest();
-      const b = crypto.createHash('sha256').update(ADMIN_USER).digest();
-      return crypto.timingSafeEqual(a, b);
-    })());
+    const userOk = !!(username && ADMIN_USER &&
+      crypto.timingSafeEqual(
+        Buffer.from(username.padEnd(200)),
+        Buffer.from(ADMIN_USER.padEnd(200))
+      ));
     // Password: supports pbkdf2 hash or legacy plain text
     ok = userOk && verifyAdminPassword(password, ADMIN_PASS);
   } catch(e) {}
@@ -1733,17 +1732,13 @@ app.post('/api/auth/login', authLimiter, async (req, res) => {
   if (!ok) {
     recordFailed(ip);
     trackAbuse('login_burst', ip);
-    // Only persist to DB after 2nd failure — one typo/autocapitalize won't
-    // survive a server restart and lock out the admin
-    const failCount = loginAttempts.get(ip)?.count || 1;
-    if (failCount >= 2) {
-      await db.execute(
-        `INSERT INTO settings (key_name, value, updated_at)
-         VALUES (?, ?, ?)
-         ON DUPLICATE KEY UPDATE value=VALUES(value), updated_at=VALUES(updated_at)`,
-        [`auth_fail:${ip}`, failCount, new Date()]
-      ).catch(() => {}); // non-fatal
-    }
+    // Persist failed attempt to DB so it survives server restarts/redeploys
+    await db.execute(
+      `INSERT INTO settings (key_name, value, updated_at)
+       VALUES (?, ?, ?)
+       ON DUPLICATE KEY UPDATE value=VALUES(value), updated_at=VALUES(updated_at)`,
+      [`auth_fail:${ip}`, loginAttempts.get(ip)?.count || 1, new Date()]
+    ).catch(() => {}); // non-fatal
     // Never reveal how many attempts remain — removes attacker intel
     return res.status(401).json({ error: 'Credenciales incorrectas.' });
   }
@@ -5722,24 +5717,6 @@ async function start() {
     await auth.restoreRevocations();
     await fixCorruptedInventoryRows();
     await migrateInventoryRows();
-    // ── Admin credential sanity check ────────────────────────────────────────
-    if (!ADMIN_USER || !ADMIN_PASS) {
-      console.warn('\u26a0\ufe0f  ADMIN_USER or ADMIN_PASS not set — admin login disabled');
-    } else if (ADMIN_PASS.startsWith('pbkdf2:')) {
-      const parts = ADMIN_PASS.split(':');
-      if (parts.length !== 4) {
-        console.error('\U0001f6a8 ADMIN_PASS pbkdf2 invalid — expected 4 parts, got ' + parts.length);
-      } else {
-        const iters = parseInt(parts[1], 10);
-        const saltLen = parts[2].length;
-        const hashLen = parts[3].length;
-        if (!iters || iters < 100000) console.error('\U0001f6a8 ADMIN_PASS iterations too low: ' + iters);
-        else if (hashLen !== 64) console.error('\U0001f6a8 ADMIN_PASS hash wrong length: ' + hashLen + ' chars (expected 64)');
-        else console.log('\u2705 ADMIN_PASS pbkdf2 OK — iters:' + iters + ' hash:' + hashLen + 'chars');
-      }
-    } else {
-      console.warn('\u26a0\ufe0f  ADMIN_PASS is plain text');
-    }
     console.log('\u2705 SILLAGE PARFUMERIE v3.1 - Server Ready | ' + BASE_URL);
   } catch(err) {
     console.error('\u274C DB startup failed:', err.message);
