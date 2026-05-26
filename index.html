@@ -85,7 +85,7 @@
 html{scroll-behavior:smooth}
 body{background:var(--dark);color:var(--cream);font-family:'Jost',sans-serif;font-weight:300;overflow-x:clip}
 
-header{position:fixed;top:0;width:100%;z-index:100;display:flex;align-items:center;justify-content:space-between;padding:1.4rem 4rem;background:rgba(14,12,10,0.95);backdrop-filter:blur(12px);border-bottom:1px solid var(--border)}
+header{position:sticky;top:0;width:100%;z-index:100;display:flex;align-items:center;justify-content:space-between;padding:1.4rem 4rem;background:rgba(14,12,10,0.95);backdrop-filter:blur(12px);border-bottom:1px solid var(--border)}
 .logo{font-family:Cormorant Garamond,serif;font-size:2rem;font-weight:300;letter-spacing:0.35em;color:var(--gold);text-transform:uppercase;flex:1}
 .logo span{font-style:italic;color:var(--cream)}
 nav{display:flex;gap:2.5rem;flex:1;justify-content:center}
@@ -3535,6 +3535,10 @@ function buildGrid(){
   buildFavoritesRow();
   buildStoreCta();
 
+  // Build brandCounts here so buildCollections() works even when productGrid is absent
+  var brandCounts = {};
+  (P||[]).forEach(function(p){ if(p.brand) brandCounts[p.brand] = (brandCounts[p.brand]||0)+1; });
+
   // Card building — only on pages with a product grid
   if(!grid){ return; }
   grid.querySelectorAll('.product-card').forEach(function(el){el.remove();});
@@ -3594,8 +3598,6 @@ function buildGrid(){
   });
 
   // ── Build brand counts (used by pills and cards) ──
-  var brandCounts = {};
-  (P||[]).forEach(function(p){ if(p.brand) brandCounts[p.brand] = (brandCounts[p.brand]||0)+1; });
 
   // ── Build brand pills dynamically from catalogue ──
   var brandPills = document.getElementById('brandPills');

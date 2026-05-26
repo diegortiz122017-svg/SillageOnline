@@ -1,16 +1,15 @@
 <!DOCTYPE html>
-<!-- BUILD: store_fresh_nez_bottom_v1 | source=store(4).html | New Arrivals disabled | Nez bottom | APIs preserved -->
 <html lang="es">
 <head>
 <meta charset="UTF-8"/>
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate"/>
 <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-<title>Sillage Parfumerie — La Colección</title>
+<title>Tienda — Sillage Parfumerie</title>
 <meta name="description" content="Compra perfumes 100% originales en El Salvador. Chanel, Dior, Tom Ford, Jo Malone y más. Envío a domicilio en todo el país. Pago con tarjeta, Wompi y contra entrega."/>
 <meta name="keywords" content="perfumes El Salvador, fragancias originales El Salvador, comprar perfumes online SV, Chanel El Salvador, Dior El Salvador, Tom Ford El Salvador, perfumeria El Salvador, perfumes San Salvador"/>
 <meta name="robots" content="index, follow"/>
 <meta name="author" content="Sillage Parfumerie"/>
-<link rel="canonical" href="https://sillage-sv.com/store.html"/>
+<link rel="canonical" href="https://sillage-sv.com/tienda"/>
 
 <!-- Open Graph -->
 <meta property="og:type" content="website"/>
@@ -86,7 +85,7 @@
 html{scroll-behavior:smooth}
 body{background:var(--dark);color:var(--cream);font-family:'Jost',sans-serif;font-weight:300;overflow-x:hidden}
 
-header{position:fixed;top:0;width:100%;z-index:1000;display:flex;align-items:center;justify-content:space-between;padding:1.4rem 4rem;background:rgba(14,12,10,0.95);backdrop-filter:blur(12px);border-bottom:1px solid var(--border)}
+header{position:sticky;top:0;width:100%;z-index:100;display:flex;align-items:center;justify-content:space-between;padding:1.4rem 4rem;background:rgba(14,12,10,0.95);backdrop-filter:blur(12px);border-bottom:1px solid var(--border)}
 .logo{font-family:Cormorant Garamond,serif;font-size:2rem;font-weight:300;letter-spacing:0.35em;color:var(--gold);text-transform:uppercase;flex:1}
 .logo span{font-style:italic;color:var(--cream)}
 nav{display:flex;gap:2.5rem;flex:1;justify-content:center}
@@ -1786,112 +1785,112 @@ footer{background:var(--dark);padding:3.5rem 4rem;text-align:center;border-top:1
   .hero-spacer{max-height:0.8rem}
 }
 
-/* Store page: use the original collection section directly, without an extra hero */
-.store-page #shop{padding-top:clamp(3.5rem,8vw,5rem);}
-.store-page .section-header{margin-bottom:2.8rem;}
+/* ── TIENDA PAGE HEADER ─────────────────────────────── */
+.tienda-header{background:var(--warm-white);color:var(--charcoal);padding:7rem 4rem 3rem;border-bottom:1px solid rgba(184,149,90,0.12)}
+.tienda-header-inner{max-width:1400px;margin:0 auto}
+.tienda-back{display:inline-flex;align-items:center;gap:0.4rem;font-size:0.6rem;letter-spacing:0.2em;text-transform:uppercase;color:var(--muted);text-decoration:none;margin-bottom:1.5rem;transition:color 0.25s}
+.tienda-back:hover{color:var(--gold)}
+.tienda-eyebrow{display:block;font-size:0.58rem;letter-spacing:0.35em;text-transform:uppercase;color:var(--gold);margin-bottom:0.5rem}
+.tienda-h1{font-family:'Cormorant Garamond',serif;font-size:clamp(3rem,5vw,4.5rem);font-weight:300;color:var(--charcoal);line-height:1}
+.tienda-h1 em{font-style:italic;color:var(--gold)}
+@media(max-width:768px){
+  .tienda-header{padding:5rem 1.5rem 2rem}
+}
 
-
-/* ── Store Nez bottom access — integrated with shop section ─────────────── */
-.store-nez-access{
-  scroll-margin-top:110px;
+/* ── TIENDA EDITORIAL COLLECTIONS ───────────────────────────────── */
+.tienda-collections{
   background:var(--warm-white);
   color:var(--charcoal);
-  padding:4.25rem 4rem 4.75rem;
-  border-top:1px solid rgba(184,149,90,0.14);
+  padding:6rem 4rem 7rem;
+  border-top:1px solid rgba(184,149,90,0.12);
+  position:relative;
 }
-.store-nez-inner{
-  max-width:980px;
-  margin:0 auto;
+.tc-header{
+  max-width:600px;
+  margin:0 auto 4rem;
   text-align:center;
 }
-.store-nez-kicker{
-  font-size:0.6rem;
-  letter-spacing:0.34em;
-  text-transform:uppercase;
-  color:var(--gold);
-  margin-bottom:0.9rem;
+.tc-eyebrow{
+  display:block;font-size:0.6rem;letter-spacing:0.35em;
+  text-transform:uppercase;color:var(--gold);margin-bottom:0.9rem;
+  opacity:0;transform:translateY(12px);
+  transition:opacity 0.6s ease,transform 0.6s ease;
 }
-.store-nez-title{
-  font-family:Cormorant Garamond,serif;
-  font-size:clamp(2.6rem,6vw,4.8rem);
-  font-weight:300;
-  line-height:1;
-  color:var(--charcoal);
-  margin-bottom:1rem;
+.tc-title{
+  font-family:'Cormorant Garamond',serif;
+  font-size:clamp(2.2rem,4vw,3.2rem);font-weight:300;
+  color:var(--charcoal);line-height:1.1;margin-bottom:0.8rem;
+  opacity:0;transform:translateY(14px);
+  transition:opacity 0.7s ease 0.1s,transform 0.7s ease 0.1s;
 }
-.store-nez-title em{
-  font-style:italic;
-  color:var(--gold);
+.tc-title em{font-style:italic;color:var(--gold)}
+.tc-sub{
+  font-size:0.76rem;color:var(--muted);line-height:1.8;
+  opacity:0;transform:translateY(10px);
+  transition:opacity 0.6s ease 0.2s,transform 0.6s ease 0.2s;
 }
-.store-nez-copy{
-  max-width:620px;
-  margin:0 auto 1.8rem;
-  font-size:0.78rem;
-  line-height:1.9;
-  color:var(--muted);
+.tienda-collections.tc-inview .tc-eyebrow,
+.tienda-collections.tc-inview .tc-title,
+.tienda-collections.tc-inview .tc-sub{opacity:1;transform:none}
+
+/* List */
+.tc-list{
+  max-width:900px;margin:0 auto;
+  display:flex;flex-direction:column;
 }
-.store-nez-btn{
-  display:inline-flex;
+.tc-row{
+  display:grid;
+  grid-template-columns:1fr auto;
   align-items:center;
-  justify-content:center;
-  gap:0.7rem;
-  min-width:min(100%,360px);
-  padding:0.95rem 2rem;
-  border:1px solid var(--gold);
-  background:transparent;
-  color:var(--gold);
-  font-family:'Jost',sans-serif;
-  font-size:0.65rem;
-  letter-spacing:0.22em;
-  text-transform:uppercase;
+  gap:2rem;
+  padding:2rem 0;
+  border-bottom:1px solid rgba(184,149,90,0.1);
   cursor:pointer;
-  transition:background 0.25s,color 0.25s,border-color 0.25s;
+  position:relative;
+  opacity:0;transform:translateX(-16px);
+  transition:opacity 0.55s ease,transform 0.55s ease,border-color 0.3s;
 }
-.store-nez-btn:hover{
-  background:var(--gold);
-  color:var(--dark);
+.tc-row:first-child{border-top:1px solid rgba(184,149,90,0.1)}
+.tc-row.tc-row-visible{opacity:1;transform:none}
+.tc-row:hover{border-color:rgba(184,149,90,0.35)}
+.tc-row:hover .tc-row-name{color:var(--gold)}
+.tc-row:hover .tc-row-arrow{transform:translateX(5px);color:var(--gold)}
+
+.tc-row-left{display:flex;flex-direction:column;gap:0.4rem}
+.tc-row-name{
+  font-family:'Cormorant Garamond',serif;
+  font-size:clamp(1.8rem,3.5vw,2.6rem);font-weight:300;
+  font-style:italic;color:var(--charcoal);
+  line-height:1;
+  transition:color 0.3s;
 }
-@media(max-width:680px){
-  .store-nez-access{
-    scroll-margin-top:96px;
-    padding:3.3rem 1rem 3.8rem;
-  }
-  .store-nez-title{
-    font-size:clamp(2.35rem,11vw,3.45rem);
-  }
-  .store-nez-copy{
-    max-width:330px;
-    font-size:0.74rem;
-  }
-  .store-nez-btn{
-    width:100%;
-    padding:0.9rem 1rem;
-  }
+.tc-row-desc{
+  font-size:0.72rem;color:var(--muted);
+  letter-spacing:0.04em;line-height:1.6;
+}
+.tc-row-count{
+  font-size:0.52rem;letter-spacing:0.2em;
+  text-transform:uppercase;color:rgba(184,149,90,0.55);
+  margin-top:0.2rem;
 }
 
-
-/* ── Fixed header layout safety ───────────────────────────────
-   Header remains visible while scrolling, while page content reserves
-   space so section titles do not hide underneath it. */
-:root{--site-header-height:76px}
-body{padding-top:var(--site-header-height);overflow-x:hidden}
-header{
-  position:fixed !important;
-  top:0;
-  left:0;
-  right:0;
-  width:100%;
-  z-index:1000;
+.tc-row-right{
+  display:flex;align-items:center;gap:1rem;flex-shrink:0;
 }
-html{scroll-padding-top:calc(var(--site-header-height) + 16px)}
-#shop,.store-nez-access{scroll-margin-top:calc(var(--site-header-height) + 16px)}
-@media(max-width:680px){
-  :root{--site-header-height:73px}
-  body{padding-top:var(--site-header-height)}
-  html{scroll-padding-top:calc(var(--site-header-height) + 12px)}
-  #shop,.store-nez-access{scroll-margin-top:calc(var(--site-header-height) + 12px)}
+.tc-row-arrow{
+  width:40px;height:40px;
+  border:1px solid rgba(184,149,90,0.25);
+  display:flex;align-items:center;justify-content:center;
+  color:var(--muted);
+  transition:transform 0.3s,color 0.3s,border-color 0.3s;
 }
 
+@media(max-width:768px){
+  .tienda-collections{padding:4rem 1.5rem 5rem}
+  .tc-row{grid-template-columns:1fr auto;gap:1rem;padding:1.5rem 0}
+  .tc-row-name{font-size:clamp(1.6rem,7vw,2.2rem)}
+  .tc-row-desc{font-size:0.68rem}
+}
 </style>
 <script type="application/ld+json">
 {
@@ -1917,14 +1916,14 @@ html{scroll-padding-top:calc(var(--site-header-height) + 16px)}
   <script src="https://checkout.wompi.sv/widget.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.5/gsap.min.js" defer></script>
 </head>
-<body class="store-page">
+<body>
 
 <header>
   <a href="/" class="logo" style="text-decoration:none">Silla<span>ge</span></a>
   <nav>
-    <a href="/">Inicio</a>
+    <a href="#home">Inicio</a>
     <a href="#" onclick="openCollections();return false;">Colecciones</a>
-    <a href="/store.html">Tienda</a>
+    <a href="/tienda" style="color:var(--gold)">Tienda</a>
     <a href="/nosotros">Nosotros</a>
   </nav>
   <div class="header-right">
@@ -1944,6 +1943,14 @@ html{scroll-padding-top:calc(var(--site-header-height) + 16px)}
   <svg class="cart-fab-icon" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" style="pointer-events:none"><path d="M6 2L3 6v14a2 2 0 002 2h14a2 2 0 002-2V6l-3-4z"/><line x1="3" y1="6" x2="21" y2="6"/><path d="M16 10a4 4 0 01-8 0"/></svg>
   <span class="cart-fab-count" id="cartFabCount">0</span>
 </button>
+
+<section class="tienda-header" id="home">
+  <div class="tienda-header-inner">
+    <a href="/" class="tienda-back"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><polyline points="15 18 9 12 15 6"/></svg>Inicio</a>
+    <span class="tienda-eyebrow">Sillage Parfumerie</span>
+  </div>
+</section>
+
 
 <section id="shop">
   <div class="section-header">
@@ -1971,6 +1978,18 @@ html{scroll-padding-top:calc(var(--site-header-height) + 16px)}
   </div>
 </section>
 
+<!-- EDITORIAL COLLECTIONS -->
+<section class="tienda-collections" id="tiendaCollections">
+  <div class="tc-header">
+    <span class="tc-eyebrow">Colecciones Curadas</span>
+    <h2 class="tc-title">Encuentra tu <em>siguiente fragancia</em></h2>
+    <p class="tc-sub">Cada colección reúne las fragancias que mejor encajan con un momento, un estado de ánimo, o una intención.</p>
+  </div>
+  <div class="tc-list" id="tcList">
+    <!-- Populated by buildTiendaCollections() -->
+  </div>
+</section>
+
 <!-- Bundle Detail Modal -->
 <div class="bundle-modal-overlay" id="bundleDetailOverlay" onclick="if(event.target===this)closeBundleDetail()">
   <div class="bundle-modal">
@@ -1995,21 +2014,6 @@ html{scroll-padding-top:calc(var(--site-header-height) + 16px)}
     </div>
   </div>
 </div>
-
-
-<section class="store-nez-access" id="nezAccess">
-  <div class="store-nez-inner">
-    <p class="store-nez-kicker">Sommelier IA</p>
-    <h2 class="store-nez-title">¿No sabes cuál <em>elegir?</em></h2>
-    <p class="store-nez-copy">
-      Habla con Nez para recibir recomendaciones según ocasión, notas, intensidad y presupuesto.
-    </p>
-    <button class="store-nez-btn" type="button" onclick="openSommelierModal()">
-      Consultar a Nez <span aria-hidden="true">→</span>
-    </button>
-  </div>
-</section>
-
 
 <footer>
   <div class="f-logo">Sillage</div>
@@ -2893,7 +2897,8 @@ function buildGrid(){
     return parseArrivalDate(a.arrivedAt).getTime() - parseArrivalDate(b.arrivedAt).getTime();
   }).slice(0,4);
 
-  if(false && newArrivals.length){ /* disabled on dedicated store page */
+  var naAnchorEl = document.getElementById('na-anchor');
+  if(newArrivals.length && naAnchorEl){
     var naWrap = document.createElement('div');
     naWrap.id = 'newArrivalsSection';
     naWrap.className = 'new-arrivals-section';
@@ -3001,8 +3006,8 @@ function buildGrid(){
     naSticky.appendChild(naPanel);
     naWrap.appendChild(naSticky);
 
-    var shopSection = document.getElementById('shop');
-    shopSection.parentNode.insertBefore(naWrap, shopSection);
+    // Insert NA section (we're on homepage — na-anchor exists)
+    naAnchorEl.parentNode.insertBefore(naWrap, naAnchorEl);
 
     var bottleZone = document.getElementById('naBottleZone');
     var textZone = document.getElementById('naTextZone');
@@ -3393,6 +3398,10 @@ function buildGrid(){
 
   applyFilters();
   injectProductSchema(P);
+  // Build editorial collections section below grid
+  if(typeof buildTiendaCollections === 'function'){
+    loadCuratedFromDB(function(){ buildTiendaCollections(); });
+  }
 
   // Re-apply scent profile order after every grid rebuild (survives polling)
   if(typeof _somProfile !== 'undefined' && _somProfile){
@@ -7526,11 +7535,71 @@ document.addEventListener('DOMContentLoaded', function(){
   checkBtcpayRenew();
   checkResetToken();
 });
+
+// ── TIENDA EDITORIAL COLLECTIONS ─────────────────────────────────────────────
+function buildTiendaCollections(){
+  var list = document.getElementById('tcList');
+  if(!list || !CURATED || !CURATED.length) return;
+
+  list.innerHTML = '';
+
+  CURATED.forEach(function(col, i){
+    // Count matching products
+    var count = (P||[]).filter(function(p){
+      try{ return col.filter(p); } catch(e){ return false; }
+    }).length;
+    if(!count) return; // skip empty collections
+
+    var row = document.createElement('div');
+    row.className = 'tc-row';
+    row.style.transitionDelay = (i * 0.06) + 's';
+    row.innerHTML =
+      '<div class="tc-row-left">' +
+        '<div class="tc-row-name">' + esc(col.name) + '</div>' +
+        '<div class="tc-row-desc">' + esc(col.desc || '') + '</div>' +
+        '<div class="tc-row-count">' + count + ' ' + (count === 1 ? 'fragancia' : 'fragancias') + '</div>' +
+      '</div>' +
+      '<div class="tc-row-right">' +
+        '<div class="tc-row-arrow">' +
+          '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/></svg>' +
+        '</div>' +
+      '</div>';
+
+    row.addEventListener('click', function(){
+      filterByCurated(col);
+      // Scroll to top of shop grid
+      var shop = document.getElementById('shop');
+      if(shop) shop.scrollIntoView({ behavior:'smooth', block:'start' });
+    });
+
+    list.appendChild(row);
+  });
+
+  // IO reveal for header
+  var section = document.getElementById('tiendaCollections');
+  if(section && 'IntersectionObserver' in window){
+    var headerObs = new IntersectionObserver(function(entries){
+      if(entries[0].isIntersecting){ section.classList.add('tc-inview'); headerObs.disconnect(); }
+    }, { threshold:0.1 });
+    headerObs.observe(section);
+
+    // IO reveal per row
+    var rowObs = new IntersectionObserver(function(entries){
+      entries.forEach(function(entry){
+        if(entry.isIntersecting) entry.target.classList.add('tc-row-visible');
+      });
+    }, { threshold:0.15 });
+    list.querySelectorAll('.tc-row').forEach(function(r){ rowObs.observe(r); });
+  } else {
+    if(section) section.classList.add('tc-inview');
+    list.querySelectorAll('.tc-row').forEach(function(r){ r.classList.add('tc-row-visible'); });
+  }
+}
 </script>
 
 <!-- MOBILE BOTTOM NAV -->
 <nav class="mob-nav" id="mobNav">
-  <a href="/" class="mob-nav-btn">
+  <a href="#home" class="mob-nav-btn">
     <span class="mob-nav-icon">
       <svg viewBox="0 0 24 24" fill="none" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
         <path d="M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/>
@@ -7545,7 +7614,7 @@ document.addEventListener('DOMContentLoaded', function(){
       </svg>
     </span>Colecciones
   </button>
-  <a href="/store.html" class="mob-nav-btn">
+  <a href="#shop" class="mob-nav-btn">
     <span class="mob-nav-icon">
       <svg viewBox="0 0 24 24" fill="none" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
         <circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>
@@ -7749,9 +7818,5 @@ document.addEventListener('DOMContentLoaded', function(){
     </div>
   </div>
 </div>
-
-<!-- VERIFY: /api inventory/pricing/catalogue/decant/order/wompi/btcpay/customer/sommelier calls preserved from source file. -->
-
-<!-- BUILD FIX: fixed header retained; body padding reserves header space; scroll offsets applied -->
 </body>
 </html>
