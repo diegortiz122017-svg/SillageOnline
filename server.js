@@ -5722,6 +5722,24 @@ async function start() {
     await auth.restoreRevocations();
     await fixCorruptedInventoryRows();
     await migrateInventoryRows();
+    // ── Admin credential sanity check ────────────────────────────────────────
+    if (!ADMIN_USER || !ADMIN_PASS) {
+      console.warn('\u26a0\ufe0f  ADMIN_USER or ADMIN_PASS not set — admin login disabled');
+    } else if (ADMIN_PASS.startsWith('pbkdf2:')) {
+      const parts = ADMIN_PASS.split(':');
+      if (parts.length !== 4) {
+        console.error('\U0001f6a8 ADMIN_PASS pbkdf2 invalid — expected 4 parts, got ' + parts.length);
+      } else {
+        const iters = parseInt(parts[1], 10);
+        const saltLen = parts[2].length;
+        const hashLen = parts[3].length;
+        if (!iters || iters < 100000) console.error('\U0001f6a8 ADMIN_PASS iterations too low: ' + iters);
+        else if (hashLen !== 64) console.error('\U0001f6a8 ADMIN_PASS hash wrong length: ' + hashLen + ' chars (expected 64)');
+        else console.log('\u2705 ADMIN_PASS pbkdf2 OK — iters:' + iters + ' hash:' + hashLen + 'chars');
+      }
+    } else {
+      console.warn('\u26a0\ufe0f  ADMIN_PASS is plain text');
+    }
     console.log('\u2705 SILLAGE PARFUMERIE v3.1 - Server Ready | ' + BASE_URL);
   } catch(err) {
     console.error('\u274C DB startup failed:', err.message);
