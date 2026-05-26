@@ -750,8 +750,8 @@ tr:hover td{background:rgba(255,255,255,0.02)}
     <div class="login-card">
       <div class="login-title">Iniciar Sesión</div>
       <div class="login-sub2">Ingresa tus credenciales de administrador</div>
-      <div class="lf"><label>Usuario</label><input type="text" id="lu" placeholder="admin" autocomplete="username"/></div>
-      <div class="lf"><label>Contraseña</label><input type="password" id="lp" placeholder="••••••••" autocomplete="current-password"/></div>
+      <div class="lf"><label>Usuario</label><input type="text" id="lu" placeholder="admin" autocomplete="username" autocapitalize="none" autocorrect="off" spellcheck="false"/></div>
+      <div class="lf"><label>Contraseña</label><input type="password" id="lp" placeholder="••••••••" autocomplete="current-password" autocapitalize="none" autocorrect="off" spellcheck="false"/></div>
       <div class="login-err" id="lerr"></div>
       <button class="login-btn" id="loginBtn">Iniciar Sesión</button>
       
@@ -1673,7 +1673,7 @@ var sessionToken = (function(){
 
 function tryLogin(){
   var u=document.getElementById('lu').value.trim();
-  var p=document.getElementById('lp').value;
+  var p=document.getElementById('lp').value.trim();
   var err=document.getElementById('lerr');
   var btn=document.getElementById('loginBtn');
   if(!u||!p){err.textContent='Please enter your credentials.';return;}

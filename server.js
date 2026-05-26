@@ -1113,7 +1113,7 @@ function checkRateLimit(ip) {
   const e = loginAttempts.get(ip);
   if (!e) return true;
   if (Date.now() - e.firstAttempt > 15 * 60 * 1000) { loginAttempts.delete(ip); return true; }
-  return e.count < 5;
+  return e.count < 10;
 }
 function recordFailed(ip) {
   const e = loginAttempts.get(ip) || { count: 0, firstAttempt: Date.now() };
@@ -1340,13 +1340,6 @@ app.get('/', async (req, res) => {
 });
 
 app.get('/nosotros',    (req, res) => res.sendFile(path.join(__dirname, 'nosotros.html')));
-app.get('/tienda',      (req, res) => {
-  const fs   = require('fs');
-  const file = path.join(__dirname, 'tienda.html');
-  if (fs.existsSync(file)) return res.sendFile(file);
-  // Fallback: serve index.html if tienda.html not deployed yet
-  res.sendFile(path.join(__dirname, 'index.html'));
-});
 app.get('/envios', (req, res) => res.sendFile(path.join(__dirname, 'envios.html')));
 app.get('/terminos', (req, res) => res.sendFile(path.join(__dirname, 'terminos.html')));
 app.get('/devoluciones', (req, res) => res.sendFile(path.join(__dirname, 'devoluciones.html')));
@@ -1738,8 +1731,10 @@ app.post('/api/auth/login', authLimiter, async (req, res) => {
   if (!ok) {
     recordFailed(ip);
     trackAbuse('login_burst', ip);
-    // Persist failed attempt to DB so it survives server restarts/redeploys
-    await db.execute(
+    // Only persist to DB after 2+ failures — prevents a single typo from
+    // locking out the admin after a server restart
+    const currentCount = loginAttempts.get(ip)?.count || 0;
+    if (currentCount >= 2) await db.execute(
       `INSERT INTO settings (key_name, value, updated_at)
        VALUES (?, ?, ?)
        ON DUPLICATE KEY UPDATE value=VALUES(value), updated_at=VALUES(updated_at)`,
