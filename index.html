@@ -1014,7 +1014,7 @@ footer{background:var(--dark);padding:3.5rem 4rem;text-align:center;border-top:1
 
 /* ── New arrivals — scrolltelling ── */
 .new-arrivals-section{position:relative;margin:0;border-top:1px solid rgba(184,149,90,0.12);border-bottom:1px solid rgba(184,149,90,0.12);background:var(--warm-white);color:var(--charcoal)}
-.na-sticky-wrap{position:relative;height:520vh}
+.na-sticky-wrap{position:relative;height:var(--na-h,520vh)}
 .na-sticky{position:sticky;top:0;height:100vh;overflow:hidden;background:var(--warm-white);transition:background 0.9s ease;padding:0;display:block}
 .na-bg-orb{position:absolute;width:1100px;height:1100px;border-radius:50%;filter:blur(120px);opacity:0.10;pointer-events:none;transition:background 0.9s ease;z-index:1}
 .na-bg-orb.a{top:-20%;left:-15%}
@@ -3116,6 +3116,9 @@ function buildGrid(){
     var naWrap = document.createElement('div');
     naWrap.id = 'newArrivalsSection';
     naWrap.className = 'new-arrivals-section';
+    // Dynamic height: 80vh per product + 100vh for sticky panel
+    // Keeps scroll time proportional to content, not a fixed 520vh
+    naWrap.style.setProperty('--na-h', (N * 80 + 100) + 'vh');
 
     var naSticky = document.createElement('div');
     naSticky.className = 'na-sticky-wrap';
@@ -3361,7 +3364,7 @@ function buildGrid(){
       function apply(p){
         if(railFill) railFill.style.width = (p*100).toFixed(2)+'%';
         var segLen = 1/N;
-        var fadeZone = 0.06;
+        var fadeZone = 0.10;
         var activeIdx = Math.min(N-1, Math.floor(p / segLen));
         var localP = naClamp((p - activeIdx*segLen) / segLen);
         var active = diary[activeIdx];
