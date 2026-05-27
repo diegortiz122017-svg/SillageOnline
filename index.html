@@ -108,7 +108,7 @@ nav a:hover{color:var(--gold)}
 .orb-1{width:400px;height:400px;background:rgba(184,149,90,0.08);top:10%;left:5%}
 .orb-2{width:300px;height:300px;background:rgba(184,149,90,0.06);bottom:15%;right:8%;animation-delay:-3s}
 @keyframes floatOrb{0%,100%{transform:translate(0,0)}50%{transform:translate(15px,-20px)}}
-.hero-content{position:relative;z-index:2;display:flex;flex-direction:column;align-items:center;justify-content:space-between;width:100%;height:100%;padding:2rem 0 4rem;box-sizing:border-box;text-align:center}
+.hero-content{position:relative;z-index:2;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2.5rem;width:100%;height:100%;padding:2rem 0 4rem;box-sizing:border-box;text-align:center}
 .hero-eyebrow{font-size:0.65rem;letter-spacing:0.35em;text-transform:uppercase;color:var(--gold);margin-bottom:1rem;opacity:0;animation:fadeUp 1s ease 0.3s forwards}
 .hero-title{font-family:Cormorant Garamond,serif;font-size:clamp(3.5rem,10vw,9rem);font-weight:300;line-height:1;color:var(--cream);opacity:0;animation:fadeUp 1s ease 0.5s forwards}
 .hero-title em{font-style:italic;color:var(--gold-light);display:block;font-size:1.15em;letter-spacing:-0.01em}
@@ -1374,8 +1374,8 @@ footer{background:var(--dark);padding:3.5rem 4rem;text-align:center;border-top:1
 @media(max-width:680px){
   .hero{
     /* Fill viewport minus only the sticky header */
-    height:calc(100dvh - 56px);
-    min-height:480px;
+    height:auto;
+    min-height:calc(100dvh - 56px);
   }
   .mob-nav{
     display:flex;position:sticky;bottom:0;left:0;right:0;z-index:499;
@@ -1600,10 +1600,10 @@ footer{background:var(--dark);padding:3.5rem 4rem;text-align:center;border-top:1
 /* ── HERO SOMMELIER BLOCK ── */
 .hero-som-divider{
   width:1px;
-  height:28px;
+  height:20px;
   background:linear-gradient(to bottom,transparent,rgba(184,149,90,0.2),transparent);
   align-self:center;
-  margin:1.2rem 0 1rem;
+  margin:0 0 0.8rem;
   opacity:0;animation:fadeIn 0.8s ease 1.0s forwards;
 }
 .hero-som-invite{text-align:center;max-width:420px;opacity:0;animation:fadeUp 1s ease 1.1s forwards}
@@ -7005,15 +7005,12 @@ function toggleSommelier(){
   function isMobile(){ return window.innerWidth <= 680; }
 
   if('IntersectionObserver' in window){
-    // threshold:0 fires as soon as ANY part of hero enters or leaves viewport
     var obs = new IntersectionObserver(function(entries){
       if(!isMobile()){ nav.classList.remove('nav-hidden'); return; }
-      // isIntersecting = true → hero visible → hide nav
-      // isIntersecting = false → hero gone → show nav
       nav.classList.toggle('nav-hidden', entries[0].isIntersecting);
     }, {
-      threshold: 0
-      // No rootMargin — fires the moment hero edge crosses viewport edge
+      threshold: 0,
+      rootMargin: '0px 0px -85% 0px'
     });
     obs.observe(hero);
   } else {
