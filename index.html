@@ -1019,11 +1019,11 @@ footer{background:var(--dark);padding:3.5rem 4rem;text-align:center;border-top:1
 .na-bg-orb{position:absolute;width:1100px;height:1100px;border-radius:50%;filter:blur(120px);opacity:0.10;pointer-events:none;transition:background 0.9s ease;z-index:1}
 .na-bg-orb.a{top:-20%;left:-15%}
 .na-bg-orb.b{bottom:-25%;right:-15%}
-.na-corner-stamp{position:absolute;top:1.4rem;left:2.2rem;font-size:0.5rem;letter-spacing:0.3em;text-transform:uppercase;color:var(--muted);z-index:5;display:flex;align-items:center;gap:0.4rem}
-.na-corner-stamp span{font-family:'Cormorant Garamond',serif;font-style:italic;font-size:1rem;letter-spacing:0.04em;text-transform:none;color:var(--gold)}
+.na-corner-stamp{position:absolute;top:1.4rem;left:2.2rem;font-size:0.5rem;letter-spacing:0.3em;color:var(--muted);z-index:5;display:flex;align-items:center;gap:0.4rem}
+.na-corner-stamp span{font-family:'Cormorant Garamond',serif;font-style:italic;font-size:1rem;letter-spacing:0.04em;color:var(--gold)}
 .na-stage{position:absolute;inset:0;display:grid;grid-template-columns:280px 1fr 460px;gap:3rem;padding:4rem 4rem 4.5rem;z-index:2}
 .na-toc{display:flex;flex-direction:column;padding-top:1rem}
-.na-toc-cap{font-size:0.5rem;letter-spacing:0.3em;text-transform:uppercase;color:var(--muted);line-height:1.7}
+.na-toc-cap{display:none}
 .na-toc-cap b{display:block;margin-top:0.3rem;font-family:'Cormorant Garamond',serif;font-size:0.95rem;font-style:italic;font-weight:400;letter-spacing:0.04em;text-transform:none;color:var(--gold)}
 .na-toc-list{margin-top:auto;display:flex;flex-direction:column;gap:0.05rem;padding-top:2rem}
 .na-toc-item{min-height:44px;display:flex;align-items:baseline;gap:0.9rem;padding:0.55rem 0;border-bottom:1px solid var(--border-light);cursor:pointer;transition:color 0.3s,padding 0.3s,opacity 0.3s}
@@ -3116,9 +3116,6 @@ function buildGrid(){
     var naWrap = document.createElement('div');
     naWrap.id = 'newArrivalsSection';
     naWrap.className = 'new-arrivals-section';
-    // Dynamic height: 80vh per product + 100vh for sticky panel
-    // Keeps scroll time proportional to content, not a fixed 520vh
-    naWrap.style.setProperty('--na-h', (N * 80 + 100) + 'vh');
 
     var naSticky = document.createElement('div');
     naSticky.className = 'na-sticky-wrap';
@@ -3205,10 +3202,10 @@ function buildGrid(){
     naPanel.innerHTML =
       '<div class="na-bg-orb a" id="naOrbA"></div>'+
       '<div class="na-bg-orb b" id="naOrbB"></div>'+
-      '<div class="na-corner-stamp">Recién <span>Llegados</span></div>'+
+      '<div class="na-corner-stamp">Reci\u00e9n Llegados</div>'+
       '<div class="na-stage">'+
         '<aside class="na-toc">'+
-          '<div class="na-toc-cap">CUATRO P\u00c1GINAS<b>de un mismo diario</b></div>'+
+          '<div class="na-toc-cap"></div>'+
           '<div class="na-toc-list" id="naTocList"></div>'+
         '</aside>'+
         '<div class="na-bottle-zone" id="naBottleZone"><div class="na-bottle-mark" id="naBottleMark">01</div></div>'+
@@ -3306,6 +3303,8 @@ function buildGrid(){
       var textSlots = textZone.querySelectorAll('.na-text-slot');
       var tocItems = tocList.querySelectorAll('.na-toc-item');
       var N = diary.length;
+      // Dynamic height: 80vh per product + 100vh for the sticky panel
+      wrap.style.setProperty('--na-h', (N * 80 + 100) + 'vh');
       var lastP = -1;
       var raf = 0;
       var sectionInView = true;
@@ -6214,7 +6213,14 @@ function buildCollections(){
       '<div class="cc-name">'+col.name+'</div>'+
       '<div class="cc-desc">'+col.desc+'</div>'+
       '<div class="cc-count">'+count+' fragancia'+(count!==1?'s':'')+'</div>';
-    card.addEventListener('click', function(){ filterByCurated(col); });
+    card.addEventListener('click', function(){
+      // On tienda: filter in place. On homepage: navigate to tienda with param.
+      if(document.getElementById('productGrid')){
+        filterByCurated(col);
+      } else {
+        window.location.href = '/tienda?coleccion=' + encodeURIComponent(col.id);
+      }
+    });
     curatedGrid.appendChild(card);
   });
 }
