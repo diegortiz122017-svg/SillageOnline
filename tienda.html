@@ -1788,7 +1788,10 @@ footer{background:var(--dark);padding:3.5rem 4rem;text-align:center;border-top:1
 /* ── TIENDA PAGE HEADER ─────────────────────────────── */
 .tienda-header{background:var(--warm-white);color:var(--charcoal);padding:2rem 4rem 1.5rem;border-bottom:1px solid rgba(184,149,90,0.12)}
 .tienda-header-inner{max-width:1400px;margin:0 auto}
-.tienda-back{display:inline-flex;align-items:center;gap:0.4rem;font-size:0.6rem;letter-spacing:0.2em;text-transform:uppercase;color:var(--muted);text-decoration:none;margin-bottom:1.5rem;transition:color 0.25s}
+.tienda-header-top{display:flex;align-items:center;gap:0;margin-bottom:0}
+.tienda-header-top .tienda-back{margin-right:0.6rem}
+.tienda-header-top .tienda-back::after{content:'/';margin-left:0.6rem;color:rgba(184,149,90,0.3);font-weight:300}
+.tienda-back{display:inline-flex;align-items:center;gap:0.4rem;font-size:0.6rem;letter-spacing:0.2em;text-transform:uppercase;color:var(--muted);text-decoration:none;transition:color 0.25s}
 .tienda-back:hover{color:var(--gold)}
 .tienda-eyebrow{display:block;font-size:0.58rem;letter-spacing:0.35em;text-transform:uppercase;color:var(--gold);margin-bottom:0.5rem}
 .tienda-h1{font-family:'Cormorant Garamond',serif;font-size:clamp(3rem,5vw,4.5rem);font-weight:300;color:var(--charcoal);line-height:1}
@@ -1893,65 +1896,53 @@ footer{background:var(--dark);padding:3.5rem 4rem;text-align:center;border-top:1
 }
 
 /* ── TIENDA PROFILE ZONE ─────────────────────────────── */
-.tienda-header-top{display:flex;align-items:center;gap:1rem;margin-bottom:0}
 .tienda-profile-zone{
-  margin-top:1.2rem;
-  display:flex;align-items:center;justify-content:space-between;
-  gap:1.5rem;flex-wrap:wrap;
-  padding-top:1rem;
+  margin-top:0.8rem;padding-top:0.8rem;
+  display:flex;align-items:center;gap:1rem;flex-wrap:wrap;
   border-top:1px solid rgba(184,149,90,0.1);
 }
+.tpz-left{display:flex;align-items:center;gap:0.8rem;flex:1;min-width:0;flex-wrap:wrap}
 .tpz-label{
-  font-size:0.52rem;letter-spacing:0.25em;text-transform:uppercase;
-  color:var(--gold);display:block;margin-bottom:0.5rem;
+  font-size:0.5rem;letter-spacing:0.25em;text-transform:uppercase;
+  color:var(--gold);white-space:nowrap;flex-shrink:0;
 }
-.tpz-chips{display:flex;flex-wrap:wrap;gap:0.4rem}
+.tpz-chips{display:flex;flex-wrap:wrap;gap:0.35rem}
 .tpz-chip{
-  font-size:0.6rem;letter-spacing:0.08em;
+  font-size:0.58rem;letter-spacing:0.05em;
   color:var(--charcoal);
-  background:rgba(184,149,90,0.08);
-  border:1px solid rgba(184,149,90,0.2);
-  padding:0.25rem 0.7rem;
-  white-space:nowrap;
+  background:rgba(184,149,90,0.06);
+  border:1px solid rgba(184,149,90,0.18);
+  padding:0.2rem 0.6rem;white-space:nowrap;
 }
-.tpz-actions{display:flex;gap:0.6rem;flex-shrink:0}
+.tpz-actions{display:flex;gap:0.5rem;flex-shrink:0}
 .tpz-btn{
-  font-size:0.58rem;letter-spacing:0.15em;text-transform:uppercase;
-  padding:0.4rem 1rem;cursor:pointer;
-  font-family:'Jost',sans-serif;
-  transition:all 0.25s;
+  font-size:0.52rem;letter-spacing:0.12em;text-transform:uppercase;
+  padding:0.3rem 0.85rem;cursor:pointer;
+  font-family:'Jost',sans-serif;transition:all 0.25s;
 }
-.tpz-refine{
-  background:transparent;border:1px solid var(--gold);color:var(--gold);
-}
+.tpz-refine{background:transparent;border:1px solid var(--gold);color:var(--gold)}
 .tpz-refine:hover{background:var(--gold);color:white}
-.tpz-reset{
-  background:transparent;border:1px solid rgba(138,127,114,0.3);color:var(--muted);
-}
+.tpz-reset{background:transparent;border:1px solid rgba(138,127,114,0.25);color:var(--muted)}
 .tpz-reset:hover{border-color:var(--muted);color:var(--charcoal)}
 
 /* No-profile invite */
 .tienda-nez-invite{
-  margin-top:1rem;padding-top:1rem;
+  margin-top:0.8rem;padding-top:0.8rem;
   border-top:1px solid rgba(184,149,90,0.1);
-  display:flex;align-items:center;gap:1.5rem;
+  display:flex;align-items:center;gap:1rem;
 }
-.tni-text{font-size:0.72rem;color:var(--muted)}
+.tni-text{font-size:0.68rem;color:var(--muted)}
 .tni-btn{
-  font-size:0.58rem;letter-spacing:0.12em;
+  font-size:0.55rem;letter-spacing:0.12em;
   background:transparent;border:none;
   color:var(--gold);cursor:pointer;
-  font-family:'Jost',sans-serif;
-  padding:0;
-  transition:opacity 0.2s;
+  font-family:'Jost',sans-serif;padding:0;transition:opacity 0.2s;
 }
 .tni-btn:hover{opacity:0.7}
-
 @media(max-width:768px){
-  .tienda-profile-zone{flex-direction:column;align-items:flex-start;gap:0.8rem}
-  .tpz-actions{width:100%}
-  .tpz-btn{flex:1;text-align:center}
-  .tienda-nez-invite{flex-direction:column;align-items:flex-start;gap:0.5rem}
+  .tienda-profile-zone{gap:0.6rem}
+  .tpz-actions{gap:0.4rem}
+  .tpz-btn{padding:0.3rem 0.7rem}
 }
 </style>
 <script type="application/ld+json">
@@ -6791,6 +6782,8 @@ function closeSommelierModal(){
   _somOpen = false;
   document.getElementById('somModal').classList.remove('open');
   document.body.style.overflow = '';
+  // Update tienda profile zone if on tienda page
+  if(typeof renderTiendaProfile === 'function') renderTiendaProfile();
 }
 
 function toggleSommelier(){
@@ -7448,8 +7441,8 @@ function saveAndApplyScentProfile(profile){
   // Show active profile in section
   showSommelierProfileActive(profile);
 
-
-
+  // Update tienda header profile zone in real time
+  if(typeof renderTiendaProfile === 'function') renderTiendaProfile();
 }
 
 // ── Profile-based catalogue scoring ──────────────────
