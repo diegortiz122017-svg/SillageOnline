@@ -83,7 +83,7 @@
   --error:#c0504a;--success:#5a9a6a;--warn:#d4901a;
 }
 html{scroll-behavior:smooth}
-body{background:var(--dark);color:var(--cream);font-family:'Jost',sans-serif;font-weight:300;overflow-x:hidden}
+body{background:var(--dark);color:var(--cream);font-family:'Jost',sans-serif;font-weight:300;overflow-x:clip}
 
 header{position:sticky;top:0;width:100%;z-index:100;display:flex;align-items:center;justify-content:space-between;padding:1.4rem 4rem;background:rgba(14,12,10,0.95);backdrop-filter:blur(12px);border-bottom:1px solid var(--border)}
 .logo{font-family:Cormorant Garamond,serif;font-size:2rem;font-weight:300;letter-spacing:0.35em;color:var(--gold);text-transform:uppercase;flex:1}
@@ -1085,7 +1085,7 @@ footer{background:var(--dark);padding:3.5rem 4rem;text-align:center;border-top:1
   .na-name{font-size:3rem}
 }
 @media(max-width:768px){
-  html,body{width:100%;max-width:100%;overflow-x:hidden}
+  html,body{width:100%;max-width:100%;overflow-x:clip}
   body{min-width:0}
   header,.hero,#shop,footer,.new-arrivals-section{width:100%;max-width:100%;box-sizing:border-box}
   .na-sticky-wrap{height:auto}
@@ -1974,7 +1974,7 @@ footer{background:var(--dark);padding:3.5rem 4rem;text-align:center;border-top:1
 <header>
   <a href="/" class="logo" style="text-decoration:none">Silla<span>ge</span></a>
   <nav>
-    <a href="#home">Inicio</a>
+    <a href="/">Inicio</a>
     <a href="#" onclick="openCollections();return false;">Colecciones</a>
     <a href="/tienda" style="color:var(--gold)">Tienda</a>
     <a href="/nosotros">Nosotros</a>
@@ -7755,7 +7755,7 @@ function renderTiendaProfile(){
 
 <!-- MOBILE BOTTOM NAV -->
 <nav class="mob-nav" id="mobNav">
-  <a href="#home" class="mob-nav-btn">
+  <a href="/" class="mob-nav-btn">
     <span class="mob-nav-icon">
       <svg viewBox="0 0 24 24" fill="none" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
         <path d="M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/>
