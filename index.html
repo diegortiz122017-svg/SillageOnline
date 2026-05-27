@@ -108,7 +108,7 @@ nav a:hover{color:var(--gold)}
 .orb-1{width:400px;height:400px;background:rgba(184,149,90,0.08);top:10%;left:5%}
 .orb-2{width:300px;height:300px;background:rgba(184,149,90,0.06);bottom:15%;right:8%;animation-delay:-3s}
 @keyframes floatOrb{0%,100%{transform:translate(0,0)}50%{transform:translate(15px,-20px)}}
-.hero-content{position:relative;z-index:2;display:flex;flex-direction:column;align-items:center;justify-content:center;width:100%;height:100%;padding:2rem 0 5rem;box-sizing:border-box;text-align:center}
+.hero-content{position:relative;z-index:2;display:flex;flex-direction:column;align-items:center;justify-content:space-between;width:100%;height:100%;padding:2rem 0 4rem;box-sizing:border-box;text-align:center}
 .hero-eyebrow{font-size:0.65rem;letter-spacing:0.35em;text-transform:uppercase;color:var(--gold);margin-bottom:1rem;opacity:0;animation:fadeUp 1s ease 0.3s forwards}
 .hero-title{font-family:Cormorant Garamond,serif;font-size:clamp(3.5rem,10vw,9rem);font-weight:300;line-height:1;color:var(--cream);opacity:0;animation:fadeUp 1s ease 0.5s forwards}
 .hero-title em{font-style:italic;color:var(--gold-light);display:block;font-size:1.15em;letter-spacing:-0.01em}
@@ -120,7 +120,7 @@ nav a:hover{color:var(--gold)}
 .hero-cta span{position:relative;z-index:1}
 @keyframes fadeUp{from{opacity:0;transform:translateY(30px)}to{opacity:1;transform:translateY(0)}}
 @keyframes fadeIn{from{opacity:0}to{opacity:1}}
-.scroll-indicator{position:absolute;bottom:1.8rem;left:50%;transform:translateX(-50%);display:flex;flex-direction:column;align-items:center;gap:0.3rem;opacity:0;animation:fadeUp 1s ease 1.2s forwards;z-index:3;pointer-events:none}
+.scroll-indicator{position:absolute;bottom:1.2rem;left:50%;transform:translateX(-50%);display:flex;flex-direction:column;align-items:center;gap:0.3rem;opacity:0;animation:fadeUp 1s ease 1.2s forwards;z-index:3;pointer-events:none}
 .scroll-indicator span{font-size:0.48rem;letter-spacing:0.3em;text-transform:uppercase;color:var(--muted)}
 .scroll-line{width:1px;height:40px;background:linear-gradient(to bottom,var(--gold),transparent);animation:spulse 2s ease-in-out infinite}
 @keyframes spulse{0%,100%{opacity:0.3}50%{opacity:1}}
@@ -1373,8 +1373,8 @@ footer{background:var(--dark);padding:3.5rem 4rem;text-align:center;border-top:1
 .mob-nav{display:none}
 @media(max-width:680px){
   .hero{
-    /* Fill exactly the space between header and bottom nav */
-    height:calc(100dvh - 56px - 64px);
+    /* Fill viewport minus only the sticky header */
+    height:calc(100dvh - 56px);
     min-height:480px;
   }
   .mob-nav{
@@ -1729,7 +1729,7 @@ footer{background:var(--dark);padding:3.5rem 4rem;text-align:center;border-top:1
   }
   .profile-pills{max-width:100%}
 }
-.hero-spacer{flex:1;min-height:0;max-height:1.5rem}
+.hero-spacer{display:none}
 @media(max-width:768px){.hero-spacer{flex:0;min-height:0;max-height:0.8rem}}
 
 /* ── SOMMELIER MODAL INTERNALS ─────────────────────── */
@@ -2019,6 +2019,9 @@ footer{background:var(--dark);padding:3.5rem 4rem;text-align:center;border-top:1
   .nez-chat-bubble{font-size:0.92rem}
 }
 
+.hero-main{display:flex;flex-direction:column;align-items:center;text-align:center}
+.hero-bottom{display:flex;flex-direction:column;align-items:center;text-align:center;padding-bottom:0.5rem}
+
 /* ── STORE CTA SECTION ──────────────────────────────── */
 .store-cta-section{background:var(--warm-white);color:var(--charcoal);padding:6rem 4rem;border-top:1px solid rgba(184,149,90,0.12);position:relative;overflow:hidden}
 .store-cta-section::after{content:'';position:absolute;right:-10%;top:50%;transform:translateY(-50%);width:55%;height:130%;background:radial-gradient(ellipse at center,rgba(184,149,90,0.07) 0%,transparent 65%);pointer-events:none}
@@ -2106,29 +2109,27 @@ footer{background:var(--dark);padding:3.5rem 4rem;text-align:center;border-top:1
   <div class="hero-bg"></div>
   <div class="orb orb-1"></div><div class="orb orb-2"></div>
   <div class="hero-content">
-    <p class="hero-eyebrow">Sillage &middot; Est. 2026</p>
-    <h1 class="hero-title">Tu Destino en<br><em>Alta Perfumería</em></h1>
-    <p class="hero-sub">Fragancias seleccionadas de las casas de perfumería más admiradas del mundo, ahora accesibles.</p>
-    <a href="/tienda" class="hero-cta"><span>Explorar la Colección</span></a>
-
-    <div class="hero-spacer"></div>
-    <div class="hero-som-divider"></div>
-
-    <div id="somInvite" class="hero-som-invite">
-      <p class="hero-som-label">Nez &mdash; Tu Sommelier</p>
-      <p class="hero-som-sub">Algunas fragancias solo necesitan que las descubras.</p>
-      <button class="hero-som-btn" onclick="openSommelierModal()">
-        Consultar a Nez
-      </button>
-      <p class="hero-som-note" id="somConsultNote"></p>
+    <div class="hero-main">
+      <p class="hero-eyebrow">Sillage &middot; Est. 2026</p>
+      <h1 class="hero-title">Tu Destino en<br><em>Alta Perfumería</em></h1>
+      <p class="hero-sub">Fragancias seleccionadas de las casas de perfumería más admiradas del mundo, ahora accesibles.</p>
+      <a href="/tienda" class="hero-cta"><span>Explorar la Colección</span></a>
     </div>
-
-    <div id="somProfileActive" class="profile-container" style="display:none">
-      <div class="profile-label">Tu Perfil Activo</div>
-      <div class="profile-pills" id="somProfileTags"></div>
-      <div class="profile-actions">
-        <button class="hero-som-action-btn" onclick="openSommelierModal()">Refinar</button>
-        <button class="hero-som-action-btn" onclick="resetSommelierProfile()">Restablecer</button>
+    <div class="hero-bottom">
+      <div class="hero-som-divider"></div>
+      <div id="somInvite" class="hero-som-invite">
+        <p class="hero-som-label">Nez &mdash; Tu Sommelier</p>
+        <p class="hero-som-sub">Algunas fragancias solo necesitan que las descubras.</p>
+        <button class="hero-som-btn" onclick="openSommelierModal()">Consultar a Nez</button>
+        <p class="hero-som-note" id="somConsultNote"></p>
+      </div>
+      <div id="somProfileActive" class="profile-container" style="display:none">
+        <div class="profile-label">Tu Perfil Activo</div>
+        <div class="profile-pills" id="somProfileTags"></div>
+        <div class="profile-actions">
+          <button class="hero-som-action-btn" onclick="openSommelierModal()">Refinar</button>
+          <button class="hero-som-action-btn" onclick="resetSommelierProfile()">Restablecer</button>
+        </div>
       </div>
     </div>
   </div>
@@ -6994,21 +6995,41 @@ function toggleSommelier(){
   window.addEventListener('resize', update);
 })();
 
-// Hide mobile nav while hero section is in view
+// Show/hide mobile nav based on hero visibility using IntersectionObserver
 (function(){
   var nav  = document.getElementById('mobNav');
   var hero = document.getElementById('home');
   if(!nav || !hero) return;
-  function updateNavVisibility(){
-    if(window.innerWidth > 680){ nav.classList.remove('nav-hidden'); return; }
-    var heroBottom = hero.getBoundingClientRect().bottom;
-    // Hide nav while any part of the hero is still visible
-    nav.classList.toggle('nav-hidden', heroBottom > 0);
+
+  // Only apply on mobile
+  function isMobile(){ return window.innerWidth <= 680; }
+
+  if('IntersectionObserver' in window){
+    // threshold:0 fires as soon as ANY part of hero enters or leaves viewport
+    var obs = new IntersectionObserver(function(entries){
+      if(!isMobile()){ nav.classList.remove('nav-hidden'); return; }
+      // isIntersecting = true → hero visible → hide nav
+      // isIntersecting = false → hero gone → show nav
+      nav.classList.toggle('nav-hidden', entries[0].isIntersecting);
+    }, {
+      threshold: 0
+      // No rootMargin — fires the moment hero edge crosses viewport edge
+    });
+    obs.observe(hero);
+  } else {
+    // Fallback for browsers without IO
+    function checkHero(){
+      if(!isMobile()){ nav.classList.remove('nav-hidden'); return; }
+      nav.classList.toggle('nav-hidden', hero.getBoundingClientRect().bottom > 0);
+    }
+    window.addEventListener('scroll', checkHero, { passive:true });
+    checkHero();
   }
-  // Run on load and scroll
-  updateNavVisibility();
-  window.addEventListener('scroll', updateNavVisibility, { passive: true });
-  window.addEventListener('resize', updateNavVisibility, { passive: true });
+
+  // Restore on desktop resize
+  window.addEventListener('resize', function(){
+    if(!isMobile()) nav.classList.remove('nav-hidden');
+  });
 })();
 
 document.addEventListener('DOMContentLoaded', function(){
@@ -8001,7 +8022,7 @@ function buildStoreCta(){
 </script>
 
 <!-- MOBILE BOTTOM NAV -->
-<nav class="mob-nav" id="mobNav">
+<nav class="mob-nav nav-hidden" id="mobNav">
   <a href="#home" class="mob-nav-btn" onclick="window.scrollTo({top:0,behavior:'smooth'});return false;">
     <span class="mob-nav-icon">
       <svg viewBox="0 0 24 24" fill="none" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
