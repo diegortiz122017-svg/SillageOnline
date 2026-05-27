@@ -4047,7 +4047,7 @@ app.post('/api/sommelier/chat', sommelierBurst, sommelierLimiter, async (req, re
   }
   const avoidIds = [...new Set(alreadyRecommended)];
   // Tell Nez if this is the last turn
-  const isLastTurn = userMsgCount >= 5;
+  const isLastTurn = userMsgCount >= 4; // fire on 4th user msg so 5th response feels like natural close
   const lastTurnNote = isLastTurn ? '\n\nÚLTIMO MENSAJE: Este es tu último mensaje en esta consulta. NO hagas preguntas — el cliente no podrá responder. Cierra con tu mejor recomendación y dirige a las tarjetas.' : '';
 
   const avoidNote = avoidIds.length
@@ -4108,7 +4108,7 @@ Campos: gender_pref, families (NON-EMPTY), notes, intensity, occasions, season, 
 SOLO omite PERFIL_JSON si únicamente haces una pregunta.
 
 CIERRE: Cuando el cliente muestre interés o decisión, cierra directo: "La encuentras en las tarjetas de abajo — agrégala al carrito desde ahí." Si ya eligió, confirma y cierra: "Perfecto. La tienes en la tarjeta de abajo." No preguntes "¿te gustaría agregarla?" — simplemente indica dónde está.
-ÚLTIMO TURNO: Si es tu último mensaje disponible en esta consulta, NUNCA termines con una pregunta — el cliente no podrá responder. Cierra con una recomendación final clara y dirige a las tarjetas: "Ahí las tienes en las tarjetas — cualquiera es una excelente elección."
+ÚLTIMO TURNO: Si es tu último mensaje disponible en esta consulta, NUNCA termines con una pregunta — el cliente no podrá responder. Cierra con una recomendación final clara y dirige a las tarjetas con una de las frases del CIERRE FINAL.
 
 VALORES DE SILLAGE — úsalos en objeciones:
 - Autenticidad garantizada: importamos de distribuidores mayoristas autorizados en EE.UU., con todos los registros sanitarios de El Salvador. Sin réplicas, sin alteraciones.
@@ -4286,7 +4286,13 @@ Responde en el idioma del cliente.`
             if (pText.includes(nt)) { score += 25; noteMatchCount++; }
           });
           // Hard penalty: if specific notes requested and product has NONE, bury it
-          if (expandedNoteTerms.length > 0 && noteMatchCount === 0) score -= 50;
+          // But skip penalty if the product matched by NAME (name match was the intent)
+          const hadNameMatch = expandedNoteTerms.some(nt => {
+            const ntNorm = nt.replace(/[^a-z0-9]/g, '');
+            const nameNorm = (p.brand+' '+p.name).toLowerCase().replace(/[^a-z0-9 ]/g, '');
+            return nameNorm.includes(ntNorm) || ntNorm.includes(nameNorm.split(' ').find(w => w.length > 4)||'');
+          });
+          if (expandedNoteTerms.length > 0 && noteMatchCount === 0 && !hadNameMatch) score -= 50;
 
           // Price range
           const price = parseFloat(p.price);
@@ -4388,7 +4394,8 @@ Responde en el idioma del cliente.`
   // ── OpenAI agentic loop ───────────────────────────────
   try {
     // ── Reply cache check — skip OpenAI if identical first-message query seen recently ──
-    const replyCacheKey = getReplyCacheKey(messages, profileContext);
+    // Skip reply cache when user has a profile — personalised responses shouldn't be cached
+  const replyCacheKey = profileContext ? null : getReplyCacheKey(messages, profileContext);
     if (replyCacheKey) {
       const cached = getReplyCache(replyCacheKey);
       if (cached) {
