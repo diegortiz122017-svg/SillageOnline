@@ -7534,6 +7534,27 @@ document.addEventListener('DOMContentLoaded', function(){
   // Handle URL params that require DOM — must run after all elements exist
   checkBtcpayRenew();
   checkResetToken();
+  // Apply collection filter from homepage navigation (?coleccion=id)
+  (function(){
+    var params = new URLSearchParams(window.location.search);
+    var colId = params.get('coleccion');
+    if(!colId) return;
+    // Wait for P to be populated (loadViaREST may not have run yet)
+    var tries = 0;
+    var interval = setInterval(function(){
+      tries++;
+      if((P && P.length && CURATED && CURATED.length) || tries > 40){
+        clearInterval(interval);
+        var col = CURATED.find(function(c){ return c.id === colId; });
+        if(col){
+          filterByCurated(col);
+          // Scroll to shop grid
+          var shop = document.getElementById('shop');
+          if(shop) setTimeout(function(){ shop.scrollIntoView({ behavior:'smooth', block:'start' }); }, 100);
+        }
+      }
+    }, 150);
+  })();
 });
 
 // ── TIENDA EDITORIAL COLLECTIONS ─────────────────────────────────────────────
