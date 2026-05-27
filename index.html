@@ -6996,12 +6996,12 @@ function toggleSommelier(){
 })();
 
 // Show/hide mobile nav based on hero visibility using IntersectionObserver
-(function(){
+// Hide mobile nav while hero section is in view
+document.addEventListener('DOMContentLoaded', function(){
   var nav  = document.getElementById('mobNav');
   var hero = document.getElementById('home');
   if(!nav || !hero) return;
 
-  // Only apply on mobile
   function isMobile(){ return window.innerWidth <= 680; }
 
   if('IntersectionObserver' in window){
@@ -7010,11 +7010,10 @@ function toggleSommelier(){
       nav.classList.toggle('nav-hidden', entries[0].isIntersecting);
     }, {
       threshold: 0,
-      rootMargin: '0px 0px -85% 0px'
+      rootMargin: '-56px 0px 0px 0px'
     });
     obs.observe(hero);
   } else {
-    // Fallback for browsers without IO
     function checkHero(){
       if(!isMobile()){ nav.classList.remove('nav-hidden'); return; }
       nav.classList.toggle('nav-hidden', hero.getBoundingClientRect().bottom > 0);
@@ -7023,11 +7022,10 @@ function toggleSommelier(){
     checkHero();
   }
 
-  // Restore on desktop resize
   window.addEventListener('resize', function(){
     if(!isMobile()) nav.classList.remove('nav-hidden');
   });
-})();
+});
 
 document.addEventListener('DOMContentLoaded', function(){
   var bg = document.getElementById('somModal');
