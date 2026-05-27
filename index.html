@@ -108,7 +108,7 @@ nav a:hover{color:var(--gold)}
 .orb-1{width:400px;height:400px;background:rgba(184,149,90,0.08);top:10%;left:5%}
 .orb-2{width:300px;height:300px;background:rgba(184,149,90,0.06);bottom:15%;right:8%;animation-delay:-3s}
 @keyframes floatOrb{0%,100%{transform:translate(0,0)}50%{transform:translate(15px,-20px)}}
-.hero-content{position:relative;z-index:2;display:flex;flex-direction:column;align-items:center;justify-content:center;width:100%;height:100%;padding:2rem 0 4.5rem;box-sizing:border-box;text-align:center}
+.hero-content{position:relative;z-index:2;display:flex;flex-direction:column;align-items:center;justify-content:center;width:100%;height:100%;padding:2rem 0 1.5rem;box-sizing:border-box;text-align:center}
 .hero-eyebrow{font-size:0.65rem;letter-spacing:0.35em;text-transform:uppercase;color:var(--gold);margin-bottom:1rem;opacity:0;animation:fadeUp 1s ease 0.3s forwards}
 .hero-title{font-family:Cormorant Garamond,serif;font-size:clamp(3.5rem,10vw,9rem);font-weight:300;line-height:1;color:var(--cream);opacity:0;animation:fadeUp 1s ease 0.5s forwards}
 .hero-title em{font-style:italic;color:var(--gold-light);display:block;font-size:1.15em;letter-spacing:-0.01em}
@@ -120,7 +120,7 @@ nav a:hover{color:var(--gold)}
 .hero-cta span{position:relative;z-index:1}
 @keyframes fadeUp{from{opacity:0;transform:translateY(30px)}to{opacity:1;transform:translateY(0)}}
 @keyframes fadeIn{from{opacity:0}to{opacity:1}}
-.scroll-indicator{position:absolute;bottom:0.8rem;left:50%;transform:translateX(-50%);display:flex;flex-direction:column;align-items:center;gap:0.3rem;opacity:0;animation:fadeUp 1s ease 1.2s forwards;z-index:1;pointer-events:none}
+.scroll-indicator{display:flex;flex-direction:column;align-items:center;gap:0.3rem;opacity:0;animation:fadeUp 1s ease 1.2s forwards;z-index:1;pointer-events:none;margin-top:auto;padding-top:1rem}
 .scroll-indicator span{font-size:0.48rem;letter-spacing:0.3em;text-transform:uppercase;color:var(--muted)}
 .scroll-line{width:1px;height:40px;background:linear-gradient(to bottom,var(--gold),transparent);animation:spulse 2s ease-in-out infinite}
 @keyframes spulse{0%,100%{opacity:0.3}50%{opacity:1}}
@@ -1379,6 +1379,13 @@ footer{background:var(--dark);padding:3.5rem 4rem;text-align:center;border-top:1
   }
   .mob-nav{
     display:flex;position:sticky;bottom:0;left:0;right:0;z-index:499;
+    transition:opacity 0.4s ease,transform 0.4s ease;
+  }
+  .mob-nav.nav-hidden{
+    opacity:0;transform:translateY(100%);pointer-events:none;
+  }
+  .mob-nav{
+    display:flex;position:sticky;bottom:0;left:0;right:0;z-index:499;
     background:rgba(14,12,10,0.97);border-top:1px solid rgba(184,149,90,0.15);
     backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px);
     padding:0.5rem 0 calc(0.5rem + env(safe-area-inset-bottom));
@@ -2124,8 +2131,8 @@ footer{background:var(--dark);padding:3.5rem 4rem;text-align:center;border-top:1
         <button class="hero-som-action-btn" onclick="resetSommelierProfile()">Restablecer</button>
       </div>
     </div>
+    <div class="scroll-indicator"><span>Descubrir</span><div class="scroll-line"></div></div>
   </div>
-  <div class="scroll-indicator"><span>Descubrir</span><div class="scroll-line"></div></div>
 </section>
 
 
@@ -6986,6 +6993,22 @@ function toggleSommelier(){
   update();
   window.addEventListener('resize', update);
 })();
+
+// Hide mobile nav while hero section is in view
+(function(){
+  var nav  = document.getElementById('mobNav');
+  var hero = document.getElementById('home');
+  if(!nav || !hero || !('IntersectionObserver' in window)) return;
+  function applyHeroNav(){
+    if(window.innerWidth > 680){ nav.classList.remove('nav-hidden'); return; }
+    var obs = new IntersectionObserver(function(entries){
+      nav.classList.toggle('nav-hidden', entries[0].isIntersecting);
+    }, { threshold: 0.4 });
+    obs.observe(hero);
+  }
+  applyHeroNav();
+  window.addEventListener('resize', applyHeroNav);
+})();;
 
 document.addEventListener('DOMContentLoaded', function(){
   var bg = document.getElementById('somModal');
