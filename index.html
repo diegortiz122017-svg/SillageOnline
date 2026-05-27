@@ -2165,8 +2165,8 @@ footer{background:var(--dark);padding:3.5rem 4rem;text-align:center;border-top:1
   <div class="nez-inner">
     <div class="nez-left">
       <span class="nez-eyebrow">Nez &mdash; Tu Sommelier</span>
-      <h2 class="nez-title">Algunas fragancias<br><em>te eligen a ti</em></h2>
-      <p class="nez-body">Cuéntale a Nez qué buscas — una ocasión, un estado de ánimo, una nota que recuerdas. En pocos turnos encuentra la fragancia que ya llevas dentro.</p>
+      <h2 class="nez-title">Una experiencia<br><em>olfativa personalizada</em></h2>
+      <p class="nez-body">Cuéntale a Nez qué buscas — una atmósfera, una emoción, una versión de ti.<br>En pocos momentos descubrirás fragancias que se sienten personales desde el primer instante.</p>
       <button class="nez-cta" onclick="openSommelierModal()">
         <span>Consultar a Nez</span>
         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z"/></svg>
@@ -4481,7 +4481,7 @@ function renderCart(){
         var subRow = document.createElement('div');
         subRow.className = 'cart-bundle-item';
         subRow.innerHTML =
-          '<div class="cart-thumb" style="width:32px;height:32px">'+svg(p.c,p.s,'sm')+'</div>'+
+          '<div class="cart-thumb" style="width:32px;height:32px">'+(p.photos&&p.photos.length?'<img src="'+esc(cdnImg(p.photos[0],80))+'" alt="'+esc(p.name)+'" style="width:100%;height:100%;object-fit:contain;">':svg(p.c,p.s,'sm'))+'</div>'+
           '<div class="cr-bundle-item-info">'+
             '<span class="cr-brand" style="font-size:0.58rem">'+esc(p.brand)+'</span>'+
             '<span class="cr-name" style="font-size:0.72rem">'+esc(item.label)+'</span>'+
@@ -4533,7 +4533,7 @@ function renderCart(){
     var cartKey       = p.id + '_' + itemType;
     row.className     = 'cart-row';
     row.innerHTML=
-      '<div class="cart-thumb">'+svg(p.c,p.s,'sm')+'</div>'+
+      '<div class="cart-thumb">'+(p.photos&&p.photos.length?'<img src="'+esc(cdnImg(p.photos[0],120))+'" alt="'+esc(p.name)+'" style="width:100%;height:100%;object-fit:contain;">':svg(p.c,p.s,'sm'))+'</div>'+
       '<div class="cart-row-info"><div class="cr-brand">'+p.brand+'</div>'+
       '<div class="cr-name">'+p.name+(itemType==='decant'?' <span style="font-size:0.55rem;color:var(--gold);text-transform:uppercase">Decant</span>':'')+' </div>'+
       '<div class="cr-size">'+itemSize+'</div>'+
