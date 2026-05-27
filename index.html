@@ -7843,7 +7843,10 @@ function buildFavoritesRow(){
   var track = document.getElementById('favTrack');
   if(!track) return;
   track.innerHTML = '';
-  var favorites = (P||[]).filter(function(p){ return p.badge === 'bestseller'; }).slice(0,8);
+  var favorites = (P||[]).filter(function(p){
+    var b = (p.badge||'').toLowerCase();
+    return b === 'bestseller' || b === 'más vendido' || b === 'favorito' || b === 'popular';
+  }).slice(0,8);
   if(!favorites.length) favorites = (P||[]).slice(0,8);
   favorites.forEach(function(p, i){
     var inv = getInv(p.id);
@@ -7854,8 +7857,12 @@ function buildFavoritesRow(){
     card.className = 'fav-card';
     card.style.transitionDelay = (i * 0.07) + 's';
     card.innerHTML =
-      (p.badge === 'bestseller' ? '<div class="fav-card-badge">Favorito</div>' : '') +
-      '<div class="fav-card-bottle">' + svg(p.c, p.s, 'md') + '</div>' +
+      (['bestseller','más vendido','favorito','popular'].indexOf((p.badge||'').toLowerCase()) > -1 ? '<div class="fav-card-badge">Favorito</div>' : '') +
+      '<div class="fav-card-bottle">' +
+        (p.photos && p.photos.length
+          ? '<img src="' + esc(cdnImg(p.photos[0], 300)) + '" alt="' + esc(p.brand+' '+p.name) + '" style="max-height:140px;max-width:100%;object-fit:contain;"/>'
+          : svg(p.c, p.s, 'md')) +
+      '</div>' +
       '<div class="fav-card-brand">' + esc(p.brand) + '</div>' +
       '<div class="fav-card-name">' + esc(p.name) + '</div>' +
       '<div class="fav-card-tagline">' + esc(p.tagline || p.notes || '') + '</div>' +
@@ -7913,20 +7920,41 @@ function scrollFavTrack(dir){
 function buildStoreCta(){
   var bottleWrap = document.getElementById('storeCtaBottles');
   if(!bottleWrap || !P || !P.length) return;
-  // Pick 3 visually varied products
+  // Pick 3 bottles — prioritise scent profile recommendations, then M/F/U variety
   var picks = [];
   var picked = {};
   var candidates = (P||[]).filter(function(p){ return !getInv(p.id).outOfStock; });
-  // Try to get M, F, U variety
-  ['M','F','U'].forEach(function(g){
-    var match = candidates.find(function(p){ return p.g === g && !picked[p.id]; });
-    if(match){ picks.push(match); picked[match.id] = true; }
-  });
-  // Fill remaining with bestsellers
-  while(picks.length < 3){
-    var fill = candidates.find(function(p){ return !picked[p.id]; });
-    if(!fill) break;
-    picks.push(fill); picked[fill.id] = true;
+
+  // Try scent profile recommended_ids first
+  var profileRecs = [];
+  try {
+    var stored = localStorage.getItem('sillage_scent_profile');
+    if(stored){
+      var prof = JSON.parse(stored);
+      var recs = (prof.data || prof).recommended_ids || [];
+      profileRecs = recs.slice(0,3).map(function(id){
+        return candidates.find(function(p){ return p.id == id; });
+      }).filter(Boolean);
+    }
+  } catch(e){}
+
+  if(profileRecs.length >= 3){
+    picks = profileRecs.slice(0,3);
+    profileRecs.forEach(function(p){ picked[p.id] = true; });
+  } else {
+    // Fill from profile first, then M/F/U variety
+    profileRecs.forEach(function(p){ picks.push(p); picked[p.id] = true; });
+    ['M','F','U'].forEach(function(g){
+      if(picks.length >= 3) return;
+      var match = candidates.find(function(p){ return p.g === g && !picked[p.id]; });
+      if(match){ picks.push(match); picked[match.id] = true; }
+    });
+    // Fill any remaining
+    while(picks.length < 3){
+      var fill = candidates.find(function(p){ return !picked[p.id]; });
+      if(!fill) break;
+      picks.push(fill); picked[fill.id] = true;
+    }
   }
   bottleWrap.innerHTML = '';
   var sizes = [0.9, 1.15, 0.85];
@@ -7937,7 +7965,10 @@ function buildStoreCta(){
     div.style.textDecoration = 'none';
     var sc = sizes[i];
     var w = Math.round(100 * sc), h = Math.round(180 * sc);
-    div.innerHTML = '<div style="transform:scale(' + sc + ');transform-origin:bottom center">' + svg(p.c, p.s, 'lg') + '</div>' +
+    div.innerHTML =
+      (p.photos && p.photos.length
+        ? '<img src="' + esc(cdnImg(p.photos[0], 300)) + '" alt="' + esc(p.brand+' '+p.name) + '" style="height:' + Math.round(180*sc) + 'px;max-width:120px;object-fit:contain;transform-origin:bottom center;display:block;"/>'
+        : '<div style="transform:scale(' + sc + ');transform-origin:bottom center">' + svg(p.c, p.s, 'lg') + '</div>') +
       '<div class="cta-bottle-label">' + esc(p.brand) + '</div>';
     bottleWrap.appendChild(div);
   });
