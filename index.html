@@ -7237,10 +7237,23 @@ function updateSomProgress(n){
   dots.forEach(function(d,i){ d.classList.toggle('done', i < n); });
 }
 
+function somMdToHtml(text){
+  // Minimal markdown: **bold**, *italic*, newlines → <br>
+  return text
+    .replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')
+    .replace(/\*\*([^*]+)\*\*/g,'<strong>$1</strong>')
+    .replace(/\*([^*]+)\*/g,'<em>$1</em>')
+    .replace(/\n/g,'<br>');
+}
+
 function somAddMsg(role, text, recs){
   var el = document.createElement('div');
   el.className = 'som-msg ' + (role === 'user' ? 'user' : 'bot');
-  el.textContent = text;
+  if(role === 'user'){
+    el.textContent = text;
+  } else {
+    el.innerHTML = somMdToHtml(text);
+  }
   if(recs && recs.length){
     var recsDiv = document.createElement('div');
     recsDiv.className = 'som-recs';
@@ -7354,7 +7367,7 @@ function sommelierSendToAPI(primeText){
     headers: _somHeaders,
     body: JSON.stringify({
       // Catalogue no longer sent — GPT queries MySQL live via function calling
-      messages:  _somMessages.slice(-6),
+      messages:  _somMessages.slice(-8),
       sessionId: _somSession,
       _h: getBFScore()
     })
