@@ -1786,7 +1786,7 @@ footer{background:var(--dark);padding:3.5rem 4rem;text-align:center;border-top:1
 }
 
 /* ── TIENDA PAGE HEADER ─────────────────────────────── */
-.tienda-header{background:var(--warm-white);color:var(--charcoal);padding:7rem 4rem 3rem;border-bottom:1px solid rgba(184,149,90,0.12)}
+.tienda-header{background:var(--warm-white);color:var(--charcoal);padding:2rem 4rem 1.5rem;border-bottom:1px solid rgba(184,149,90,0.12)}
 .tienda-header-inner{max-width:1400px;margin:0 auto}
 .tienda-back{display:inline-flex;align-items:center;gap:0.4rem;font-size:0.6rem;letter-spacing:0.2em;text-transform:uppercase;color:var(--muted);text-decoration:none;margin-bottom:1.5rem;transition:color 0.25s}
 .tienda-back:hover{color:var(--gold)}
@@ -1794,7 +1794,7 @@ footer{background:var(--dark);padding:3.5rem 4rem;text-align:center;border-top:1
 .tienda-h1{font-family:'Cormorant Garamond',serif;font-size:clamp(3rem,5vw,4.5rem);font-weight:300;color:var(--charcoal);line-height:1}
 .tienda-h1 em{font-style:italic;color:var(--gold)}
 @media(max-width:768px){
-  .tienda-header{padding:5rem 1.5rem 2rem}
+  .tienda-header{padding:1.5rem 1.5rem 1rem}
 }
 
 /* ── TIENDA EDITORIAL COLLECTIONS ───────────────────────────────── */
@@ -1891,6 +1891,68 @@ footer{background:var(--dark);padding:3.5rem 4rem;text-align:center;border-top:1
   .tc-row-name{font-size:clamp(1.6rem,7vw,2.2rem)}
   .tc-row-desc{font-size:0.68rem}
 }
+
+/* ── TIENDA PROFILE ZONE ─────────────────────────────── */
+.tienda-header-top{display:flex;align-items:center;gap:1rem;margin-bottom:0}
+.tienda-profile-zone{
+  margin-top:1.2rem;
+  display:flex;align-items:center;justify-content:space-between;
+  gap:1.5rem;flex-wrap:wrap;
+  padding-top:1rem;
+  border-top:1px solid rgba(184,149,90,0.1);
+}
+.tpz-label{
+  font-size:0.52rem;letter-spacing:0.25em;text-transform:uppercase;
+  color:var(--gold);display:block;margin-bottom:0.5rem;
+}
+.tpz-chips{display:flex;flex-wrap:wrap;gap:0.4rem}
+.tpz-chip{
+  font-size:0.6rem;letter-spacing:0.08em;
+  color:var(--charcoal);
+  background:rgba(184,149,90,0.08);
+  border:1px solid rgba(184,149,90,0.2);
+  padding:0.25rem 0.7rem;
+  white-space:nowrap;
+}
+.tpz-actions{display:flex;gap:0.6rem;flex-shrink:0}
+.tpz-btn{
+  font-size:0.58rem;letter-spacing:0.15em;text-transform:uppercase;
+  padding:0.4rem 1rem;cursor:pointer;
+  font-family:'Jost',sans-serif;
+  transition:all 0.25s;
+}
+.tpz-refine{
+  background:transparent;border:1px solid var(--gold);color:var(--gold);
+}
+.tpz-refine:hover{background:var(--gold);color:white}
+.tpz-reset{
+  background:transparent;border:1px solid rgba(138,127,114,0.3);color:var(--muted);
+}
+.tpz-reset:hover{border-color:var(--muted);color:var(--charcoal)}
+
+/* No-profile invite */
+.tienda-nez-invite{
+  margin-top:1rem;padding-top:1rem;
+  border-top:1px solid rgba(184,149,90,0.1);
+  display:flex;align-items:center;gap:1.5rem;
+}
+.tni-text{font-size:0.72rem;color:var(--muted)}
+.tni-btn{
+  font-size:0.58rem;letter-spacing:0.12em;
+  background:transparent;border:none;
+  color:var(--gold);cursor:pointer;
+  font-family:'Jost',sans-serif;
+  padding:0;
+  transition:opacity 0.2s;
+}
+.tni-btn:hover{opacity:0.7}
+
+@media(max-width:768px){
+  .tienda-profile-zone{flex-direction:column;align-items:flex-start;gap:0.8rem}
+  .tpz-actions{width:100%}
+  .tpz-btn{flex:1;text-align:center}
+  .tienda-nez-invite{flex-direction:column;align-items:flex-start;gap:0.5rem}
+}
 </style>
 <script type="application/ld+json">
 {
@@ -1946,8 +2008,26 @@ footer{background:var(--dark);padding:3.5rem 4rem;text-align:center;border-top:1
 
 <section class="tienda-header" id="home">
   <div class="tienda-header-inner">
-    <a href="/" class="tienda-back"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><polyline points="15 18 9 12 15 6"/></svg>Inicio</a>
-    <span class="tienda-eyebrow">Sillage Parfumerie</span>
+    <div class="tienda-header-top">
+      <a href="/" class="tienda-back"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><polyline points="15 18 9 12 15 6"/></svg>Inicio</a>
+      <span class="tienda-eyebrow">Sillage Parfumerie</span>
+    </div>
+    <!-- Profile zone: shown when active profile exists -->
+    <div class="tienda-profile-zone" id="tiendaProfileZone" style="display:none">
+      <div class="tpz-left">
+        <span class="tpz-label">Tu perfil olfativo</span>
+        <div class="tpz-chips" id="tiendaProfileChips"></div>
+      </div>
+      <div class="tpz-actions">
+        <button class="tpz-btn tpz-refine" onclick="openSommelierModal()">Refinar</button>
+        <button class="tpz-btn tpz-reset" onclick="resetScentProfile();renderTiendaProfile()">Restablecer</button>
+      </div>
+    </div>
+    <!-- No-profile invite -->
+    <div class="tienda-nez-invite" id="tiendaNezInvite" style="display:none">
+      <span class="tni-text">¿No sabes por dónde empezar?</span>
+      <button class="tni-btn" onclick="openSommelierModal()">Consultar a Nez &rarr;</button>
+    </div>
   </div>
 </section>
 
@@ -3398,6 +3478,7 @@ function buildGrid(){
 
   applyFilters();
   injectProductSchema(P);
+  renderTiendaProfile();
   // Build editorial collections section below grid
   if(typeof buildTiendaCollections === 'function'){
     loadCuratedFromDB(function(){ buildTiendaCollections(); });
@@ -7614,6 +7695,67 @@ function buildTiendaCollections(){
   } else {
     if(section) section.classList.add('tc-inview');
     list.querySelectorAll('.tc-row').forEach(function(r){ r.classList.add('tc-row-visible'); });
+  }
+}
+
+// ── TIENDA HEADER: PROFILE ZONE ───────────────────────────────────────────────
+function renderTiendaProfile(){
+  var profileZone  = document.getElementById('tiendaProfileZone');
+  var chipsEl      = document.getElementById('tiendaProfileChips');
+  var nezInvite    = document.getElementById('tiendaNezInvite');
+  if(!profileZone || !chipsEl || !nezInvite) return;
+
+  // Read profile
+  var profile = null;
+  try {
+    var stored = localStorage.getItem('sillage_scent_profile');
+    if(stored){
+      var entry = JSON.parse(stored);
+      profile = entry.data || entry;
+      // Check not expired (48h)
+      if(entry.expires && Date.now() > entry.expires) profile = null;
+    }
+  } catch(e){}
+  // Also check _somProfile in memory
+  if(!profile && typeof _somProfile !== 'undefined' && _somProfile) profile = _somProfile;
+
+  var hasProfile = profile && (
+    (profile.families && profile.families.length) ||
+    (profile.occasions && profile.occasions.length) ||
+    profile.gender_pref
+  );
+
+  if(hasProfile){
+    profileZone.style.display = 'flex';
+    nezInvite.style.display = 'none';
+
+    // Build chips
+    var chips = [];
+    var familyLabels = {
+      woody:'Amaderado', fresh:'Fresco', oriental:'Oriental', floral:'Floral',
+      citrus:'Cítrico', aquatic:'Acuático', gourmand:'Gourmand', chypre:'Chypre',
+      fougere:'Fougère', spicy:'Especiado', powdery:'Empolvado', green:'Verde'
+    };
+    if(profile.gender_pref && profile.gender_pref !== 'U'){
+      chips.push(profile.gender_pref === 'M' ? 'Masculino' : 'Femenino');
+    }
+    (profile.families||[]).slice(0,3).forEach(function(f){
+      chips.push(familyLabels[f.toLowerCase()] || (f.charAt(0).toUpperCase()+f.slice(1)));
+    });
+    (profile.occasions||[]).slice(0,2).forEach(function(o){
+      chips.push(o.charAt(0).toUpperCase()+o.slice(1));
+    });
+    if(profile.intensity && profile.intensity !== 'moderate'){
+      var iLabels = {light:'Ligero',moderate:'Moderado',strong:'Intenso','very strong':'Muy intenso'};
+      chips.push(iLabels[profile.intensity] || profile.intensity);
+    }
+
+    chipsEl.innerHTML = chips.slice(0,6).map(function(ch){
+      return '<span class="tpz-chip">'+esc(ch)+'</span>';
+    }).join('');
+  } else {
+    profileZone.style.display = 'none';
+    nezInvite.style.display = 'flex';
   }
 }
 </script>
