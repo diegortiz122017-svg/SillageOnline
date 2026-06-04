@@ -1,0 +1,5 @@
+# El JAR del firmador y los certificados NO se versionan — son binarios/secretos.
+firmador.jar
+*.crt
+*.key
+uploads/
