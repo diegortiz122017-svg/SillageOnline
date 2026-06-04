@@ -1,0 +1,515 @@
+'use strict';
+
+// ════════════════════════════════════════════════════════════════════════════
+//  DTE — Documento Tributario Electrónico (Factura Electrónica El Salvador)
+// ────────────────────────────────────────────────────────────────────────────
+//  Builds the official MH JSON, signs it through Hacienda's firmador service,
+//  transmits it to the reception API and persists the Sello de Recepción.
+//
+//  Supported document types:
+//    01 — Factura (Consumidor Final)   schema version 1   IVA incluido en precio
+//    03 — Comprobante de Crédito Fiscal schema version 3   IVA desglosado
+//    05 — Nota de Crédito              schema version 3   ajuste sobre un CCF
+//
+//  IMPORTANT — before going live:
+//    • Validate the produced JSON against the official MH JSON Schemas
+//      (factura.gob.sv → "Documentos técnicos"). Field names/types are exact.
+//    • Fill the real emisor data (NIT, NRC, codActividad, departamento,
+//      municipio…) via the DTE_* environment variables.
+//    • Everything here is gated by cfg.DTE_ENABLED — when false this module
+//      never touches the network and emitForOrder() is a no-op.
+// ════════════════════════════════════════════════════════════════════════════
+
+const crypto = require('crypto');
+const db     = require('./db');
+const cfg    = require('../config');
+
+const IVA_RATE = 0.13;
+
+// ─── small helpers ────────────────────────────────────────────────────────────
+const round2 = n => Math.round((Number(n) + Number.EPSILON) * 100) / 100;
+const round8 = n => Math.round((Number(n) + Number.EPSILON) * 1e8) / 1e8;
+
+function uuidUpper() {
+  return crypto.randomUUID().toUpperCase();
+}
+
+// MH expects fecEmi = YYYY-MM-DD and horEmi = HH:MM:SS in El Salvador time (UTC-6).
+function nowSV() {
+  const d = new Date(Date.now() - 6 * 60 * 60 * 1000); // shift to UTC-6
+  const fecEmi = d.toISOString().slice(0, 10);
+  const horEmi = d.toISOString().slice(11, 19);
+  return { fecEmi, horEmi };
+}
+
+// Número de control: DTE-{tipo}-{8 alfanum: codEstable+codPuntoVenta}-{15 dígitos correlativo}
+function numeroControl(tipoDte, correlativo) {
+  const e   = cfg.DTE_EMISOR;
+  const est = String(e.codEstable || e.codEstableMH || '0000').padStart(4, '0').slice(-4);
+  const pv  = String(e.codPuntoVenta || e.codPuntoVentaMH || '0001').padStart(4, '0').slice(-4);
+  const seq = String(correlativo).padStart(15, '0');
+  return `DTE-${tipoDte}-${(est + pv).toUpperCase()}-${seq}`;
+}
+
+// ─── número a letras (formato MH: "CIEN 00/100") ──────────────────────────────
+function numeroALetras(num) {
+  const entero   = Math.floor(num);
+  const centavos = Math.round((num - entero) * 100);
+  const UNI = ['', 'UNO', 'DOS', 'TRES', 'CUATRO', 'CINCO', 'SEIS', 'SIETE', 'OCHO', 'NUEVE',
+    'DIEZ', 'ONCE', 'DOCE', 'TRECE', 'CATORCE', 'QUINCE', 'DIECISÉIS', 'DIECISIETE',
+    'DIECIOCHO', 'DIECINUEVE', 'VEINTE'];
+  const DEC = ['', '', 'VEINTI', 'TREINTA', 'CUARENTA', 'CINCUENTA', 'SESENTA', 'SETENTA', 'OCHENTA', 'NOVENTA'];
+  const CEN = ['', 'CIENTO', 'DOSCIENTOS', 'TRESCIENTOS', 'CUATROCIENTOS', 'QUINIENTOS',
+    'SEISCIENTOS', 'SETECIENTOS', 'OCHOCIENTOS', 'NOVECIENTOS'];
+
+  function seccion(n) {
+    if (n === 0)   return '';
+    if (n === 100) return 'CIEN';
+    let out = '';
+    const c = Math.floor(n / 100);
+    const d = Math.floor((n % 100) / 10);
+    const u = n % 10;
+    if (c) out += CEN[c] + ' ';
+    const dd = n % 100;
+    if (dd <= 20) {
+      out += UNI[dd];
+    } else if (d === 2) {
+      out += 'VEINTI' + UNI[u];
+    } else {
+      out += DEC[d];
+      if (u) out += ' Y ' + UNI[u];
+    }
+    return out.trim();
+  }
+
+  function aLetras(n) {
+    if (n === 0) return 'CERO';
+    let out = '';
+    const millones = Math.floor(n / 1e6);
+    const miles    = Math.floor((n % 1e6) / 1000);
+    const resto    = n % 1000;
+    if (millones) out += (millones === 1 ? 'UN MILLÓN' : seccion(millones) + ' MILLONES') + ' ';
+    if (miles)    out += (miles === 1 ? 'MIL' : seccion(miles) + ' MIL') + ' ';
+    if (resto)    out += seccion(resto);
+    return out.trim();
+  }
+
+  const cc = String(centavos).padStart(2, '0');
+  return `${aLetras(entero)} ${cc}/100`;
+}
+
+// ─── emisor block (shared by every document) ──────────────────────────────────
+function buildEmisor() {
+  const e = cfg.DTE_EMISOR;
+  return {
+    nit:                 e.nit,
+    nrc:                 e.nrc,
+    nombre:              e.nombre,
+    codActividad:        e.codActividad,
+    descActividad:       e.descActividad,
+    nombreComercial:     e.nombreComercial || e.nombre,
+    tipoEstablecimiento: e.tipoEstablecimiento,
+    direccion: {
+      departamento: e.departamento,
+      municipio:    e.municipio,
+      complemento:  e.complemento,
+    },
+    telefono:        e.telefono,
+    correo:          e.correo,
+    codEstableMH:    e.codEstableMH,
+    codEstable:      e.codEstable,
+    codPuntoVentaMH: e.codPuntoVentaMH,
+    codPuntoVenta:   e.codPuntoVenta,
+  };
+}
+
+// Normalise a stored order's items array into a consistent shape.
+//   { descripcion, cantidad, precioUnitario }  (precio = lo que pagó el cliente, IVA incluido)
+function normalizeItems(items) {
+  return (items || []).map(i => ({
+    descripcion:    String(i.name || i.descripcion || 'Producto').slice(0, 1000),
+    cantidad:       Number(i.qty || i.cantidad || 1),
+    precioUnitario: round2(Number(i.price || i.precioUni || 0)),
+  }));
+}
+
+// ════════════════════════════════════════════════════════════════════════════
+//  TIPO 01 — Factura Consumidor Final (IVA incluido en el precio)
+// ════════════════════════════════════════════════════════════════════════════
+function buildFactura(order, opts) {
+  const { fecEmi, horEmi } = nowSV();
+  const items = normalizeItems(JSON.parse(order.items || '[]'));
+
+  const cuerpoDocumento = items.map((it, idx) => {
+    const ventaGravada = round2(it.cantidad * it.precioUnitario); // IVA incluido
+    const ivaItem      = round2(ventaGravada - ventaGravada / (1 + IVA_RATE));
+    return {
+      numItem:        idx + 1,
+      tipoItem:       1,            // 1 = bien
+      numeroDocumento: null,
+      cantidad:       it.cantidad,
+      codigo:         null,
+      codTributo:     null,
+      uniMedida:      59,           // 59 = unidad
+      descripcion:    it.descripcion,
+      precioUni:      it.precioUnitario,
+      montoDescu:     0,
+      ventaNoSuj:     0,
+      ventaExenta:    0,
+      ventaGravada,
+      tributos:       null,         // FC: IVA incluido, sin tributos a nivel ítem
+      psv:            0,
+      noGravado:      0,
+      ivaItem,
+    };
+  });
+
+  const totalGravada = round2(cuerpoDocumento.reduce((s, c) => s + c.ventaGravada, 0));
+  const totalIva     = round2(cuerpoDocumento.reduce((s, c) => s + c.ivaItem, 0));
+
+  const resumen = {
+    totalNoSuj:           0,
+    totalExenta:          0,
+    totalGravada:         totalGravada,
+    subTotalVentas:       totalGravada,
+    descuNoSuj:           0,
+    descuExenta:          0,
+    descuGravada:         0,
+    porcentajeDescuento:  0,
+    totalDescu:           0,
+    tributos:             null,        // FC: null
+    subTotal:             totalGravada,
+    ivaRete1:             0,
+    reteRenta:            0,
+    montoTotalOperacion:  totalGravada,
+    totalNoGravado:       0,
+    totalPagar:           totalGravada,
+    totalLetras:          numeroALetras(totalGravada),
+    totalIva:             totalIva,    // FC: IVA embebido informativo
+    saldoFavor:           0,
+    condicionOperacion:   1,           // 1 = contado
+    pagos:                null,
+    numPagoElectronico:   null,
+  };
+
+  return {
+    identificacion:      buildIdentificacion('01', 1, opts.numeroControl, opts.codigoGeneracion, fecEmi, horEmi),
+    documentoRelacionado: null,
+    emisor:              buildEmisor(),
+    receptor: {
+      tipoDocumento: null,
+      numDocumento:  null,
+      nrc:           null,
+      nombre:        order.customer || null,
+      codActividad:  null,
+      descActividad: null,
+      direccion:     null,
+      telefono:      order.phone || null,
+      correo:        order.email || null,
+    },
+    otrosDocumentos: null,
+    ventaTercero:    null,
+    cuerpoDocumento,
+    resumen,
+    extension:       null,
+    apendice:        null,
+  };
+}
+
+// ════════════════════════════════════════════════════════════════════════════
+//  TIPO 03 — Comprobante de Crédito Fiscal (IVA desglosado, receptor obligatorio)
+//  receptor = { nit, nrc, nombre, codActividad, descActividad, depto, municipio,
+//               complemento, telefono, correo }
+// ════════════════════════════════════════════════════════════════════════════
+function buildCreditoFiscal(order, receptor, opts) {
+  const { fecEmi, horEmi } = nowSV();
+  const items = normalizeItems(JSON.parse(order.items || '[]'));
+
+  const cuerpoDocumento = items.map((it, idx) => {
+    // El precio guardado incluye IVA → lo convertimos a neto para el CCF.
+    const precioNeto   = round8(it.precioUnitario / (1 + IVA_RATE));
+    const ventaGravada = round2(it.cantidad * precioNeto);
+    return {
+      numItem:         idx + 1,
+      tipoItem:        1,
+      numeroDocumento: null,
+      cantidad:        it.cantidad,
+      codigo:          null,
+      codTributo:      null,
+      uniMedida:       59,
+      descripcion:     it.descripcion,
+      precioUni:       round8(precioNeto),
+      montoDescu:      0,
+      ventaNoSuj:      0,
+      ventaExenta:     0,
+      ventaGravada,
+      tributos:        ['20'],   // 20 = IVA 13%
+      psv:             0,
+      noGravado:       0,
+    };
+  });
+
+  const totalGravada = round2(cuerpoDocumento.reduce((s, c) => s + c.ventaGravada, 0));
+  const iva          = round2(totalGravada * IVA_RATE);
+  const montoTotal   = round2(totalGravada + iva);
+
+  const resumen = {
+    totalNoSuj:          0,
+    totalExenta:         0,
+    totalGravada:        totalGravada,
+    subTotalVentas:      totalGravada,
+    descuNoSuj:          0,
+    descuExenta:         0,
+    descuGravada:        0,
+    porcentajeDescuento: 0,
+    totalDescu:          0,
+    tributos: [
+      { codigo: '20', descripcion: 'Impuesto al Valor Agregado 13%', valor: iva },
+    ],
+    subTotal:            totalGravada,
+    ivaPerci1:           0,
+    ivaRete1:            0,
+    reteRenta:           0,
+    montoTotalOperacion: montoTotal,
+    totalNoGravado:      0,
+    totalPagar:          montoTotal,
+    totalLetras:         numeroALetras(montoTotal),
+    saldoFavor:          0,
+    condicionOperacion:  1,
+    pagos:               null,
+    numPagoElectronico:  null,
+  };
+
+  return {
+    identificacion:      buildIdentificacion('03', 3, opts.numeroControl, opts.codigoGeneracion, fecEmi, horEmi),
+    documentoRelacionado: null,
+    emisor:              buildEmisor(),
+    receptor: {
+      nit:           receptor.nit,
+      nrc:           receptor.nrc,
+      nombre:        receptor.nombre,
+      codActividad:  receptor.codActividad,
+      descActividad: receptor.descActividad,
+      nombreComercial: receptor.nombreComercial || null,
+      direccion: {
+        departamento: receptor.departamento,
+        municipio:    receptor.municipio,
+        complemento:  receptor.complemento,
+      },
+      telefono:      receptor.telefono || null,
+      correo:        receptor.correo || order.email || null,
+    },
+    otrosDocumentos: null,
+    ventaTercero:    null,
+    cuerpoDocumento,
+    resumen,
+    extension:       null,
+    apendice:        null,
+  };
+}
+
+// ════════════════════════════════════════════════════════════════════════════
+//  TIPO 05 — Nota de Crédito (ajuste sobre un CCF ya emitido)
+//  docRelacionado = { codigoGeneracion, fecEmi } del CCF original
+// ════════════════════════════════════════════════════════════════════════════
+function buildNotaCredito(order, receptor, docRelacionado, opts) {
+  const ccf = buildCreditoFiscal(order, receptor, opts);
+  ccf.identificacion = buildIdentificacion('05', 3, opts.numeroControl, opts.codigoGeneracion, ...Object.values(nowSV()));
+  ccf.documentoRelacionado = [{
+    tipoDocumento:   '03',     // se ajusta un Crédito Fiscal
+    tipoGeneracion:  2,        // 2 = electrónico
+    numeroDocumento: docRelacionado.codigoGeneracion,
+    fechaEmision:    docRelacionado.fecEmi,
+  }];
+  // En la Nota de Crédito no se reportan pagos ni condición de pago.
+  delete ccf.resumen.pagos;
+  delete ccf.resumen.numPagoElectronico;
+  delete ccf.resumen.condicionOperacion;
+  return ccf;
+}
+
+function buildIdentificacion(tipoDte, version, numControl, codGen, fecEmi, horEmi) {
+  return {
+    version,
+    ambiente:         cfg.DTE_AMBIENTE,
+    tipoDte,
+    numeroControl:    numControl,
+    codigoGeneracion: codGen,
+    tipoModelo:       1,    // 1 = modelo previo (transmisión normal)
+    tipoOperacion:    1,    // 1 = transmisión normal
+    tipoContingencia: null,
+    motivoContin:     null,
+    fecEmi,
+    horEmi,
+    tipoMoneda:       'USD',
+  };
+}
+
+// ─── correlativo atómico por tipo de documento ────────────────────────────────
+async function nextCorrelativo(tipoDte) {
+  await db.execute(
+    `INSERT INTO dte_correlativos (tipo_dte, seq) VALUES (?, 1)
+     ON DUPLICATE KEY UPDATE seq = seq + 1`,
+    [tipoDte]
+  );
+  const [rows] = await db.execute('SELECT seq FROM dte_correlativos WHERE tipo_dte=?', [tipoDte]);
+  return rows[0].seq;
+}
+
+// ─── MH auth (token cacheado ~23h) ────────────────────────────────────────────
+let _token = null;
+let _tokenExp = 0;
+async function getAuthToken() {
+  if (_token && Date.now() < _tokenExp) return _token;
+  const body = new URLSearchParams({ user: cfg.DTE_API_USER, pwd: cfg.DTE_API_PWD });
+  const r = await fetch(cfg.DTE_AUTH_URL, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/x-www-form-urlencoded', 'User-Agent': 'SillageDTE/1.0' },
+    body,
+  });
+  const j = await r.json();
+  if (j.status !== 'OK' || !j.body?.token) {
+    throw new Error('MH auth falló: ' + (j.body?.descripcion || j.message || JSON.stringify(j)));
+  }
+  _token    = j.body.token;             // ya viene con prefijo "Bearer "
+  _tokenExp = Date.now() + 23 * 60 * 60 * 1000;
+  return _token;
+}
+
+// ─── firmar con el firmador de Hacienda ───────────────────────────────────────
+async function firmar(dteJson) {
+  const payload = {
+    nit:            cfg.DTE_EMISOR.nit,
+    activo:         true,
+    passwordPri:    cfg.DTE_CERT_PWD,
+    dteJson,
+  };
+  const r = await fetch(cfg.DTE_FIRMADOR_URL, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body:    JSON.stringify(payload),
+  });
+  const j = await r.json();
+  if (j.status !== 'OK' || !j.body) {
+    throw new Error('Firmador falló: ' + JSON.stringify(j.body || j));
+  }
+  return j.body; // JWS firmado (string)
+}
+
+// ─── transmitir a recepción MH ────────────────────────────────────────────────
+async function transmitir(tipoDte, version, codigoGeneracion, documentoFirmado) {
+  const token = await getAuthToken();
+  const payload = {
+    ambiente:    cfg.DTE_AMBIENTE,
+    idEnvio:     Date.now() % 1e9,
+    version,
+    tipoDte,
+    documento:   documentoFirmado,
+    codigoGeneracion,
+  };
+  const r = await fetch(cfg.DTE_RECEPCION_URL, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'Authorization': token,
+      'User-Agent': 'SillageDTE/1.0',
+    },
+    body: JSON.stringify(payload),
+  });
+  return r.json(); // { estado, selloRecibido, descripcionMsg, observaciones, ... }
+}
+
+// ─── persistencia ─────────────────────────────────────────────────────────────
+async function persist(rec) {
+  await db.execute(
+    `INSERT INTO dte_documents
+       (order_id, tipo_dte, version, ambiente, codigo_generacion, numero_control,
+        sello_recibido, estado, observaciones, json_dte, json_firmado, created_at, updated_at)
+     VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)`,
+    [
+      rec.orderId, rec.tipoDte, rec.version, cfg.DTE_AMBIENTE,
+      rec.codigoGeneracion, rec.numeroControl,
+      rec.selloRecibido || null, rec.estado, rec.observaciones || null,
+      JSON.stringify(rec.jsonDte), rec.jsonFirmado || null,
+      new Date(), new Date(),
+    ]
+  );
+}
+
+// ════════════════════════════════════════════════════════════════════════════
+//  Orquestador público
+// ════════════════════════════════════════════════════════════════════════════
+//  emitForOrder(order, { tipoDte, receptor, docRelacionado })
+//    tipoDte default '01'. Returns the DTE record (with sello) or null if
+//    DTE is disabled. Never throws into the caller's happy-path on transport
+//    failure — it stores estado 'RECHAZADO'/'CONTINGENCIA' so it can be retried.
+// ════════════════════════════════════════════════════════════════════════════
+async function emitForOrder(order, options = {}) {
+  if (!cfg.DTE_ENABLED) return null;
+
+  const tipoDte = options.tipoDte || '01';
+  const version = tipoDte === '01' ? 1 : 3;
+  const codigoGeneracion = uuidUpper();
+  const correlativo      = await nextCorrelativo(tipoDte);
+  const numControl       = numeroControl(tipoDte, correlativo);
+  const opts = { numeroControl: numControl, codigoGeneracion };
+
+  let jsonDte;
+  if (tipoDte === '01')      jsonDte = buildFactura(order, opts);
+  else if (tipoDte === '03') jsonDte = buildCreditoFiscal(order, options.receptor || {}, opts);
+  else if (tipoDte === '05') jsonDte = buildNotaCredito(order, options.receptor || {}, options.docRelacionado || {}, opts);
+  else throw new Error('tipoDte no soportado: ' + tipoDte);
+
+  const base = {
+    orderId: order.id, tipoDte, version,
+    codigoGeneracion, numeroControl: numControl, jsonDte,
+  };
+
+  try {
+    const firmado  = await firmar(jsonDte);
+    const recepcion = await transmitir(tipoDte, version, codigoGeneracion, firmado);
+    const estado   = recepcion.estado === 'PROCESADO' ? 'PROCESADO' : 'RECHAZADO';
+    const observaciones = Array.isArray(recepcion.observaciones)
+      ? recepcion.observaciones.join(' | ')
+      : (recepcion.descripcionMsg || null);
+    const rec = {
+      ...base,
+      jsonFirmado:  firmado,
+      selloRecibido: recepcion.selloRecibido || null,
+      estado,
+      observaciones,
+    };
+    await persist(rec);
+    return rec;
+  } catch (e) {
+    // Falla de red/firmador → guardar en contingencia para reintento manual.
+    const rec = { ...base, jsonFirmado: null, selloRecibido: null, estado: 'CONTINGENCIA', observaciones: e.message };
+    await persist(rec).catch(() => {});
+    console.error(`DTE ${tipoDte} para orden ${order.id} quedó en contingencia:`, e.message);
+    return rec;
+  }
+}
+
+// URL pública de verificación en el portal de Hacienda (para QR / factura).
+function verificacionUrl(codigoGeneracion, fecEmi) {
+  return `https://admin.factura.gob.sv/consultaPublica?ambiente=${cfg.DTE_AMBIENTE}` +
+         `&codGen=${codigoGeneracion}&fechaEmi=${fecEmi}`;
+}
+
+async function getByOrderId(orderId) {
+  const [rows] = await db.execute(
+    'SELECT * FROM dte_documents WHERE order_id=? ORDER BY id DESC', [orderId]
+  );
+  return rows;
+}
+
+module.exports = {
+  emitForOrder,
+  getByOrderId,
+  verificacionUrl,
+  numeroALetras,           // exported for tests
+  buildFactura,
+  buildCreditoFiscal,
+  buildNotaCredito,
+  IVA_RATE,
+};
