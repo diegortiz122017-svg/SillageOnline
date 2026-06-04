@@ -128,6 +128,16 @@
 
     <build>
         <plugins>
+            <!-- Desactiva el procesamiento de anotaciones (QueryDSL APT es vestigial
+                 y su processor jakarta falla sin JPA en el classpath, abortando la
+                 compilación). El firmador no usa clases generadas de QueryDSL. -->
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-compiler-plugin</artifactId>
+                <configuration>
+                    <proc>none</proc>
+                </configuration>
+            </plugin>
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
                 <artifactId>maven-surefire-plugin</artifactId>
