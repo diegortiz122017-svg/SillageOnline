@@ -1097,12 +1097,14 @@ async function restoreLoginAttempts() {
     );
     const cutoff = Date.now() - 15 * 60 * 1000;
     for (const row of rows) {
-      const updated = new Date(row.updated_at).getTime();
-      if (updated > cutoff) {
+      let parsed;
+      try { parsed = JSON.parse(row.value); } catch { parsed = null; }
+      const count        = parsed?.count        ?? (parseInt(row.value) || 1);
+      const firstAttempt = parsed?.firstAttempt ?? new Date(row.updated_at).getTime();
+      if (firstAttempt > cutoff) {
         const ip = row.key_name.replace('auth_fail:', '');
-        loginAttempts.set(ip, { count: parseInt(row.value) || 1, firstAttempt: updated });
+        loginAttempts.set(ip, { count, firstAttempt });
       } else {
-        // Expired — clean up
         await db.execute('DELETE FROM settings WHERE key_name=?', [row.key_name]).catch(() => {});
       }
     }
@@ -1733,11 +1735,12 @@ app.post('/api/auth/login', authLimiter, async (req, res) => {
     recordFailed(ip);
     trackAbuse('login_burst', ip);
     // Persist failed attempt to DB so it survives server restarts/redeploys
+    const attempt = loginAttempts.get(ip);
     await db.execute(
       `INSERT INTO settings (key_name, value, updated_at)
        VALUES (?, ?, ?)
        ON DUPLICATE KEY UPDATE value=VALUES(value), updated_at=VALUES(updated_at)`,
-      [`auth_fail:${ip}`, loginAttempts.get(ip)?.count || 1, new Date()]
+      [`auth_fail:${ip}`, JSON.stringify({ count: attempt?.count || 1, firstAttempt: attempt?.firstAttempt || Date.now() }), new Date()]
     ).catch(() => {}); // non-fatal
     // Never reveal how many attempts remain — removes attacker intel
     return res.status(401).json({ error: 'Credenciales incorrectas.' });
@@ -1749,6 +1752,16 @@ app.post('/api/auth/login', authLimiter, async (req, res) => {
   const token = createSession(username, 'admin');
   await logActivity('Admin inició sesión');
   res.json({ ok: true, token });
+});
+// Emergency lockout reset — requires correct password in body, no session needed
+app.post('/api/auth/clear-lockout', async (req, res) => {
+  const { password } = req.body || {};
+  if (!verifyAdminPassword(password, ADMIN_PASS)) {
+    return res.status(401).json({ error: 'Credenciales incorrectas.' });
+  }
+  loginAttempts.clear();
+  await db.execute("DELETE FROM settings WHERE key_name LIKE 'auth_fail:%'").catch(() => {});
+  res.json({ ok: true, message: 'Lockout cleared.' });
 });
 app.post('/api/auth/logout', async (req, res) => {
   destroySession(req.headers['x-session-token']);
