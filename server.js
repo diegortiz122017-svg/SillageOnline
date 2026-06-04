@@ -22,6 +22,7 @@ const cfg          = require('./config');
 const db           = require('./services/db');
 const catalogueSvc = require('./services/catalogue');
 const emailSvc     = require('./services/email');
+const dteSvc       = require('./services/dte');
 const { Cache }    = require('./services/cache');
 const security     = require('./middleware/security');
 const auth         = require('./middleware/auth');
@@ -310,6 +311,35 @@ async function initDB() {
       key_name   VARCHAR(100) PRIMARY KEY,
       value      TEXT NOT NULL,
       updated_at DATETIME NOT NULL
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
+  `);
+
+  // ── DTE / Factura Electrónica (Ministerio de Hacienda) ──────────────────────
+  await db.execute(`
+    CREATE TABLE IF NOT EXISTS dte_documents (
+      id                INT AUTO_INCREMENT PRIMARY KEY,
+      order_id          VARCHAR(40)  NOT NULL,
+      tipo_dte          VARCHAR(2)   NOT NULL,           -- 01, 03, 05
+      version           INT          NOT NULL,
+      ambiente          VARCHAR(2)   NOT NULL,           -- 00 pruebas, 01 prod
+      codigo_generacion VARCHAR(40)  NOT NULL UNIQUE,    -- UUID
+      numero_control    VARCHAR(40)  NOT NULL,
+      sello_recibido    VARCHAR(200) NULL,               -- sello de recepción MH
+      estado            VARCHAR(20)  NOT NULL,           -- PROCESADO/RECHAZADO/CONTINGENCIA
+      observaciones     TEXT         NULL,
+      json_dte          LONGTEXT     NOT NULL,           -- JSON original (sin firmar)
+      json_firmado      LONGTEXT     NULL,               -- JWS firmado
+      created_at        DATETIME     NOT NULL,
+      updated_at        DATETIME     NOT NULL,
+      INDEX idx_order  (order_id),
+      INDEX idx_estado (estado)
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
+  `);
+
+  await db.execute(`
+    CREATE TABLE IF NOT EXISTS dte_correlativos (
+      tipo_dte VARCHAR(2) PRIMARY KEY,
+      seq      BIGINT NOT NULL DEFAULT 0
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
   `);
 
@@ -2033,6 +2063,50 @@ app.get('/api/orders/:id/invoice', optionalCustomer, async (req, res) => {
   const total  = parseFloat(order.total || 0).toFixed(2);
   const date   = new Date(order.created_at).toLocaleDateString('es-ES', { day:'numeric', month:'long', year:'numeric' });
 
+  // ── DTE legal data (if a Factura Electrónica was accepted by Hacienda) ──────
+  let dte = null, dteQr = '';
+  try {
+    const dteRows = await dteSvc.getByOrderId(order.id);
+    dte = dteRows.find(d => d.estado === 'PROCESADO') || null;
+    if (dte && global._QRCode) {
+      const fecEmi = new Date(dte.created_at).toISOString().slice(0, 10);
+      const url    = dteSvc.verificacionUrl(dte.codigo_generacion, fecEmi);
+      dteQr = await new Promise(resolve =>
+        global._QRCode.toDataURL(url, { errorCorrectionLevel: 'M', margin: 1, width: 150 },
+          (e, u) => resolve(e ? '' : u))
+      );
+    }
+  } catch(e) { console.error('Invoice DTE lookup error:', e.message); }
+
+  // IVA breakdown: for an accepted DTE the IVA (13%) is embedded in the total.
+  const ivaMonto  = dte ? (parseFloat(total) - parseFloat(total) / 1.13) : 0;
+  const netoMonto = parseFloat(total) - ivaMonto;
+
+  const dteHeaderBlock = dte ? `
+        <div class="dte-legal">
+          <div class="dte-legal-row"><span>Documento Tributario Electrónico</span><strong>${dte.tipo_dte === '03' ? 'Comprobante de Crédito Fiscal' : dte.tipo_dte === '05' ? 'Nota de Crédito' : 'Factura (Consumidor Final)'}</strong></div>
+          <div class="dte-legal-row"><span>Número de Control</span><strong>${escHtml(dte.numero_control)}</strong></div>
+          <div class="dte-legal-row"><span>Código de Generación</span><strong>${escHtml(dte.codigo_generacion)}</strong></div>
+          <div class="dte-legal-row"><span>Sello de Recepción</span><strong>${escHtml(dte.sello_recibido || '—')}</strong></div>
+          ${dte.ambiente === '00' ? '<div class="dte-ambiente">AMBIENTE DE PRUEBAS — SIN VALIDEZ TRIBUTARIA</div>' : ''}
+        </div>` : '';
+
+  const dteQrBlock = (dte && dteQr) ? `
+        <div class="dte-qr">
+          <img src="${dteQr}" alt="QR verificación MH" width="120" height="120"/>
+          <div class="dte-qr-cap">Verifica este documento en<br/>admin.factura.gob.sv</div>
+        </div>` : '';
+
+  const ivaRows = dte ? `
+        <div class="inv-total-row"><div class="inv-total-box">
+          <div class="inv-total-label">Suma de operaciones gravadas</div>
+          <div class="inv-subval">$${netoMonto.toFixed(2)}</div>
+        </div></div>
+        <div class="inv-total-row"><div class="inv-total-box">
+          <div class="inv-total-label">IVA 13%</div>
+          <div class="inv-subval">$${ivaMonto.toFixed(2)}</div>
+        </div></div>` : '';
+
   const itemRows = items.map(i =>
     `<tr>
       <td style="padding:10px 12px;border-bottom:1px solid #f0e6d0;color:#1a1714;font-size:13px">${escHtml(i.name)}</td>
@@ -2075,13 +2149,22 @@ app.get('/api/orders/:id/invoice', optionalCustomer, async (req, res) => {
       @media print{body{background:#fff;padding:0}.inv-footer{display:none}}
       .print-btn{display:block;width:100%;max-width:200px;margin:1.5rem auto 0;padding:10px;background:#b8955a;border:none;color:#0e0c0a;font-family:inherit;font-size:11px;letter-spacing:2px;text-transform:uppercase;cursor:pointer}
       @media print{.print-btn{display:none}}
+      .dte-legal{margin-top:14px;padding:12px 0 0;border-top:1px dashed #d8c8a8}
+      .dte-legal-row{display:flex;justify-content:space-between;gap:1rem;font-size:10px;color:#8a7f72;padding:3px 0}
+      .dte-legal-row strong{color:#1a1714;font-weight:600;text-align:right;word-break:break-all;max-width:62%}
+      .dte-ambiente{margin-top:8px;padding:5px 8px;background:#fdf3d8;border:1px solid #e8d8b8;color:#9a7b2a;font-size:9px;letter-spacing:1px;text-align:center;text-transform:uppercase}
+      .dte-block{display:flex;justify-content:space-between;align-items:flex-start;gap:1.5rem;margin-top:8px}
+      .dte-qr{text-align:center;flex-shrink:0}
+      .dte-qr img{border:1px solid #f0e6d0}
+      .dte-qr-cap{font-size:8px;color:#aaa;margin-top:4px;line-height:1.4}
+      .inv-subval{font-family:Georgia,serif;font-size:14px;color:#5a5249}
     </style>
   </head><body>
     <div class="invoice">
       <div class="inv-header">
         <div><div class="inv-logo">Sillage</div><div class="inv-logo-sub">Parfumerie</div></div>
         <div class="inv-label">
-          <div class="inv-label-title">Factura</div>
+          <div class="inv-label-title">${dte ? (dte.tipo_dte === '03' ? 'Crédito Fiscal' : dte.tipo_dte === '05' ? 'Nota de Crédito' : 'Factura Electrónica') : 'Factura'}</div>
           <div class="inv-label-id">${escHtml(order.id)}</div>
           <div class="inv-label-date">${date}</div>
         </div>
@@ -2112,15 +2195,18 @@ app.get('/api/orders/:id/invoice', optionalCustomer, async (req, res) => {
             <tbody>${itemRows}</tbody>
           </table>
         </div>
+        ${ivaRows}
         <div class="inv-total-row">
           <div class="inv-total-box">
-            <div class="inv-total-label">Total</div>
+            <div class="inv-total-label">${dte ? 'Total a pagar' : 'Total'}</div>
             <div class="inv-total-val">$${total}</div>
           </div>
         </div>
+        ${dte ? `<div class="dte-block">${dteHeaderBlock}${dteQrBlock}</div>` : ''}
       </div>
       <div class="inv-footer">
         Sillage Parfumerie · El Salvador · sillage-sv.com<br/>
+        ${dte && cfg.DTE_EMISOR.nit ? 'NIT '+escHtml(cfg.DTE_EMISOR.nit)+(cfg.DTE_EMISOR.nrc?' · NRC '+escHtml(cfg.DTE_EMISOR.nrc):'')+'<br/>' : ''}
         Gracias por tu compra
       </div>
     </div>
@@ -2129,6 +2215,54 @@ app.get('/api/orders/:id/invoice', optionalCustomer, async (req, res) => {
 
   res.setHeader('Content-Type', 'text/html; charset=utf-8');
   res.send(html);
+});
+
+// ── DTE / Factura Electrónica admin routes ───────────────────────────────────
+
+// GET /api/admin/orders/:id/dte — list DTE records emitted for an order
+app.get('/api/admin/orders/:id/dte', requireAdmin, async (req, res) => {
+  try {
+    const rows = await dteSvc.getByOrderId(req.params.id);
+    res.json(rows.map(r => ({
+      id:               r.id,
+      tipoDte:          r.tipo_dte,
+      estado:           r.estado,
+      ambiente:         r.ambiente,
+      numeroControl:    r.numero_control,
+      codigoGeneracion: r.codigo_generacion,
+      selloRecibido:    r.sello_recibido,
+      observaciones:    r.observaciones,
+      createdAt:        r.created_at,
+    })));
+  } catch(e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
+// POST /api/admin/orders/:id/dte — manually emit / retry a DTE
+// Body: { tipoDte?: '01'|'03'|'05', receptor?: {...}, docRelacionado?: {...} }
+app.post('/api/admin/orders/:id/dte', requireAdmin, async (req, res) => {
+  if (!cfg.DTE_ENABLED) {
+    return res.status(409).json({ error: 'DTE deshabilitado. Configura DTE_ENABLED=true y las credenciales del Ministerio de Hacienda.' });
+  }
+  const { tipoDte, receptor, docRelacionado } = req.body || {};
+  if (tipoDte === '03' && (!receptor || !receptor.nit || !receptor.nrc)) {
+    return res.status(400).json({ error: 'El Crédito Fiscal requiere receptor con NIT y NRC.' });
+  }
+  try {
+    const rec = await emitDteForOrder(req.params.id, { tipoDte: tipoDte || '01', receptor, docRelacionado });
+    if (!rec) return res.status(404).json({ error: 'Pedido no encontrado o DTE ya emitido.' });
+    res.json({
+      ok:    rec.estado === 'PROCESADO',
+      estado: rec.estado,
+      numeroControl:    rec.numeroControl,
+      codigoGeneracion: rec.codigoGeneracion,
+      selloRecibido:    rec.selloRecibido,
+      observaciones:    rec.observaciones,
+    });
+  } catch(e) {
+    res.status(500).json({ error: e.message });
+  }
 });
 
 // ── Customer addresses CRUD ──────────────────────────────────────────────────
@@ -2298,6 +2432,39 @@ setInterval(async () => {
 app.get('/api/catalogue', async (req, res) => res.json(await getCatalogue()));
 
 // ── Helper: deduct inventory and broadcast ────────────
+// ── DTE: emit a Factura Electrónica for a paid order ─────────────────────────
+// Gated by cfg.DTE_ENABLED (no-op when off). Never throws into the caller —
+// failures are persisted as CONTINGENCIA for later retry from the admin panel.
+async function emitDteForOrder(orderId, options = {}) {
+  if (!cfg.DTE_ENABLED) return null;
+  try {
+    // Don't emit twice for the same order/tipo.
+    const existing = await dteSvc.getByOrderId(orderId);
+    const tipo = options.tipoDte || '01';
+    if (existing.some(d => d.tipo_dte === tipo && d.estado === 'PROCESADO')) return null;
+
+    const [rows] = await db.execute('SELECT * FROM orders WHERE id=?', [orderId]);
+    if (!rows.length) return null;
+
+    const rec = await dteSvc.emitForOrder(rows[0], options);
+    if (rec) {
+      await logActivity(
+        rec.estado === 'PROCESADO'
+          ? `DTE ${rec.tipoDte} emitido para pedido ${orderId} — ${rec.numeroControl}`
+          : `DTE ${rec.tipoDte} pedido ${orderId} en ${rec.estado}: ${rec.observaciones || ''}`
+      );
+      broadcastAdmin('dte_update', {
+        orderId, tipoDte: rec.tipoDte, estado: rec.estado,
+        numeroControl: rec.numeroControl, selloRecibido: rec.selloRecibido,
+      });
+    }
+    return rec;
+  } catch (e) {
+    console.error(`emitDteForOrder(${orderId}) error:`, e.message);
+    return null;
+  }
+}
+
 async function deductInventory(items) {
   const n = new Date();
   for (const item of items) {
@@ -2898,6 +3065,7 @@ app.post('/api/wompi/webhook', express.json(), async (req, res) => {
     await logActivity(`Pago Wompi confirmado — pedido ${orderObj.id} de ${orderObj.customer} — $${parseFloat(orderObj.total||0).toFixed(2)}`);
     try { await sendOrderConfirmation(fullOrder); } catch(e) { console.error('Wompi confirm email error:', e.message); }
     try { await notifyAdmins(fullOrder); } catch(e) {}
+    try { await emitDteForOrder(orderObj.id); } catch(e) { console.error('Wompi DTE error:', e.message); }
     console.log(`Wompi order created on payment: ${orderObj.id} — ref ${reference}`);
   } catch(e) {
     console.error('Wompi webhook processing error:', e.message);
@@ -3247,6 +3415,7 @@ app.post('/api/btcpay/webhook', async (req, res) => {
       await logActivity(`Pago BTCPay confirmado (${type}) — pedido ${orderObj.id} de ${orderObj.customer} — $${parseFloat(orderObj.total||0).toFixed(2)}`);
       try { await sendOrderConfirmation(fullOrder); } catch(e) { console.error('BTCPay confirmation email error:', e.message); }
       try { await notifyAdmins(fullOrder); } catch(e) {}
+      try { await emitDteForOrder(orderObj.id); } catch(e) { console.error('BTCPay DTE error:', e.message); }
       console.log(`BTCPay order created on payment: ${orderObj.id} — invoice ${invoiceId}`);
 
     } else {
@@ -3780,6 +3949,7 @@ app.patch('/api/orders/:id', requireAdmin, async (req, res) => {
       order.payment_status = 'Pagado';
       broadcastAdmin('order_update', { id: order.id, status: order.status, paymentStatus: 'Pagado', trackerStep: order.tracker_step });
       await logActivity(`Pago BTCPay confirmado manualmente para pedido ${escHtml(order.id)}`);
+      try { await emitDteForOrder(order.id); } catch(e) { console.error('DTE (BTCPay manual) error:', e.message); }
     }
 
     // COD → Entregado: mark as Pagado (payment collected on delivery)
@@ -3788,6 +3958,7 @@ app.patch('/api/orders/:id', requireAdmin, async (req, res) => {
       order.payment_status = 'Pagado';
       broadcastAdmin('order_update', { id: order.id, status: order.status, paymentStatus: 'Pagado', trackerStep: order.tracker_step });
       await logActivity(`Pago COD confirmado para pedido ${escHtml(order.id)}`);
+      try { await emitDteForOrder(order.id); } catch(e) { console.error('DTE (COD) error:', e.message); }
     }
 
     // COD → No Entregado: track no-show and auto-block after threshold
