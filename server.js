@@ -27,7 +27,7 @@ const security     = require('./middleware/security');
 const auth         = require('./middleware/auth');
 
 // ─── Aliases for backwards compatibility within this file ──────────────────
-const { getCatalogue, saveCatalogue, getInventoryMap, invalidateInventory, getPricingMap, getActivity, getSetting, setSetting, getBrandHierarchy } = catalogueSvc;
+const { getCatalogue, saveCatalogue, deleteProduct, getInventoryMap, invalidateInventory, getPricingMap, getActivity, getSetting, setSetting, getBrandHierarchy } = catalogueSvc;
 const { calcIntensity } = require('./services/noteIntensity');
 const { calcChords }    = require('./services/chords');
 
@@ -4854,12 +4854,12 @@ app.put('/api/catalogue/:id', requireAdmin, async (req, res) => {
 
 app.delete('/api/catalogue/:id', requireAdmin, async (req, res) => {
   const id = parseInt(req.params.id, 10);
-  let catalogue = await getCatalogue();
+  const catalogue = await getCatalogue();
   const frag = catalogue.find(p => p.id === id);
   if (!frag) return res.status(404).json({ error: 'Fragancia no encontrada' });
-  catalogue = catalogue.filter(p => p.id !== id);
-  await saveCatalogue(catalogue);
-  broadcast('catalogue', catalogue);
+  await deleteProduct(id);
+  const updated = catalogue.filter(p => p.id !== id);
+  broadcast('catalogue', updated);
   await logActivity(`Fragancia eliminada: ${frag.brand} ${frag.name}`);
   res.json({ ok: true });
 });
