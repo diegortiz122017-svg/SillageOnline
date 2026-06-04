@@ -2265,6 +2265,36 @@ app.post('/api/admin/orders/:id/dte', requireAdmin, async (req, res) => {
   }
 });
 
+// POST /api/admin/dte/test — emite una FACTURA DE PRUEBA (orden ficticia) para
+// validar el circuito completo: firmador → Hacienda → sello. No crea un pedido real.
+app.post('/api/admin/dte/test', requireAdmin, async (req, res) => {
+  if (!cfg.DTE_ENABLED) {
+    return res.status(409).json({ error: 'DTE deshabilitado. Configura DTE_ENABLED=true.' });
+  }
+  const fakeOrder = {
+    id:       'TEST-' + Date.now(),
+    customer: 'Cliente de Prueba',
+    email:    cfg.DTE_EMISOR.correo || 'prueba@sillage-sv.com',
+    phone:    null,
+    items:    JSON.stringify([{ name: 'Producto de prueba DTE', qty: 1, price: 11.30 }]),
+    total:    11.30,
+  };
+  try {
+    const rec = await dteSvc.emitForOrder(fakeOrder, { tipoDte: '01' });
+    res.json({
+      ok:               rec && rec.estado === 'PROCESADO',
+      ambiente:         cfg.DTE_AMBIENTE,
+      estado:           rec?.estado,
+      numeroControl:    rec?.numeroControl,
+      codigoGeneracion: rec?.codigoGeneracion,
+      selloRecibido:    rec?.selloRecibido,
+      observaciones:    rec?.observaciones,
+    });
+  } catch(e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
 // ── Customer addresses CRUD ──────────────────────────────────────────────────
 
 // GET /api/customer/addresses — list all addresses for the logged-in customer
