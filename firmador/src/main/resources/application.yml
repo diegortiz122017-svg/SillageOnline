@@ -1,0 +1,10 @@
+server:
+  port: 8113
+spring:
+  main:
+    allow-bean-definition-overriding: true
+  application:
+    name: Firma-Digital
+  config:
+    activate:
+      on-profile: nonssl

@@ -1,0 +1,13 @@
+server:
+  port: 8113
+  ssl:
+    enabled: true
+    key-store: ${SVFE_ARCHIVO}
+    key-store-password: ${SVFE_PASSWORD}
+    key-store-type: PKCS12
+spring:
+  application:
+    name: Firma-Digital
+  config:
+    activate:
+      on-profile: ssl

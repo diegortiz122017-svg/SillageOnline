@@ -2966,7 +2966,7 @@ var P=[
 // ════════════════════════════════════════════
 function svg(c,s,sz){
   var id='b'+Math.random().toString(36).substr(2,5);
-  var sc={sm:0.42,md:0.72,lg:1.35}[sz]||0.72;
+  var sc=typeof sz==='number'?sz:({sm:0.42,md:0.72,lg:1.35}[sz]||0.72);
   var w=Math.round(100*sc),h=Math.round(180*sc);
   if(s==='rect')return'<svg class="bottle-svg" width="'+w+'" height="'+h+'" viewBox="0 0 100 180"><defs><linearGradient id="'+id+'" x1="0" y1="0" x2="1" y2="1"><stop offset="0%" stop-color="'+c[0]+'"/><stop offset="100%" stop-color="'+c[2]+'"/></linearGradient></defs><rect x="36" y="8" width="28" height="18" rx="2" fill="'+c[2]+'"/><rect x="42" y="24" width="16" height="18" fill="'+c[1]+'"/><rect x="22" y="42" width="56" height="116" rx="4" fill="url(#'+id+')"/><rect x="27" y="50" width="6" height="90" rx="3" fill="rgba(255,255,255,0.2)"/><rect x="28" y="90" width="44" height="40" rx="2" fill="rgba(255,255,255,0.12)"/></svg>';
   if(s==='round')return'<svg class="bottle-svg" width="'+w+'" height="'+h+'" viewBox="0 0 100 180"><defs><radialGradient id="'+id+'" cx="35%" cy="35%" r="65%"><stop offset="0%" stop-color="'+c[0]+'"/><stop offset="60%" stop-color="'+c[1]+'"/><stop offset="100%" stop-color="'+c[2]+'"/></radialGradient></defs><ellipse cx="50" cy="20" rx="14" ry="12" fill="'+c[2]+'"/><rect x="44" y="30" width="12" height="18" fill="'+c[1]+'"/><ellipse cx="50" cy="115" rx="34" ry="42" fill="url(#'+id+')"/><ellipse cx="38" cy="98" rx="8" ry="12" fill="rgba(255,255,255,0.2)"/></svg>';

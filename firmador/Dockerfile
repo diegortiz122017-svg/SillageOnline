@@ -10,9 +10,9 @@ FROM maven:3.9-amazoncorretto-21 AS build
 WORKDIR /build
 # Cache de dependencias: primero el pom, luego el código
 COPY pom.xml .
-RUN mvn -q -B dependency:go-offline || true
+RUN mvn -B dependency:go-offline || true
 COPY src ./src
-RUN mvn -q -B clean package -DskipTests
+RUN mvn -B clean package -DskipTests
 # El pom genera el jar ejecutable con classifier "exec"
 RUN cp target/svfe-api-firmador-*-exec.jar /app.jar
 

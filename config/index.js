@@ -71,31 +71,34 @@ const DTE_ANULACION_URL = `${DTE_MH_BASE}/fesv/anulardte`;
 const DTE_FIRMADOR_URL = process.env.DTE_FIRMADOR_URL || 'http://localhost:8113/firmardocumento/';
 
 // API credentials (MH portal). User = NIT del emisor por defecto.
-const DTE_API_USER = process.env.DTE_API_USER || null;
+const DTE_API_USER = process.env.DTE_API_USER || '08230505261016';
 const DTE_API_PWD  = process.env.DTE_API_PWD  || null;
 // Clave privada del certificado (para el firmador).
 const DTE_CERT_PWD = process.env.DTE_CERT_PWD || null;
 
-// Datos tributarios del emisor (Sillage). NIT/NRC ya los tienen.
+// Datos tributarios del emisor (Sillage). Defaults reales tomados del
+// certificado MH (NIT 0823-050526-101-6, NRC 3869539). Se pueden sobreescribir
+// con variables de entorno.
 const DTE_EMISOR = {
-  nit:                 process.env.DTE_NIT  || null,            // 14 dígitos sin guiones
-  nrc:                 process.env.DTE_NRC  || null,            // sin guiones
-  nombre:              process.env.DTE_NOMBRE || 'Sillage Parfumerie',
+  nit:                 process.env.DTE_NIT  || '08230505261016',  // 14 dígitos sin guiones
+  nrc:                 process.env.DTE_NRC  || '3869539',         // sin guiones
+  nombre:              process.env.DTE_NOMBRE || 'SILLAGE, SOCIEDAD POR ACCIONES SIMPLIFICADA DE CAPITAL VARIABLE',
   nombreComercial:     process.env.DTE_NOMBRE_COMERCIAL || 'Sillage Parfumerie',
   codActividad:        process.env.DTE_COD_ACTIVIDAD || '47730', // venta de perfumes/cosméticos
   descActividad:       process.env.DTE_DESC_ACTIVIDAD || 'Venta al por menor de perfumes y cosméticos',
-  tipoEstablecimiento: process.env.DTE_TIPO_ESTABLECIMIENTO || '02', // 02 = casa matriz
-  // Dirección — códigos del catálogo MH (CAT-012 departamento, CAT-013 municipio).
-  departamento:        process.env.DTE_DEPARTAMENTO || '06',   // 06 = San Salvador
-  municipio:           process.env.DTE_MUNICIPIO    || '14',   // ej. San Salvador centro
-  complemento:         process.env.DTE_DIRECCION || 'San Salvador, El Salvador',
-  telefono:            process.env.DTE_TELEFONO || null,
-  correo:              process.env.DTE_CORREO || EMAIL_PEDIDOS,
-  // Códigos de establecimiento/punto de venta asignados por MH (pueden ir null).
-  codEstableMH:        process.env.DTE_COD_ESTABLE_MH    || null,
-  codEstable:          process.env.DTE_COD_ESTABLE       || null,
-  codPuntoVentaMH:     process.env.DTE_COD_PUNTOVENTA_MH || null,
-  codPuntoVenta:       process.env.DTE_COD_PUNTOVENTA    || null,
+  // Dirección fiscal real de Sillage (tarjeta NRC): Barrio El Carmen,
+  // Distrito de San Juan Talpa, Municipio de La Paz Oeste, Depto. de La Paz.
+  // Códigos del catálogo territorial oficial (reforma 2024): 08 / 03 / 11.
+  departamento:        process.env.DTE_DEPARTAMENTO || '08',   // 08 = La Paz
+  municipio:           process.env.DTE_MUNICIPIO    || '03',   // 03 = La Paz Oeste
+  distrito:            process.env.DTE_DISTRITO     || '11',   // 11 = San Juan Talpa
+  complemento:         process.env.DTE_DIRECCION || 'Barrio El Carmen, San Juan Talpa, La Paz',
+  telefono:            process.env.DTE_TELEFONO || '21000000', // 8+ dígitos (req. por esquema)
+  correo:              process.env.DTE_CORREO || 'ortiz@sillage-sv.com',
+  // Segmentos del Número de Control: (M|B|S|P)### y punto de venta ###.
+  // codEstable debe ser 4 chars (ej. 'M001'); codPuntoVenta 1-15 chars.
+  codEstable:          process.env.DTE_COD_ESTABLE    || 'M001',
+  codPuntoVenta:       process.env.DTE_COD_PUNTOVENTA || '001',
 };
 
 // ─── Admin ────────────────────────────────────────────────────────────────────

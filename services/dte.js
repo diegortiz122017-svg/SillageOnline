@@ -42,13 +42,14 @@ function nowSV() {
   return { fecEmi, horEmi };
 }
 
-// Número de control: DTE-{tipo}-{8 alfanum: codEstable+codPuntoVenta}-{15 dígitos correlativo}
+// Número de control (31 chars). Formato exacto del esquema MH:
+//   DTE-{tipo}-(M|B|S|P)###P###-{15 dígitos}     ej. DTE-01-M001P001-000000000000123
 function numeroControl(tipoDte, correlativo) {
   const e   = cfg.DTE_EMISOR;
-  const est = String(e.codEstable || e.codEstableMH || '0000').padStart(4, '0').slice(-4);
-  const pv  = String(e.codPuntoVenta || e.codPuntoVentaMH || '0001').padStart(4, '0').slice(-4);
+  const est = String(e.codEstable || 'M001').toUpperCase();       // letra + 3 dígitos
+  const pv  = String(e.codPuntoVenta || '001').replace(/\D/g, '').padStart(3, '0').slice(-3);
   const seq = String(correlativo).padStart(15, '0');
-  return `DTE-${tipoDte}-${(est + pv).toUpperCase()}-${seq}`;
+  return `DTE-${tipoDte}-${est}P${pv}-${seq}`;
 }
 
 // ─── número a letras (formato MH: "CIEN 00/100") ──────────────────────────────
@@ -98,28 +99,26 @@ function numeroALetras(num) {
   return `${aLetras(entero)} ${cc}/100`;
 }
 
-// ─── emisor block (shared by every document) ──────────────────────────────────
+// ─── emisor block (shared — coincide con esquema FC v2 / CCF v4 / NC v4) ───────
 function buildEmisor() {
   const e = cfg.DTE_EMISOR;
   return {
-    nit:                 e.nit,
-    nrc:                 e.nrc,
-    nombre:              e.nombre,
-    codActividad:        e.codActividad,
-    descActividad:       e.descActividad,
-    nombreComercial:     e.nombreComercial || e.nombre,
-    tipoEstablecimiento: e.tipoEstablecimiento,
+    nit:             e.nit,
+    nrc:             e.nrc,
+    nombre:          e.nombre,
+    codActividad:    e.codActividad,
+    descActividad:   e.descActividad,
+    nombreComercial: e.nombreComercial || e.nombre,
     direccion: {
       departamento: e.departamento,
       municipio:    e.municipio,
+      distrito:     e.distrito,
       complemento:  e.complemento,
     },
-    telefono:        e.telefono,
-    correo:          e.correo,
-    codEstableMH:    e.codEstableMH,
-    codEstable:      e.codEstable,
-    codPuntoVentaMH: e.codPuntoVentaMH,
-    codPuntoVenta:   e.codPuntoVenta,
+    telefono:      e.telefono,
+    correo:        e.correo,
+    codEstable:    e.codEstable,
+    codPuntoVenta: e.codPuntoVenta,
   };
 }
 
@@ -177,10 +176,9 @@ function buildFactura(order, opts) {
     descuGravada:         0,
     porcentajeDescuento:  0,
     totalDescu:           0,
-    tributos:             null,        // FC: null
+    tributos:             null,        // FC: null (IVA incluido vía totalIva)
     subTotal:             totalGravada,
-    ivaRete1:             0,
-    reteRenta:            0,
+    ivaRete:              0,
     montoTotalOperacion:  totalGravada,
     totalNoGravado:       0,
     totalPagar:           totalGravada,
@@ -190,10 +188,11 @@ function buildFactura(order, opts) {
     condicionOperacion:   1,           // 1 = contado
     pagos:                null,
     numPagoElectronico:   null,
+    observaciones:        null,
   };
 
   return {
-    identificacion:      buildIdentificacion('01', 1, opts.numeroControl, opts.codigoGeneracion, fecEmi, horEmi),
+    identificacion:      buildIdentificacion('01', 2, opts.numeroControl, opts.codigoGeneracion, fecEmi, horEmi),
     documentoRelacionado: null,
     emisor:              buildEmisor(),
     receptor: {
@@ -204,14 +203,13 @@ function buildFactura(order, opts) {
       codActividad:  null,
       descActividad: null,
       direccion:     null,
-      telefono:      order.phone || null,
+      telefono:      null,            // se omite (esquema exige 8+ chars si no es null)
       correo:        order.email || null,
     },
     otrosDocumentos: null,
     ventaTercero:    null,
     cuerpoDocumento,
     resumen,
-    extension:       null,
     apendice:        null,
   };
 }
@@ -233,12 +231,12 @@ function buildCreditoFiscal(order, receptor, opts) {
       numItem:         idx + 1,
       tipoItem:        1,
       numeroDocumento: null,
-      cantidad:        it.cantidad,
       codigo:          null,
       codTributo:      null,
-      uniMedida:       59,
       descripcion:     it.descripcion,
-      precioUni:       round8(precioNeto),
+      cantidad:        it.cantidad,
+      uniMedida:       59,
+      precioUni:       precioNeto,
       montoDescu:      0,
       ventaNoSuj:      0,
       ventaExenta:     0,
@@ -267,9 +265,8 @@ function buildCreditoFiscal(order, receptor, opts) {
       { codigo: '20', descripcion: 'Impuesto al Valor Agregado 13%', valor: iva },
     ],
     subTotal:            totalGravada,
-    ivaPerci1:           0,
-    ivaRete1:            0,
-    reteRenta:           0,
+    ivaPerci:            0,
+    ivaRete:             0,
     montoTotalOperacion: montoTotal,
     totalNoGravado:      0,
     totalPagar:          montoTotal,
@@ -278,33 +275,39 @@ function buildCreditoFiscal(order, receptor, opts) {
     condicionOperacion:  1,
     pagos:               null,
     numPagoElectronico:  null,
+    observaciones:       null,
   };
 
   return {
-    identificacion:      buildIdentificacion('03', 3, opts.numeroControl, opts.codigoGeneracion, fecEmi, horEmi),
+    identificacion:      buildIdentificacion('03', 4, opts.numeroControl, opts.codigoGeneracion, fecEmi, horEmi),
     documentoRelacionado: null,
     emisor:              buildEmisor(),
-    receptor: {
-      nit:           receptor.nit,
-      nrc:           receptor.nrc,
-      nombre:        receptor.nombre,
-      codActividad:  receptor.codActividad,
-      descActividad: receptor.descActividad,
-      nombreComercial: receptor.nombreComercial || null,
-      direccion: {
-        departamento: receptor.departamento,
-        municipio:    receptor.municipio,
-        complemento:  receptor.complemento,
-      },
-      telefono:      receptor.telefono || null,
-      correo:        receptor.correo || order.email || null,
-    },
-    otrosDocumentos: null,
-    ventaTercero:    null,
+    receptor:            buildReceptorCCF(receptor, order),
+    otrosDocumentos:     null,
+    ventaTercero:        null,
     cuerpoDocumento,
     resumen,
-    extension:       null,
-    apendice:        null,
+    apendice:            null,
+  };
+}
+
+// Receptor obligatorio de CCF/NC (esquema v4).
+function buildReceptorCCF(receptor, order) {
+  return {
+    nit:             receptor.nit,
+    nrc:             receptor.nrc || null,
+    nombre:          receptor.nombre,
+    codActividad:    receptor.codActividad,
+    descActividad:   receptor.descActividad,
+    nombreComercial: receptor.nombreComercial || null,
+    direccion: {
+      departamento: receptor.departamento,
+      municipio:    receptor.municipio,
+      distrito:     receptor.distrito,
+      complemento:  receptor.complemento,
+    },
+    telefono:        receptor.telefono || null,
+    correo:          receptor.correo || order.email || null,
   };
 }
 
@@ -313,19 +316,101 @@ function buildCreditoFiscal(order, receptor, opts) {
 //  docRelacionado = { codigoGeneracion, fecEmi } del CCF original
 // ════════════════════════════════════════════════════════════════════════════
 function buildNotaCredito(order, receptor, docRelacionado, opts) {
-  const ccf = buildCreditoFiscal(order, receptor, opts);
-  ccf.identificacion = buildIdentificacion('05', 3, opts.numeroControl, opts.codigoGeneracion, ...Object.values(nowSV()));
-  ccf.documentoRelacionado = [{
-    tipoDocumento:   '03',     // se ajusta un Crédito Fiscal
-    tipoGeneracion:  2,        // 2 = electrónico
-    numeroDocumento: docRelacionado.codigoGeneracion,
-    fechaEmision:    docRelacionado.fecEmi,
-  }];
-  // En la Nota de Crédito no se reportan pagos ni condición de pago.
-  delete ccf.resumen.pagos;
-  delete ccf.resumen.numPagoElectronico;
-  delete ccf.resumen.condicionOperacion;
-  return ccf;
+  const { fecEmi, horEmi } = nowSV();
+  const items = normalizeItems(JSON.parse(order.items || '[]'));
+  const refDoc = docRelacionado.codigoGeneracion || null;
+
+  const cuerpoDocumento = items.map((it, idx) => {
+    const precioNeto   = round8(it.precioUnitario / (1 + IVA_RATE));
+    const ventaGravada = round2(it.cantidad * precioNeto);
+    const totalIva     = round2(ventaGravada * IVA_RATE);
+    return {
+      numItem:         idx + 1,
+      tipoItem:        1,
+      numeroDocumento: refDoc,    // código de generación del CCF ajustado
+      cantidad:        it.cantidad,
+      codigo:          null,
+      codTributo:      null,
+      uniMedida:       59,
+      descripcion:     it.descripcion,
+      precioUni:       precioNeto,
+      montoDescu:      0,
+      ventaNoSuj:      0,
+      ventaExenta:     0,
+      ventaGravada,
+      tributos:        ['20'],
+      noGravado:       0,
+      ivaPerci:        0,
+      totalIva,
+      ivaRete:         0,
+    };
+  });
+
+  const totalGravada = round2(cuerpoDocumento.reduce((s, c) => s + c.ventaGravada, 0));
+  const iva          = round2(totalGravada * IVA_RATE);
+  const montoTotal   = round2(totalGravada + iva);
+
+  const resumen = {
+    totalNoSuj:          0,
+    totalExenta:         0,
+    totalGravada:        totalGravada,
+    subTotalVentas:      totalGravada,
+    totalDescu:          0,
+    tributos: [
+      { codigo: '20', descripcion: 'Impuesto al Valor Agregado 13%', valor: iva },
+    ],
+    montoTotalOperacion: montoTotal,
+    ivaPerci:            0,
+    totalIva:            iva,
+    ivaRete:             0,
+    totalNoGravado:      0,
+    totalPagar:          montoTotal,
+    totalLetras:         numeroALetras(montoTotal),
+    condicionOperacion:  1,
+    observaciones:       null,
+    codigoRetencionMH:   null,
+  };
+
+  // identificación de NC: incluye "fusion" (no presente en FC/CCF)
+  const identificacion = buildIdentificacion('05', 4, opts.numeroControl, opts.codigoGeneracion, fecEmi, horEmi);
+  identificacion.fusion = null;
+
+  // emisor de NC: NO lleva codEstable/codPuntoVenta
+  const emisor = buildEmisor();
+  delete emisor.codEstable;
+  delete emisor.codPuntoVenta;
+
+  return {
+    identificacion,
+    documentoRelacionado: [{
+      tipoDocumento:   '03',     // se ajusta un Crédito Fiscal
+      tipoGeneracion:  2,        // 2 = electrónico
+      numeroDocumento: refDoc,
+      fechaEmision:    docRelacionado.fecEmi,
+    }],
+    emisor,
+    receptor: {
+      tipoDocumento:   '36',     // 36 = NIT
+      numDocumento:    receptor.nit,
+      nrc:             receptor.nrc || null,
+      nombre:          receptor.nombre,
+      codActividad:    receptor.codActividad,
+      descActividad:   receptor.descActividad,
+      nombreComercial: receptor.nombreComercial || null,
+      direccion: {
+        departamento: receptor.departamento,
+        municipio:    receptor.municipio,
+        distrito:     receptor.distrito,
+        complemento:  receptor.complemento,
+      },
+      telefono:        receptor.telefono || null,
+      correo:          receptor.correo || order.email || null,
+    },
+    ventaTercero:    null,
+    cuerpoDocumento,
+    resumen,
+    apendice:        null,
+  };
 }
 
 function buildIdentificacion(tipoDte, version, numControl, codGen, fecEmi, horEmi) {
@@ -448,7 +533,7 @@ async function emitForOrder(order, options = {}) {
   if (!cfg.DTE_ENABLED) return null;
 
   const tipoDte = options.tipoDte || '01';
-  const version = tipoDte === '01' ? 1 : 3;
+  const version = tipoDte === '01' ? 2 : 4;   // FC v2, CCF/NC v4
   const codigoGeneracion = uuidUpper();
   const correlativo      = await nextCorrelativo(tipoDte);
   const numControl       = numeroControl(tipoDte, correlativo);
