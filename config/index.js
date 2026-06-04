@@ -51,6 +51,53 @@ const WOMPI_PUBLIC_KEY    = process.env.WOMPI_PUBLIC_KEY    || null; // pub_... 
 // ─── AI ───────────────────────────────────────────────────────────────────────
 const OPENAI_API_KEY = process.env.OPENAI_API_KEY || null;
 
+// ─── DTE / Factura Electrónica (Ministerio de Hacienda, El Salvador) ──────────
+// Master switch. When false, no DTE is emitted — the order flow is untouched.
+// Turn on only once the certificate + API credentials are in place.
+const DTE_ENABLED = process.env.DTE_ENABLED === 'true';
+
+// Ambiente: '00' = pruebas (apitest), '01' = producción.
+const DTE_AMBIENTE = process.env.DTE_AMBIENTE || '00';
+
+// MH endpoints differ per ambiente.
+const DTE_MH_BASE = DTE_AMBIENTE === '01'
+  ? 'https://api.dtes.mh.gob.sv'
+  : 'https://apitest.dtes.mh.gob.sv';
+const DTE_AUTH_URL     = `${DTE_MH_BASE}/seguridad/auth`;
+const DTE_RECEPCION_URL = `${DTE_MH_BASE}/fesv/recepciondte`;
+const DTE_ANULACION_URL = `${DTE_MH_BASE}/fesv/anulardte`;
+
+// Firmador oficial de Hacienda (corre como contenedor/JAR local).
+const DTE_FIRMADOR_URL = process.env.DTE_FIRMADOR_URL || 'http://localhost:8113/firmardocumento/';
+
+// API credentials (MH portal). User = NIT del emisor por defecto.
+const DTE_API_USER = process.env.DTE_API_USER || null;
+const DTE_API_PWD  = process.env.DTE_API_PWD  || null;
+// Clave privada del certificado (para el firmador).
+const DTE_CERT_PWD = process.env.DTE_CERT_PWD || null;
+
+// Datos tributarios del emisor (Sillage). NIT/NRC ya los tienen.
+const DTE_EMISOR = {
+  nit:                 process.env.DTE_NIT  || null,            // 14 dígitos sin guiones
+  nrc:                 process.env.DTE_NRC  || null,            // sin guiones
+  nombre:              process.env.DTE_NOMBRE || 'Sillage Parfumerie',
+  nombreComercial:     process.env.DTE_NOMBRE_COMERCIAL || 'Sillage Parfumerie',
+  codActividad:        process.env.DTE_COD_ACTIVIDAD || '47730', // venta de perfumes/cosméticos
+  descActividad:       process.env.DTE_DESC_ACTIVIDAD || 'Venta al por menor de perfumes y cosméticos',
+  tipoEstablecimiento: process.env.DTE_TIPO_ESTABLECIMIENTO || '02', // 02 = casa matriz
+  // Dirección — códigos del catálogo MH (CAT-012 departamento, CAT-013 municipio).
+  departamento:        process.env.DTE_DEPARTAMENTO || '06',   // 06 = San Salvador
+  municipio:           process.env.DTE_MUNICIPIO    || '14',   // ej. San Salvador centro
+  complemento:         process.env.DTE_DIRECCION || 'San Salvador, El Salvador',
+  telefono:            process.env.DTE_TELEFONO || null,
+  correo:              process.env.DTE_CORREO || EMAIL_PEDIDOS,
+  // Códigos de establecimiento/punto de venta asignados por MH (pueden ir null).
+  codEstableMH:        process.env.DTE_COD_ESTABLE_MH    || null,
+  codEstable:          process.env.DTE_COD_ESTABLE       || null,
+  codPuntoVentaMH:     process.env.DTE_COD_PUNTOVENTA_MH || null,
+  codPuntoVenta:       process.env.DTE_COD_PUNTOVENTA    || null,
+};
+
 // ─── Admin ────────────────────────────────────────────────────────────────────
 const ADMIN_USER = process.env.ADMIN_USER?.trim() || null;
 const ADMIN_PASS = process.env.ADMIN_PASS?.trim() || null;
@@ -91,6 +138,9 @@ module.exports = {
   WOMPI_CLIENT_ID, WOMPI_CLIENT_SECRET, WOMPI_PUBLIC_KEY,
   OPENAI_API_KEY,
   ADMIN_USER, ADMIN_PASS,
+  DTE_ENABLED, DTE_AMBIENTE, DTE_MH_BASE,
+  DTE_AUTH_URL, DTE_RECEPCION_URL, DTE_ANULACION_URL,
+  DTE_FIRMADOR_URL, DTE_API_USER, DTE_API_PWD, DTE_CERT_PWD, DTE_EMISOR,
   CACHE_TTL_CATALOGUE, CACHE_TTL_INVENTORY, CACHE_TTL_PRICING,
   CACHE_TTL_TOOL, CACHE_TTL_REPLY,
   RATE_LIMIT_WINDOW, RATE_LIMIT_MAX,
