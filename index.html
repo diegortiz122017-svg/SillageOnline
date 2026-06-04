@@ -2,9 +2,6 @@
 <html lang="es">
 <head>
 <meta charset="UTF-8"/>
-  <meta name="theme-color" content="#0e0c0a"/>
-  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent"/>
-  <style>html,body{background:#0e0c0a}</style>
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate"/>
 <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
 <title>Sillage Parfumerie — Perfumes Originales en El Salvador</title>
@@ -8002,7 +7999,7 @@ function buildStoreCta(){
     var w = Math.round(100 * sc), h = Math.round(180 * sc);
     div.innerHTML =
       (p.photos && p.photos.length
-        ? '<img src="' + esc(cdnImg(p.photos[0], 300)) + '" alt="' + esc(p.brand+' '+p.name) + '" style="height:' + Math.round(180*sc) + 'px;max-width:120px;object-fit:contain;transform-origin:bottom center;display:block;"/>'
+        ? '<img src="' + esc(cdnImg(p.photos[0], 300)) + '" alt="' + esc(p.brand+' '+p.name) + '" style="width:' + Math.round(135*sc) + 'px;height:' + Math.round(243*sc) + 'px;object-fit:contain;transform-origin:bottom center;display:block;"/>'
         : '<div style="transform:scale(' + sc + ');transform-origin:bottom center">' + svg(p.c, p.s, 'lg') + '</div>') +
       '<div class="cta-bottle-label">' + esc(p.brand) + '</div>';
     bottleWrap.appendChild(div);
