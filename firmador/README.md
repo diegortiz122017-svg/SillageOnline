@@ -1,69 +1,61 @@
 # Firmador Electrónico MH — despliegue en Railway
 
 Servicio que firma los DTEs de Sillage con el certificado del Ministerio de
-Hacienda. Corre como un **servicio aparte** dentro del mismo proyecto Railway
-que la app Node, accesible **solo por red privada** (nunca público — contiene
-la llave privada del certificado).
+Hacienda (proyecto oficial `svfe-api-firmador` v2.0.0). Corre como un **servicio
+aparte** dentro del mismo proyecto Railway que la app Node, accesible **solo por
+red privada** (nunca público — contiene la llave privada del certificado).
 
-## 1. Conseguir el JAR del firmador
+El código fuente del firmador ya está en esta carpeta. **Railway lo compila solo**
+con Maven (Dockerfile multi-stage) — no necesitas descargar ni compilar nada.
 
-1. Entra a [factura.gob.sv](https://www.mh.gob.sv/facturacion-electronica/) →
-   sección **Documentos técnicos / Descargas**.
-2. Descarga el **Firmador Electrónico** (paquete oficial del MH, un JAR de
-   Spring Boot, suele llamarse `svfe-api-firmador.jar` o similar).
-3. Renómbralo a `firmador.jar` y colócalo en esta carpeta (`firmador/`).
+## 1. Crear el servicio en Railway
 
-> El JAR **no** se versiona en git (ver `.gitignore`). Cada quien lo descarga.
+1. En tu proyecto de Railway → **"+ New" → "GitHub Repo"** → elige el repo de Sillage.
+2. En el nuevo servicio → **Settings**:
+   - **Service Name**: `firmador` (importante — así lo llama el Node).
+   - **Root Directory**: `firmador`
+   - **Build**: detecta el `Dockerfile` automáticamente.
+3. **Deploy**. El primer build tarda varios minutos (compila Java con Maven).
+4. **No le asignes dominio público** (Settings → Networking → quita el dominio si
+   Railway generó uno). Solo red privada.
 
-## 2. Crear el servicio en Railway
+## 2. Variables del servicio firmador
 
-1. En tu proyecto de Railway → **New Service → Empty Service** (o "Deploy from
-   repo" apuntando al subdirectorio `firmador/`).
-2. En **Settings → Build**, usa el `Dockerfile` de esta carpeta
-   (Root Directory = `firmador`).
-3. Railway construye la imagen y levanta el firmador en el puerto `8113`.
-4. **NO** le asignes dominio público. Déjalo solo en red privada.
+En el servicio **firmador** → **Variables**:
 
-## 3. Subir el certificado (volumen)
+| Variable | Valor |
+|----------|-------|
+| `DTE_NIT` | `08230505261016` |
+| `DTE_CERT_B64` | *(todo el contenido del archivo `cert_b64.txt`)* |
 
-El firmador lee certificados desde `/firmador/uploads/{NIT}.crt`.
+El `entrypoint.sh` decodifica el certificado y lo escribe en
+`/firmador/uploads/08230505261016.crt` al arrancar.
 
-1. En el servicio del firmador → **Settings → Volumes** → crea un volumen
-   montado en `/firmador/uploads`.
-2. Sube el archivo del certificado **renombrado a tu NIT**:
-
-   ```
-   08230505261016.crt
-   ```
-
-   (es el `Certificado_08230505261016.crt` que descargaste del MH).
-
-## 4. Conectar la app Node al firmador
-
-En el servicio **Node (Sillage)**, agrega las variables de entorno:
+## 3. Variables del servicio Node (Sillage)
 
 ```bash
 DTE_ENABLED=true
-DTE_AMBIENTE=00                         # 00 = pruebas, 01 = producción
+DTE_AMBIENTE=00
 DTE_FIRMADOR_URL=http://firmador.railway.internal:8113/firmardocumento/
 DTE_CERT_PWD=qZ6+phx!qm%-4RnyVi          # clave privada del certificado
-DTE_API_USER=08230505261016             # NIT (ya es el default)
-DTE_API_PWD=<contraseña del API de transmisión MH>
+DTE_API_PWD=<contraseña del portal MH>   # misma con la que inicias sesión en Hacienda
 ```
 
-> `firmador.railway.internal` es el hostname privado del servicio — ajústalo al
-> nombre exacto que le pongas al servicio del firmador en Railway.
+(`DTE_API_USER` = NIT, ya es el default.)
 
-## 5. Probar
+## 4. Probar
 
-1. Redespliega el Node.
-2. Haz un pedido de prueba y márcalo como pagado.
-3. Revisa el panel admin → debería aparecer el DTE con estado `PROCESADO` y un
-   `selloRecibido`. Si queda en `CONTINGENCIA`, revisa los logs (firmador caído,
-   credenciales del API, o JSON rechazado por el MH).
+1. Revisa los **logs del firmador**: debe decir
+   `Certificado escrito en /firmador/uploads/08230505261016.crt` y arrancar en `:8113`.
+2. Haz un pedido de prueba y márcalo pagado (o usa el endpoint admin de DTE).
+3. En el panel admin debe aparecer el DTE con estado `PROCESADO` y `selloRecibido`.
+   Si queda en `CONTINGENCIA`, revisa los logs (firmador, `DTE_API_PWD`, o JSON
+   rechazado por el MH).
 
-## Notas de seguridad
+## Notas
 
-- El firmador **nunca** debe tener dominio público.
+- El firmador escucha en `8113` con perfil `nonssl` (HTTP plano, seguro porque
+  solo vive en la red privada de Railway).
 - La llave privada compartida durante el registro de pruebas debe **regenerarse**
   antes de pasar a producción (`DTE_AMBIENTE=01`).
+- Los esquemas JSON oficiales validados están en `../services/dte-schemas/`.

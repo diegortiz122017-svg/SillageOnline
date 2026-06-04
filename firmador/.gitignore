@@ -1,5 +1,7 @@
-# El JAR del firmador y los certificados NO se versionan — son binarios/secretos.
-firmador.jar
+# Certificados y llaves NUNCA se versionan (van como env var DTE_CERT_B64).
 *.crt
 *.key
 uploads/
+
+# Artefactos de compilación Maven (Railway los genera en el build).
+target/

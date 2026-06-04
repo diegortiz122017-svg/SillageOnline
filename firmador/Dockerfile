@@ -1,26 +1,29 @@
-# ── Firmador Electrónico del Ministerio de Hacienda (El Salvador) ─────────────
-# Servicio aparte que firma los DTEs con el certificado del emisor.
-# Corre en Railway como su propio servicio, accesible solo por red privada.
+# ── Firmador Electrónico del Ministerio de Hacienda (svfe-api-firmador 2.0.0) ──
+# Multi-stage: Railway compila el código fuente con Maven y luego corre el JAR.
+# No necesitas compilar nada localmente.
 #
-# IMPORTANTE: el JAR del firmador NO se incluye en este repo. Descárgalo del
-# portal oficial (factura.gob.sv → Documentos técnicos / Descargas → "Firmador")
-# y colócalo en esta carpeta como `firmador.jar` antes de construir la imagen.
-#
-# El certificado .crt tampoco va en la imagen — se monta por volumen de Railway
-# en /firmador/uploads (ver README.md).
+# El certificado .crt NO va en la imagen — el entrypoint lo escribe en
+# /firmador/uploads/{NIT}.crt desde la variable de entorno DTE_CERT_B64.
 
-FROM eclipse-temurin:17-jre-jammy
+# ── Stage 1: build con Maven ──────────────────────────────────────────────────
+FROM maven:3.9-amazoncorretto-21 AS build
+WORKDIR /build
+# Cache de dependencias: primero el pom, luego el código
+COPY pom.xml .
+RUN mvn -q -B dependency:go-offline || true
+COPY src ./src
+RUN mvn -q -B clean package -DskipTests
+# El pom genera el jar ejecutable con classifier "exec"
+RUN cp target/svfe-api-firmador-*-exec.jar /app.jar
 
+# ── Stage 2: runtime ──────────────────────────────────────────────────────────
+FROM amazoncorretto:21-alpine-jdk
 WORKDIR /firmador
-
-# El firmador lee los certificados desde ./uploads, nombrados {NIT}.crt
+ENV TZ=America/El_Salvador
+# El firmador lee el certificado desde {workdir}/uploads/{NIT}.crt
 RUN mkdir -p /firmador/uploads
-
-# JAR oficial del firmador (debes colocarlo en firmador/firmador.jar)
-COPY firmador.jar /firmador/firmador.jar
-
-# Puerto interno del firmador (no se expone públicamente en Railway)
+COPY --from=build /app.jar /firmador/app.jar
+COPY entrypoint.sh /firmador/entrypoint.sh
+RUN chmod +x /firmador/entrypoint.sh
 EXPOSE 8113
-
-# Railway inyecta $PORT, pero el firmador usa 8113 fijo internamente.
-ENTRYPOINT ["java", "-jar", "/firmador/firmador.jar"]
+ENTRYPOINT ["/firmador/entrypoint.sh"]
