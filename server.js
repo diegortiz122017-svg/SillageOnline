@@ -163,6 +163,48 @@ async function initDB() {
   `);
 
   await db.execute(`
+    CREATE TABLE IF NOT EXISTS products (
+      id                INT PRIMARY KEY,
+      brand             VARCHAR(255)  NOT NULL DEFAULT '',
+      name              VARCHAR(255)  NOT NULL DEFAULT '',
+      gender            CHAR(1)       NOT NULL DEFAULT 'U',
+      price             DECIMAL(10,2) NOT NULL DEFAULT 0,
+      decant_price      DECIMAL(10,2) DEFAULT NULL,
+      decant_price_5    DECIMAL(10,2) DEFAULT NULL,
+      decant_size_ml    DECIMAL(6,2)  DEFAULT NULL,
+      size              VARCHAR(50)   DEFAULT NULL,
+      badge             VARCHAR(50)   DEFAULT NULL,
+      luxury            TINYINT(1)    NOT NULL DEFAULT 0,
+      olfactive_family  VARCHAR(100)  DEFAULT NULL,
+      arrived_at        DATE          DEFAULT NULL,
+      notify_subscribers TINYINT(1)  NOT NULL DEFAULT 0,
+      notes             TEXT          DEFAULT NULL,
+      top_notes         TEXT          DEFAULT NULL,
+      mid_notes         TEXT          DEFAULT NULL,
+      base_notes        TEXT          DEFAULT NULL,
+      top_intensity     INT           NOT NULL DEFAULT 30,
+      mid_intensity     INT           NOT NULL DEFAULT 30,
+      base_intensity    INT           NOT NULL DEFAULT 30,
+      tagline           TEXT          DEFAULT NULL,
+      description       TEXT          DEFAULT NULL,
+      concentration     VARCHAR(100)  DEFAULT NULL,
+      season            VARCHAR(100)  DEFAULT NULL,
+      sillage           VARCHAR(100)  DEFAULT NULL,
+      longevity         VARCHAR(100)  DEFAULT NULL,
+      colors            JSON          DEFAULT NULL,
+      shape             VARCHAR(100)  DEFAULT NULL,
+      photos            JSON          DEFAULT NULL,
+      chords            JSON          DEFAULT NULL,
+      chords_override   JSON          DEFAULT NULL,
+      sort_order        INT           NOT NULL DEFAULT 0,
+      active            TINYINT(1)    NOT NULL DEFAULT 1,
+      created_at        DATETIME      NOT NULL,
+      updated_at        DATETIME      NOT NULL,
+      INDEX idx_active_sort (active, sort_order ASC, id ASC)
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
+  `);
+
+  await db.execute(`
     CREATE TABLE IF NOT EXISTS scent_profiles (
       id          INT AUTO_INCREMENT PRIMARY KEY,
       customer_id INT DEFAULT NULL,
@@ -5009,51 +5051,54 @@ app.delete('/api/bundles/:id', requireAdmin, async (req, res) => {
   res.json({ ok: true });
 });
 // ─── Catalogue routes ─────────────────────────────────
-app.post('/api/catalogue', requireAdmin, async (req, res) => {
-  const catalogue = await getCatalogue();
-  const maxId = catalogue.reduce((m, p) => Math.max(m, p.id || 0), 0);
-  const newFrag = { ...req.body, id: maxId + 1, ...calcIntensity(req.body) };
-  // Auto-generate chords unless manually overridden
-  if (!newFrag.chords_override) {
-    newFrag.chords = calcChords(newFrag);
-  }
-  catalogue.push(newFrag);
-  await saveCatalogue(catalogue);
-  broadcast('catalogue', catalogue);
-  await logActivity(`Fragancia agregada: ${newFrag.brand} ${newFrag.name}`);
-
-  // Auto-create bottle_inventory record for this new fragrance (ml=0, ready to configure)
+app.post('/api/catalogue', requireAdmin, async (req, res, next) => {
   try {
-    const sizeStr    = String(newFrag.size || '');
-    const sizeMatch  = sizeStr.match(/([\d.]+)\s*ml/i);
-    const bottleSize = sizeMatch ? parseFloat(sizeMatch[1]) : 100;
-    await db.execute(`
-      INSERT IGNORE INTO bottle_inventory
-        (product_id, ml_total, ml_remaining, ml_reserved, decant_size, sample_size, alert_ml, bottles_count, bottle_size, notes, updated_at)
-      VALUES (?, 0, 0, 0, 5, 1.5, ?, 0, ?, '', ?)
-    `, [newFrag.id, Math.max(10, bottleSize * 0.15), bottleSize, new Date()]);
-  } catch(e) { /* non-fatal */ }
+    const catalogue = await getCatalogue();
+    const maxId = catalogue.reduce((m, p) => Math.max(m, p.id || 0), 0);
+    const newFrag = { ...req.body, id: maxId + 1, ...calcIntensity(req.body) };
+    if (!newFrag.chords_override) {
+      newFrag.chords = calcChords(newFrag);
+    }
+    catalogue.push(newFrag);
+    await saveCatalogue(catalogue);
+    broadcast('catalogue', catalogue);
+    logActivity(`Fragancia agregada: ${newFrag.brand} ${newFrag.name}`).catch(() => {});
 
-  res.json({ ok: true, fragrance: newFrag });
+    // Auto-create bottle_inventory record for this new fragrance (ml=0, ready to configure)
+    try {
+      const sizeStr    = String(newFrag.size || '');
+      const sizeMatch  = sizeStr.match(/([\d.]+)\s*ml/i);
+      const bottleSize = sizeMatch ? parseFloat(sizeMatch[1]) : 100;
+      await db.execute(`
+        INSERT IGNORE INTO bottle_inventory
+          (product_id, ml_total, ml_remaining, ml_reserved, decant_size, sample_size, alert_ml, bottles_count, bottle_size, notes, updated_at)
+        VALUES (?, 0, 0, 0, 5, 1.5, ?, 0, ?, '', ?)
+      `, [newFrag.id, Math.max(10, bottleSize * 0.15), bottleSize, new Date()]);
+    } catch(e) { /* non-fatal */ }
+
+    res.json({ ok: true, fragrance: newFrag });
+  } catch(e) { next(e); }
 });
 
-app.put('/api/catalogue/:id', requireAdmin, async (req, res) => {
-  const id = parseInt(req.params.id, 10);
-  const catalogue = await getCatalogue();
-  const idx = catalogue.findIndex(p => p.id === id);
-  if (idx === -1) return res.status(404).json({ error: 'Fragancia no encontrada' });
-  catalogue[idx] = { ...req.body, id, ...calcIntensity(req.body) };
-  // Recalculate chords unless manually overridden
-  if (!catalogue[idx].chords_override) {
-    catalogue[idx].chords = calcChords(catalogue[idx]);
-  }
-  await saveCatalogue(catalogue);
-  broadcast('catalogue', catalogue);
-  await logActivity(`Fragancia actualizada: ${catalogue[idx].brand} ${catalogue[idx].name}`);
-  res.json({ ok: true, fragrance: catalogue[idx] });
+app.put('/api/catalogue/:id', requireAdmin, async (req, res, next) => {
+  try {
+    const id = parseInt(req.params.id, 10);
+    const catalogue = await getCatalogue();
+    const idx = catalogue.findIndex(p => p.id === id);
+    if (idx === -1) return res.status(404).json({ error: 'Fragancia no encontrada' });
+    catalogue[idx] = { ...req.body, id, ...calcIntensity(req.body) };
+    if (!catalogue[idx].chords_override) {
+      catalogue[idx].chords = calcChords(catalogue[idx]);
+    }
+    await saveCatalogue(catalogue);
+    broadcast('catalogue', catalogue);
+    logActivity(`Fragancia actualizada: ${catalogue[idx].brand} ${catalogue[idx].name}`).catch(() => {});
+    res.json({ ok: true, fragrance: catalogue[idx] });
+  } catch(e) { next(e); }
 });
 
-app.delete('/api/catalogue/:id', requireAdmin, async (req, res) => {
+app.delete('/api/catalogue/:id', requireAdmin, async (req, res, next) => {
+  try {
   const id = parseInt(req.params.id, 10);
   const catalogue = await getCatalogue();
   const frag = catalogue.find(p => p.id === id);
@@ -5061,8 +5106,9 @@ app.delete('/api/catalogue/:id', requireAdmin, async (req, res) => {
   await deleteProduct(id);
   const updated = catalogue.filter(p => p.id !== id);
   broadcast('catalogue', updated);
-  await logActivity(`Fragancia eliminada: ${frag.brand} ${frag.name}`);
+  logActivity(`Fragancia eliminada: ${frag.brand} ${frag.name}`).catch(() => {});
   res.json({ ok: true });
+  } catch(e) { next(e); }
 });
 
 // ── ADMIN NOTIFICATION EMAILS ────────────────────────────────────────────────
