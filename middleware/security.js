@@ -63,10 +63,7 @@ const _rlStore = new Map();
 
 function rateLimit({ max = cfg.RATE_LIMIT_MAX, window = cfg.RATE_LIMIT_WINDOW } = {}) {
   return (req, res, next) => {
-    const forwarded = req.headers['x-forwarded-for'];
-    const ip = forwarded
-      ? forwarded.split(',').map(s => s.trim()).pop()
-      : req.socket.remoteAddress;
+    const ip = getIp(req);   // real per-user client IP (see getIp below)
 
     const now   = Date.now();
     const entry = _rlStore.get(ip) || { count: 0, start: now };
@@ -98,11 +95,18 @@ setInterval(() => {
 const bodyLimit = '50kb';
 
 // ─── IP extraction helper ─────────────────────────────────────────────────────
+// Returns the REAL client IP so rate-limit buckets are per-user, not per-proxy.
+// Behind Cloudflare, CF-Connecting-IP holds the genuine client IP (Cloudflare
+// overwrites any client-supplied value, so it can't be spoofed). Fall back to the
+// FIRST x-forwarded-for entry (the original client), then the socket address.
+// NOTE: using the LAST x-forwarded-for entry (the previous behaviour) returned the
+// proxy/edge IP — identical for every visitor — so all users shared ONE bucket.
 function getIp(req) {
+  const cf = req.headers['cf-connecting-ip'];
+  if (cf) return cf.trim();
   const forwarded = req.headers['x-forwarded-for'];
-  return forwarded
-    ? forwarded.split(',').map(s => s.trim()).pop()
-    : req.socket.remoteAddress;
+  if (forwarded) return forwarded.split(',')[0].trim();
+  return req.socket.remoteAddress;
 }
 
 // Customer auth limiter — keyed by EMAIL not IP.

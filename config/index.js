@@ -114,7 +114,7 @@ const CACHE_TTL_REPLY      = 60 * 60 * 1000;  // 60 min (Nez reply cache)
 
 // ─── Rate limiting ────────────────────────────────────────────────────────────
 const RATE_LIMIT_WINDOW    = 15 * 60 * 1000;  // 15 min
-const RATE_LIMIT_MAX       = 100;
+const RATE_LIMIT_MAX       = 400;             // per real client IP (≈27 req/min) — a SPA session makes many API calls
 const ANON_SESSION_TTL     = 60 * 60 * 1000;  // 60 min
 const ANON_WS_LIMIT        = 3;
 const ANON_SOMMELIER_MAX   = 2;

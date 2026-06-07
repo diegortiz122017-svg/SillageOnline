@@ -986,8 +986,7 @@ function rateLimit(max, windowMs) {
   }, 10 * 60 * 1000).unref();
 
   return function(req, res, next) {
-    const fwd = req.headers['x-forwarded-for'];
-    const ip  = fwd ? fwd.split(',').map(s => s.trim()).pop() : req.socket.remoteAddress;
+    const ip  = getIp(req);   // real per-user client IP (CF-Connecting-IP aware)
     const now = Date.now();
     const rec = store.get(ip) || { count: 0, start: now };
     if (now - rec.start > windowMs) { rec.count = 0; rec.start = now; }
@@ -1217,11 +1216,13 @@ app.use(express.json({
 }));
 app.use(security.securityHeaders);
 app.use(function(req, res, next) {
-  // Skip global rate limit for authenticated admin API calls
-  const adminToken = req.headers['x-admin-token'];
-  if (adminToken && req.path.startsWith('/api/')) return next();
+  // Only rate-limit API calls — page loads, images and static assets must NOT
+  // count against the budget (they'd exhaust it on a single visit).
+  if (!req.path.startsWith('/api/')) return next();
+  // Authenticated admin API calls are exempt.
+  if (req.headers['x-admin-token']) return next();
   return security.rateLimit()(req, res, next);
-});                                                    // global rate limit (admin exempt)
+});                                                    // global rate limit (/api only, admin exempt)
 
 // Additional security headers not covered by middleware
 app.use(function(req, res, next) {
