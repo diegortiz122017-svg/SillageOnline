@@ -4885,6 +4885,23 @@ app.get('/api/sommelier/profile', async (req, res) => {
     res.json({ profile: null });
   }
 });
+
+// DELETE /api/sommelier/profile — clear the saved scent profile (so "Restablecer"
+// actually sticks across reloads, not just in localStorage).
+app.delete('/api/sommelier/profile', async (req, res) => {
+  const customerToken   = req.headers['x-customer-token'];
+  const customerSession = customerToken ? validateSession(customerToken) : null;
+  const customerId      = (customerSession && customerSession.role === 'customer') ? customerSession.user.id : null;
+  const sessionId       = req.headers['x-session-id'] || req.query.sessionId;
+  try {
+    if (customerId)      await db.execute('DELETE FROM scent_profiles WHERE customer_id=?', [customerId]);
+    else if (sessionId)  await db.execute('DELETE FROM scent_profiles WHERE session_id=? AND customer_id IS NULL', [sessionId]);
+    res.json({ ok: true });
+  } catch(e) {
+    console.error('Clear profile error:', e.message);
+    res.status(500).json({ error: 'Error clearing profile' });
+  }
+});
 // ─── Bundle Routes ────────────────────────────────────
 
 // ── COLLECTIONS ────────────────────────────────────────────────────────────
