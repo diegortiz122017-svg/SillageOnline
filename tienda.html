@@ -2713,7 +2713,7 @@ function loadViaREST() {
       var _match = (P||[]).find(function(p){ return slugify(p.brand+'-'+p.name) === _slug; });
       if(_match){
         setTimeout(function(){ openDetail(_match.id); }, 400);
-        window.history.replaceState(null, '', '/');
+        window.history.replaceState(null, '', '/tienda');
       }
     }
     var _urlBundle = new URLSearchParams(window.location.search).get('bundle');
@@ -2733,7 +2733,7 @@ function loadViaREST() {
         var found = (window._allBundles||[]).find(function(b){ return slugify(b.name) === _bslug; });
         if(found) openBundleDetail(found);
       }, 700);
-      window.history.replaceState(null, '', '/');
+      window.history.replaceState(null, '', '/tienda');
     }
   }).catch(function() {
     setConn('offline', 'Sin conexión');
@@ -3983,7 +3983,7 @@ function closeDetail(){
   document.body.style.overflow='';
   // Restore base URL
   if(window.history.state && window.history.state.producto){
-    window.history.pushState({}, '', '/');
+    window.history.pushState({}, '', '/tienda');
   }
 }
 document.getElementById('backBtn').addEventListener('click',closeDetail);
@@ -5043,7 +5043,7 @@ function openBundleDetail(b){
 function closeBundleDetail(){
   document.getElementById('bundleDetailOverlay').classList.remove('open');
   if(window.history.state && window.history.state.bundle){
-    window.history.pushState({}, '', '/');
+    window.history.pushState({}, '', '/tienda');
   }
 }
 

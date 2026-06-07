@@ -1378,22 +1378,24 @@ app.get('/envios', (req, res) => res.sendFile(path.join(__dirname, 'envios.html'
 app.get('/terminos', (req, res) => res.sendFile(path.join(__dirname, 'terminos.html')));
 app.get('/devoluciones', (req, res) => res.sendFile(path.join(__dirname, 'devoluciones.html')));
 
-// Shared product and bundle links — serve index.html so JS can open the detail overlay
+// Shared product and bundle links — serve tienda.html (it has the catalogue +
+// openDetail). index.html is the editorial home and has NO product grid, so it
+// can't open the detail — serving it made reloads/shares land on the home page.
 app.get('/fragancia/:slug', (req, res) => {
-  const fs    = require('fs');
-  const index = path.join(__dirname, 'index.html');
-  const store = path.join(__dirname, 'store.html');
-  if (fs.existsSync(index)) return res.sendFile(index);
-  if (fs.existsSync(store)) return res.sendFile(store);
+  const fs     = require('fs');
+  const tienda = path.join(__dirname, 'tienda.html');
+  const index  = path.join(__dirname, 'index.html');
+  if (fs.existsSync(tienda)) return res.sendFile(tienda);
+  if (fs.existsSync(index))  return res.sendFile(index);
   res.redirect('/');
 });
 
 app.get('/bundle/:slug', (req, res) => {
-  const fs    = require('fs');
-  const index = path.join(__dirname, 'index.html');
-  const store = path.join(__dirname, 'store.html');
-  if (fs.existsSync(index)) return res.sendFile(index);
-  if (fs.existsSync(store)) return res.sendFile(store);
+  const fs     = require('fs');
+  const tienda = path.join(__dirname, 'tienda.html');
+  const index  = path.join(__dirname, 'index.html');
+  if (fs.existsSync(tienda)) return res.sendFile(tienda);
+  if (fs.existsSync(index))  return res.sendFile(index);
   res.redirect('/');
 });
 app.get('/privacidad', (req, res) => {
