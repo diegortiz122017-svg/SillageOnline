@@ -1300,33 +1300,88 @@ footer{background:var(--dark);padding:3.5rem 4rem;text-align:center;border-top:1
 /* ── MOBILE NAV BAR ── */
 .mob-nav{display:none}
 @media(max-width:680px){
-  .mob-nav{
-    display:flex;position:sticky;bottom:0;left:0;right:0;z-index:499;
-    background:rgba(14,12,10,0.97);border-top:1px solid rgba(184,149,90,0.15);
-    backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px);
-    padding:0.5rem 0 calc(0.5rem + env(safe-area-inset-bottom));
-    justify-content:space-around;align-items:center;
-  }
-  .mob-nav-btn{
-    display:flex;flex-direction:column;align-items:center;gap:0.2rem;
-    background:none;border:none;color:var(--muted);cursor:pointer;
-    font-family:'Jost',sans-serif;font-size:0.48rem;letter-spacing:0.12em;
-    text-transform:uppercase;padding:0.3rem 0.8rem;
-    transition:color 0.2s;-webkit-tap-highlight-color:transparent;
-    text-decoration:none;
-  }
-  .mob-nav-btn:hover,.mob-nav-btn:active{color:var(--gold)}
-  .mob-nav-icon{font-size:1.2rem;line-height:1;margin-bottom:0.1rem}
-  .mob-nav-icon svg{width:20px;height:20px;stroke:currentColor}
-  /* Push page content up so it's not hidden behind nav + FAB */
-  body{padding-bottom:calc(64px + 80px + env(safe-area-inset-bottom))}
-  /* FAB sits above the nav bar with comfortable clearance */
-  .cart-fab{bottom:calc(4.5rem + env(safe-area-inset-bottom))}
+  /* Bottom nav removed — navigation now lives in the burger drawer (below).
+     #mobNav stays in the DOM (hidden) so scroll-handlers don't break. */
+  .mob-nav{display:none !important}
+  /* FAB now rests at the bottom edge — no nav bar above it anymore */
+  .cart-fab{bottom:calc(1.3rem + env(safe-area-inset-bottom))}
 }
 
 /* Keep cart-btn visible on tablets where nav is hidden but FAB isn't shown */
 @media(min-width:481px) and (max-width:680px){
   .cart-btn{display:flex !important}
+}
+
+/* ── BURGER + MOBILE DRAWER (Dior-style: burger left · logo center · cart right) ── */
+.burger{display:none}
+.drawer-scrim{
+  position:fixed;inset:0;z-index:600;
+  background:rgba(8,7,6,0.55);
+  opacity:0;pointer-events:none;
+  transition:opacity 260ms cubic-bezier(0.23,1,0.32,1);
+  -webkit-backdrop-filter:blur(2px);backdrop-filter:blur(2px);
+}
+.drawer-scrim.open{opacity:1;pointer-events:auto}
+.drawer{
+  position:fixed;top:0;left:0;bottom:0;z-index:601;
+  width:min(80vw,340px);
+  display:flex;flex-direction:column;
+  background:rgba(14,12,10,0.985);border-right:1px solid var(--border);
+  -webkit-backdrop-filter:blur(16px);backdrop-filter:blur(16px);
+  padding-top:env(safe-area-inset-top);padding-bottom:env(safe-area-inset-bottom);
+  transform:translateX(-100%);
+  transition:transform 360ms cubic-bezier(0.32,0.72,0,1);
+  will-change:transform;
+}
+.drawer-scrim.open .drawer{transform:translateX(0)}
+.drawer-head{display:flex;align-items:center;justify-content:space-between;padding:1.5rem 1.6rem 1.3rem;border-bottom:1px solid var(--border-light)}
+.drawer-logo{font-family:'Cormorant Garamond',serif;font-size:1.5rem;font-weight:300;letter-spacing:0.3em;color:var(--gold);text-transform:uppercase}
+.drawer-close{background:none;border:none;color:var(--muted);cursor:pointer;width:34px;height:34px;display:flex;align-items:center;justify-content:center;transition:transform 160ms cubic-bezier(0.23,1,0.32,1),color 0.2s;-webkit-tap-highlight-color:transparent}
+.drawer-close:active{transform:scale(0.9)}
+.drawer-close:hover{color:var(--gold)}
+.drawer-close svg{width:20px;height:20px}
+.drawer-links{display:flex;flex-direction:column;padding:0.8rem 0;flex:1;overflow-y:auto}
+.drawer-link{
+  display:flex;align-items:center;gap:1.1rem;
+  padding:1.05rem 1.7rem;
+  font-family:'Jost',sans-serif;font-size:0.78rem;letter-spacing:0.2em;text-transform:uppercase;
+  color:var(--cream);text-decoration:none;background:none;border:none;cursor:pointer;text-align:left;width:100%;
+  transition:color 0.2s,background 0.2s;
+  opacity:0;transform:translateX(-14px);
+}
+.drawer-link svg{width:18px;height:18px;stroke:currentColor;opacity:0.65;flex-shrink:0}
+.drawer-link:hover{color:var(--gold)}
+.drawer-link:active{background:rgba(184,149,90,0.08)}
+.drawer-scrim.open .drawer-link{
+  opacity:1;transform:translateX(0);
+  transition:opacity 340ms ease-out,transform 340ms cubic-bezier(0.23,1,0.32,1);
+}
+.drawer-scrim.open .drawer-link:nth-child(1){transition-delay:70ms}
+.drawer-scrim.open .drawer-link:nth-child(2){transition-delay:105ms}
+.drawer-scrim.open .drawer-link:nth-child(3){transition-delay:140ms}
+.drawer-scrim.open .drawer-link:nth-child(4){transition-delay:175ms}
+.drawer-scrim.open .drawer-link:nth-child(5){transition-delay:210ms}
+.drawer-scrim.open .drawer-link:nth-child(6){transition-delay:245ms}
+.drawer-foot{padding:1.1rem 1.7rem calc(1.1rem + 0.2vh);border-top:1px solid var(--border-light);font-size:0.55rem;letter-spacing:0.18em;text-transform:uppercase;color:var(--muted)}
+@media(prefers-reduced-motion:reduce){
+  .drawer{transition:transform 200ms ease}
+  .drawer-scrim{transition:opacity 200ms ease}
+  .drawer-scrim.open .drawer-link{transform:none;transition:opacity 200ms ease;transition-delay:0ms}
+}
+@media(max-width:768px){
+  .burger{
+    display:flex;align-items:center;justify-content:center;
+    width:40px;height:40px;flex:0 0 auto;margin-left:-0.3rem;
+    background:none;border:none;cursor:pointer;color:var(--cream);
+    -webkit-tap-highlight-color:transparent;
+    transition:transform 160ms cubic-bezier(0.23,1,0.32,1);
+  }
+  .burger:active{transform:scale(0.9)}
+  .burger svg{width:22px;height:22px}
+  .logo{flex:1;text-align:center}
+  .header-right{flex:0 0 auto;min-width:40px;justify-content:flex-end;gap:0.5rem}
+  .conn-indicator{display:none}
+  #customerArea{display:none}
 }
 
 /* ── SHIPPING ── */
@@ -1972,6 +2027,9 @@ footer{background:var(--dark);padding:3.5rem 4rem;text-align:center;border-top:1
 <body>
 
 <header>
+  <button class="burger" id="burgerBtn" aria-label="Abrir menú" onclick="openDrawer()">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/></svg>
+  </button>
   <a href="/" class="logo" style="text-decoration:none">Silla<span>ge</span></a>
   <nav>
     <a href="/">Inicio</a>
@@ -1996,6 +2054,45 @@ footer{background:var(--dark);padding:3.5rem 4rem;text-align:center;border-top:1
   <svg class="cart-fab-icon" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" style="pointer-events:none"><path d="M6 2L3 6v14a2 2 0 002 2h14a2 2 0 002-2V6l-3-4z"/><line x1="3" y1="6" x2="21" y2="6"/><path d="M16 10a4 4 0 01-8 0"/></svg>
   <span class="cart-fab-count" id="cartFabCount">0</span>
 </button>
+
+<!-- MOBILE NAV DRAWER (burger) -->
+<div class="drawer-scrim" id="drawerScrim" onclick="if(event.target===this)closeDrawer()">
+  <aside class="drawer" role="dialog" aria-label="Menú" aria-modal="true">
+    <div class="drawer-head">
+      <span class="drawer-logo">Sillage</span>
+      <button class="drawer-close" aria-label="Cerrar menú" onclick="closeDrawer()">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+      </button>
+    </div>
+    <nav class="drawer-links">
+      <a class="drawer-link" href="/" onclick="closeDrawer()">
+        <svg viewBox="0 0 24 24" fill="none" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>
+        Inicio
+      </a>
+      <button class="drawer-link" onclick="closeDrawer();openCollections()">
+        <svg viewBox="0 0 24 24" fill="none" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg>
+        Colecciones
+      </button>
+      <a class="drawer-link" href="/tienda" onclick="closeDrawer()">
+        <svg viewBox="0 0 24 24" fill="none" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+        Tienda
+      </a>
+      <button class="drawer-link" onclick="closeDrawer();openSommelierModal()">
+        <svg viewBox="0 0 24 24" fill="none" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2a7 7 0 00-7 7c0 3 2 5 2 7h10c0-2 2-4 2-7a7 7 0 00-7-7z"/><line x1="9" y1="21" x2="15" y2="21"/></svg>
+        Nez &mdash; Sommelier
+      </button>
+      <a class="drawer-link" href="/nosotros" onclick="closeDrawer()">
+        <svg viewBox="0 0 24 24" fill="none" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg>
+        Nosotros
+      </a>
+      <button class="drawer-link" onclick="closeDrawer();(typeof currentCustomer!=='undefined'&&currentCustomer?openAccount():openAuth('login'))">
+        <svg viewBox="0 0 24 24" fill="none" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 00-4-4H8a4 4 0 00-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+        <span id="drawerUser">Cuenta</span>
+      </button>
+    </nav>
+    <div class="drawer-foot">Sillage Parfumerie &middot; El Salvador</div>
+  </aside>
+</div>
 
 <section class="tienda-header" id="home">
   <div class="tienda-header-inner">
@@ -2902,6 +2999,27 @@ function injectProductSchema(products) {
   script.textContent = JSON.stringify(schema);
   document.head.appendChild(script);
 }
+
+// ── Mobile nav drawer (burger) ───────────────────────────────────────────────
+function openDrawer(){
+  var s = document.getElementById('drawerScrim');
+  if(!s) return;
+  var u = document.getElementById('drawerUser');
+  if(u && typeof currentCustomer!=='undefined' && currentCustomer){
+    u.textContent = (currentCustomer.name||'Mi cuenta').split(' ')[0];
+  }
+  s.classList.add('open');
+  document.body.style.overflow = 'hidden';
+}
+function closeDrawer(){
+  var s = document.getElementById('drawerScrim');
+  if(!s) return;
+  s.classList.remove('open');
+  document.body.style.overflow = '';
+}
+document.addEventListener('keydown', function(e){
+  if(e.key === 'Escape') closeDrawer();
+});
 
 // ── FAB visibility: hide on hero, show when catalogue scrolls into view ──────
 (function(){
