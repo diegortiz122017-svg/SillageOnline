@@ -1424,8 +1424,8 @@ footer{background:var(--dark);padding:3.5rem 4rem;text-align:center;border-top:1
   color:var(--muted);display:block;margin-bottom:0.2rem}
 .size-opt.active .so-label{color:var(--gold)}
 .size-opt .so-size{font-size:0.75rem;color:var(--charcoal);display:block;margin-bottom:0.15rem}
-.size-opt .so-price{font-family:Cormorant Garamond,serif;font-size:1.1rem;color:var(--charcoal)}
-.size-opt.active .so-price{color:var(--gold)}
+.size-opt .so-price{font-family:Cormorant Garamond,serif;font-size:1.15rem;font-weight:600;color:var(--charcoal)}
+.size-opt.active .so-price{color:#8a6a2a}
 .decant-note{font-size:0.6rem;color:var(--muted);margin-bottom:1rem;line-height:1.6;
   padding:0.5rem 0.7rem;background:rgba(184,149,90,0.05);
   border-left:2px solid rgba(184,149,90,0.3)}
@@ -2111,7 +2111,7 @@ footer{background:var(--dark);padding:3.5rem 4rem;text-align:center;border-top:1
       </div>
       <div class="tpz-actions">
         <button class="tpz-btn tpz-refine" onclick="openSommelierModal()">Refinar</button>
-        <button class="tpz-btn tpz-reset" onclick="resetScentProfile();renderTiendaProfile()">Restablecer</button>
+        <button class="tpz-btn tpz-reset" onclick="resetSommelierProfile();renderTiendaProfile()">Restablecer</button>
       </div>
     </div>
     <!-- No-profile invite -->
@@ -3849,19 +3849,25 @@ function openDetail(pid){
       setTimeout(function(){ openAuth('register'); }, 800);
       return;
     }
-    var favs = getFavs();
-    var fi   = favs.indexOf(pid);
-    if(fi === -1){ favs.push(pid); }
-    else { favs.splice(fi, 1); }
-    saveFavs(favs);
-    var saved = isFav(pid);
-    // Sync both buttons
+    // Logged in — toggle in the DB optimistically (igual que los corazones de las tarjetas)
+    var wasAdded = !isFav(pid);
+    if(_dbFavs){ if(wasAdded) _dbFavs.add(+pid); else _dbFavs.delete(+pid); }
     var btn1 = document.getElementById('dWishBtn');
     var btn2 = document.getElementById('dWishMob');
-    var lbl  = document.getElementById('dWishMobLbl') || (btn2 && btn2.nextElementSibling);
-    if(btn1){ btn1.classList.toggle('on',saved); btn1.textContent=saved?'♥':'♡'; }
-    if(btn2){ btn2.classList.toggle('saved',saved); btn2.textContent=saved?'♥ En favoritos':'♡ Guardar'; }
-    if(saved) toast(esc(p.brand+' '+p.name),'Añadido a favoritos','ok');
+    function paintWish(s){
+      if(btn1){ btn1.classList.toggle('on',s); btn1.textContent=s?'♥':'♡'; }
+      if(btn2){ btn2.classList.toggle('saved',s); btn2.textContent=s?'♥ En favoritos':'♡ Guardar'; }
+    }
+    paintWish(isFav(pid));
+    if(wasAdded) toast(esc(p.brand+' '+p.name),'Añadido a favoritos','ok');
+    customerFetch(API+'/customer/favorites', {
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({ productId: pid })
+    }).catch(function(){
+      // Rollback on error
+      if(_dbFavs){ if(wasAdded) _dbFavs.delete(+pid); else _dbFavs.add(+pid); }
+      paintWish(isFav(pid));
+    });
   }
   document.getElementById('dWishBtn').addEventListener('click', toggleWish);
   var mobWish = document.getElementById('dWishMob');
@@ -6277,7 +6283,7 @@ function toggleFav(e, pid){
     if(idx === -1){ favs.push(+pid); toast('Guardado','A\u00f1adido a favoritos','ok'); }
     else          { favs.splice(idx,1); }
     saveFavs(favs);
-    var btn = e.currentTarget;
+    var btn = (e && e.currentTarget) || document.createElement('button'); // dummy si no hay target (ej. quitar desde favoritos)
     btn.classList.toggle('saved', isFav(pid));
     btn.textContent = isFav(pid) ? '\u2665' : '\u2661';
     return;
@@ -6285,7 +6291,7 @@ function toggleFav(e, pid){
   // Logged in — toggle in DB optimistically
   var wasAdded = !isFav(pid);
   if(_dbFavs){ if(wasAdded) _dbFavs.add(+pid); else _dbFavs.delete(+pid); }
-  var btn = e.currentTarget;
+  var btn = (e && e.currentTarget) || document.createElement('button'); // dummy si no hay target (ej. quitar desde favoritos)
   btn.classList.toggle('saved', isFav(pid));
   btn.textContent = isFav(pid) ? '\u2665' : '\u2661';
   if(wasAdded) toast('','A\u00f1adido a favoritos','ok');
