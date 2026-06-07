@@ -5010,15 +5010,17 @@ app.delete('/api/bundles/:id', requireAdmin, async (req, res) => {
 });
 // ─── Catalogue routes ─────────────────────────────────
 app.post('/api/catalogue', requireAdmin, async (req, res) => {
-  const catalogue = await getCatalogue();
-  const maxId = catalogue.reduce((m, p) => Math.max(m, p.id || 0), 0);
-  const newFrag = { ...req.body, id: maxId + 1, ...calcIntensity(req.body) };
+  const newFrag = { ...req.body, ...calcIntensity(req.body) };
   // Auto-generate chords unless manually overridden
   if (!newFrag.chords_override) {
     newFrag.chords = calcChords(newFrag);
   }
-  catalogue.push(newFrag);
-  await saveCatalogue(catalogue);
+  // Use addProduct: assigns id = MAX(id)+1 over ALL products (incl. soft-deleted
+  // active=0 rows), avoiding id collisions that would silently leave the new
+  // product inactive/invisible. Also inserts a single row instead of re-upserting all.
+  const newId = await catalogueSvc.addProduct(newFrag);
+  newFrag.id = newId;
+  const catalogue = await getCatalogue();
   broadcast('catalogue', catalogue);
   await logActivity(`Fragancia agregada: ${newFrag.brand} ${newFrag.name}`);
 
