@@ -294,9 +294,9 @@ nav a:hover{color:var(--gold)}
 .d-add-btn{flex:1;padding:0.9rem;background:var(--gold);border:none;color:var(--dark);font-family:'Jost',sans-serif;font-size:0.68rem;letter-spacing:0.22em;text-transform:uppercase;cursor:pointer;transition:background 0.3s;font-weight:500}
 .d-add-btn:hover{background:var(--gold-light)}
 .d-add-btn:disabled{background:#ccc;cursor:not-allowed}
-.d-wish-btn{width:46px;border:1px solid var(--border);background:transparent;display:flex;align-items:center;justify-content:center;cursor:pointer;font-size:1rem;transition:all 0.3s}
-.d-wish-btn:hover{border-color:var(--gold)}
-.d-wish-btn.on{color:#e06060;border-color:#e06060}
+.d-wish-btn{width:46px;border:1px solid var(--gold);background:transparent;color:var(--gold);display:flex;align-items:center;justify-content:center;cursor:pointer;font-size:1.3rem;line-height:1;transition:all 0.25s}
+.d-wish-btn:hover{border-color:var(--gold);background:rgba(184,149,90,0.1)}
+.d-wish-btn.on{color:#e06060;border-color:#e06060;background:rgba(224,96,96,0.08)}
 .inv-note{font-size:0.62rem;color:var(--warn);margin-top:0.5rem}
 .suggestions{background:var(--charcoal);padding:3.5rem 4rem}
 .sugg-eyebrow{font-size:0.58rem;letter-spacing:0.3em;text-transform:uppercase;color:var(--gold);margin-bottom:0.4rem}
@@ -1022,14 +1022,14 @@ footer{background:var(--dark);padding:3.5rem 4rem;text-align:center;border-top:1
 .na-bg-orb{position:absolute;width:1100px;height:1100px;border-radius:50%;filter:blur(120px);opacity:0.10;pointer-events:none;transition:background 0.9s ease;z-index:1}
 .na-bg-orb.a{top:-20%;left:-15%}
 .na-bg-orb.b{bottom:-25%;right:-15%}
-.na-corner-stamp{position:absolute;top:1.4rem;left:2.2rem;font-size:0.5rem;letter-spacing:0.3em;text-transform:uppercase;color:var(--muted);z-index:5;display:flex;align-items:center;gap:0.6rem}
+.na-corner-stamp{position:absolute;top:1.4rem;left:2.2rem;font-size:0.6rem;letter-spacing:0.3em;text-transform:uppercase;color:var(--gold);z-index:5;display:flex;align-items:center;gap:0.6rem}
 .na-corner-stamp span{font-family:'Cormorant Garamond',serif;font-style:italic;font-size:0.95rem;letter-spacing:0.04em;text-transform:none;color:var(--gold)}
 .na-stage{position:absolute;inset:0;display:grid;grid-template-columns:280px 1fr 460px;gap:3rem;padding:4rem 4rem 4.5rem;z-index:2}
 .na-toc{display:flex;flex-direction:column;padding-top:1rem}
 .na-toc-cap{font-size:0.5rem;letter-spacing:0.3em;text-transform:uppercase;color:var(--muted);line-height:1.7}
 .na-toc-cap b{display:block;margin-top:0.3rem;font-family:'Cormorant Garamond',serif;font-size:0.95rem;font-style:italic;font-weight:400;letter-spacing:0.04em;text-transform:none;color:var(--gold)}
 .na-toc-list{margin-top:auto;display:flex;flex-direction:column;gap:0.05rem;padding-top:2rem}
-.na-toc-item{min-height:44px;display:flex;align-items:baseline;gap:0.9rem;padding:0.55rem 0;border-bottom:1px solid var(--border-light);cursor:pointer;transition:color 0.3s,padding 0.3s,opacity 0.3s}
+.na-toc-item{min-height:44px;display:flex;align-items:baseline;gap:0.9rem;padding:0.55rem 0;background:none;border:none;border-bottom:1px solid var(--border-light);width:100%;text-align:left;font:inherit;-webkit-appearance:none;appearance:none;cursor:pointer;transition:color 0.3s,padding 0.3s,opacity 0.3s}
 .na-toc-num{width:1.6rem;font-family:'Cormorant Garamond',serif;font-size:0.85rem;font-style:italic;color:var(--muted);transition:color 0.3s}
 .na-toc-name{font-family:'Cormorant Garamond',serif;font-size:1.05rem;font-weight:300;color:var(--muted);transition:color 0.3s,font-style 0.3s}
 .na-toc-arrow{margin-left:auto;font-size:0.6rem;color:var(--gold);opacity:0;transform:translateX(-4px);transition:opacity 0.3s,transform 0.3s}
