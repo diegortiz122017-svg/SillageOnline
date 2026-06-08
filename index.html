@@ -2294,7 +2294,7 @@ footer{background:var(--dark);padding:3.5rem 4rem;text-align:center;border-top:1
   <div class="store-cta-inner">
     <div class="store-cta-left">
       <span class="store-cta-eyebrow">La Colección Completa</span>
-      <h2 class="store-cta-title">24 fragancias<br><em>esperando por ti</em></h2>
+      <h2 class="store-cta-title"><span id="ctaCount">24</span> fragancias<br><em>esperando por ti</em></h2>
       <p class="store-cta-body">Filtra por marca, género o notas. Encuentra la que lleva tu nombre &mdash; o deja que Nez te guíe.</p>
       <a href="/tienda" class="store-cta-btn"><span>Ir a la Tienda</span><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/></svg></a>
     </div>
@@ -8084,6 +8084,9 @@ function scrollFavTrack(dir){
 }
 
 function buildStoreCta(){
+  // Mantener el número del titular en sync con el catálogo real
+  var ctaCount = document.getElementById('ctaCount');
+  if(ctaCount && P && P.length) ctaCount.textContent = P.length;
   var bottleWrap = document.getElementById('storeCtaBottles');
   if(!bottleWrap || !P || !P.length) return;
   // Pick 3 bottles — prioritise scent profile recommendations, then M/F/U variety
