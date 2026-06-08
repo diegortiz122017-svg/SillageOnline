@@ -180,6 +180,8 @@ async function initDB() {
   try { await db.execute('ALTER TABLE scent_profiles ADD COLUMN last_used DATETIME NOT NULL DEFAULT NOW()'); } catch(e) {}
   // Clean up profiles inactive for 90+ days
   try { await db.execute('DELETE FROM scent_profiles WHERE last_used < DATE_SUB(NOW(), INTERVAL 90 DAY)'); } catch(e) {}
+  // "Favoritos de Todos" homepage flag — independent of badge
+  try { await db.execute('ALTER TABLE products ADD COLUMN home_favorite TINYINT(1) DEFAULT 0'); } catch(e) {}
 
   await db.execute(`
     CREATE TABLE IF NOT EXISTS bundles (

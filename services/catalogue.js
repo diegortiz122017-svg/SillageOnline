@@ -46,6 +46,7 @@ function rowToProduct(r) {
     })(),
     chords_override: r.chords_override ? (typeof r.chords_override === 'string' ? JSON.parse(r.chords_override) : r.chords_override) : null,
     sort_order:    r.sort_order,
+    homeFavorite:  !!r.home_favorite,
   };
 }
 
@@ -84,6 +85,7 @@ function productToRow(p, now) {
     p.chords       ? JSON.stringify(p.chords) : null,
     p.chords_override ? JSON.stringify(p.chords_override) : null,
     p.sort_order   != null ? p.sort_order : 0,
+    p.homeFavorite ? 1 : 0,
     now,
   ];
 }
@@ -115,8 +117,8 @@ async function saveCatalogue(data) {
          notes, top_notes, mid_notes, base_notes,
          top_intensity, mid_intensity, base_intensity,
          tagline, description, concentration, season, sillage, longevity,
-         colors, shape, photos, chords, chords_override, sort_order, active, created_at, updated_at)
-      VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,1,?,?)
+         colors, shape, photos, chords, chords_override, sort_order, home_favorite, active, created_at, updated_at)
+      VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,1,?,?)
       ON DUPLICATE KEY UPDATE
         brand=VALUES(brand), name=VALUES(name), gender=VALUES(gender),
         price=VALUES(price), decant_price=VALUES(decant_price),
@@ -132,7 +134,7 @@ async function saveCatalogue(data) {
         olfactive_family=VALUES(olfactive_family),
         arrived_at=VALUES(arrived_at), notify_subscribers=VALUES(notify_subscribers),
         chords=VALUES(chords), chords_override=VALUES(chords_override),
-        sort_order=VALUES(sort_order), updated_at=VALUES(updated_at)`,
+        sort_order=VALUES(sort_order), home_favorite=VALUES(home_favorite), updated_at=VALUES(updated_at)`,
       [p.id, ...productToRow(p, now), now]
     );
   }
@@ -153,8 +155,8 @@ async function addProduct(p) {
        notes, top_notes, mid_notes, base_notes,
        top_intensity, mid_intensity, base_intensity,
        tagline, description, concentration, season, sillage, longevity,
-       colors, shape, photos, chords, chords_override, sort_order, active, created_at, updated_at)
-    VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,1,?,?)`,
+       colors, shape, photos, chords, chords_override, sort_order, home_favorite, active, created_at, updated_at)
+    VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,1,?,?)`,
     [id, ...productToRow(p, now), now]
   );
   cache.catalogueCache.delete('catalogue');
@@ -170,7 +172,7 @@ async function updateProduct(id, p) {
       notes=?, top_notes=?, mid_notes=?, base_notes=?,
       top_intensity=?, mid_intensity=?, base_intensity=?,
       tagline=?, description=?, concentration=?, season=?, sillage=?, longevity=?,
-      colors=?, shape=?, photos=?, chords=?, chords_override=?, sort_order=?, updated_at=?
+      colors=?, shape=?, photos=?, chords=?, chords_override=?, sort_order=?, home_favorite=?, updated_at=?
     WHERE id=?`,
     [...productToRow(p, now), id]
   );

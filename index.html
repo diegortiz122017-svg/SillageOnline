@@ -8016,10 +8016,7 @@ function buildFavoritesRow(){
   var track = document.getElementById('favTrack');
   if(!track) return;
   track.innerHTML = '';
-  var favorites = (P||[]).filter(function(p){
-    var b = (p.badge||'').toLowerCase();
-    return b === 'bestseller' || b === 'más vendido' || b === 'favorito' || b === 'popular';
-  }).slice(0,8);
+  var favorites = (P||[]).filter(function(p){ return !!p.homeFavorite; }).slice(0,8);
   if(!favorites.length) favorites = (P||[]).slice(0,8);
   favorites.forEach(function(p, i){
     var inv = getInv(p.id);
@@ -8030,7 +8027,7 @@ function buildFavoritesRow(){
     card.className = 'fav-card';
     card.style.transitionDelay = (i * 0.07) + 's';
     card.innerHTML =
-      (['bestseller','más vendido','favorito','popular'].indexOf((p.badge||'').toLowerCase()) > -1 ? '<div class="fav-card-badge">Favorito</div>' : '') +
+      (p.homeFavorite ? '<div class="fav-card-badge">Favorito</div>' : '') +
       '<div class="fav-card-bottle">' +
         (p.photos && p.photos.length
           ? '<img src="' + esc(cdnImg(p.photos[0], 300)) + '" alt="' + esc(p.brand+' '+p.name) + '" style="max-height:140px;max-width:100%;object-fit:contain;"/>'

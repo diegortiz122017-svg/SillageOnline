@@ -571,10 +571,14 @@ tr:hover td{background:rgba(255,255,255,0.02)}
         <select id="fBadge">
           <option value="">Ninguna</option>
           <option value="new">Nuevo</option>
-          <option value="bestseller">★ Favoritos de Todos (Home)</option>
+          <option value="bestseller">Destacado</option>
           <option value="limited">Edición Limitada</option>
         </select>
-        <p style="font-size:0.5rem;color:#8a7f72;margin-top:0.3rem;line-height:1.5">"Favoritos de Todos" muestra el perfume en la sección destacada del homepage.</p>
+      </div>
+      <div class="frag-field" style="align-items:center;flex-direction:row;gap:0.8rem;padding-top:1.2rem">
+        <label style="margin:0;letter-spacing:0.15em;font-size:0.56rem;text-transform:uppercase;color:var(--muted)">&#9733; Favoritos de Todos</label>
+        <label class="tog-wrap"><span class="tog"><input type="checkbox" id="fHomeFav"><span class="tog-track"></span><span class="tog-thumb"></span></span></label>
+        <span style="font-size:0.58rem;color:var(--muted)">Sección destacada del homepage</span>
       </div>
     </div>
     <div class="frag-row">
@@ -3279,6 +3283,7 @@ function openFragModal(id){
   document.getElementById('fLuxury').checked=p?!!(p.luxury):false;
   document.getElementById('fSize').value   =p?p.size:'100ml';
   document.getElementById('fBadge').value  =p?(p.badge||''):'';
+  document.getElementById('fHomeFav').checked=p?!!(p.homeFavorite):false;
   document.getElementById('fArrivedAt').value = p && p.arrivedAt ? new Date(p.arrivedAt).toISOString().slice(0,10) : '';
   initNoteTagPicker('notes', p?p.notes:'');
   initNoteTagPicker('top',   p?p.top:'');
@@ -3341,6 +3346,7 @@ function saveFragrance(){
     brand:brand,name:name,g:document.getElementById('fGender').value,
     price:price,decantPrice:parseFloat(document.getElementById('fDecantPrice').value)||null,decantPrice5:parseFloat(document.getElementById('fDecantPrice5').value)||null,decantSizeMl:parseFloat(document.getElementById('fDecantSizeMl').value)||null,luxury:document.getElementById('fLuxury').checked||false,size:document.getElementById('fSize').value||'100ml',
     badge:document.getElementById('fBadge').value||null,
+    homeFavorite:document.getElementById('fHomeFav').checked||false,
     arrivedAt: document.getElementById('fArrivedAt').value || null,
     notes:document.getElementById('fNotes').value,
     top:document.getElementById('fTop').value,mid:document.getElementById('fMid').value,
