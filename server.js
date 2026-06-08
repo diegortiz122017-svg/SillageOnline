@@ -1219,8 +1219,11 @@ app.use(function(req, res, next) {
   // Only rate-limit API calls — page loads, images and static assets must NOT
   // count against the budget (they'd exhaust it on a single visit).
   if (!req.path.startsWith('/api/')) return next();
-  // Authenticated admin API calls are exempt.
-  if (req.headers['x-admin-token']) return next();
+  // Authenticated admin calls are exempt. The admin panel sends its session as
+  // x-session-token (NOT x-admin-token), so validate that and exempt admin role.
+  if (req.headers['x-admin-token']) return next();              // legacy
+  const _s = validateSession(req.headers['x-session-token']);
+  if (_s && _s.role === 'admin') return next();
   return security.rateLimit()(req, res, next);
 });                                                    // global rate limit (/api only, admin exempt)
 
