@@ -1023,12 +1023,15 @@ footer{background:var(--dark);padding:3.5rem 4rem;text-align:center;border-top:1
 .na-bg-orb{position:absolute;width:1100px;height:1100px;border-radius:50%;filter:blur(120px);opacity:0.10;pointer-events:none;transition:background 0.9s ease;z-index:1}
 .na-bg-orb.a{top:-20%;left:-15%}
 .na-bg-orb.b{bottom:-25%;right:-15%}
-.na-corner-stamp{position:absolute;top:1.4rem;left:2.2rem;font-size:0.6rem;letter-spacing:0.3em;text-transform:uppercase;color:var(--gold);z-index:5;display:flex;align-items:center;gap:0.4rem}
+.na-corner-stamp{display:none}
 .na-corner-stamp span{font-family:'Cormorant Garamond',serif;font-style:italic;font-size:1rem;letter-spacing:0.04em;color:var(--gold)}
 .na-stage{position:absolute;inset:0;display:grid;grid-template-columns:280px 1fr 460px;gap:3rem;padding:4rem 4rem 4.5rem;z-index:2}
 .na-toc{display:flex;flex-direction:column;padding-top:1rem}
-.na-toc-cap{display:none}
-.na-toc-cap b{display:block;margin-top:0.3rem;font-family:'Cormorant Garamond',serif;font-size:0.95rem;font-style:italic;font-weight:400;letter-spacing:0.04em;text-transform:none;color:var(--gold)}
+.na-toc-cap{display:flex;flex-direction:column;gap:0.7rem;padding-right:1rem}
+.na-cap-eyebrow{font-size:0.55rem;letter-spacing:0.3em;text-transform:uppercase;color:var(--gold)}
+.na-cap-title{font-family:'Cormorant Garamond',serif;font-weight:300;font-size:1.9rem;line-height:1.05;color:var(--charcoal);margin:0}
+.na-cap-title em{font-style:italic;color:var(--gold)}
+.na-cap-line{font-size:0.72rem;line-height:1.7;color:var(--muted);max-width:240px;margin:0}
 .na-toc-list{margin-top:auto;display:flex;flex-direction:column;gap:0.05rem;padding-top:2rem}
 .na-toc-item{min-height:44px;display:flex;align-items:baseline;gap:0.9rem;padding:0.55rem 0;background:none;border:none;border-bottom:1px solid var(--border-light);width:100%;text-align:left;font:inherit;-webkit-appearance:none;appearance:none;cursor:pointer;transition:color 0.3s,padding 0.3s,opacity 0.3s}
 .na-toc-num{width:1.6rem;font-family:'Cormorant Garamond',serif;font-size:0.85rem;font-style:italic;color:var(--muted);transition:color 0.3s}
@@ -3326,7 +3329,11 @@ function buildGrid(){
       '<div class="na-corner-stamp">Reci\u00e9n Llegados</div>'+
       '<div class="na-stage">'+
         '<aside class="na-toc">'+
-          '<div class="na-toc-cap"></div>'+
+          '<div class="na-toc-cap">'+
+            '<span class="na-cap-eyebrow">Recién Llegados</span>'+
+            '<h2 class="na-cap-title">Lo más reciente<br><em>de la casa</em></h2>'+
+            '<p class="na-cap-line">Fragancias que acaban de llegar a Sillage &mdash; descúbrelas antes que nadie.</p>'+
+          '</div>'+
           '<div class="na-toc-list" id="naTocList"></div>'+
         '</aside>'+
         '<div class="na-bottle-zone" id="naBottleZone"><div class="na-bottle-mark" id="naBottleMark">01</div></div>'+
