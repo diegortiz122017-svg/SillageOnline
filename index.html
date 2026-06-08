@@ -3385,8 +3385,8 @@ function buildGrid(){
       bs.className = 'na-bottle-slot';
       bs.dataset.pid = p.id;
       bs.innerHTML = '<div class="na-bottle-svg">'+(p.photos&&p.photos.length
-        ? '<img src="'+esc(cdnImg(p.photos[0],600))+'" alt="'+esc(p.brand+' '+p.name)+'" style="width:200px;height:360px;object-fit:contain;display:block" loading="lazy"/>'
-        : svg(p.c, p.s, 2.0))+'</div>';
+        ? '<img src="'+esc(cdnImg(p.photos[0],900))+'" alt="'+esc(p.brand+' '+p.name)+'" style="width:400px;height:720px;object-fit:contain;display:block" loading="lazy"/>'
+        : svg(p.c, p.s, 4.0))+'</div>';
       bottleZone.appendChild(bs);
 
       var ts = document.createElement('div');
