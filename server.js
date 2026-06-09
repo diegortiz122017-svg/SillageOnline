@@ -5781,6 +5781,30 @@ app.get('/api/catalogue/top-sellers', requireAdmin, async (req, res) => {
     res.json([]);
   }
 });
+
+// Public, PII-free version for the storefront "Los Más Vendidos" collection.
+// Returns only [{ productId, units }] (top 20) — no customer/order data.
+app.get('/api/storefront/top-sellers', async (req, res) => {
+  try {
+    const [rows] = await db.query("SELECT items FROM orders WHERE payment_status = 'Pagado' ORDER BY created_at DESC LIMIT 2000");
+    const counts = {};
+    rows.forEach(r => {
+      try {
+        JSON.parse(r.items).forEach(item => {
+          const pid = parseInt(item.productId, 10);
+          if (pid) counts[pid] = (counts[pid] || 0) + (parseInt(item.qty, 10) || 1);
+        });
+      } catch(e) {}
+    });
+    const sorted = Object.entries(counts)
+      .map(([pid, units]) => ({ productId: parseInt(pid), units }))
+      .sort((a, b) => b.units - a.units)
+      .slice(0, 20);
+    res.json(sorted);
+  } catch(e) {
+    res.json([]);
+  }
+});
 // ─── Start ────────────────────────────────────────────
 // Prevent DB errors from crashing the server
 // ── Global Express error handler — NEVER expose internals to client ──────────

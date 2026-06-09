@@ -6186,21 +6186,49 @@ function getBrandColor(brand){
   return BRAND_PALETTE[hash % BRAND_PALETTE.length];
 }
 
+// IDs de los más vendidos reales (poblado desde la DB; ver loadTopSellers)
+var _topSellerIds = {};   // { productId: units }
+
+// ── Helpers de filtrado de colecciones ───────────────────────────────────────
+// Los acordes (p.chords) ya vienen normalizados en español por services/chords.js.
+// Como respaldo se busca en el texto de notas/familia, con sinónimos ES/EN.
+function _collChords(p){ return (p.chords||[]).map(function(x){ return String(x).toLowerCase(); }); }
+function _collText(p){ return [(p.notes||''),(p.family||''),(p.top||''),(p.mid||''),(p.base||'')].join(' ').toLowerCase(); }
+function _hasAnyChord(p, list){ var c=_collChords(p); return list.some(function(x){ return c.indexOf(x)!==-1; }); }
+function _hasAnyWord(p, list){ var t=_collText(p); return list.some(function(x){ return t.indexOf(x)!==-1; }); }
+
 // Fallback estático — se usa solo si la DB no tiene colecciones
 var CURATED_FALLBACK = [
   { id:'office',     icon:'💼', name:'La Oficina',       desc:'Presente sin saturar. El tipo que hace que pregunten.',
-    filter:function(p){ var t=[(p.notes||''),(p.family||''),(p.top||''),(p.mid||''),(p.base||'')].join(' ').toLowerCase(); return t.indexOf('cedar')!==-1||t.indexOf('sandalwood')!==-1||t.indexOf('vetiver')!==-1||(p.family||'').indexOf('woody')!==-1||(p.family||'').indexOf('fresh')!==-1; } },
+    filter:function(p){ return _hasAnyChord(p,['amaderado','aromático','aromatico','verde','herbal'])
+      || _hasAnyWord(p,['cedar','cedro','vetiver','sandalwood','sándalo','sandalo','woody','amaderado','tea','té verde','lavand']); } },
   { id:'evening',    icon:'🕯️', name:'Noche Especial',   desc:'Para cuando quieres dejar rastro.',
-    filter:function(p){ var t=[(p.notes||''),(p.family||''),(p.top||''),(p.mid||''),(p.base||'')].join(' ').toLowerCase(); return t.indexOf('oud')!==-1||t.indexOf('amber')!==-1||t.indexOf('vanilla')!==-1||(p.family||'').indexOf('oriental')!==-1||(p.sillage||'')==='Very Strong'; } },
+    filter:function(p){ return _hasAnyChord(p,['ambarado','oriental','sensual','ahumado','gourmand'])
+      || _hasAnyWord(p,['oud','oudh','amber','ámbar','ambar','incense','incienso','tobacco','tabaco','oriental','vanilla','vainilla'])
+      || (p.sillage||'')==='Very Strong' || (p.sillage||'')==='Strong'; } },
   { id:'fresh',      icon:'🌊', name:'Frescos & Cítricos', desc:'Abre una ventana. Energía inmediata.',
-    filter:function(p){ var t=[(p.family||''),(p.notes||''),(p.top||'')].join(' ').toLowerCase(); return t.indexOf('fresh')!==-1||t.indexOf('citrus')!==-1||t.indexOf('aquatic')!==-1||t.indexOf('bergamot')!==-1||t.indexOf('lemon')!==-1; } },
+    filter:function(p){ return _hasAnyChord(p,['fresco','cítrico','citrico','acuático','acuatico','verde'])
+      || _hasAnyWord(p,['fresh','fresco','citrus','cítric','citric','bergamot','bergamota','lemon','limón','limon','lima','lime','aquatic','acuátic','acuatic','marine','marino','mint','menta']); } },
   { id:'gift',       icon:'🎁', name:'Para Regalar',      desc:'Piezas que impresionan. Para quien merece lo mejor.',
-    filter:function(p){ var ep=parseFloat(p.price); return ep>=80; } },
+    filter:function(p){ return parseFloat(p.price) >= 80 || !!p.luxury; } },
   { id:'bestseller', icon:'⭐', name:'Los Más Vendidos',   desc:'Las fragancias más queridas por nuestros clientes.',
-    filter:function(p){ return p.badge==='bestseller'; } },
+    filter:function(p){ return !!_topSellerIds[+p.id] || !!p.homeFavorite || p.badge==='bestseller'; } },
   { id:'romantic',   icon:'🌹', name:'Una Primera Cita',  desc:'Suave, memorable. Que invite a acercarse.',
-    filter:function(p){ var t=[(p.family||''),(p.notes||''),(p.mid||''),(p.base||'')].join(' ').toLowerCase(); return t.indexOf('rose')!==-1||t.indexOf('floral')!==-1||t.indexOf('jasmine')!==-1||t.indexOf('musk')!==-1||t.indexOf('powdery')!==-1; } },
+    filter:function(p){ return _hasAnyChord(p,['floral','empolvado','dulce','sensual'])
+      || _hasAnyWord(p,['rose','rosa','floral','jasmine','jazmín','jazmin','jasmin','musk','almizcle','powdery','empolvad','vanilla','vainilla','peony','peonía','peonia','iris']); } },
 ];
+
+// Carga los más vendidos reales (sin datos sensibles) para la colección bestseller
+function loadTopSellers(cb){
+  fetch(API+'/storefront/top-sellers')
+    .then(function(r){ return r.ok ? r.json() : []; })
+    .then(function(list){
+      _topSellerIds = {};
+      (list||[]).forEach(function(it){ if(it && it.productId) _topSellerIds[+it.productId] = it.units||1; });
+      if(cb) cb();
+    })
+    .catch(function(){ if(cb) cb(); });
+}
 
 // Convierte una colección de DB en un objeto compatible con el frontend
 function dbCollectionToLocal(c){
@@ -6231,13 +6259,33 @@ function dbCollectionToLocal(c){
 
 var CURATED = CURATED_FALLBACK; // default — overridden by DB on load
 var _curatedLoaded = false;
+var _curatedIsFallback = true;  // true mientras se usen las colecciones predeterminadas
+
+// Ordena las colecciones predeterminadas por cantidad de productos (desc). NO reordena
+// las colecciones de la DB (ahí manda el sort_order del admin).
+function orderedCurated(){
+  if(!_curatedIsFallback) return CURATED;
+  var prods = P || [];
+  return CURATED.slice().sort(function(a,b){
+    var ca = prods.filter(function(p){ try{return a.filter(p);}catch(e){return false;} }).length;
+    var cb = prods.filter(function(p){ try{return b.filter(p);}catch(e){return false;} }).length;
+    return cb - ca;
+  });
+}
+
+// Re-renderiza la vista de colecciones si está presente
+function rerenderCollections(){
+  if(document.getElementById('curatedGrid') && document.getElementById('curatedGrid').children.length && typeof buildCollections==='function') buildCollections();
+}
 
 function loadCuratedFromDB(cb){
+  loadTopSellers(function(){ rerenderCollections(); });
   fetch(API+'/collections')
     .then(function(r){ return r.ok ? r.json() : []; })
     .then(function(cols){
       if(cols && cols.length){
         CURATED = cols.map(dbCollectionToLocal);
+        _curatedIsFallback = false;
       }
       _curatedLoaded = true;
       if(cb) cb();
@@ -6335,7 +6383,7 @@ function buildCollections(){
   // ── Curated cards ──
   var curatedGrid = document.getElementById('curatedGrid');
   curatedGrid.innerHTML = '';
-  CURATED.forEach(function(col){
+  orderedCurated().forEach(function(col){
     var count = products.filter(col.filter).length;
     if(!count) return;
     var card = document.createElement('div');
