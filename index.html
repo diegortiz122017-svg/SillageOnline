@@ -2838,7 +2838,7 @@ function loadViaREST() {
   ]).then(function(results) {
     if(results[0]) adminState.inventory = results[0];
     if(results[1]) adminState.pricing   = results[1];
-    if(results[2] && results[2].length > 0) P = results[2];
+    if(results[2] && results[2].length > 0){ P = results[2]; reconcileCartPhotos(); }
     if(results[3]) adminState.decants   = results[3];
     setConn(results[0] ? 'live' : 'offline', results[0] ? 'En línea' : 'Sin conexión');
     buildGrid();
@@ -2960,6 +2960,7 @@ function connectWS() {
         if (msg.type === 'catalogue') {
           if (msg.payload && msg.payload.length > 0) {
             P = msg.payload;
+            reconcileCartPhotos();
             buildGrid();
             buildGrid();
           }
@@ -4665,6 +4666,18 @@ function renderCart(){
       '<div class="cart-row-right"><button class="cr-remove" data-rm="'+cartKey+'">×</button><span class="cr-total">$'+(itemUnitPrice*q).toFixed(2)+'</span></div>';
     list.appendChild(row);
   });
+}
+
+function reconcileCartPhotos(){
+  if(!P||!P.length)return;
+  var changed=false;
+  cart.forEach(function(i){
+    if(!i.p||!i.p.id)return;
+    if(i.p.photos&&i.p.photos.length)return;
+    var fresh=P.find(function(x){return x.id===i.p.id;});
+    if(fresh&&fresh.photos&&fresh.photos.length){i.p.photos=fresh.photos;changed=true;}
+  });
+  if(changed){saveCart();renderCart();}
 }
 
 document.getElementById('cartList').addEventListener('click',function(e){
