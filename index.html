@@ -4646,7 +4646,7 @@ function renderCart(){
       var subRow = document.createElement('div');
       subRow.className = 'cart-bundle-item';
       subRow.innerHTML =
-        '<div class="cart-thumb" style="width:32px;height:32px">'+svg(p.c,p.s,'sm')+'</div>'+
+        '<div class="cart-thumb" style="width:32px;height:32px">'+(p.photos&&p.photos.length?'<img src="'+esc(cdnImg(p.photos[0],80))+'" alt="'+esc(p.name)+'" style="width:100%;height:100%;object-fit:contain;">':svg(p.c,p.s,'sm'))+'</div>'+
         '<div class="cr-bundle-item-info">'+
           '<span class="cr-brand" style="font-size:0.58rem">'+esc(p.brand)+'</span>'+
           '<span class="cr-name" style="font-size:0.72rem">'+esc(item.label)+'</span>'+
