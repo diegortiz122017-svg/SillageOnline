@@ -588,10 +588,44 @@ async function getByOrderId(orderId) {
   return rows;
 }
 
+// ─── Diagnóstico de conectividad (no emite ningún DTE) ────────────────────────
+// Verifica que (1) el firmador responde y (2) la autenticación con Hacienda
+// funciona. Útil para el panel admin antes de intentar emitir facturas reales.
+async function checkConnectivity() {
+  const out = { ambiente: cfg.DTE_AMBIENTE, mhBase: cfg.DTE_MH_BASE, firmador: {}, mhAuth: {} };
+
+  // (1) Firmador alcanzable — cualquier respuesta HTTP = alcanzable (red OK).
+  try {
+    const r = await fetch(cfg.DTE_FIRMADOR_URL, {
+      method:  'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body:    JSON.stringify({ ping: true }),
+    });
+    out.firmador = { ok: true, msg: 'Firmador alcanzable (HTTP ' + r.status + ').' };
+  } catch (e) {
+    out.firmador = { ok: false, msg: 'No se pudo contactar el firmador: ' + e.message };
+  }
+
+  // (2) Auth con el Ministerio de Hacienda.
+  if (!cfg.DTE_API_PWD) {
+    out.mhAuth = { ok: false, msg: 'Falta DTE_API_PWD (contraseña API del MH).' };
+  } else {
+    try {
+      _token = null; _tokenExp = 0;   // forzar token fresco
+      await getAuthToken();
+      out.mhAuth = { ok: true, msg: 'Autenticación con Hacienda OK (' + cfg.DTE_MH_BASE + ').' };
+    } catch (e) {
+      out.mhAuth = { ok: false, msg: e.message };
+    }
+  }
+  return out;
+}
+
 module.exports = {
   emitForOrder,
   getByOrderId,
   verificacionUrl,
+  checkConnectivity,
   numeroALetras,           // exported for tests
   buildFactura,
   buildCreditoFiscal,

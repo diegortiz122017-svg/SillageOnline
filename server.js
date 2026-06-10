@@ -2303,6 +2303,72 @@ app.post('/api/admin/dte/test', requireAdmin, async (req, res) => {
   }
 });
 
+// GET /api/admin/dte/status — configuración + conteos + correlativos (no contacta al MH)
+app.get('/api/admin/dte/status', requireAdmin, async (req, res) => {
+  try {
+    const [counts] = await db.execute('SELECT estado, COUNT(*) c FROM dte_documents GROUP BY estado').catch(() => [[]]);
+    const [corr]   = await db.execute('SELECT tipo_dte, seq FROM dte_correlativos ORDER BY tipo_dte').catch(() => [[]]);
+    const byEstado = {};
+    (counts || []).forEach(r => { byEstado[r.estado] = r.c; });
+    res.json({
+      enabled:    cfg.DTE_ENABLED,
+      ambiente:   cfg.DTE_AMBIENTE,          // 00 pruebas / 01 producción
+      mhBase:     cfg.DTE_MH_BASE,
+      apiUser:    cfg.DTE_API_USER,
+      apiPwdSet:  !!cfg.DTE_API_PWD,
+      certPwdSet: !!cfg.DTE_CERT_PWD,
+      firmadorUrl: cfg.DTE_FIRMADOR_URL,
+      emisor: {
+        nombre:          cfg.DTE_EMISOR.nombre,
+        nombreComercial: cfg.DTE_EMISOR.nombreComercial,
+        nit:             cfg.DTE_EMISOR.nit,
+        nrc:             cfg.DTE_EMISOR.nrc,
+        actividad:       cfg.DTE_EMISOR.descActividad,
+        direccion:       cfg.DTE_EMISOR.complemento,
+        correo:          cfg.DTE_EMISOR.correo,
+      },
+      counts:       byEstado,
+      correlativos: corr || [],
+    });
+  } catch(e) { res.status(500).json({ error: e.message }); }
+});
+
+// GET /api/admin/dte/documents?estado=&limit= — lista de DTEs emitidos
+app.get('/api/admin/dte/documents', requireAdmin, async (req, res) => {
+  try {
+    const estado = req.query.estado;
+    const limit  = Math.min(parseInt(req.query.limit, 10) || 100, 500);
+    let sql = 'SELECT id, order_id, tipo_dte, ambiente, estado, numero_control, codigo_generacion, sello_recibido, observaciones, created_at FROM dte_documents';
+    const params = [];
+    if (estado) { sql += ' WHERE estado=?'; params.push(estado); }
+    sql += ' ORDER BY id DESC LIMIT ' + limit;
+    const [rows] = await db.execute(sql, params);
+    res.json((rows || []).map(r => {
+      const fecEmi = (r.created_at instanceof Date ? r.created_at.toISOString() : String(r.created_at)).slice(0, 10);
+      return {
+        id:               r.id,
+        orderId:          r.order_id,
+        tipoDte:          r.tipo_dte,
+        ambiente:         r.ambiente,
+        estado:           r.estado,
+        numeroControl:    r.numero_control,
+        codigoGeneracion: r.codigo_generacion,
+        selloRecibido:    r.sello_recibido,
+        observaciones:    r.observaciones,
+        createdAt:        r.created_at,
+        verificacionUrl:  r.codigo_generacion ? dteSvc.verificacionUrl(r.codigo_generacion, fecEmi) : null,
+      };
+    }));
+  } catch(e) { res.status(500).json({ error: e.message }); }
+});
+
+// POST /api/admin/dte/ping — diagnóstico de conectividad (firmador + auth MH)
+app.post('/api/admin/dte/ping', requireAdmin, async (req, res) => {
+  try {
+    res.json(await dteSvc.checkConnectivity());
+  } catch(e) { res.status(500).json({ error: e.message }); }
+});
+
 // ── Customer addresses CRUD ──────────────────────────────────────────────────
 
 // GET /api/customer/addresses — list all addresses for the logged-in customer

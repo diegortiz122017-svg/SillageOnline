@@ -114,6 +114,9 @@ tr:hover td{background:rgba(255,255,255,0.02)}
 .save-bar{display:flex;align-items:center;gap:1rem;padding:1rem 0}
 .save-btn{padding:0.7rem 2rem;background:var(--gold);border:none;color:var(--dark);font-family:'Jost',sans-serif;font-size:0.65rem;letter-spacing:0.2em;text-transform:uppercase;cursor:pointer;font-weight:500;transition:background 0.3s}
 .save-btn:hover{background:var(--gold-light)}
+.dte-lbl{display:block;font-size:0.55rem;letter-spacing:0.12em;text-transform:uppercase;color:var(--muted);margin-bottom:0.3rem}
+.dte-inp{background:var(--card);border:1px solid var(--border-light);color:var(--cream);font-family:'Jost',sans-serif;font-size:0.68rem;padding:0.55rem 0.7rem;outline:none;box-sizing:border-box;min-width:160px}
+.dte-inp:focus{border-color:var(--gold)}
 .saved-msg{font-size:0.65rem;color:var(--success);opacity:0;transition:opacity 0.3s}
 .saved-msg.show{opacity:1}
 
@@ -788,6 +791,8 @@ tr:hover td{background:rgba(255,255,255,0.02)}
         <button class="nav-btn" data-page="cod"><span class="nav-icon">🛡️</span>COD</button>
         <div class="sb-section">Clientes</div>
         <button class="nav-btn" data-page="clientes"><span class="nav-icon">👤</span>Clientes</button>
+        <div class="sb-section">Fiscal</div>
+        <button class="nav-btn" data-page="dte"><span class="nav-icon">📄</span>DTE</button>
       </div>
       <div class="sb-bottom">
         <a class="sb-link" href="claud-perfumes.html" target="_blank">↗ Ver Tienda</a>
@@ -1154,6 +1159,77 @@ tr:hover td{background:rgba(255,255,255,0.02)}
           </table>
         </div>
       </div>
+      <!-- DTE / FACTURA ELECTRÓNICA PAGE -->
+      <div class="page" id="page-dte">
+        <div class="page-title">Factura Electrónica (DTE)</div>
+        <div class="page-sub" style="margin-bottom:1.5rem">Diligencias con el Ministerio de Hacienda — estado, diagnóstico y emisión</div>
+
+        <!-- Estado de la integración -->
+        <div style="background:rgba(255,255,255,0.03);border:1px solid var(--border-light);padding:1.2rem;margin-bottom:1.2rem">
+          <div style="font-size:0.6rem;letter-spacing:0.2em;text-transform:uppercase;color:var(--gold);margin-bottom:1rem">Estado de la integración</div>
+          <div id="dteStatusBody" style="font-size:0.72rem;color:var(--cream);line-height:1.9">Cargando…</div>
+        </div>
+
+        <!-- Diagnóstico / acciones -->
+        <div style="background:rgba(255,255,255,0.03);border:1px solid var(--border-light);padding:1.2rem;margin-bottom:1.2rem">
+          <div style="font-size:0.6rem;letter-spacing:0.2em;text-transform:uppercase;color:var(--gold);margin-bottom:1rem">Diagnóstico</div>
+          <div style="display:flex;gap:0.6rem;flex-wrap:wrap">
+            <button class="save-btn" onclick="dtePing()">🔌 Probar conexión</button>
+            <button class="save-btn" onclick="dteTest()">🧪 Emitir factura de prueba</button>
+            <button class="save-btn" onclick="renderDtePage()">↻ Refrescar</button>
+          </div>
+          <div id="dteDiagOut" style="margin-top:1rem;font-size:0.7rem;color:var(--muted);line-height:1.8"></div>
+        </div>
+
+        <!-- Emitir / reintentar DTE de un pedido -->
+        <div style="background:rgba(255,255,255,0.03);border:1px solid var(--border-light);padding:1.2rem;margin-bottom:1.2rem">
+          <div style="font-size:0.6rem;letter-spacing:0.2em;text-transform:uppercase;color:var(--gold);margin-bottom:1rem">Emitir / reintentar DTE de un pedido</div>
+          <div style="display:flex;gap:0.6rem;flex-wrap:wrap;align-items:flex-end">
+            <div>
+              <label class="dte-lbl">N.º de pedido</label>
+              <input id="dteOrderId" class="dte-inp" placeholder="ej. SIL-1024"/>
+            </div>
+            <div>
+              <label class="dte-lbl">Tipo de documento</label>
+              <select id="dteTipo" class="dte-inp" onchange="dteToggleReceptor()">
+                <option value="01">Factura (Consumidor final)</option>
+                <option value="03">Comprobante de Crédito Fiscal</option>
+              </select>
+            </div>
+            <button class="save-btn" onclick="dteEmitForOrder()">Emitir DTE</button>
+          </div>
+          <div id="dteReceptor" style="display:none;margin-top:0.9rem;gap:0.6rem;flex-wrap:wrap">
+            <div><label class="dte-lbl">NIT receptor</label><input id="dteRcpNit" class="dte-inp" placeholder="14 dígitos"/></div>
+            <div><label class="dte-lbl">NRC receptor</label><input id="dteRcpNrc" class="dte-inp" placeholder="sin guiones"/></div>
+            <div><label class="dte-lbl">Nombre / razón social</label><input id="dteRcpNom" class="dte-inp" placeholder="Nombre del receptor"/></div>
+          </div>
+          <div id="dteEmitOut" style="margin-top:1rem;font-size:0.7rem;line-height:1.8"></div>
+        </div>
+
+        <!-- Documentos emitidos -->
+        <div style="display:flex;align-items:center;gap:0.8rem;flex-wrap:wrap;margin-bottom:0.8rem">
+          <div style="font-size:0.6rem;letter-spacing:0.2em;text-transform:uppercase;color:var(--gold)">Documentos emitidos</div>
+          <select id="dteFilterEstado" class="dte-inp" style="width:auto" onchange="loadDteDocuments()">
+            <option value="">Todos los estados</option>
+            <option value="PROCESADO">Procesado</option>
+            <option value="RECHAZADO">Rechazado</option>
+            <option value="CONTINGENCIA">Contingencia</option>
+          </select>
+          <span id="dteCountsInline" style="font-size:0.62rem;color:var(--muted)"></span>
+        </div>
+        <div class="tbl-wrap" style="overflow-x:auto">
+          <table id="dteDocsTable" style="min-width:820px">
+            <thead><tr>
+              <th>Pedido</th><th>Tipo</th><th>Amb.</th><th>Estado</th>
+              <th>N.º Control</th><th>Cód. Generación</th><th>Sello</th><th>Fecha</th><th></th>
+            </tr></thead>
+            <tbody id="dteDocsBody">
+              <tr><td colspan="9" style="text-align:center;padding:2rem;color:var(--muted)">Cargando…</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
       <div class="page" id="page-orders">
         <div style="display:flex;align-items:flex-start;justify-content:space-between;flex-wrap:wrap;gap:0.8rem;margin-bottom:1rem">
           <div>
@@ -1258,6 +1334,7 @@ tr:hover td{background:rgba(255,255,255,0.02)}
       <button class="mob-drawer-item" data-page="decants" onclick="navToFromDrawer('decants')"><span class="mob-icon">🧪</span>Decants</button>
       <button class="mob-drawer-item" data-page="cod" onclick="navToFromDrawer('cod')"><span class="mob-icon">🛡️</span>COD</button>
       <button class="mob-drawer-item" data-page="clientes" onclick="navToFromDrawer('clientes')"><span class="mob-icon">👤</span>Clientes</button>
+      <button class="mob-drawer-item" data-page="dte" onclick="navToFromDrawer('dte')"><span class="mob-icon">📄</span>DTE</button>
     </div>
   </div>
   <!-- DETAIL SLIDE PANEL — shared by order detail + customer history -->
@@ -1828,6 +1905,7 @@ function navTo(page){
   if(page==='decants'){     renderDecantInventory(); }
   if(page==='cod'){         renderCODPage(); }
   if(page==='clientes')  loadClientes();
+  if(page==='dte')       renderDtePage();
 }
 document.querySelectorAll('.nav-btn,.mob-tab').forEach(function(b){
   b.addEventListener('click',function(){
@@ -2022,6 +2100,127 @@ function adminFetch(url, opts){
 }
 
 function sc(val,lbl,cls,action,hint){var onclick=action?'onclick="'+action+'"':'';return'<div class="stat-card" '+onclick+'><div class="stat-val '+cls+'">'+val+'</div><div class="stat-label">'+lbl+'</div>'+(hint?'<div class="stat-hint">'+hint+'</div>':'')+'</div>';}
+
+// ══════════════════ DTE / FACTURA ELECTRÓNICA ══════════════════
+function _dteEsc(s){ return String(s==null?'':s).replace(/[&<>"]/g,function(c){return{'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c];}); }
+function _dteChip(ok,txt){ var col=ok?'var(--ok,#5fb87a)':'#d98a3a'; return '<span style="display:inline-block;padding:0.12rem 0.55rem;border:1px solid '+col+';color:'+col+';font-size:0.58rem;letter-spacing:0.12em;text-transform:uppercase;border-radius:2px">'+_dteEsc(txt)+'</span>'; }
+function _dteEstadoColor(e){ return e==='PROCESADO'?'#5fb87a':(e==='RECHAZADO'?'#d9534f':'#d98a3a'); }
+
+function renderDtePage(){
+  loadDteStatus();
+  loadDteDocuments();
+}
+
+function loadDteStatus(){
+  var body=document.getElementById('dteStatusBody'); if(!body) return;
+  adminFetch(API+'/admin/dte/status',{}).then(function(r){return r?r.json():null;}).then(function(d){
+    if(!d){ body.textContent='No se pudo cargar el estado.'; return; }
+    var ambTxt = d.ambiente==='01' ? 'Producción' : 'Pruebas (00)';
+    var rows = [
+      ['Integración', _dteChip(d.enabled, d.enabled?'Habilitada':'Deshabilitada (DTE_ENABLED)')],
+      ['Ambiente', _dteChip(d.ambiente==='01', ambTxt)+' &nbsp;<span style="color:var(--muted)">'+_dteEsc(d.mhBase)+'</span>'],
+      ['Contraseña API (MH)', _dteChip(d.apiPwdSet, d.apiPwdSet?'Configurada':'Falta DTE_API_PWD')],
+      ['Contraseña certificado', _dteChip(d.certPwdSet, d.certPwdSet?'Configurada':'Falta DTE_CERT_PWD')],
+      ['Firmador', '<span style="color:var(--muted)">'+_dteEsc(d.firmadorUrl)+'</span>'],
+      ['Emisor', _dteEsc(d.emisor.nombreComercial)+' &nbsp;<span style="color:var(--muted)">NIT '+_dteEsc(d.emisor.nit)+' · NRC '+_dteEsc(d.emisor.nrc)+'</span>'],
+    ];
+    var corr = (d.correlativos||[]).map(function(c){ return _dteEsc(c.tipo_dte)+': '+_dteEsc(c.seq); }).join(' &nbsp;·&nbsp; ') || '—';
+    rows.push(['Correlativos', '<span style="color:var(--muted)">'+corr+'</span>']);
+    body.innerHTML = rows.map(function(r){
+      return '<div style="display:flex;gap:0.8rem"><div style="min-width:170px;color:var(--muted);font-size:0.62rem;letter-spacing:0.08em;text-transform:uppercase">'+r[0]+'</div><div>'+r[1]+'</div></div>';
+    }).join('');
+    // conteos inline
+    var c=d.counts||{}; var inline=document.getElementById('dteCountsInline');
+    if(inline){ inline.innerHTML='Procesados: <b style="color:#5fb87a">'+(c.PROCESADO||0)+'</b> · Rechazados: <b style="color:#d9534f">'+(c.RECHAZADO||0)+'</b> · Contingencia: <b style="color:#d98a3a">'+(c.CONTINGENCIA||0)+'</b>'; }
+  }).catch(function(){ body.textContent='Error cargando el estado.'; });
+}
+
+function loadDteDocuments(){
+  var tb=document.getElementById('dteDocsBody'); if(!tb) return;
+  var estado=document.getElementById('dteFilterEstado').value;
+  var url=API+'/admin/dte/documents?limit=200'+(estado?('&estado='+estado):'');
+  tb.innerHTML='<tr><td colspan="9" style="text-align:center;padding:2rem;color:var(--muted)">Cargando…</td></tr>';
+  adminFetch(url,{}).then(function(r){return r?r.json():[];}).then(function(rows){
+    if(!rows||!rows.length){ tb.innerHTML='<tr><td colspan="9" style="text-align:center;padding:2rem;color:var(--muted)">Sin documentos.</td></tr>'; return; }
+    var tipoTxt={'01':'FC','03':'CCF','05':'NC'};
+    tb.innerHTML=rows.map(function(r){
+      var fecha=r.createdAt?String(r.createdAt).slice(0,10):'—';
+      var sello=r.selloRecibido?('<span title="'+_dteEsc(r.selloRecibido)+'">'+_dteEsc(r.selloRecibido).slice(0,10)+'…</span>'):'—';
+      var ver=r.verificacionUrl?('<a href="'+_dteEsc(r.verificacionUrl)+'" target="_blank" style="color:var(--gold)">Verificar ↗</a>'):'';
+      var obs=r.observaciones?('<div style="font-size:0.56rem;color:#d98a3a;max-width:280px">'+_dteEsc(r.observaciones)+'</div>'):'';
+      return '<tr>'+
+        '<td>'+_dteEsc(r.orderId)+'</td>'+
+        '<td>'+(tipoTxt[r.tipoDte]||r.tipoDte)+'</td>'+
+        '<td>'+_dteEsc(r.ambiente)+'</td>'+
+        '<td><span style="color:'+_dteEstadoColor(r.estado)+'">'+_dteEsc(r.estado)+'</span>'+obs+'</td>'+
+        '<td style="font-size:0.56rem">'+_dteEsc(r.numeroControl||'—')+'</td>'+
+        '<td style="font-size:0.56rem">'+_dteEsc((r.codigoGeneracion||'—'))+'</td>'+
+        '<td style="font-size:0.56rem">'+sello+'</td>'+
+        '<td>'+fecha+'</td>'+
+        '<td>'+ver+'</td>'+
+      '</tr>';
+    }).join('');
+  }).catch(function(){ tb.innerHTML='<tr><td colspan="9" style="text-align:center;padding:2rem;color:#d9534f">Error.</td></tr>'; });
+}
+
+function dtePing(){
+  var out=document.getElementById('dteDiagOut');
+  out.innerHTML='Probando conexión…';
+  adminFetch(API+'/admin/dte/ping',{method:'POST'}).then(function(r){return r?r.json():null;}).then(function(d){
+    if(!d){ out.textContent='Sin respuesta.'; return; }
+    if(d.error){ out.innerHTML='<span style="color:#d9534f">'+_dteEsc(d.error)+'</span>'; return; }
+    out.innerHTML=
+      '<div>Firmador: '+_dteChip(d.firmador&&d.firmador.ok, d.firmador&&d.firmador.ok?'OK':'Falla')+' '+_dteEsc(d.firmador&&d.firmador.msg)+'</div>'+
+      '<div style="margin-top:0.4rem">Hacienda (auth): '+_dteChip(d.mhAuth&&d.mhAuth.ok, d.mhAuth&&d.mhAuth.ok?'OK':'Falla')+' '+_dteEsc(d.mhAuth&&d.mhAuth.msg)+'</div>';
+  }).catch(function(e){ out.innerHTML='<span style="color:#d9534f">Error: '+_dteEsc(e.message)+'</span>'; });
+}
+
+function dteTest(){
+  var out=document.getElementById('dteDiagOut');
+  if(!confirm('Emitir una FACTURA DE PRUEBA (orden ficticia) hacia Hacienda en el ambiente actual?')) return;
+  out.innerHTML='Emitiendo factura de prueba…';
+  adminFetch(API+'/admin/dte/test',{method:'POST'}).then(function(r){return r?r.json():null;}).then(function(d){
+    if(!d){ out.textContent='Sin respuesta.'; return; }
+    if(d.error){ out.innerHTML='<span style="color:#d9534f">'+_dteEsc(d.error)+'</span>'; return; }
+    out.innerHTML='Resultado: '+_dteChip(d.ok,d.estado||'—')+
+      (d.numeroControl?' · N.º Control '+_dteEsc(d.numeroControl):'')+
+      (d.selloRecibido?' · Sello '+_dteEsc(d.selloRecibido).slice(0,16)+'…':'')+
+      (d.observaciones?'<div style="color:#d98a3a;margin-top:0.3rem">'+_dteEsc(d.observaciones)+'</div>':'');
+    loadDteDocuments(); loadDteStatus();
+  }).catch(function(e){ out.innerHTML='<span style="color:#d9534f">Error: '+_dteEsc(e.message)+'</span>'; });
+}
+
+function dteToggleReceptor(){
+  var t=document.getElementById('dteTipo').value;
+  document.getElementById('dteReceptor').style.display = (t==='03') ? 'flex' : 'none';
+}
+
+function dteEmitForOrder(){
+  var out=document.getElementById('dteEmitOut');
+  var orderId=(document.getElementById('dteOrderId').value||'').trim();
+  var tipo=document.getElementById('dteTipo').value;
+  if(!orderId){ out.innerHTML='<span style="color:#d9534f">Ingresa el N.º de pedido.</span>'; return; }
+  var bodyObj={ tipoDte:tipo };
+  if(tipo==='03'){
+    bodyObj.receptor={
+      nit:(document.getElementById('dteRcpNit').value||'').trim(),
+      nrc:(document.getElementById('dteRcpNrc').value||'').trim(),
+      nombre:(document.getElementById('dteRcpNom').value||'').trim()
+    };
+    if(!bodyObj.receptor.nit||!bodyObj.receptor.nrc){ out.innerHTML='<span style="color:#d9534f">El Crédito Fiscal requiere NIT y NRC del receptor.</span>'; return; }
+  }
+  out.innerHTML='Emitiendo…';
+  adminFetch(API+'/admin/orders/'+encodeURIComponent(orderId)+'/dte',{
+    method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(bodyObj)
+  }).then(function(r){return r?r.json():null;}).then(function(d){
+    if(!d){ out.textContent='Sin respuesta.'; return; }
+    if(d.error){ out.innerHTML='<span style="color:#d9534f">'+_dteEsc(d.error)+'</span>'; return; }
+    out.innerHTML='Resultado: '+_dteChip(d.ok,d.estado||'—')+
+      (d.numeroControl?' · N.º Control '+_dteEsc(d.numeroControl):'')+
+      (d.observaciones?'<div style="color:#d98a3a;margin-top:0.3rem">'+_dteEsc(d.observaciones)+'</div>':'');
+    loadDteDocuments(); loadDteStatus();
+  }).catch(function(e){ out.innerHTML='<span style="color:#d9534f">Error: '+_dteEsc(e.message)+'</span>'; });
+}
 
 // ── ANALYTICS ─────────────────────────────────────
 function fmtRev(v){ return '$'+(+v||0).toFixed(2).replace(/\B(?=(\d{3})+(?!\d))/g,','); }
