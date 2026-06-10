@@ -585,9 +585,18 @@ async function emitForOrder(order, options = {}) {
     const firmado  = await firmar(jsonDte);
     const recepcion = await transmitir(tipoDte, version, codigoGeneracion, firmado);
     const estado   = recepcion.estado === 'PROCESADO' ? 'PROCESADO' : 'RECHAZADO';
-    const observaciones = Array.isArray(recepcion.observaciones)
-      ? recepcion.observaciones.join(' | ')
-      : (recepcion.descripcionMsg || null);
+    // Capturar TODO el motivo: descripcionMsg + observaciones[] + codigoMsg.
+    // (Antes: si observaciones era [] vacío, se perdía el descripcionMsg → rechazo "sin mensaje".)
+    const obsArr = Array.isArray(recepcion.observaciones)
+      ? recepcion.observaciones.filter(Boolean)
+      : (recepcion.observaciones ? [String(recepcion.observaciones)] : []);
+    const partes = [];
+    if (recepcion.descripcionMsg) partes.push(recepcion.descripcionMsg);
+    if (obsArr.length)            partes.push(obsArr.join(' | '));
+    let observaciones = partes.join(' — ') || null;
+    if (estado === 'RECHAZADO' && recepcion.codigoMsg) {
+      observaciones = '[' + recepcion.codigoMsg + '] ' + (observaciones || 'Rechazado sin descripción');
+    }
     const rec = {
       ...base,
       jsonFirmado:  firmado,
