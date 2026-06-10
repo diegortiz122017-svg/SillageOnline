@@ -2284,20 +2284,51 @@ app.post('/api/admin/orders/:id/dte', requireAdmin, async (req, res) => {
 
 // POST /api/admin/dte/test — emite una FACTURA DE PRUEBA (orden ficticia) para
 // validar el circuito completo: firmador → Hacienda → sello. No crea un pedido real.
+// Genera una orden ficticia ALEATORIA con productos reales del catálogo para
+// estresar el JSON (nombres con tildes/ñ, varios ítems, montos y redondeos de IVA
+// distintos, métodos de pago variados). Body opcional: { items: N } fija la cantidad
+// de ítems para reproducir un caso.
+const _DTE_TEST_CLIENTES = [
+  'José Peña Martínez', 'María Fernández Ñúñez', 'Andrés Villalobos',
+  'Wendy Guzmán Cañas', 'Óscar Iraheta', 'Ángela Domínguez', 'Consumidor Final',
+];
+const _DTE_TEST_PAGOS = ['wompi', 'btcpay', 'cod'];
+async function buildRandomTestOrder(opts = {}) {
+  const cat = await getCatalogue().catch(() => []);
+  const pool = (cat || []).filter(p => p && parseFloat(p.price) > 0);
+  const pick = (arr) => arr[Math.floor(Math.random() * arr.length)];
+
+  let nItems = opts.items ? Math.max(1, Math.min(6, parseInt(opts.items, 10) || 1))
+                          : 1 + Math.floor(Math.random() * 4); // 1-4
+  const items = [];
+  for (let i = 0; i < nItems; i++) {
+    if (pool.length) {
+      const p = pick(pool);
+      items.push({ name: `${p.brand} ${p.name}`.slice(0, 200), qty: 1 + Math.floor(Math.random() * 3), price: parseFloat(p.price) });
+    } else {
+      items.push({ name: 'Producto de prueba DTE', qty: 1, price: 11.30 });
+    }
+  }
+  const total = Math.round(items.reduce((s, it) => s + it.qty * it.price, 0) * 100) / 100;
+  return {
+    id:             'TEST-' + Date.now(),
+    customer:       pick(_DTE_TEST_CLIENTES),
+    email:          cfg.DTE_EMISOR.correo || 'prueba@sillage-sv.com',
+    phone:          null,
+    payment_method: pick(_DTE_TEST_PAGOS),
+    items:          JSON.stringify(items),
+    total,
+  };
+}
+
 app.post('/api/admin/dte/test', requireAdmin, async (req, res) => {
   if (!cfg.DTE_ENABLED) {
     return res.status(409).json({ error: 'DTE deshabilitado. Configura DTE_ENABLED=true.' });
   }
-  const fakeOrder = {
-    id:       'TEST-' + Date.now(),
-    customer: 'Cliente de Prueba',
-    email:    cfg.DTE_EMISOR.correo || 'prueba@sillage-sv.com',
-    phone:    null,
-    items:    JSON.stringify([{ name: 'Producto de prueba DTE', qty: 1, price: 11.30 }]),
-    total:    11.30,
-  };
   try {
+    const fakeOrder = await buildRandomTestOrder(req.body || {});
     const rec = await dteSvc.emitForOrder(fakeOrder, { tipoDte: '01' });
+    const items = JSON.parse(fakeOrder.items);
     res.json({
       ok:               rec && rec.estado === 'PROCESADO',
       ambiente:         cfg.DTE_AMBIENTE,
@@ -2306,6 +2337,13 @@ app.post('/api/admin/dte/test', requireAdmin, async (req, res) => {
       codigoGeneracion: rec?.codigoGeneracion,
       selloRecibido:    rec?.selloRecibido,
       observaciones:    rec?.observaciones,
+      // Resumen de lo que se generó (para verlo en el panel)
+      prueba: {
+        customer:      fakeOrder.customer,
+        paymentMethod: fakeOrder.payment_method,
+        numItems:      items.length,
+        total:         fakeOrder.total,
+      },
     });
   } catch(e) {
     res.status(500).json({ error: e.message });

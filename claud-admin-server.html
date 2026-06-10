@@ -2177,14 +2177,17 @@ function dtePing(){
 
 function dteTest(){
   var out=document.getElementById('dteDiagOut');
-  if(!confirm('Emitir una FACTURA DE PRUEBA (orden ficticia) hacia Hacienda en el ambiente actual?')) return;
-  out.innerHTML='Emitiendo factura de prueba…';
-  adminFetch(API+'/admin/dte/test',{method:'POST'}).then(function(r){return r?r.json():null;}).then(function(d){
+  if(!confirm('Emitir una FACTURA DE PRUEBA aleatoria (productos reales del catálogo) hacia Hacienda en el ambiente actual?')) return;
+  out.innerHTML='Generando pedido aleatorio y emitiendo…';
+  adminFetch(API+'/admin/dte/test',{method:'POST',headers:{'Content-Type':'application/json'},body:'{}'}).then(function(r){return r?r.json():null;}).then(function(d){
     if(!d){ out.textContent='Sin respuesta.'; return; }
     if(d.error){ out.innerHTML='<span style="color:#d9534f">'+_dteEsc(d.error)+'</span>'; return; }
+    var pr=d.prueba||{};
+    var gen = pr.customer ? ('<div style="color:var(--muted);margin-top:0.3rem">Generado: '+_dteEsc(pr.customer)+' · '+_dteEsc(pr.numItems)+' ítem(s) · $'+_dteEsc((pr.total!=null?Number(pr.total).toFixed(2):'?'))+' · pago '+_dteEsc(pr.paymentMethod)+'</div>') : '';
     out.innerHTML='Resultado: '+_dteChip(d.ok,d.estado||'—')+
       (d.numeroControl?' · N.º Control '+_dteEsc(d.numeroControl):'')+
       (d.selloRecibido?' · Sello '+_dteEsc(d.selloRecibido).slice(0,16)+'…':'')+
+      gen+
       (d.observaciones?'<div style="color:#d98a3a;margin-top:0.3rem">'+_dteEsc(d.observaciones)+'</div>':'');
     loadDteDocuments(); loadDteStatus();
   }).catch(function(e){ out.innerHTML='<span style="color:#d9534f">Error: '+_dteEsc(e.message)+'</span>'; });
