@@ -84,8 +84,10 @@ const DTE_EMISOR = {
   nrc:                 process.env.DTE_NRC  || '3869539',         // sin guiones
   nombre:              process.env.DTE_NOMBRE || 'SILLAGE, SOCIEDAD POR ACCIONES SIMPLIFICADA DE CAPITAL VARIABLE',
   nombreComercial:     process.env.DTE_NOMBRE_COMERCIAL || 'Sillage Parfumerie',
-  codActividad:        process.env.DTE_COD_ACTIVIDAD || '47730', // venta de perfumes/cosméticos
-  descActividad:       process.env.DTE_DESC_ACTIVIDAD || 'Venta al por menor de perfumes y cosméticos',
+  // CAT-019 Actividad Económica (catálogo oficial MH). '47730' NO existe → rechazo [003].
+  // Código correcto para venta al por menor de perfumería/cosméticos: 47722.
+  codActividad:        '47722',
+  descActividad:       'Venta al por menor de productos cosméticos y de tocador',
   // Dirección fiscal real de Sillage (tarjeta NRC): Barrio El Carmen,
   // Dirección fiscal: Distrito San Juan Talpa, Municipio La Paz Oeste, Depto. La Paz.
   // Códigos FIJOS (sin env) tomados del catálogo OFICIAL del MH (reforma territorial 2024):
