@@ -122,6 +122,21 @@ function buildEmisor() {
   };
 }
 
+// Forma de pago (CAT-017) a partir del método de pago del pedido.
+//   01 = Billetes y monedas · 02 = Tarjeta Débito · 03 = Tarjeta Crédito
+//   05 = Transferencia/Depósito · 99 = Otros (requiere referencia)
+function formaPagoDesde(order) {
+  const m = String(order.payment_method || order.paymentMethod || '').toLowerCase();
+  if (m.includes('wompi') || m.includes('card') || m.includes('tarjeta') || m.includes('credit')) {
+    return { codigo: '02', referencia: null };
+  }
+  if (m.includes('btc') || m.includes('bitcoin') || m.includes('crypto') || m.includes('lightning')) {
+    return { codigo: '99', referencia: 'Bitcoin / Lightning' };
+  }
+  // efectivo / contra entrega (COD) / desconocido
+  return { codigo: '01', referencia: null };
+}
+
 // Normalise a stored order's items array into a consistent shape.
 //   { descripcion, cantidad, precioUnitario }  (precio = lo que pagó el cliente, IVA incluido)
 function normalizeItems(items) {
@@ -186,7 +201,16 @@ function buildFactura(order, opts) {
     totalIva:             totalIva,    // FC: IVA embebido informativo
     saldoFavor:           0,
     condicionOperacion:   1,           // 1 = contado
-    pagos:                null,
+    pagos:                (function(){
+      const fp = formaPagoDesde(order);
+      return [{
+        codigo:     fp.codigo,
+        montoPago:  totalGravada,
+        referencia: fp.referencia,
+        plazo:      null,
+        periodo:    null,
+      }];
+    })(),
     numPagoElectronico:   null,
     observaciones:        null,
   };
