@@ -87,15 +87,16 @@ const DTE_EMISOR = {
   codActividad:        process.env.DTE_COD_ACTIVIDAD || '47730', // venta de perfumes/cosméticos
   descActividad:       process.env.DTE_DESC_ACTIVIDAD || 'Venta al por menor de perfumes y cosméticos',
   // Dirección fiscal real de Sillage (tarjeta NRC): Barrio El Carmen,
-  // Distrito de San Juan Talpa, Municipio de La Paz Oeste, Depto. de La Paz.
-  // ⚠️ FIJOS (sin env): el DTE usa CÓDIGOS CONCATENADOS del catálogo oficial (reforma 2024),
-  // NO los componentes sueltos: departamento 2 díg, municipio 4 díg (depto+muni),
-  // distrito 6 díg (depto+muni+distrito). Mandar '03'/'11' da "no cumple el formato requerido".
-  //   Código Municipios 0803 = La Paz Oeste · Código Distritos 080311 = San Juan Talpa.
-  // Se dejan hardcodeados a propósito para que NO dependan de variables de Railway.
-  departamento:        '08',       // 08 = La Paz
-  municipio:           '0803',     // 0803 = La Paz Oeste
-  distrito:            '080311',   // 080311 = San Juan Talpa
+  // Dirección fiscal: Distrito San Juan Talpa, Municipio La Paz Oeste, Depto. La Paz.
+  // Códigos FIJOS (sin env) tomados del catálogo OFICIAL del MH (reforma territorial 2024):
+  //   CAT-012 Departamento → 08  = La Paz
+  //   CAT-013 Municipio    → 23  = La Paz Oeste   (los municipios NUEVOS recibieron códigos
+  //                                                 altos: ej. 23 San Salvador Centro, 23 La Paz Oeste)
+  //   CAT-008 Distrito     → 11  = San Juan Talpa
+  // OJO: NO son los componentes "03"/"0803" del catálogo del SSF — el DTE usa el CAT-013.
+  departamento:        '08',     // CAT-012: La Paz
+  municipio:           '23',     // CAT-013: La Paz Oeste
+  distrito:            '11',     // CAT-008: San Juan Talpa
   complemento:         process.env.DTE_DIRECCION || 'Barrio El Carmen, San Juan Talpa, La Paz',
   telefono:            process.env.DTE_TELEFONO || '21000000', // 8+ dígitos (req. por esquema)
   correo:              process.env.DTE_CORREO || 'ortiz@sillage-sv.com',
