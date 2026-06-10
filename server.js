@@ -340,10 +340,19 @@ async function initDB() {
 
   await db.execute(`
     CREATE TABLE IF NOT EXISTS dte_correlativos (
-      tipo_dte VARCHAR(2) PRIMARY KEY,
-      seq      BIGINT NOT NULL DEFAULT 0
+      tipo_dte        VARCHAR(2)  NOT NULL,
+      cod_estable     VARCHAR(4)  NOT NULL DEFAULT 'M001',
+      cod_punto_venta VARCHAR(15) NOT NULL DEFAULT '001',
+      seq             BIGINT      NOT NULL DEFAULT 0,
+      PRIMARY KEY (tipo_dte, cod_estable, cod_punto_venta)
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
   `);
+  // Migración para tablas existentes (PK antigua = solo tipo_dte): numerar por
+  // (tipo, establecimiento, punto de venta) para soportar múltiples sucursales sin
+  // colisiones de Número de Control. Idempotente.
+  try { await db.execute("ALTER TABLE dte_correlativos ADD COLUMN cod_estable VARCHAR(4) NOT NULL DEFAULT 'M001'"); } catch(e) {}
+  try { await db.execute("ALTER TABLE dte_correlativos ADD COLUMN cod_punto_venta VARCHAR(15) NOT NULL DEFAULT '001'"); } catch(e) {}
+  try { await db.execute("ALTER TABLE dte_correlativos DROP PRIMARY KEY, ADD PRIMARY KEY (tipo_dte, cod_estable, cod_punto_venta)"); } catch(e) {}
 
   await db.execute(`
     CREATE TABLE IF NOT EXISTS bottle_inventory (
@@ -2307,7 +2316,7 @@ app.post('/api/admin/dte/test', requireAdmin, async (req, res) => {
 app.get('/api/admin/dte/status', requireAdmin, async (req, res) => {
   try {
     const [counts] = await db.execute('SELECT estado, COUNT(*) c FROM dte_documents GROUP BY estado').catch(() => [[]]);
-    const [corr]   = await db.execute('SELECT tipo_dte, seq FROM dte_correlativos ORDER BY tipo_dte').catch(() => [[]]);
+    const [corr]   = await db.execute('SELECT tipo_dte, cod_estable, cod_punto_venta, seq FROM dte_correlativos ORDER BY tipo_dte, cod_estable, cod_punto_venta').catch(() => [[]]);
     const byEstado = {};
     (counts || []).forEach(r => { byEstado[r.estado] = r.c; });
     res.json({

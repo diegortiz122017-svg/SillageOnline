@@ -88,13 +88,14 @@ const DTE_EMISOR = {
   descActividad:       process.env.DTE_DESC_ACTIVIDAD || 'Venta al por menor de perfumes y cosméticos',
   // Dirección fiscal real de Sillage (tarjeta NRC): Barrio El Carmen,
   // Distrito de San Juan Talpa, Municipio de La Paz Oeste, Depto. de La Paz.
-  // ⚠️ El DTE usa CÓDIGOS CONCATENADOS del catálogo oficial (reforma 2024), NO los
-  // componentes sueltos: departamento 2 díg, municipio 4 díg (depto+muni),
+  // ⚠️ FIJOS (sin env): el DTE usa CÓDIGOS CONCATENADOS del catálogo oficial (reforma 2024),
+  // NO los componentes sueltos: departamento 2 díg, municipio 4 díg (depto+muni),
   // distrito 6 díg (depto+muni+distrito). Mandar '03'/'11' da "no cumple el formato requerido".
   //   Código Municipios 0803 = La Paz Oeste · Código Distritos 080311 = San Juan Talpa.
-  departamento:        process.env.DTE_DEPARTAMENTO || '08',       // 08 = La Paz
-  municipio:           process.env.DTE_MUNICIPIO    || '0803',     // 0803 = La Paz Oeste
-  distrito:            process.env.DTE_DISTRITO     || '080311',   // 080311 = San Juan Talpa
+  // Se dejan hardcodeados a propósito para que NO dependan de variables de Railway.
+  departamento:        '08',       // 08 = La Paz
+  municipio:           '0803',     // 0803 = La Paz Oeste
+  distrito:            '080311',   // 080311 = San Juan Talpa
   complemento:         process.env.DTE_DIRECCION || 'Barrio El Carmen, San Juan Talpa, La Paz',
   telefono:            process.env.DTE_TELEFONO || '21000000', // 8+ dígitos (req. por esquema)
   correo:              process.env.DTE_CORREO || 'ortiz@sillage-sv.com',

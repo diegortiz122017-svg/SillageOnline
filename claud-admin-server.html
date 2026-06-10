@@ -2124,7 +2124,7 @@ function loadDteStatus(){
       ['Firmador', '<span style="color:var(--muted)">'+_dteEsc(d.firmadorUrl)+'</span>'],
       ['Emisor', _dteEsc(d.emisor.nombreComercial)+' &nbsp;<span style="color:var(--muted)">NIT '+_dteEsc(d.emisor.nit)+' · NRC '+_dteEsc(d.emisor.nrc)+'</span>'],
     ];
-    var corr = (d.correlativos||[]).map(function(c){ return _dteEsc(c.tipo_dte)+': '+_dteEsc(c.seq); }).join(' &nbsp;·&nbsp; ') || '—';
+    var corr = (d.correlativos||[]).map(function(c){ var suc=(c.cod_estable||c.cod_punto_venta)?(' '+_dteEsc((c.cod_estable||'')+'/'+(c.cod_punto_venta||''))):''; return _dteEsc(c.tipo_dte)+suc+': '+_dteEsc(c.seq); }).join(' &nbsp;·&nbsp; ') || '—';
     rows.push(['Correlativos', '<span style="color:var(--muted)">'+corr+'</span>']);
     body.innerHTML = rows.map(function(r){
       return '<div style="display:flex;gap:0.8rem"><div style="min-width:170px;color:var(--muted);font-size:0.62rem;letter-spacing:0.08em;text-transform:uppercase">'+r[0]+'</div><div>'+r[1]+'</div></div>';

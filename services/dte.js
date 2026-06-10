@@ -455,13 +455,20 @@ function buildIdentificacion(tipoDte, version, numControl, codGen, fecEmi, horEm
 }
 
 // ─── correlativo atómico por tipo de documento ────────────────────────────────
+// Correlativo por (tipo_dte, establecimiento, punto de venta). Cada sucursal/caja
+// lleva su propia numeración → no hay colisiones de Número de Control al crecer.
 async function nextCorrelativo(tipoDte) {
+  const codEstable    = cfg.DTE_EMISOR.codEstable    || 'M001';
+  const codPuntoVenta = cfg.DTE_EMISOR.codPuntoVenta || '001';
   await db.execute(
-    `INSERT INTO dte_correlativos (tipo_dte, seq) VALUES (?, 1)
+    `INSERT INTO dte_correlativos (tipo_dte, cod_estable, cod_punto_venta, seq) VALUES (?, ?, ?, 1)
      ON DUPLICATE KEY UPDATE seq = seq + 1`,
-    [tipoDte]
+    [tipoDte, codEstable, codPuntoVenta]
   );
-  const [rows] = await db.execute('SELECT seq FROM dte_correlativos WHERE tipo_dte=?', [tipoDte]);
+  const [rows] = await db.execute(
+    'SELECT seq FROM dte_correlativos WHERE tipo_dte=? AND cod_estable=? AND cod_punto_venta=?',
+    [tipoDte, codEstable, codPuntoVenta]
+  );
   return rows[0].seq;
 }
 
