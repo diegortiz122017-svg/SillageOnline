@@ -2164,21 +2164,37 @@ function loadDteDocuments(){
   }).catch(function(){ tb.innerHTML='<tr><td colspan="9" style="text-align:center;padding:2rem;color:#d9534f">Error.</td></tr>'; });
 }
 
-// Abre el JSON del DTE (sin firmar) en una pestaña nueva, formateado.
+// Abre un payload de DTE (con jsonDte) en una pestaña nueva, formateado.
+function _dteOpenJsonWindow(d, fallbackTitle){
+  var pretty=JSON.stringify(d.jsonDte, null, 2);
+  var head='// DTE '+(d.numeroControl||'')+'  ·  estado '+(d.estado||'')+'  ·  cod '+(d.codigoGeneracion||'')+'\n\n';
+  var w=window.open('','_blank');
+  if(!w){ alert('Permite ventanas emergentes para ver el JSON.'); return; }
+  w.document.write('<html><head><title>DTE '+_dteEsc(d.numeroControl||fallbackTitle||'')+'</title>'+
+    '<style>body{margin:0;background:#0e0c0a;color:#e8dcc0;font:12px/1.5 monospace;padding:16px}'+
+    'pre{white-space:pre-wrap;word-break:break-word}</style></head><body><pre>'+
+    _dteEsc(head+pretty)+'</pre></body></html>');
+  w.document.close();
+}
+// Abre el JSON del DTE (sin firmar) de un documento por su id.
 function dteViewJson(id){
   adminFetch(API+'/admin/dte/documents/'+id+'/json',{}).then(function(r){return r?r.json():null;}).then(function(d){
     if(!d){ alert('No se pudo cargar el JSON.'); return; }
     if(d.error){ alert(d.error); return; }
-    var pretty=JSON.stringify(d.jsonDte, null, 2);
-    var head='// DTE '+(d.numeroControl||'')+'  ·  estado '+(d.estado||'')+'  ·  cod '+(d.codigoGeneracion||'')+'\n\n';
-    var w=window.open('','_blank');
-    if(!w){ alert('Permite ventanas emergentes para ver el JSON.'); return; }
-    w.document.write('<html><head><title>DTE '+_dteEsc(d.numeroControl||id)+'</title>'+
-      '<style>body{margin:0;background:#0e0c0a;color:#e8dcc0;font:12px/1.5 monospace;padding:16px}'+
-      'pre{white-space:pre-wrap;word-break:break-word}</style></head><body><pre>'+
-      _dteEsc(head+pretty)+'</pre></body></html>');
-    w.document.close();
+    _dteOpenJsonWindow(d, id);
   }).catch(function(e){ alert('Error: '+e.message); });
+}
+// Abre el JSON del DTE más reciente de un PEDIDO (desde la pestaña de Pedidos).
+function orderViewDteJson(oid){
+  adminFetch(API+'/admin/orders/'+encodeURIComponent(oid)+'/dte/json',{}).then(function(r){
+    if(!r) return null;
+    if(r.status===404){ toast('Sin DTE','El pedido '+oid+' aún no tiene DTE emitido','warn'); return null; }
+    return r.json();
+  }).then(function(d){
+    if(!d) return;
+    if(d.error){ toast('Sin DTE', d.error, 'warn'); return; }
+    _dteOpenJsonWindow(d, oid);
+  }).catch(function(e){ toast('Error', e.message, 'err'); });
 }
 // Descarga el JSON del DTE como archivo.
 function dteDownloadJson(id){
@@ -2500,6 +2516,7 @@ function renderOrdersList(list, banner){
           '<button onclick="confirmOrderPayment(\''+o.id+'\')" title="Marcar el pago como recibido — emite el DTE" style="background:rgba(95,184,122,0.12);border:1px solid rgba(95,184,122,0.35);color:#5fb87a;font-family:\'Jost\',sans-serif;font-size:0.55rem;letter-spacing:0.1em;text-transform:uppercase;padding:0.25rem 0.6rem;cursor:pointer">✓ Confirmar pago</button>'
           :'')+
         '<span class="oc-total">$'+parseFloat(o.total||0).toFixed(2)+'</span>'+
+        '<button onclick="orderViewDteJson(\''+o.id+'\')" title="Ver el JSON del DTE de este pedido" style="background:rgba(184,149,90,0.1);border:1px solid rgba(184,149,90,0.35);color:var(--gold);font-family:\'Jost\',sans-serif;font-size:0.55rem;letter-spacing:0.1em;text-transform:uppercase;padding:0.25rem 0.6rem;cursor:pointer">JSON DTE</button>'+
         (o.payment_method==='cod'&&o.status!=='Entregado'&&o.status!=='No Entregado'?
           '<button onclick="markNoShow(\''+o.id+'\')" title="Marcar como no entregado y registrar no-show" style="background:rgba(192,80,74,0.12);border:1px solid rgba(192,80,74,0.3);color:#c0504a;font-family:\'Jost\',sans-serif;font-size:0.55rem;letter-spacing:0.1em;text-transform:uppercase;padding:0.25rem 0.6rem;cursor:pointer">No Entregado</button>'
           :'')+
