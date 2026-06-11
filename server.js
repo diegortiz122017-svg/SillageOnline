@@ -2416,6 +2416,53 @@ app.post('/api/admin/dte/ping', requireAdmin, async (req, res) => {
   } catch(e) { res.status(500).json({ error: e.message }); }
 });
 
+// GET /api/admin/dte/documents/:id/json — JSON del DTE (sin firmar + firmado/JWS).
+// ?download=1 fuerza descarga como archivo.
+app.get('/api/admin/dte/documents/:id/json', requireAdmin, async (req, res) => {
+  try {
+    const [rows] = await db.execute(
+      'SELECT id, order_id, tipo_dte, numero_control, codigo_generacion, estado, json_dte, json_firmado FROM dte_documents WHERE id=?',
+      [req.params.id]
+    );
+    if (!rows.length) return res.status(404).json({ error: 'DTE no encontrado' });
+    const r = rows[0];
+    let jsonDte;
+    try { jsonDte = JSON.parse(r.json_dte); } catch(e) { jsonDte = r.json_dte; }
+    const payload = {
+      id:               r.id,
+      orderId:          r.order_id,
+      tipoDte:          r.tipo_dte,
+      numeroControl:    r.numero_control,
+      codigoGeneracion: r.codigo_generacion,
+      estado:           r.estado,
+      jsonDte,
+      jsonFirmado:      r.json_firmado || null,
+    };
+    if (req.query.download) {
+      res.setHeader('Content-Type', 'application/json; charset=utf-8');
+      res.setHeader('Content-Disposition', `attachment; filename="dte-${r.numero_control || r.id}.json"`);
+      return res.send(JSON.stringify(payload, null, 2));
+    }
+    res.json(payload);
+  } catch(e) { res.status(500).json({ error: e.message }); }
+});
+
+// GET /api/admin/orders/:id/dte/json — JSON del DTE más reciente de un pedido.
+app.get('/api/admin/orders/:id/dte/json', requireAdmin, async (req, res) => {
+  try {
+    const rows = await dteSvc.getByOrderId(req.params.id);
+    if (!rows.length) return res.status(404).json({ error: 'El pedido no tiene DTE emitido' });
+    const r = rows[0]; // más reciente (getByOrderId ordena DESC)
+    let jsonDte;
+    try { jsonDte = JSON.parse(r.json_dte); } catch(e) { jsonDte = r.json_dte; }
+    res.json({
+      id: r.id, orderId: r.order_id, tipoDte: r.tipo_dte, estado: r.estado,
+      numeroControl: r.numero_control, codigoGeneracion: r.codigo_generacion,
+      jsonDte, jsonFirmado: r.json_firmado || null,
+    });
+  } catch(e) { res.status(500).json({ error: e.message }); }
+});
+
 // ── Customer addresses CRUD ──────────────────────────────────────────────────
 
 // GET /api/customer/addresses — list all addresses for the logged-in customer
@@ -4057,19 +4104,29 @@ app.get('/api/orders/export', requireAdmin, async (req, res) => {
 });
 
 app.patch('/api/orders/:id', requireAdmin, async (req, res) => {
-  const { status, trackerStep, trackingNumber } = req.body;
+  const { status, trackerStep, trackingNumber, paymentStatus } = req.body;
   const [existing] = await db.execute('SELECT * FROM orders WHERE id=?', [req.params.id]);
   if (!existing.length) return res.status(404).json({ error: 'Pedido no encontrado' });
-  const prevStatus = existing[0].status;
+  const prevStatus  = existing[0].status;
+  const prevPayment = existing[0].payment_status;
   await db.execute(
     `UPDATE orders SET
       status          = COALESCE(?,status),
       tracker_step    = COALESCE(?,tracker_step),
       tracking_number = COALESCE(?,tracking_number),
+      payment_status  = COALESCE(?,payment_status),
       updated_at      = ?
      WHERE id=?`,
-    [status || null, trackerStep ?? null, trackingNumber || null, new Date(), req.params.id]
+    [status || null, trackerStep ?? null, trackingNumber || null, paymentStatus || null, new Date(), req.params.id]
   );
+
+  // Confirmación de pago manual (admin) → emite el DTE (opción A, sin esperar webhook).
+  // Útil cuando el webhook de Wompi/BTCPay no llega o para pruebas. Dedup-guarded.
+  if (paymentStatus === 'Pagado' && prevPayment !== 'Pagado') {
+    broadcastAdmin('order_update', { id: req.params.id, paymentStatus: 'Pagado' });
+    await logActivity(`Pago confirmado manualmente para pedido ${escHtml(req.params.id)}`);
+    try { await emitDteForOrder(req.params.id); } catch(e) { console.error('DTE (pago manual) error:', e.message); }
+  }
   const [updated] = await db.execute('SELECT * FROM orders WHERE id=?', [req.params.id]);
   const order = {
     ...updated[0],

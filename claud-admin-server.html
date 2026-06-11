@@ -2147,6 +2147,7 @@ function loadDteDocuments(){
       var fecha=r.createdAt?String(r.createdAt).slice(0,10):'—';
       var sello=r.selloRecibido?('<span title="'+_dteEsc(r.selloRecibido)+'">'+_dteEsc(r.selloRecibido).slice(0,10)+'…</span>'):'—';
       var ver=r.verificacionUrl?('<a href="'+_dteEsc(r.verificacionUrl)+'" target="_blank" style="color:var(--gold)">Verificar ↗</a>'):'';
+      var jsonLink='<a href="#" onclick="dteViewJson('+r.id+');return false" style="color:var(--gold)">JSON</a> · <a href="#" onclick="dteDownloadJson('+r.id+');return false" style="color:var(--muted)">↓</a>';
       var obs=r.observaciones?('<div style="font-size:0.56rem;color:#d98a3a;max-width:280px">'+_dteEsc(r.observaciones)+'</div>'):'';
       return '<tr>'+
         '<td>'+_dteEsc(r.orderId)+'</td>'+
@@ -2157,10 +2158,37 @@ function loadDteDocuments(){
         '<td style="font-size:0.56rem">'+_dteEsc((r.codigoGeneracion||'—'))+'</td>'+
         '<td style="font-size:0.56rem">'+sello+'</td>'+
         '<td>'+fecha+'</td>'+
-        '<td>'+ver+'</td>'+
+        '<td style="white-space:nowrap">'+jsonLink+(ver?' · '+ver:'')+'</td>'+
       '</tr>';
     }).join('');
   }).catch(function(){ tb.innerHTML='<tr><td colspan="9" style="text-align:center;padding:2rem;color:#d9534f">Error.</td></tr>'; });
+}
+
+// Abre el JSON del DTE (sin firmar) en una pestaña nueva, formateado.
+function dteViewJson(id){
+  adminFetch(API+'/admin/dte/documents/'+id+'/json',{}).then(function(r){return r?r.json():null;}).then(function(d){
+    if(!d){ alert('No se pudo cargar el JSON.'); return; }
+    if(d.error){ alert(d.error); return; }
+    var pretty=JSON.stringify(d.jsonDte, null, 2);
+    var head='// DTE '+(d.numeroControl||'')+'  ·  estado '+(d.estado||'')+'  ·  cod '+(d.codigoGeneracion||'')+'\n\n';
+    var w=window.open('','_blank');
+    if(!w){ alert('Permite ventanas emergentes para ver el JSON.'); return; }
+    w.document.write('<html><head><title>DTE '+_dteEsc(d.numeroControl||id)+'</title>'+
+      '<style>body{margin:0;background:#0e0c0a;color:#e8dcc0;font:12px/1.5 monospace;padding:16px}'+
+      'pre{white-space:pre-wrap;word-break:break-word}</style></head><body><pre>'+
+      _dteEsc(head+pretty)+'</pre></body></html>');
+    w.document.close();
+  }).catch(function(e){ alert('Error: '+e.message); });
+}
+// Descarga el JSON del DTE como archivo.
+function dteDownloadJson(id){
+  adminFetch(API+'/admin/dte/documents/'+id+'/json?download=1',{}).then(function(r){return r?r.blob():null;}).then(function(b){
+    if(!b){ return; }
+    var url=URL.createObjectURL(b);
+    var a=document.createElement('a'); a.href=url; a.download='dte-'+id+'.json';
+    document.body.appendChild(a); a.click(); a.remove();
+    setTimeout(function(){ URL.revokeObjectURL(url); }, 2000);
+  }).catch(function(e){ alert('Error: '+e.message); });
 }
 
 function dtePing(){
@@ -2468,6 +2496,9 @@ function renderOrdersList(list, banner){
         '<input class="tracking-input" id="trk-'+o.id+'" placeholder="N° seguimiento" value="'+(o.tracking_number||'')+'" data-oid="'+o.id+'" title="Número de seguimiento — se incluye en el email de envío"/>'+
         '<span class="sc '+scls+'">'+o.status+'</span>'+
         '<span class="pay-chip pay-'+(o.paymentStatus==='Pagado'?'ok':o.paymentStatus==='Fallido'?'err':'pend')+'">'+pmLabel+'</span>'+
+        (o.paymentStatus!=='Pagado'?
+          '<button onclick="confirmOrderPayment(\''+o.id+'\')" title="Marcar el pago como recibido — emite el DTE" style="background:rgba(95,184,122,0.12);border:1px solid rgba(95,184,122,0.35);color:#5fb87a;font-family:\'Jost\',sans-serif;font-size:0.55rem;letter-spacing:0.1em;text-transform:uppercase;padding:0.25rem 0.6rem;cursor:pointer">✓ Confirmar pago</button>'
+          :'')+
         '<span class="oc-total">$'+parseFloat(o.total||0).toFixed(2)+'</span>'+
         (o.payment_method==='cod'&&o.status!=='Entregado'&&o.status!=='No Entregado'?
           '<button onclick="markNoShow(\''+o.id+'\')" title="Marcar como no entregado y registrar no-show" style="background:rgba(192,80,74,0.12);border:1px solid rgba(192,80,74,0.3);color:#c0504a;font-family:\'Jost\',sans-serif;font-size:0.55rem;letter-spacing:0.1em;text-transform:uppercase;padding:0.25rem 0.6rem;cursor:pointer">No Entregado</button>'
@@ -2475,6 +2506,24 @@ function renderOrdersList(list, banner){
       '</div>';
     container.appendChild(div);
   });
+}
+// Confirma el pago de un pedido manualmente → dispara la emisión del DTE (opción A).
+function confirmOrderPayment(oid){
+  if(!confirm('¿Marcar el pago del pedido '+oid+' como RECIBIDO? Esto emitirá el DTE.')) return;
+  adminFetch(API+'/orders/'+oid,{method:'PATCH',headers:{'Content-Type':'application/json'},body:JSON.stringify({paymentStatus:'Pagado'})})
+    .then(function(r){ return r?r.json():null; })
+    .then(function(res){
+      if(res&&res.ok){
+        var o=orders.find(function(x){return String(x.id)===String(oid);});
+        if(o){o.paymentStatus='Pagado';}
+        toast('Pago confirmado','Pedido '+oid+' — emitiendo DTE…','ok');
+        if(currentPage==='orders') renderOrders();
+        if(typeof loadDteDocuments==='function') setTimeout(loadDteDocuments,1500);
+      } else {
+        toast('Error','No se pudo confirmar el pago','err');
+      }
+    })
+    .catch(function(){ toast('Error','No se pudo confirmar el pago','err'); });
 }
 function saveTracking(oid,val){
   adminFetch(API+'/orders/'+oid,{method:'PATCH',headers:{'Content-Type':'application/json'},body:JSON.stringify({trackingNumber:val})})
