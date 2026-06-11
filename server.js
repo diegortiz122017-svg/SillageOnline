@@ -3211,7 +3211,11 @@ app.post('/api/wompi/webhook', express.json(), async (req, res) => {
   const status    = (tx.estado || tx.status || '').toUpperCase();
   const isProd    = req.body?.esProductiva !== false;
 
-  if (!isProd) { console.log(`Wompi webhook: test transaction for ${reference} — ignored`); return; }
+  // Las transacciones de PRUEBA de Wompi (esProductiva:false) se ignoran por defecto.
+  // Para probar el flujo completo (pedido→pago→DTE) con pagos sandbox, poner
+  // WOMPI_ACCEPT_TEST=true en el entorno (quitar al pasar a producción real).
+  const acceptTest = process.env.WOMPI_ACCEPT_TEST === 'true';
+  if (!isProd && !acceptTest) { console.log(`Wompi webhook: test transaction for ${reference} — ignored (set WOMPI_ACCEPT_TEST=true to accept)`); return; }
   if (status !== 'APROBADA' && status !== 'APPROVED') { console.log(`Wompi webhook: ${reference} status ${status} — not approved, skipping`); return; }
   if (!reference) { console.warn('Wompi webhook: no reference'); return; }
 
@@ -3228,23 +3232,37 @@ app.post('/api/wompi/webhook', express.json(), async (req, res) => {
     const custId   = pending.customer_id;
     const now      = new Date();
 
-    // Idempotency check
-    const [exists] = await db.execute('SELECT id FROM orders WHERE id=?', [orderObj.id]);
-    if (exists.length) { console.log(`Wompi webhook: order ${orderObj.id} already exists — skipping`); return; }
+    // Idempotency: only skip if the order is ALREADY PAID (true duplicate webhook).
+    // The checkout inserts the order row with payment_status='Pendiente', so "exists"
+    // alone does NOT mean processed — that old check made the webhook skip every real
+    // order (never marked Pagado, never deducted stock, never emitted the DTE).
+    const [exists] = await db.execute('SELECT id, payment_status FROM orders WHERE id=?', [orderObj.id]);
+    if (exists.length && exists[0].payment_status === 'Pagado') {
+      console.log(`Wompi webhook: order ${orderObj.id} already paid — skipping duplicate`);
+      return;
+    }
 
-    // Create the real order
-    await db.execute(
-      `INSERT INTO orders
-         (id,customer,email,phone,address,city,state_province,country,
-          items,total,status,payment_status,payment_method,tracker_step,
-          customer_id,created_at,updated_at)
-       VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
-      [orderObj.id, orderObj.customer, orderObj.email, orderObj.phone,
-       orderObj.address, orderObj.city, orderObj.state, orderObj.country,
-       JSON.stringify(items), orderObj.total,
-       'Procesando', 'Pagado', 'wompi', 1,
-       custId || null, pending.created_at, now]
-    );
+    if (exists.length) {
+      // Order row created at checkout (Pendiente) → confirm payment on it
+      await db.execute(
+        `UPDATE orders SET status='Procesando', payment_status='Pagado', payment_method='wompi', updated_at=? WHERE id=?`,
+        [now, orderObj.id]
+      );
+    } else {
+      // Create the real order (deferred-creation path)
+      await db.execute(
+        `INSERT INTO orders
+           (id,customer,email,phone,address,city,state_province,country,
+            items,total,status,payment_status,payment_method,tracker_step,
+            customer_id,created_at,updated_at)
+         VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
+        [orderObj.id, orderObj.customer, orderObj.email, orderObj.phone,
+         orderObj.address, orderObj.city, orderObj.state, orderObj.country,
+         JSON.stringify(items), orderObj.total,
+         'Procesando', 'Pagado', 'wompi', 1,
+         custId || null, pending.created_at, now]
+      );
+    }
 
     await deductInventory(items);
     await deductBottleInventory(items);
@@ -3562,35 +3580,43 @@ app.post('/api/btcpay/webhook', async (req, res) => {
       const items    = orderObj.items || [];
       const custId   = pending.customer_id;
 
-      // Idempotency: check if order already exists before inserting
+      // Idempotency: only skip if the order is ALREADY PAID (true duplicate).
+      // The checkout inserts the order row with payment_status='Pendiente', so
+      // "exists" alone does NOT mean processed (old check skipped every real order).
       const [existingOrder] = await db.execute(
-        'SELECT id FROM orders WHERE id=?', [orderObj.id]
+        'SELECT id, payment_status FROM orders WHERE id=?', [orderObj.id]
       );
-      if (existingOrder.length) {
-        console.log(`BTCPay webhook: order ${orderObj.id} already exists — cleaning up pending and skipping`);
+      if (existingOrder.length && existingOrder[0].payment_status === 'Pagado') {
+        console.log(`BTCPay webhook: order ${orderObj.id} already paid — cleaning up pending and skipping`);
         await db.execute('DELETE FROM btcpay_pending WHERE invoice_id=?', [invoiceId]);
         return;
       }
 
-      // Use INSERT IGNORE as final safety net against race conditions
-      const [insertResult] = await db.execute(
-        `INSERT IGNORE INTO orders
-           (id,customer,email,phone,address,city,state_province,country,
-            items,total,status,payment_status,payment_method,tracker_step,
-            customer_id,created_at,updated_at)
-         VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
-        [orderObj.id, orderObj.customer, orderObj.email, orderObj.phone,
-         orderObj.address, orderObj.city, orderObj.state, orderObj.country,
-         JSON.stringify(items), orderObj.total,
-         'Procesando', 'Pagado', 'btcpay', 1,
-         custId || null, pending.created_at, now]
-      );
-
-      // If INSERT IGNORE skipped (duplicate), clean up and bail
-      if (insertResult.affectedRows === 0) {
-        console.log(`BTCPay webhook: INSERT IGNORE skipped duplicate order ${orderObj.id}`);
-        await db.execute('DELETE FROM btcpay_pending WHERE invoice_id=?', [invoiceId]);
-        return;
+      if (existingOrder.length) {
+        // Order row created at checkout (Pendiente) → confirm payment on it
+        await db.execute(
+          `UPDATE orders SET status='Procesando', payment_status='Pagado', payment_method='btcpay', updated_at=? WHERE id=?`,
+          [now, orderObj.id]
+        );
+      } else {
+        // Deferred-creation path. INSERT IGNORE as safety net against races.
+        const [insertResult] = await db.execute(
+          `INSERT IGNORE INTO orders
+             (id,customer,email,phone,address,city,state_province,country,
+              items,total,status,payment_status,payment_method,tracker_step,
+              customer_id,created_at,updated_at)
+           VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
+          [orderObj.id, orderObj.customer, orderObj.email, orderObj.phone,
+           orderObj.address, orderObj.city, orderObj.state, orderObj.country,
+           JSON.stringify(items), orderObj.total,
+           'Procesando', 'Pagado', 'btcpay', 1,
+           custId || null, pending.created_at, now]
+        );
+        if (insertResult.affectedRows === 0) {
+          console.log(`BTCPay webhook: INSERT IGNORE skipped duplicate order ${orderObj.id}`);
+          await db.execute('DELETE FROM btcpay_pending WHERE invoice_id=?', [invoiceId]);
+          return;
+        }
       }
 
       await deductInventory(items);
@@ -3635,6 +3661,7 @@ app.post('/api/btcpay/webhook', async (req, res) => {
           await deductBottleInventory(items);
           broadcastAdmin('order_update', { id: orderId, status: 'Procesando', paymentStatus: 'Pagado' });
           await logActivity(`Pago BTCPay confirmado (fallback) para pedido ${orderId}`);
+          try { await emitDteForOrder(orderId); } catch(e) { console.error('BTCPay DTE (fallback) error:', e.message); }
         }
       } else {
         console.warn(`BTCPay webhook: invoice ${invoiceId} settled but no pending record found — possible expiry`);
