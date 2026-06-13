@@ -2360,22 +2360,23 @@ const DTE_HOMOLOGACION = [
   { tipoDte: '05', label: 'Nota de Crédito',                target: 50 },
 ];
 
-// Receptor de prueba (empresa) para CCF/NC — usa códigos de catálogo válidos conocidos.
+// Receptor de prueba (empresa) para CCF/NC — NIT/NRC distintos al emisor (MH rechaza auto-factura).
+// NIT 06140101011034 = empresa de prueba estándar de la normativa MH (14 dígitos sin guiones).
 function buildTestReceptor() {
   const e = cfg.DTE_EMISOR;
   return {
-    nit:           e.nit,            // NIT válido conocido (formato correcto)
-    nrc:           e.nrc,
-    nombre:        'Cliente Empresa de Prueba, S.A. de C.V.',
-    nombreComercial: 'Cliente de Prueba',
+    nit:           '06140101011034',
+    nrc:           '2',
+    nombre:        'DISTRIBUIDORA DE PRUEBA, SOCIEDAD ANONIMA DE CAPITAL VARIABLE',
+    nombreComercial: 'Distribuidora de Prueba',
     codActividad:  e.codActividad,   // CAT-019 válido (47722)
     descActividad: e.descActividad,
-    departamento:  e.departamento,   // 08 / 23 / 11 (válidos)
-    municipio:     e.municipio,
-    distrito:      e.distrito,
-    complemento:   'Dirección de prueba, San Juan Talpa, La Paz',
-    telefono:      e.telefono,
-    correo:        e.correo,
+    departamento:  '06',             // CAT-012: San Salvador
+    municipio:     '23',             // CAT-013: San Salvador Centro (mismo código 23)
+    distrito:      '06',             // CAT-008: San Salvador Centro
+    complemento:   '10 Av. Norte 456, Col. Centro, San Salvador',
+    telefono:      '25551234',
+    correo:        'receptor-prueba@example.com',
   };
 }
 
