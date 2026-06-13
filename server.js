@@ -2371,10 +2371,10 @@ function buildTestReceptor() {
     nombreComercial: 'Distribuidora de Prueba',
     codActividad:  e.codActividad,   // CAT-019 válido (47722)
     descActividad: e.descActividad,
-    departamento:  '06',             // CAT-012: San Salvador
-    municipio:     '23',             // CAT-013: San Salvador Centro (mismo código 23)
-    distrito:      '06',             // CAT-008: San Salvador Centro
-    complemento:   '10 Av. Norte 456, Col. Centro, San Salvador',
+    departamento:  e.departamento,   // 08 — La Paz (códigos ya validados con el MH)
+    municipio:     e.municipio,      // 23 — La Paz Oeste
+    distrito:      e.distrito,       // 11 — San Juan Talpa
+    complemento:   'Km 40 Carretera al Puerto, San Juan Talpa, La Paz',
     telefono:      '25551234',
     correo:        'receptor-prueba@example.com',
   };
