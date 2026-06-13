@@ -297,7 +297,10 @@ function buildCreditoFiscal(order, receptor, opts) {
     totalLetras:         numeroALetras(montoTotal),
     saldoFavor:          0,
     condicionOperacion:  1,
-    pagos:               null,
+    pagos:               (function(){
+      const fp = formaPagoDesde(order);
+      return [{ codigo: fp.codigo, montoPago: montoTotal, referencia: fp.referencia, plazo: null, periodo: null }];
+    })(),
     numPagoElectronico:  null,
     observaciones:       null,
   };
