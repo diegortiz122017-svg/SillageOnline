@@ -2366,7 +2366,7 @@ function buildTestReceptor() {
   const e = cfg.DTE_EMISOR;
   return {
     nit:           '06140101011034',
-    nrc:           '2',
+    nrc:           '3869539',
     nombre:        'DISTRIBUIDORA DE PRUEBA, SOCIEDAD ANONIMA DE CAPITAL VARIABLE',
     nombreComercial: 'Distribuidora de Prueba',
     codActividad:  e.codActividad,   // CAT-019 válido (47722)
