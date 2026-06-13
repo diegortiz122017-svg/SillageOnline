@@ -2365,10 +2365,10 @@ const DTE_HOMOLOGACION = [
 function buildTestReceptor() {
   const e = cfg.DTE_EMISOR;
   return {
-    nit:           e.nit,            // único NIT registrado en apitest que conocemos
-    nrc:           e.nrc,
-    nombre:        e.nombre,
-    nombreComercial: e.nombreComercial,
+    nit:           '06140812951023',
+    nrc:           '899100',
+    nombre:        'EMPRESA RECEPTORA DE PRUEBA, S.A. DE C.V.',
+    nombreComercial: 'Empresa de Prueba',
     codActividad:  e.codActividad,   // CAT-019 válido (47722)
     descActividad: e.descActividad,
     departamento:  e.departamento,   // 08 — La Paz (códigos ya validados con el MH)
