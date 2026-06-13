@@ -1181,6 +1181,14 @@ tr:hover td{background:rgba(255,255,255,0.02)}
           <div id="dteDiagOut" style="margin-top:1rem;font-size:0.7rem;color:var(--muted);line-height:1.8"></div>
         </div>
 
+        <!-- Pruebas de homologación -->
+        <div style="background:rgba(255,255,255,0.03);border:1px solid var(--border-light);padding:1.2rem;margin-bottom:1.2rem">
+          <div style="font-size:0.6rem;letter-spacing:0.2em;text-transform:uppercase;color:var(--gold);margin-bottom:0.5rem">Pruebas de homologación (MH)</div>
+          <div style="font-size:0.62rem;color:var(--muted);margin-bottom:1rem">Emite las pruebas obligatorias hasta cumplir la meta de cada tipo, luego solicita autorización de producción. La Nota de Crédito necesita un CCF ya procesado (emite CCF primero).</div>
+          <div id="dteHomoList" style="font-size:0.7rem;color:var(--cream)">Cargando…</div>
+          <div id="dteHomoOut" style="margin-top:0.8rem;font-size:0.68rem;line-height:1.7;color:var(--muted)"></div>
+        </div>
+
         <!-- Emitir / reintentar DTE de un pedido -->
         <div style="background:rgba(255,255,255,0.03);border:1px solid var(--border-light);padding:1.2rem;margin-bottom:1.2rem">
           <div style="font-size:0.6rem;letter-spacing:0.2em;text-transform:uppercase;color:var(--gold);margin-bottom:1rem">Emitir / reintentar DTE de un pedido</div>
@@ -2108,7 +2116,69 @@ function _dteEstadoColor(e){ return e==='PROCESADO'?'#5fb87a':(e==='RECHAZADO'?'
 
 function renderDtePage(){
   loadDteStatus();
+  loadHomologacion();
   loadDteDocuments();
+}
+
+// ── Pruebas de homologación ──────────────────────────────
+var _homoBusy = false;
+function loadHomologacion(){
+  var el=document.getElementById('dteHomoList'); if(!el) return;
+  adminFetch(API+'/admin/dte/homologacion',{}).then(function(r){return r?r.json():null;}).then(function(d){
+    if(!d||!d.items){ el.textContent='No se pudo cargar.'; return; }
+    var noCcf = !d.latestCcf;
+    el.innerHTML = d.items.map(function(h){
+      var pct = h.target?Math.min(100,Math.round(h.done/h.target*100)):0;
+      var full = h.done>=h.target;
+      var col = full?'#5fb87a':'var(--gold)';
+      var disabledNc = (h.tipoDte==='05' && noCcf);
+      return '<div style="margin-bottom:0.9rem">'+
+        '<div style="display:flex;align-items:center;gap:0.6rem;flex-wrap:wrap;margin-bottom:0.3rem">'+
+          '<span style="min-width:230px">'+_dteEsc(h.label)+' <b style="color:'+col+'">('+h.done+'/'+h.target+')</b>'+(full?' ✓':'')+'</span>'+
+          (full?'':(
+            '<button class="save-btn" style="padding:0.35rem 0.9rem;font-size:0.55rem" '+(disabledNc?'disabled title="Emite un CCF primero" style="opacity:0.5;padding:0.35rem 0.9rem;font-size:0.55rem"':'')+' onclick="homoEmit(\''+h.tipoDte+'\',1)">Emitir 1</button>'+
+            '<button class="save-btn" style="padding:0.35rem 0.9rem;font-size:0.55rem" '+(disabledNc?'disabled style="opacity:0.5;padding:0.35rem 0.9rem;font-size:0.55rem"':'')+' onclick="homoEmit(\''+h.tipoDte+'\',5)">+5</button>'+
+            '<button class="save-btn" style="padding:0.35rem 0.9rem;font-size:0.55rem;background:transparent;border:1px solid var(--gold);color:var(--gold)" '+(disabledNc?'disabled style="opacity:0.5"':'')+' onclick="homoComplete(\''+h.tipoDte+'\')">Completar restantes</button>'
+          ))+
+        '</div>'+
+        '<div style="height:4px;background:rgba(184,149,90,0.15);border-radius:2px;overflow:hidden"><div style="height:100%;width:'+pct+'%;background:'+col+'"></div></div>'+
+      '</div>';
+    }).join('') + (noCcf?'<div style="font-size:0.6rem;color:#d98a3a">⚠ La Nota de Crédito se habilita cuando exista al menos un CCF procesado.</div>':'');
+  }).catch(function(){ el.textContent='Error al cargar.'; });
+}
+
+function homoEmit(tipoDte, count, silent){
+  if(_homoBusy) return Promise.resolve(null);
+  _homoBusy=true;
+  var out=document.getElementById('dteHomoOut');
+  if(!silent) out.innerHTML='Emitiendo '+count+'…';
+  return adminFetch(API+'/admin/dte/homologacion/emit',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({tipoDte:tipoDte,count:count})})
+    .then(function(r){return r?r.json():null;}).then(function(d){
+      _homoBusy=false;
+      if(!d){ out.textContent='Sin respuesta.'; return null; }
+      if(d.error){ out.innerHTML='<span style="color:#d9534f">'+_dteEsc(d.error)+'</span>'; return null; }
+      var fail=(d.results||[]).filter(function(x){return x.estado!=='PROCESADO';});
+      out.innerHTML='Tipo '+_dteEsc(d.tipoDte)+': '+d.procesados+'/'+d.emitted+' procesados · total ('+d.done+'/'+d.target+')'+
+        (fail.length?'<div style="color:#d9534f;margin-top:0.3rem">⚠ '+_dteEsc((fail[0].observaciones||fail[0].estado))+'</div>':'');
+      loadHomologacion(); loadDteDocuments(); loadDteStatus();
+      return d;
+    }).catch(function(e){ _homoBusy=false; out.innerHTML='<span style="color:#d9534f">Error: '+_dteEsc(e.message)+'</span>'; return null; });
+}
+
+// Emite en lotes de 5 hasta completar la meta o hasta que uno falle.
+function homoComplete(tipoDte){
+  var out=document.getElementById('dteHomoOut');
+  function step(){
+    return homoEmit(tipoDte,5,true).then(function(d){
+      if(!d) return;
+      var anyFail=(d.results||[]).some(function(x){return x.estado!=='PROCESADO';});
+      if(anyFail){ return; }            // se detuvo por un rechazo (ya mostrado)
+      if(d.done>=d.target){ out.innerHTML='✅ '+_dteEsc(tipoDte)+' completado ('+d.done+'/'+d.target+')'; loadHomologacion(); return; }
+      return step();                    // siguiente lote
+    });
+  }
+  if(!confirm('Emitir automáticamente las pruebas restantes del tipo '+tipoDte+'? Puede tardar.')) return;
+  step();
 }
 
 function loadDteStatus(){

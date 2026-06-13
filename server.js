@@ -2350,6 +2350,104 @@ app.post('/api/admin/dte/test', requireAdmin, async (req, res) => {
   }
 });
 
+// ════════════════════════════════════════════════════════════════════════════
+//  PRUEBAS DE HOMOLOGACIÓN (MH) — emitir lotes de FC/CCF/NC hasta cumplir las
+//  metas obligatorias del ambiente de pruebas antes de pedir autorización.
+// ════════════════════════════════════════════════════════════════════════════
+const DTE_HOMOLOGACION = [
+  { tipoDte: '01', label: 'Factura (Consumidor Final)',     target: 90 },
+  { tipoDte: '03', label: 'Comprobante de Crédito Fiscal',  target: 75 },
+  { tipoDte: '05', label: 'Nota de Crédito',                target: 50 },
+];
+
+// Receptor de prueba (empresa) para CCF/NC — usa códigos de catálogo válidos conocidos.
+function buildTestReceptor() {
+  const e = cfg.DTE_EMISOR;
+  return {
+    nit:           e.nit,            // NIT válido conocido (formato correcto)
+    nrc:           e.nrc,
+    nombre:        'Cliente Empresa de Prueba, S.A. de C.V.',
+    nombreComercial: 'Cliente de Prueba',
+    codActividad:  e.codActividad,   // CAT-019 válido (47722)
+    descActividad: e.descActividad,
+    departamento:  e.departamento,   // 08 / 23 / 11 (válidos)
+    municipio:     e.municipio,
+    distrito:      e.distrito,
+    complemento:   'Dirección de prueba, San Juan Talpa, La Paz',
+    telefono:      e.telefono,
+    correo:        e.correo,
+  };
+}
+
+async function homologacionCounts() {
+  const [rows] = await db.execute(
+    "SELECT tipo_dte, COUNT(*) c FROM dte_documents WHERE estado='PROCESADO' AND ambiente=? GROUP BY tipo_dte",
+    [cfg.DTE_AMBIENTE]
+  ).catch(() => [[]]);
+  const map = {};
+  (rows || []).forEach(r => { map[r.tipo_dte] = r.c; });
+  return DTE_HOMOLOGACION.map(h => ({ ...h, done: map[h.tipoDte] || 0 }));
+}
+
+// Último CCF PROCESADO (para que la Nota de Crédito lo referencie).
+async function latestProcessedCCF() {
+  const [rows] = await db.execute(
+    "SELECT codigo_generacion, json_dte FROM dte_documents WHERE tipo_dte='03' AND estado='PROCESADO' AND ambiente=? ORDER BY id DESC LIMIT 1",
+    [cfg.DTE_AMBIENTE]
+  ).catch(() => [[]]);
+  if (!rows || !rows.length) return null;
+  let fecEmi = new Date().toISOString().slice(0, 10);
+  try { fecEmi = JSON.parse(rows[0].json_dte).identificacion.fecEmi || fecEmi; } catch(e) {}
+  return { codigoGeneracion: rows[0].codigo_generacion, fecEmi };
+}
+
+app.get('/api/admin/dte/homologacion', requireAdmin, async (req, res) => {
+  try {
+    res.json({ ambiente: cfg.DTE_AMBIENTE, items: await homologacionCounts(), latestCcf: await latestProcessedCCF() });
+  } catch(e) { res.status(500).json({ error: e.message }); }
+});
+
+// POST /api/admin/dte/homologacion/emit  body: { tipoDte, count? }
+// Emite hasta `count` (máx 10) documentos de prueba del tipo indicado.
+app.post('/api/admin/dte/homologacion/emit', requireAdmin, async (req, res) => {
+  if (!cfg.DTE_ENABLED) return res.status(409).json({ error: 'DTE deshabilitado.' });
+  const tipoDte = String((req.body && req.body.tipoDte) || '01');
+  if (!DTE_HOMOLOGACION.some(h => h.tipoDte === tipoDte)) {
+    return res.status(400).json({ error: 'tipoDte no soportado para homologación (usa 01, 03 o 05).' });
+  }
+  const count = Math.max(1, Math.min(10, parseInt((req.body && req.body.count), 10) || 1));
+  try {
+    const results = [];
+    for (let i = 0; i < count; i++) {
+      const order = await buildRandomTestOrder({});
+      const options = { tipoDte };
+      if (tipoDte === '03' || tipoDte === '05') options.receptor = buildTestReceptor();
+      if (tipoDte === '05') {
+        const ccf = await latestProcessedCCF();
+        if (!ccf) { results.push({ estado: 'ERROR', observaciones: 'No hay un CCF PROCESADO para referenciar. Emite primero un CCF.' }); break; }
+        options.docRelacionado = ccf;
+      }
+      const rec = await dteSvc.emitForOrder(order, options);
+      results.push({
+        estado:        rec?.estado || 'ERROR',
+        numeroControl: rec?.numeroControl || null,
+        observaciones: rec?.observaciones || null,
+      });
+      if (rec && rec.estado !== 'PROCESADO') break; // si uno falla, parar para no repetir el error
+    }
+    const items = await homologacionCounts();
+    const cur = items.find(h => h.tipoDte === tipoDte);
+    res.json({
+      tipoDte,
+      emitted:    results.length,
+      procesados: results.filter(r => r.estado === 'PROCESADO').length,
+      results,
+      done:       cur ? cur.done : null,
+      target:     cur ? cur.target : null,
+    });
+  } catch(e) { res.status(500).json({ error: e.message }); }
+});
+
 // GET /api/admin/dte/status — configuración + conteos + correlativos (no contacta al MH)
 app.get('/api/admin/dte/status', requireAdmin, async (req, res) => {
   try {
