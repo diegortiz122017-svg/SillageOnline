@@ -1878,7 +1878,17 @@ function checkExistingSession(){
     document.getElementById('dashboard').classList.add('show');
     document.getElementById('tbUser').textContent=d.user||'Admin';
     connectWS();
+    restoreAdminPage();
   }).catch(function(){});
+}
+
+// Restaura la última página visitada tras recargar (evita volver siempre a Overview).
+function restoreAdminPage(){
+  var saved=null;
+  try{ saved=localStorage.getItem('sillage_admin_page'); }catch(e){}
+  if(saved && saved!=='overview' && document.getElementById('page-'+saved)){
+    navTo(saved);
+  }
 }
 checkExistingSession();
 document.getElementById('logoutBtn').addEventListener('click',function(){
@@ -1921,6 +1931,7 @@ function switchToPage(page){
 
 function navTo(page){
   currentPage=page;
+  try{ localStorage.setItem('sillage_admin_page', page); }catch(e){}
   // Close quick-view panel
   closeQV();
   document.querySelectorAll('.page').forEach(function(p){p.classList.remove('active');});
@@ -2477,8 +2488,18 @@ function dteManualEmit(){
       (d.selloRecibido?' · Sello '+_dteEsc(d.selloRecibido).slice(0,16)+'…':'')+
       (d.total!=null?' · $'+_dteEsc(Number(d.total).toFixed(2)):'')+
       (d.observaciones?'<div style="color:#d98a3a;margin-top:0.3rem">'+_dteEsc(d.observaciones)+'</div>':'');
+    // Tras una emisión PROCESADA, limpiar el formulario para no enviar dobles.
+    if(d.ok) dteManualReset();
     loadHomologacion(); loadDteDocuments(); loadDteStatus();
   }).catch(function(e){ out.innerHTML='<span style="color:#d9534f">Error: '+_dteEsc(e.message)+'</span>'; });
+}
+function dteManualReset(){
+  document.getElementById('dteManualItems').innerHTML='';
+  dteManualAddItem('',1,'');
+  ['dteManualNit','dteManualNrc','dteManualNom','dteManualCliente','dteManualCorreo'].forEach(function(id){
+    var el=document.getElementById(id); if(el) el.value='';
+  });
+  dteManualRecalc();
 }
 
 function dteToggleReceptor(){
