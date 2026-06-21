@@ -2454,6 +2454,69 @@ app.post('/api/admin/dte/homologacion/emit', requireAdmin, async (req, res) => {
   } catch(e) { res.status(500).json({ error: e.message }); }
 });
 
+// POST /api/admin/dte/emit-manual — emite un DTE con los detalles reales capturados a mano.
+// Sirve igual en homologación y en PRODUCCIÓN: el admin escribe cliente, ítems y pago.
+//   body: { tipoDte, receptor?:{nit,nrc,nombre}, customer?, email?, phone?,
+//           paymentMethod?, items:[{name,qty,price}] }  (price = IVA incluido)
+app.post('/api/admin/dte/emit-manual', requireAdmin, async (req, res) => {
+  if (!cfg.DTE_ENABLED) return res.status(409).json({ error: 'DTE deshabilitado.' });
+  const b = req.body || {};
+  const tipoDte = String(b.tipoDte || '03');
+  if (!['01', '03', '05'].includes(tipoDte)) {
+    return res.status(400).json({ error: 'tipoDte no soportado (usa 01, 03 o 05).' });
+  }
+
+  // Normalizar e validar ítems
+  const rawItems = Array.isArray(b.items) ? b.items : [];
+  const items = rawItems
+    .map(it => ({
+      name:  String(it.name || it.descripcion || '').trim().slice(0, 200),
+      qty:   Math.max(1, parseInt(it.qty, 10) || 0),
+      price: Math.round((parseFloat(it.price) || 0) * 100) / 100,
+    }))
+    .filter(it => it.name && it.qty > 0 && it.price > 0);
+  if (!items.length) {
+    return res.status(400).json({ error: 'Agrega al menos un ítem con descripción, cantidad y precio.' });
+  }
+  const total = Math.round(items.reduce((s, it) => s + it.qty * it.price, 0) * 100) / 100;
+
+  const order = {
+    id:             String(b.orderId || ('MAN-' + Date.now())),
+    customer:       String(b.customer || 'Consumidor Final').slice(0, 250),
+    email:          String(b.email || cfg.DTE_EMISOR.correo || '').slice(0, 100) || null,
+    phone:          b.phone ? String(b.phone).slice(0, 30) : null,
+    payment_method: String(b.paymentMethod || 'cod'),
+    items:          JSON.stringify(items),
+    total,
+  };
+
+  try {
+    const options = { tipoDte };
+    if (tipoDte === '03' || tipoDte === '05') {
+      const r = b.receptor || {};
+      if (!r.nit || !r.nrc || !r.nombre) {
+        return res.status(400).json({ error: 'CCF/NC requieren NIT, NRC y nombre del receptor.' });
+      }
+      options.receptor = { ...buildTestReceptor(), nit: r.nit, nrc: r.nrc, nombre: r.nombre, nombreComercial: r.nombre };
+    }
+    if (tipoDte === '05') {
+      const ccf = await latestProcessedCCF();
+      if (!ccf) return res.status(409).json({ error: 'No hay un CCF PROCESADO para referenciar. Emite un CCF primero.' });
+      options.docRelacionado = ccf;
+    }
+    const rec = await dteSvc.emitForOrder(order, options);
+    res.json({
+      ok:            rec && rec.estado === 'PROCESADO',
+      estado:        rec?.estado || 'ERROR',
+      numeroControl: rec?.numeroControl || null,
+      selloRecibido: rec?.selloRecibido || null,
+      observaciones: rec?.observaciones || null,
+      total,
+      numItems:      items.length,
+    });
+  } catch(e) { res.status(500).json({ error: e.message }); }
+});
+
 // GET /api/admin/dte/status — configuración + conteos + correlativos (no contacta al MH)
 app.get('/api/admin/dte/status', requireAdmin, async (req, res) => {
   try {
