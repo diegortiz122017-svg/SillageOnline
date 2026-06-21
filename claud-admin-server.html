@@ -2171,8 +2171,16 @@ function renderDtePage(){
 }
 function dteManualInit(){
   var box=document.getElementById('dteManualItems');
-  if(box && !box.children.length){ dteManualAddItem('',1,''); }
-  dteManualToggle();
+  function seed(){
+    if(box && !box.children.length){ dteManualAddItem('',1,''); }
+    dteManualToggle();
+  }
+  // Cargar catálogo si aún no está, para poblar los selectores de producto
+  if(typeof catalogFragrances==='undefined' || !catalogFragrances || !catalogFragrances.length){
+    adminFetch(API+'/catalogue',{}).then(function(r){return r?r.json():[];}).then(function(d){
+      catalogFragrances=d||[]; if(typeof PRODUCTS!=='undefined') PRODUCTS=catalogFragrances; seed();
+    }).catch(seed);
+  } else { seed(); }
 }
 
 // ── Pruebas de homologación ──────────────────────────────
@@ -2363,18 +2371,47 @@ function dteTest(){
 }
 
 // ── DTE manual: ítems dinámicos + emisión con detalles reales ──
+function dteManualProductOptions(){
+  var list=(typeof catalogFragrances!=='undefined'&&catalogFragrances)?catalogFragrances:[];
+  var opts='<option value="">— Elegir del catálogo —</option>';
+  list.filter(function(p){return p&&parseFloat(p.price)>0;}).forEach(function(p){
+    var label=((p.brand?p.brand+' ':'')+(p.name||'')).trim();
+    opts+='<option value="'+_dteEsc(p.id)+'" data-name="'+_dteEsc(label)+'" data-price="'+_dteEsc(p.price)+'">'+_dteEsc(label)+' · $'+_dteEsc(Number(p.price).toFixed(2))+'</option>';
+  });
+  opts+='<option value="__custom">✎ Personalizado…</option>';
+  return opts;
+}
 function dteManualItemRow(name, qty, price){
   name=name||''; qty=qty||1; price=(price!=null?price:'');
   var d=document.createElement('div');
   d.className='dte-manual-row';
   d.style.cssText='display:flex;gap:0.5rem;flex-wrap:wrap;margin-bottom:0.4rem;align-items:center';
   d.innerHTML=
-    '<input class="dte-inp dte-mi-name" style="flex:1;min-width:180px" placeholder="Descripción" value="'+_dteEsc(name)+'"/>'+
+    '<select class="dte-inp dte-mi-sel" style="flex:1;min-width:200px">'+dteManualProductOptions()+'</select>'+
+    '<input class="dte-inp dte-mi-name" style="flex:1;min-width:160px;display:none" placeholder="Descripción" value="'+_dteEsc(name)+'"/>'+
     '<input class="dte-inp dte-mi-qty" type="number" min="1" step="1" style="width:80px" placeholder="Cant." value="'+_dteEsc(qty)+'"/>'+
     '<input class="dte-inp dte-mi-price" type="number" min="0" step="0.01" style="width:110px" placeholder="Precio" value="'+_dteEsc(price)+'"/>'+
     '<button class="save-btn" style="background:transparent;border:1px solid #d9534f;color:#d9534f;padding:0.25rem 0.6rem;font-size:0.6rem" title="Quitar">✕</button>';
+  var sel=d.querySelector('.dte-mi-sel');
+  var nameInp=d.querySelector('.dte-mi-name');
+  var priceInp=d.querySelector('.dte-mi-price');
+  sel.addEventListener('change',function(){
+    var o=sel.options[sel.selectedIndex];
+    if(sel.value==='__custom'){
+      nameInp.style.display=''; nameInp.value=''; priceInp.value=''; nameInp.focus();
+    } else if(sel.value){
+      nameInp.style.display='none';
+      nameInp.value=o.getAttribute('data-name')||'';
+      priceInp.value=o.getAttribute('data-price')||'';
+    } else {
+      nameInp.style.display='none'; nameInp.value='';
+    }
+    dteManualRecalc();
+  });
+  // Si se construye con nombre/precio (datos de prueba), mostrar como personalizado
+  if(name){ sel.value='__custom'; nameInp.style.display=''; }
   d.querySelector('.dte-mi-qty').addEventListener('input',dteManualRecalc);
-  d.querySelector('.dte-mi-price').addEventListener('input',dteManualRecalc);
+  priceInp.addEventListener('input',dteManualRecalc);
   d.querySelector('button').addEventListener('click',function(){ d.remove(); dteManualRecalc(); });
   return d;
 }

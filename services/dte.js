@@ -374,7 +374,9 @@ function buildNotaCredito(order, receptor, docRelacionado, opts) {
   });
 
   const totalGravada = round2(cuerpoDocumento.reduce((s, c) => s + c.ventaGravada, 0));
-  const iva          = round2(totalGravada * IVA_RATE);
+  // El MH valida totalIva = suma de los totalIva por ítem (no el IVA recalculado sobre el total).
+  // Recalcular sobre el total provoca [020] CALCULO INCORRECTO por redondeo cuando hay varios ítems.
+  const iva          = round2(cuerpoDocumento.reduce((s, c) => s + c.totalIva, 0));
   const montoTotal   = round2(totalGravada + iva);
 
   const resumen = {
