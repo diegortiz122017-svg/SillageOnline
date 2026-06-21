@@ -2422,7 +2422,12 @@ app.post('/api/admin/dte/homologacion/emit', requireAdmin, async (req, res) => {
     for (let i = 0; i < count; i++) {
       const order = await buildRandomTestOrder({});
       const options = { tipoDte };
-      if (tipoDte === '03' || tipoDte === '05') options.receptor = buildTestReceptor();
+      if (tipoDte === '03' || tipoDte === '05') {
+        const custom = req.body && req.body.receptor;
+        options.receptor = (custom && custom.nit && custom.nrc && custom.nombre)
+          ? { ...buildTestReceptor(), nit: custom.nit, nrc: custom.nrc, nombre: custom.nombre, nombreComercial: custom.nombre }
+          : buildTestReceptor();
+      }
       if (tipoDte === '05') {
         const ccf = await latestProcessedCCF();
         if (!ccf) { results.push({ estado: 'ERROR', observaciones: 'No hay un CCF PROCESADO para referenciar. Emite primero un CCF.' }); break; }

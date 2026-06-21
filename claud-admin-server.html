@@ -1189,6 +1189,28 @@ tr:hover td{background:rgba(255,255,255,0.02)}
           <div id="dteHomoOut" style="margin-top:0.8rem;font-size:0.68rem;line-height:1.7;color:var(--muted)"></div>
         </div>
 
+        <!-- CCF / Nota de Crédito manual (sin pedido real) -->
+        <div style="background:rgba(255,255,255,0.03);border:1px solid var(--border-light);padding:1.2rem;margin-bottom:1.2rem">
+          <div style="font-size:0.6rem;letter-spacing:0.2em;text-transform:uppercase;color:var(--gold);margin-bottom:0.4rem">Emitir CCF o Nota de Crédito manual</div>
+          <div style="font-size:0.62rem;color:var(--muted);margin-bottom:1rem">Genera un documento con orden de prueba aleatoria y el receptor que indiques. Útil para homologación o para emitir un CCF a un cliente empresa sin pedido en el sistema.</div>
+          <div style="display:flex;gap:0.6rem;flex-wrap:wrap;align-items:flex-end;margin-bottom:0.8rem">
+            <div>
+              <label class="dte-lbl">Tipo</label>
+              <select id="dteManualTipo" class="dte-inp">
+                <option value="03">CCF — Comprobante de Crédito Fiscal</option>
+                <option value="05">Nota de Crédito</option>
+              </select>
+            </div>
+            <button class="save-btn" onclick="dteManualEmit()">Emitir</button>
+          </div>
+          <div style="display:flex;gap:0.6rem;flex-wrap:wrap">
+            <div><label class="dte-lbl">NIT receptor (14 dígitos)</label><input id="dteManualNit" class="dte-inp" placeholder="06140812951023" value="06140812951023"/></div>
+            <div><label class="dte-lbl">NRC receptor</label><input id="dteManualNrc" class="dte-inp" placeholder="899100" value="899100"/></div>
+            <div style="flex:1;min-width:200px"><label class="dte-lbl">Nombre / razón social</label><input id="dteManualNom" class="dte-inp" style="width:100%" placeholder="Empresa Receptora, S.A. de C.V." value="EMPRESA RECEPTORA DE PRUEBA, S.A. DE C.V."/></div>
+          </div>
+          <div id="dteManualOut" style="margin-top:1rem;font-size:0.7rem;line-height:1.8"></div>
+        </div>
+
         <!-- Emitir / reintentar DTE de un pedido -->
         <div style="background:rgba(255,255,255,0.03);border:1px solid var(--border-light);padding:1.2rem;margin-bottom:1.2rem">
           <div style="font-size:0.6rem;letter-spacing:0.2em;text-transform:uppercase;color:var(--gold);margin-bottom:1rem">Emitir / reintentar DTE de un pedido</div>
@@ -2304,6 +2326,29 @@ function dteTest(){
       gen+
       (d.observaciones?'<div style="color:#d98a3a;margin-top:0.3rem">'+_dteEsc(d.observaciones)+'</div>':'');
     loadDteDocuments(); loadDteStatus();
+  }).catch(function(e){ out.innerHTML='<span style="color:#d9534f">Error: '+_dteEsc(e.message)+'</span>'; });
+}
+
+function dteManualEmit(){
+  var out=document.getElementById('dteManualOut');
+  var tipo=(document.getElementById('dteManualTipo').value||'03');
+  var nit=(document.getElementById('dteManualNit').value||'').trim();
+  var nrc=(document.getElementById('dteManualNrc').value||'').trim();
+  var nom=(document.getElementById('dteManualNom').value||'').trim();
+  if(!nit||!nrc||!nom){ out.innerHTML='<span style="color:#d9534f">Completa NIT, NRC y nombre del receptor.</span>'; return; }
+  out.innerHTML='Emitiendo…';
+  adminFetch(API+'/admin/dte/homologacion/emit',{
+    method:'POST', headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({ tipoDte:tipo, count:1, receptor:{ nit:nit, nrc:nrc, nombre:nom } })
+  }).then(function(r){return r?r.json():null;}).then(function(d){
+    if(!d){ out.textContent='Sin respuesta.'; return; }
+    if(d.error){ out.innerHTML='<span style="color:#d9534f">'+_dteEsc(d.error)+'</span>'; return; }
+    var r0=d.results&&d.results[0]||{};
+    var ok=r0.estado==='PROCESADO';
+    out.innerHTML='Resultado: '+_dteChip(ok,r0.estado||'—')+
+      (r0.numeroControl?' · N.º Control '+_dteEsc(r0.numeroControl):'')+
+      (r0.observaciones?'<div style="color:#d98a3a;margin-top:0.3rem">'+_dteEsc(r0.observaciones)+'</div>':'');
+    loadHomologacion(); loadDteDocuments(); loadDteStatus();
   }).catch(function(e){ out.innerHTML='<span style="color:#d9534f">Error: '+_dteEsc(e.message)+'</span>'; });
 }
 
