@@ -350,9 +350,10 @@ function buildNotaCredito(order, receptor, docRelacionado, opts) {
   const cuerpoDocumento = items.map((it, idx) => {
     const precioNeto   = round8(it.precioUnitario / (1 + IVA_RATE));
     const ventaGravada = round2(it.cantidad * precioNeto);
-    // El MH recalcula el IVA por ítem a plena precisión (8 dec). Si lo redondeamos a 2
-    // aquí, la suma no le cuadra → [020]. El esquema permite 8 decimales en este campo.
-    const totalIva     = round8(ventaGravada * IVA_RATE);
+    // El MH exige resumen.totalIva == Σ(item.totalIva) EXACTO. Como el resumen es de 2
+    // decimales, el IVA por ítem también debe ser de 2 dec; si no, la suma (p.ej. 90.7686)
+    // no cuadra con el resumen redondeado (90.77) → [020] CALCULO INCORRECTO.
+    const totalIva     = round2(ventaGravada * IVA_RATE);
     return {
       numItem:         idx + 1,
       tipoItem:        1,
