@@ -1154,8 +1154,10 @@ async function restoreLoginAttempts() {
 function checkRateLimit(ip) {
   const e = loginAttempts.get(ip);
   if (!e) return true;
-  if (Date.now() - e.firstAttempt > 15 * 60 * 1000) { loginAttempts.delete(ip); return true; }
-  return e.count < 5;
+  // Ventana de 5 min (antes 15) y umbral alto: solo frena fuerza-bruta real, no al
+  // admin legítimo cuyos intentos se acumulaban entre redeploys.
+  if (Date.now() - e.firstAttempt > 5 * 60 * 1000) { loginAttempts.delete(ip); return true; }
+  return e.count < 50;
 }
 function recordFailed(ip) {
   const e = loginAttempts.get(ip) || { count: 0, firstAttempt: Date.now() };
