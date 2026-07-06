@@ -560,6 +560,31 @@ async function persist(rec) {
   );
 }
 
+async function updateDocumentEstado(id, { estado, selloRecibido, observaciones }) {
+  await db.execute(
+    'UPDATE dte_documents SET estado=?, sello_recibido=?, observaciones=?, updated_at=? WHERE id=?',
+    [estado, selloRecibido || null, observaciones || null, new Date(), id]
+  );
+}
+
+// ─── detección de caída del MH (para activar contingencia automáticamente) ────
+// Un fallo de RED al transmitir (no un rechazo de negocio) enciende el modo
+// contingencia: los siguientes emitForOrder() se generan ya en modo diferido
+// (tipoModelo=2) para que puedan ampararse bajo un evento de contingencia luego.
+// Se apaga solo cuando una transmisión vuelve a tener éxito.
+let _mhDown = false;
+let _mhDownSince = null;
+const CONTINGENCIA_PENDING_MARK = '[PENDIENTE_CONTINGENCIA]';
+
+function _isNetworkError(e) {
+  const msg = String((e && e.message) || '').toLowerCase();
+  return /fetch failed|econnrefused|econnreset|etimedout|enotfound|und_err|abort|network|timeout|socket hang up/.test(msg);
+}
+
+function mhDownStatus() {
+  return { down: _mhDown, since: _mhDownSince };
+}
+
 // ════════════════════════════════════════════════════════════════════════════
 //  Orquestador público
 // ════════════════════════════════════════════════════════════════════════════
@@ -584,14 +609,48 @@ async function emitForOrder(order, options = {}) {
   else if (tipoDte === '05') jsonDte = buildNotaCredito(order, options.receptor || {}, options.docRelacionado || {}, opts);
   else throw new Error('tipoDte no soportado: ' + tipoDte);
 
+  // Si ya sabemos que el MH está caído, generar directamente en modo contingencia
+  // (tipoModelo=2) para que el documento se pueda amparar bajo un evento luego.
+  if (_mhDown) {
+    jsonDte.identificacion.tipoModelo      = 2;
+    jsonDte.identificacion.tipoOperacion   = 2;
+    jsonDte.identificacion.tipoContingencia = CONTINGENCIA_TIPO;
+    jsonDte.identificacion.motivoContin    = 'Generado automáticamente — MH no disponible';
+  }
+
   const base = {
     orderId: order.id, tipoDte, version,
     codigoGeneracion, numeroControl: numControl, jsonDte,
   };
 
+  let firmado;
   try {
-    const firmado  = await firmar(jsonDte);
+    firmado = await firmar(jsonDte);
+  } catch (e) {
+    // Falla local (firmador/certificado) — no es un caso de contingencia MH,
+    // el documento no quedó firmado y debe reintentarse por completo.
+    const rec = { ...base, jsonFirmado: null, selloRecibido: null, estado: 'CONTINGENCIA', observaciones: e.message };
+    await persist(rec).catch(() => {});
+    console.error(`DTE ${tipoDte} para orden ${order.id} quedó en contingencia (firmador):`, e.message);
+    return rec;
+  }
+
+  if (_mhDown) {
+    // El MH ya está marcado como caído — no reintentamos transmitir, queda
+    // pendiente de declarar contingencia (ver declararYTransmitirPendientes).
+    const rec = {
+      ...base, jsonFirmado: firmado, selloRecibido: null, estado: 'CONTINGENCIA',
+      observaciones: CONTINGENCIA_PENDING_MARK + ' Generado en contingencia — MH no disponible desde ' + new Date(_mhDownSince).toISOString(),
+    };
+    await persist(rec).catch(() => {});
+    return rec;
+  }
+
+  try {
     const recepcion = await transmitir(tipoDte, version, codigoGeneracion, firmado);
+    // Transmisión exitosa (aunque el DOCUMENTO sea RECHAZADO por negocio) confirma
+    // que el MH está en línea → si estaba marcado caído, se recupera.
+    if (_mhDown) { _mhDown = false; _mhDownSince = null; console.log('✅ MH de vuelta en línea — modo contingencia desactivado.'); }
     const estado   = recepcion.estado === 'PROCESADO' ? 'PROCESADO' : 'RECHAZADO';
     // Capturar TODO el motivo: descripcionMsg + observaciones[] + codigoMsg.
     // (Antes: si observaciones era [] vacío, se perdía el descripcionMsg → rechazo "sin mensaje".)
@@ -615,8 +674,32 @@ async function emitForOrder(order, options = {}) {
     await persist(rec);
     return rec;
   } catch (e) {
-    // Falla de red/firmador → guardar en contingencia para reintento manual.
-    const rec = { ...base, jsonFirmado: null, selloRecibido: null, estado: 'CONTINGENCIA', observaciones: e.message };
+    if (_isNetworkError(e)) {
+      // El MH no responde (no un rechazo de negocio) → activar contingencia y
+      // re-firmar el MISMO documento ya en modo diferido (tipoModelo=2) para
+      // que pueda ampararse bajo el próximo evento de contingencia.
+      _mhDown = true; _mhDownSince = Date.now();
+      console.error(`⚠️ MH no disponible — activando modo contingencia. (${e.message})`);
+      jsonDte.identificacion.tipoModelo      = 2;
+      jsonDte.identificacion.tipoOperacion   = 2;
+      jsonDte.identificacion.tipoContingencia = CONTINGENCIA_TIPO;
+      jsonDte.identificacion.motivoContin    = 'Generado automáticamente — MH no disponible';
+      try {
+        const firmadoContingencia = await firmar(jsonDte);
+        const rec = {
+          ...base, jsonFirmado: firmadoContingencia, selloRecibido: null, estado: 'CONTINGENCIA',
+          observaciones: CONTINGENCIA_PENDING_MARK + ' MH no disponible: ' + e.message,
+        };
+        await persist(rec).catch(() => {});
+        return rec;
+      } catch (e2) {
+        const rec = { ...base, jsonFirmado: null, selloRecibido: null, estado: 'CONTINGENCIA', observaciones: e2.message };
+        await persist(rec).catch(() => {});
+        return rec;
+      }
+    }
+    // Falla no identificada como caída del MH → contingencia genérica reintentable a mano.
+    const rec = { ...base, jsonFirmado: firmado, selloRecibido: null, estado: 'CONTINGENCIA', observaciones: e.message };
     await persist(rec).catch(() => {});
     console.error(`DTE ${tipoDte} para orden ${order.id} quedó en contingencia:`, e.message);
     return rec;
@@ -887,6 +970,67 @@ async function emitContingencia(orders, motivo) {
   }
 }
 
+// Documentos generados en contingencia (por caída real del MH) que aún no han
+// sido amparados por un evento de contingencia ni transmitidos.
+async function pendingContingenciaDocs() {
+  const [rows] = await db.execute(
+    `SELECT * FROM dte_documents
+      WHERE estado='CONTINGENCIA' AND ambiente=? AND observaciones LIKE ?
+      ORDER BY id ASC`,
+    [cfg.DTE_AMBIENTE, '%' + CONTINGENCIA_PENDING_MARK + '%']
+  );
+  return rows || [];
+}
+
+// Declara el evento de contingencia por los documentos pendientes y, si el MH
+// lo recibe, transmite cada uno normalmente (ya vienen firmados en modo diferido).
+async function declararYTransmitirPendientes(motivo) {
+  if (!cfg.DTE_ENABLED) return { ok: false, message: 'DTE deshabilitado.' };
+  const docs = await pendingContingenciaDocs();
+  if (!docs.length) return { ok: false, message: 'No hay documentos pendientes de contingencia.' };
+
+  const dteList = docs.map(d => ({ codigoGeneracion: d.codigo_generacion, tipoDoc: d.tipo_dte }));
+  const codigoGeneracion = uuidUpper();
+  const jsonEvent = buildContingencia(dteList, motivo, { codigoGeneracion });
+  const eventBase = {
+    orderId: 'CONTINGENCIA', tipoDte: 'CG', version: 3,
+    codigoGeneracion, numeroControl: 'CONTIN-' + codigoGeneracion.slice(0, 8), jsonDte: jsonEvent,
+  };
+
+  let eventoRec;
+  try {
+    const firmado   = await firmar(jsonEvent);
+    const recepcion = await transmitirContingencia(firmado);
+    const ok        = recepcion.estado === 'RECIBIDO' || recepcion.estado === 'PROCESADO';
+    eventoRec = { ...eventBase, jsonFirmado: firmado, selloRecibido: recepcion.selloRecibido || recepcion.idRecepcion || null,
+      estado: ok ? 'PROCESADO' : 'RECHAZADO', observaciones: ok ? null : JSON.stringify(recepcion) };
+    await persist(eventoRec);
+    if (!ok) return { ok: false, message: 'El evento de contingencia fue rechazado por el MH.', evento: eventoRec, pendientes: docs.length };
+  } catch (e) {
+    return { ok: false, message: 'No se pudo declarar el evento de contingencia: ' + e.message, pendientes: docs.length };
+  }
+
+  // Evento aceptado → transmitir cada documento pendiente (ya firmados).
+  let transmitidos = 0, procesados = 0, rechazados = 0;
+  for (const doc of docs) {
+    try {
+      const recepcion = await transmitir(doc.tipo_dte, doc.version, doc.codigo_generacion, doc.json_firmado);
+      const estado = recepcion.estado === 'PROCESADO' ? 'PROCESADO' : 'RECHAZADO';
+      await updateDocumentEstado(doc.id, {
+        estado, selloRecibido: recepcion.selloRecibido || null,
+        observaciones: recepcion.descripcionMsg || null,
+      });
+      transmitidos++;
+      if (estado === 'PROCESADO') procesados++; else rechazados++;
+    } catch (e) {
+      // Sigue caído o falló este documento puntual — se queda igual para el próximo intento.
+      console.error(`No se pudo transmitir el DTE pendiente ${doc.codigo_generacion}:`, e.message);
+    }
+  }
+  _mhDown = false; _mhDownSince = null;
+  return { ok: true, evento: eventoRec, pendientes: docs.length, transmitidos, procesados, rechazados };
+}
+
 // URL pública de verificación en el portal de Hacienda (para QR / factura).
 function verificacionUrl(codigoGeneracion, fecEmi) {
   return `https://admin.factura.gob.sv/consultaPublica?ambiente=${cfg.DTE_AMBIENTE}` +
@@ -946,5 +1090,8 @@ module.exports = {
   invalidarDte,
   buildContingencia,
   emitContingencia,
+  pendingContingenciaDocs,
+  declararYTransmitirPendientes,
+  mhDownStatus,
   IVA_RATE,
 };

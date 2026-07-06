@@ -1189,6 +1189,15 @@ tr:hover td{background:rgba(255,255,255,0.02)}
           <div id="dteHomoOut" style="margin-top:0.8rem;font-size:0.68rem;line-height:1.7;color:var(--muted)"></div>
         </div>
 
+        <!-- Contingencia (caídas reales del MH) -->
+        <div style="background:rgba(255,255,255,0.03);border:1px solid var(--border-light);padding:1.2rem;margin-bottom:1.2rem">
+          <div style="font-size:0.6rem;letter-spacing:0.2em;text-transform:uppercase;color:var(--gold);margin-bottom:0.4rem">Contingencia — pedidos reales</div>
+          <div style="font-size:0.62rem;color:var(--muted);margin-bottom:1rem">Cuando el MH no responde, las órdenes reales emiten su DTE automáticamente en modo contingencia (no se pierde la venta). Cuando el servicio vuelva, declara el evento aquí para amparar y transmitir todo lo pendiente.</div>
+          <div id="dteContBody" style="font-size:0.72rem;color:var(--cream);line-height:1.9;margin-bottom:0.8rem">Cargando…</div>
+          <button class="save-btn" onclick="dteContDeclarar()">Declarar evento y transmitir pendientes</button>
+          <div id="dteContOut" style="margin-top:1rem;font-size:0.7rem;line-height:1.8"></div>
+        </div>
+
         <!-- CCF / Nota de Crédito manual (con detalles reales de la transacción) -->
         <div style="background:rgba(255,255,255,0.03);border:1px solid var(--border-light);padding:1.2rem;margin-bottom:1.2rem">
           <div style="font-size:0.6rem;letter-spacing:0.2em;text-transform:uppercase;color:var(--gold);margin-bottom:0.4rem">Emitir DTE manual</div>
@@ -2202,6 +2211,7 @@ function renderDtePage(){
   loadDteDocuments();
   dteManualInit();
   loadInvalidables();
+  loadContingenciaPending();
 }
 function dteManualInit(){
   var box=document.getElementById('dteManualItems');
@@ -2523,6 +2533,36 @@ function dteManualReset(){
     var el=document.getElementById(id); if(el) el.value='';
   });
   dteManualRecalc();
+}
+
+// ── Contingencia (pedidos reales, caída real del MH) ──────
+function loadContingenciaPending(){
+  var el=document.getElementById('dteContBody'); if(!el) return;
+  adminFetch(API+'/admin/dte/contingencia/pending',{}).then(function(r){return r?r.json():null;}).then(function(d){
+    if(!d){ el.textContent='No se pudo cargar.'; return; }
+    var mh=d.mh||{};
+    var estadoMh = mh.down
+      ? '<span style="color:#d9534f">⚠ MH marcado como NO disponible desde '+_dteEsc(new Date(mh.since).toLocaleString())+'</span>'
+      : '<span style="color:#5fb87a">✓ MH operando normal (sin caídas detectadas)</span>';
+    var pend=d.pendientes||[];
+    var tipoLbl={'01':'Factura','03':'CCF','05':'Nota de Crédito'};
+    el.innerHTML = estadoMh + '<br>Pendientes de declarar: <b style="color:'+(pend.length?'#d98a3a':'var(--cream)')+'">'+pend.length+'</b>' +
+      (pend.length ? '<div style="margin-top:0.5rem;font-size:0.65rem;color:var(--muted)">' +
+        pend.slice(0,10).map(function(p){ return (tipoLbl[p.tipoDte]||p.tipoDte)+' · '+_dteEsc(p.numeroControl)+' · pedido '+_dteEsc(p.orderId); }).join('<br>') +
+        (pend.length>10 ? '<br>… y '+(pend.length-10)+' más' : '') + '</div>' : '');
+  }).catch(function(){ el.textContent='Error al cargar.'; });
+}
+function dteContDeclarar(){
+  var out=document.getElementById('dteContOut');
+  if(!confirm('¿Declarar el evento de contingencia y transmitir todos los pendientes?')) return;
+  out.innerHTML='Declarando evento y transmitiendo…';
+  adminFetch(API+'/admin/dte/contingencia/declarar',{method:'POST',headers:{'Content-Type':'application/json'},body:'{}'})
+    .then(function(r){return r?r.json():null;}).then(function(d){
+      if(!d){ out.textContent='Sin respuesta.'; return; }
+      if(!d.ok){ out.innerHTML='<span style="color:#d9534f">'+_dteEsc(d.message||'No se pudo declarar el evento.')+'</span>'; return; }
+      out.innerHTML='<span style="color:#5fb87a">✓ Evento declarado.</span> Pendientes: '+d.pendientes+' · Transmitidos: '+d.transmitidos+' · Procesados: '+d.procesados+' · Rechazados: '+d.rechazados;
+      loadContingenciaPending(); loadDteDocuments(); loadDteStatus();
+    }).catch(function(e){ out.innerHTML='<span style="color:#d9534f">Error: '+_dteEsc(e.message)+'</span>'; });
 }
 
 // ── Invalidación de un DTE ────────────────────────────────

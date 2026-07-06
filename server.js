@@ -2596,6 +2596,33 @@ app.post('/api/admin/dte/emit-manual', requireAdmin, async (req, res) => {
   } catch(e) { res.status(500).json({ error: e.message }); }
 });
 
+// GET /api/admin/dte/contingencia/pending — estado de caída del MH + documentos pendientes.
+app.get('/api/admin/dte/contingencia/pending', requireAdmin, async (req, res) => {
+  try {
+    const docs = await dteSvc.pendingContingenciaDocs();
+    res.json({
+      mh: dteSvc.mhDownStatus(),
+      pendientes: docs.map(d => ({
+        id: d.id, orderId: d.order_id, tipoDte: d.tipo_dte,
+        numeroControl: d.numero_control, codigoGeneracion: d.codigo_generacion, createdAt: d.created_at,
+      })),
+    });
+  } catch(e) { res.status(500).json({ error: e.message }); }
+});
+
+// POST /api/admin/dte/contingencia/declarar — declara el evento por los pendientes y los transmite.
+app.post('/api/admin/dte/contingencia/declarar', requireAdmin, async (req, res) => {
+  if (!cfg.DTE_ENABLED) return res.status(409).json({ error: 'DTE deshabilitado.' });
+  try {
+    const motivo = {
+      ...buildTestMotivoContingencia(),
+      motivoContingencia: (req.body && req.body.motivo) || 'Restablecimiento tras no disponibilidad del MH',
+    };
+    const result = await dteSvc.declararYTransmitirPendientes(motivo);
+    res.json(result);
+  } catch(e) { res.status(500).json({ error: e.message }); }
+});
+
 // GET /api/admin/dte/invalidables — DTEs PROCESADOS que se pueden anular (ambiente actual).
 app.get('/api/admin/dte/invalidables', requireAdmin, async (req, res) => {
   try {
@@ -2657,6 +2684,7 @@ app.get('/api/admin/dte/status', requireAdmin, async (req, res) => {
       apiPwdSet:  !!cfg.DTE_API_PWD,
       certPwdSet: !!cfg.DTE_CERT_PWD,
       firmadorUrl: cfg.DTE_FIRMADOR_URL,
+      mhDown:     dteSvc.mhDownStatus(),
       emisor: {
         nombre:          cfg.DTE_EMISOR.nombre,
         nombreComercial: cfg.DTE_EMISOR.nombreComercial,
