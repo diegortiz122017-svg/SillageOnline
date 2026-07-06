@@ -66,6 +66,8 @@ const DTE_MH_BASE = DTE_AMBIENTE === '01'
 const DTE_AUTH_URL     = `${DTE_MH_BASE}/seguridad/auth`;
 const DTE_RECEPCION_URL = `${DTE_MH_BASE}/fesv/recepciondte`;
 const DTE_ANULACION_URL = `${DTE_MH_BASE}/fesv/anulardte`;
+const DTE_CONTINGENCIA_URL = `${DTE_MH_BASE}/fesv/contingencia`;
+const DTE_LOTE_URL = `${DTE_MH_BASE}/fesv/recepcion/lote`;
 
 // Firmador oficial de Hacienda (corre como contenedor/JAR local).
 const DTE_FIRMADOR_URL = process.env.DTE_FIRMADOR_URL || 'http://localhost:8113/firmardocumento/';
@@ -149,7 +151,7 @@ module.exports = {
   OPENAI_API_KEY,
   ADMIN_USER, ADMIN_PASS,
   DTE_ENABLED, DTE_AMBIENTE, DTE_MH_BASE,
-  DTE_AUTH_URL, DTE_RECEPCION_URL, DTE_ANULACION_URL,
+  DTE_AUTH_URL, DTE_RECEPCION_URL, DTE_ANULACION_URL, DTE_CONTINGENCIA_URL, DTE_LOTE_URL,
   DTE_FIRMADOR_URL, DTE_API_USER, DTE_API_PWD, DTE_CERT_PWD, DTE_EMISOR,
   CACHE_TTL_CATALOGUE, CACHE_TTL_INVENTORY, CACHE_TTL_PRICING,
   CACHE_TTL_TOOL, CACHE_TTL_REPLY,

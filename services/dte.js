@@ -765,6 +765,128 @@ async function invalidarDte(docRow, motivo) {
   }
 }
 
+// ════════════════════════════════════════════════════════════════════════════
+//  EVENTO DE CONTINGENCIA — declara DTEs generados sin conexión (modelo diferido)
+//  Esquema contingencia v3. Endpoint DTE_CONTINGENCIA_URL. Flujo:
+//    1) generar los DTEs en modo contingencia (tipoModelo=2), firmados y guardados
+//    2) declarar el evento de contingencia listando esos códigos de generación
+//    3) (luego) transmitir el lote — para homologación basta con (2) PROCESADO
+// ════════════════════════════════════════════════════════════════════════════
+const CONTINGENCIA_TIPO = 1;   // CAT-018: 1 = No disponibilidad de sistema del MH
+
+// Genera una Factura en modo contingencia: firmada y persistida localmente
+// (estado CONTINGENCIA, aún sin sello). Devuelve su referencia para el evento.
+async function buildContingenciaDte(order) {
+  const codigoGeneracion = uuidUpper();
+  const correlativo = await nextCorrelativo('01');
+  const numControl  = numeroControl('01', correlativo);
+  const jsonDte = buildFactura(order, { numeroControl: numControl, codigoGeneracion });
+  jsonDte.identificacion.tipoModelo      = 2;   // 2 = diferido (contingencia)
+  jsonDte.identificacion.tipoOperacion   = 2;   // 2 = contingencia
+  jsonDte.identificacion.tipoContingencia = CONTINGENCIA_TIPO;
+  jsonDte.identificacion.motivoContin    = 'Prueba de homologación de contingencia';
+  const firmado = await firmar(jsonDte);
+  await persist({
+    orderId: order.id, tipoDte: '01', version: 2, codigoGeneracion,
+    numeroControl: numControl, jsonDte, jsonFirmado: firmado,
+    selloRecibido: null, estado: 'CONTINGENCIA', observaciones: 'Generado en contingencia',
+  });
+  return { codigoGeneracion, tipoDoc: '01', numeroControl: numControl, jsonFirmado: firmado };
+}
+
+// motivo = { nombreResponsable, tipoDocResponsable, numeroDocResponsable,
+//            tipoContingencia?, motivoContingencia? }
+function buildContingencia(dteList, motivo, opts) {
+  const { fecEmi: fTransmision, horEmi: hTransmision } = nowSV();
+  const e = cfg.DTE_EMISOR;
+  return {
+    identificacion: {
+      version:          3,
+      ambiente:         cfg.DTE_AMBIENTE,
+      codigoGeneracion: opts.codigoGeneracion,       // UUID del EVENTO
+      fTransmision,
+      hTransmision,
+    },
+    emisor: {
+      nit:                  e.nit,
+      nombre:               e.nombre,
+      nombreResponsable:    motivo.nombreResponsable,
+      tipoDocResponsable:   motivo.tipoDocResponsable || '36',   // 36 = NIT
+      numeroDocResponsable: motivo.numeroDocResponsable,
+      tipoEstablecimiento:  '02',                    // CAT-009: 02 = Casa Matriz
+      codEstable:           e.codEstable || null,
+      codPuntoVenta:        e.codPuntoVenta || null,
+      telefono:             e.telefono,
+      correo:               e.correo,
+    },
+    detalleDTE: dteList.map((d, i) => ({
+      noItem:           i + 1,
+      codigoGeneracion: d.codigoGeneracion,
+      tipoDoc:          d.tipoDoc,
+    })),
+    motivo: {
+      fInicio:            fTransmision,
+      fFin:               fTransmision,
+      hInicio:            hTransmision,
+      hFin:               hTransmision,
+      tipoContingencia:   motivo.tipoContingencia || CONTINGENCIA_TIPO,
+      motivoContingencia: motivo.motivoContingencia || null,
+    },
+  };
+}
+
+async function transmitirContingencia(firmado) {
+  const token = await getAuthToken();
+  const payload = { nit: cfg.DTE_EMISOR.nit, documento: firmado };
+  const r = await fetch(cfg.DTE_CONTINGENCIA_URL, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', 'Authorization': token, 'User-Agent': 'SillageDTE/1.0' },
+    body: JSON.stringify(payload),
+  });
+  return r.json();
+}
+
+// Orquestador: genera `orders.length` DTEs en contingencia y declara el evento.
+// Persiste el evento como tipo_dte='CG'. Devuelve el registro del evento.
+async function emitContingencia(orders, motivo) {
+  if (!cfg.DTE_ENABLED) return null;
+  const dteList = [];
+  for (const order of orders) dteList.push(await buildContingenciaDte(order));
+
+  const codigoGeneracion = uuidUpper();
+  const jsonEvent = buildContingencia(dteList, motivo, { codigoGeneracion });
+  const base = {
+    orderId: 'CONTINGENCIA', tipoDte: 'CG', version: 3,
+    codigoGeneracion, numeroControl: 'CONTIN-' + codigoGeneracion.slice(0, 8), jsonDte: jsonEvent,
+  };
+  try {
+    const firmado   = await firmar(jsonEvent);
+    const recepcion = await transmitirContingencia(firmado);
+    const ok        = recepcion.estado === 'RECIBIDO' || recepcion.estado === 'PROCESADO';
+    const estado    = ok ? 'PROCESADO' : 'RECHAZADO';
+    const obsArr = Array.isArray(recepcion.observaciones)
+      ? recepcion.observaciones.filter(Boolean)
+      : (recepcion.observaciones ? [String(recepcion.observaciones)] : []);
+    const partes = [];
+    if (recepcion.descripcionMsg) partes.push(recepcion.descripcionMsg);
+    if (obsArr.length)            partes.push(obsArr.join(' | '));
+    let observaciones = partes.join(' — ') || null;
+    if (!ok && recepcion.codigoMsg) {
+      observaciones = '[' + recepcion.codigoMsg + '] ' + (observaciones || 'Rechazado sin descripción');
+    }
+    // El evento devuelve un idRecepcion/selloRecibido según el ambiente.
+    const sello = recepcion.selloRecibido || recepcion.idRecepcion || null;
+    const rec = { ...base, jsonFirmado: firmado, selloRecibido: sello, estado, observaciones };
+    await persist(rec);
+    return rec;
+  } catch (e) {
+    const rec = { ...base, jsonFirmado: null, selloRecibido: null, estado: 'CONTINGENCIA', observaciones: e.message };
+    await persist(rec).catch(() => {});
+    console.error('Evento de contingencia quedó en contingencia:', e.message);
+    return rec;
+  }
+}
+
 // URL pública de verificación en el portal de Hacienda (para QR / factura).
 function verificacionUrl(codigoGeneracion, fecEmi) {
   return `https://admin.factura.gob.sv/consultaPublica?ambiente=${cfg.DTE_AMBIENTE}` +
@@ -822,5 +944,7 @@ module.exports = {
   buildNotaCredito,
   buildAnulacion,
   invalidarDte,
+  buildContingencia,
+  emitContingencia,
   IVA_RATE,
 };

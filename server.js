@@ -2361,7 +2361,20 @@ const DTE_HOMOLOGACION = [
   { tipoDte: '03', label: 'Comprobante de Crédito Fiscal',  target: 75 },
   { tipoDte: '05', label: 'Nota de Crédito',                target: 50 },
   { tipoDte: 'AN', label: 'Evento de Invalidación',         target: 15 },
+  { tipoDte: 'CG', label: 'Evento de Contingencia',         target: 15 },
 ];
+
+// Motivo de contingencia de prueba (responsable = el emisor).
+function buildTestMotivoContingencia() {
+  const e = cfg.DTE_EMISOR;
+  return {
+    nombreResponsable:    e.nombre,
+    tipoDocResponsable:   '36',            // 36 = NIT
+    numeroDocResponsable: e.nit,
+    tipoContingencia:     1,               // CAT-018: 1 = No disponibilidad de sistema del MH
+    motivoContingencia:   null,
+  };
+}
 
 // Motivo de anulación de prueba (responsable/solicita = el emisor).
 function buildTestMotivoAnulacion() {
@@ -2457,6 +2470,26 @@ app.post('/api/admin/dte/homologacion/emit', requireAdmin, async (req, res) => {
       const cur = items.find(h => h.tipoDte === 'AN');
       return res.json({
         tipoDte: 'AN', emitted: results.length,
+        procesados: results.filter(r => r.estado === 'PROCESADO').length,
+        results, done: cur ? cur.done : null, target: cur ? cur.target : null,
+      });
+    } catch(e) { return res.status(500).json({ error: e.message }); }
+  }
+
+  // Evento de Contingencia: genera una Factura en modo contingencia y declara el evento.
+  if (tipoDte === 'CG') {
+    try {
+      const results = [];
+      for (let i = 0; i < count; i++) {
+        const order = await buildRandomTestOrder({});
+        const rec = await dteSvc.emitContingencia([order], buildTestMotivoContingencia());
+        results.push({ estado: rec?.estado || 'ERROR', numeroControl: rec?.numeroControl || null, observaciones: rec?.observaciones || null });
+        if (rec && rec.estado !== 'PROCESADO') break;
+      }
+      const items = await homologacionCounts();
+      const cur = items.find(h => h.tipoDte === 'CG');
+      return res.json({
+        tipoDte: 'CG', emitted: results.length,
         procesados: results.filter(r => r.estado === 'PROCESADO').length,
         results, done: cur ? cur.done : null, target: cur ? cur.target : null,
       });
@@ -2569,7 +2602,7 @@ app.get('/api/admin/dte/invalidables', requireAdmin, async (req, res) => {
     const [rows] = await db.execute(
       `SELECT id, order_id, tipo_dte, numero_control, codigo_generacion, created_at
          FROM dte_documents
-        WHERE estado='PROCESADO' AND ambiente=? AND tipo_dte<>'AN'
+        WHERE estado='PROCESADO' AND ambiente=? AND tipo_dte NOT IN ('AN','CG')
         ORDER BY id DESC LIMIT 100`,
       [cfg.DTE_AMBIENTE]
     );
