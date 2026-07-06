@@ -814,8 +814,8 @@ function buildContingencia(dteList, motivo, opts) {
       tipoDocResponsable:   motivo.tipoDocResponsable || '36',   // 36 = NIT
       numeroDocResponsable: motivo.numeroDocResponsable,
       tipoEstablecimiento:  '02',                    // CAT-009: 02 = Casa Matriz
-      codEstable:           e.codEstable || null,
-      codPuntoVenta:        e.codPuntoVenta || null,
+      codEstableMH:         null,                     // código asignado por el MH (no el del NC)
+      codPuntoVentaMH:      null,
       telefono:             e.telefono,
       correo:               e.correo,
     },
