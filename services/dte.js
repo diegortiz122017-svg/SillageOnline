@@ -672,7 +672,7 @@ function buildAnulacion(docRow, motivo, opts) {
       codEstable:          e.codEstable || null,
       codPuntoVentaMH:     null,
       codPuntoVenta:       e.codPuntoVenta || null,
-      nomEstablecimiento:  null,
+      nomEstablecimiento:  e.nombreComercial || e.nombre,
     },
     documento: {
       tipoDte:           docRow.tipo_dte,
@@ -682,7 +682,6 @@ function buildAnulacion(docRow, motivo, opts) {
       numeroControl:     docRow.numero_control,
       fecEmi:            (json.identificacion && json.identificacion.fecEmi) || fecAnula,
       montoIva:          _montoIvaDe(json),
-      codigoDocumento:   null,
       tipoDocumento:     tipoDoc,
       numDocumento:      numDoc,
       nombre:            rec.nombre || null,
