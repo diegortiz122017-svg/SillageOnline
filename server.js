@@ -2422,6 +2422,11 @@ async function homologacionCounts() {
 }
 
 // Último CCF PROCESADO (para que la Nota de Crédito lo referencie).
+// IMPORTANTE: la NC debe ajustar montos que correspondan al CCF referenciado — el MH
+// rechaza [020] resumen.totalIva si la NC trae una orden aleatoria sin relación con el
+// CCF (los montos "no cuadran" con el documento que dice estar ajustando). Por eso aquí
+// también reconstruimos los ítems EXACTOS del CCF (precioUni neto → precio con IVA) para
+// que la NC de homologación ajuste el mismo importe.
 async function latestProcessedCCF() {
   const [rows] = await db.execute(
     "SELECT codigo_generacion, json_dte FROM dte_documents WHERE tipo_dte='03' AND estado='PROCESADO' AND ambiente=? ORDER BY id DESC LIMIT 1",
@@ -2429,8 +2434,19 @@ async function latestProcessedCCF() {
   ).catch(() => [[]]);
   if (!rows || !rows.length) return null;
   let fecEmi = new Date().toISOString().slice(0, 10);
-  try { fecEmi = JSON.parse(rows[0].json_dte).identificacion.fecEmi || fecEmi; } catch(e) {}
-  return { codigoGeneracion: rows[0].codigo_generacion, fecEmi };
+  let items = null;
+  try {
+    const ccfJson = JSON.parse(rows[0].json_dte);
+    fecEmi = ccfJson.identificacion.fecEmi || fecEmi;
+    items = (ccfJson.cuerpoDocumento || []).map(it => ({
+      name:  it.descripcion,
+      qty:   it.cantidad,
+      // precioUni del CCF es NETO (sin IVA) — se reconstruye el precio con IVA para que
+      // buildNotaCredito, al volver a quitarle el IVA, recupere el mismo monto neto.
+      price: Math.round(it.precioUni * 1.13 * 100) / 100,
+    }));
+  } catch(e) {}
+  return { codigoGeneracion: rows[0].codigo_generacion, fecEmi, items };
 }
 
 app.get('/api/admin/dte/homologacion', requireAdmin, async (req, res) => {
@@ -2499,7 +2515,6 @@ app.post('/api/admin/dte/homologacion/emit', requireAdmin, async (req, res) => {
   try {
     const results = [];
     for (let i = 0; i < count; i++) {
-      const order = await buildRandomTestOrder({});
       const options = { tipoDte };
       if (tipoDte === '03' || tipoDte === '05') {
         const custom = req.body && req.body.receptor;
@@ -2507,10 +2522,18 @@ app.post('/api/admin/dte/homologacion/emit', requireAdmin, async (req, res) => {
           ? { ...buildTestReceptor(), nit: custom.nit, nrc: custom.nrc, nombre: custom.nombre, nombreComercial: custom.nombre }
           : buildTestReceptor();
       }
+      let order;
       if (tipoDte === '05') {
         const ccf = await latestProcessedCCF();
         if (!ccf) { results.push({ estado: 'ERROR', observaciones: 'No hay un CCF PROCESADO para referenciar. Emite primero un CCF.' }); break; }
         options.docRelacionado = ccf;
+        // La NC debe ajustar los MISMOS montos del CCF referenciado (si no, el MH
+        // rechaza [020] resumen.totalIva porque los importes no le "cuadran" al documento).
+        order = ccf.items && ccf.items.length
+          ? { id: 'NC-' + Date.now(), customer: 'Cliente de Prueba', email: cfg.DTE_EMISOR.correo, payment_method: 'cod', items: JSON.stringify(ccf.items), total: 0 }
+          : await buildRandomTestOrder({});
+      } else {
+        order = await buildRandomTestOrder({});
       }
       const rec = await dteSvc.emitForOrder(order, options);
       results.push({
