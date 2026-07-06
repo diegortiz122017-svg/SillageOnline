@@ -2360,7 +2360,23 @@ const DTE_HOMOLOGACION = [
   { tipoDte: '01', label: 'Factura (Consumidor Final)',     target: 90 },
   { tipoDte: '03', label: 'Comprobante de Crédito Fiscal',  target: 75 },
   { tipoDte: '05', label: 'Nota de Crédito',                target: 50 },
+  { tipoDte: 'AN', label: 'Evento de Invalidación',         target: 15 },
 ];
+
+// Motivo de anulación de prueba (responsable/solicita = el emisor).
+function buildTestMotivoAnulacion() {
+  const e = cfg.DTE_EMISOR;
+  return {
+    tipoAnulacion:     2,                 // 2 = anulación definitiva sin reemplazo
+    motivoAnulacion:   'Anulación de prueba de homologación',
+    nombreResponsable: e.nombre,
+    tipDocResponsable: '36',              // 36 = NIT
+    numDocResponsable: e.nit,
+    nombreSolicita:    e.nombre,
+    tipDocSolicita:    '36',
+    numDocSolicita:    e.nit,
+  };
+}
 
 // Receptor de prueba (empresa) para CCF/NC — NIT/NRC distintos al emisor (MH rechaza auto-factura).
 // NIT 06140101011034 = empresa de prueba estándar de la normativa MH (14 dígitos sin guiones).
@@ -2416,9 +2432,37 @@ app.post('/api/admin/dte/homologacion/emit', requireAdmin, async (req, res) => {
   if (!cfg.DTE_ENABLED) return res.status(409).json({ error: 'DTE deshabilitado.' });
   const tipoDte = String((req.body && req.body.tipoDte) || '01');
   if (!DTE_HOMOLOGACION.some(h => h.tipoDte === tipoDte)) {
-    return res.status(400).json({ error: 'tipoDte no soportado para homologación (usa 01, 03 o 05).' });
+    return res.status(400).json({ error: 'tipoDte no soportado para homologación (usa 01, 03, 05 o AN).' });
   }
   const count = Math.max(1, Math.min(10, parseInt((req.body && req.body.count), 10) || 1));
+
+  // Evento de Invalidación: emitir una Factura fresca y anularla en el acto.
+  if (tipoDte === 'AN') {
+    try {
+      const results = [];
+      for (let i = 0; i < count; i++) {
+        const order = await buildRandomTestOrder({});
+        const fc = await dteSvc.emitForOrder(order, { tipoDte: '01' });
+        if (!fc || fc.estado !== 'PROCESADO') {
+          results.push({ estado: 'ERROR', observaciones: 'No se pudo emitir la Factura base para anular: ' + (fc?.observaciones || 'fallo') });
+          break;
+        }
+        const [rows] = await db.execute('SELECT * FROM dte_documents WHERE codigo_generacion=?', [fc.codigoGeneracion]);
+        if (!rows || !rows.length) { results.push({ estado: 'ERROR', observaciones: 'No se encontró la Factura recién emitida.' }); break; }
+        const rec = await dteSvc.invalidarDte(rows[0], buildTestMotivoAnulacion());
+        results.push({ estado: rec?.estado || 'ERROR', numeroControl: rec?.numeroControl || null, observaciones: rec?.observaciones || null });
+        if (rec && rec.estado !== 'PROCESADO') break;
+      }
+      const items = await homologacionCounts();
+      const cur = items.find(h => h.tipoDte === 'AN');
+      return res.json({
+        tipoDte: 'AN', emitted: results.length,
+        procesados: results.filter(r => r.estado === 'PROCESADO').length,
+        results, done: cur ? cur.done : null, target: cur ? cur.target : null,
+      });
+    } catch(e) { return res.status(500).json({ error: e.message }); }
+  }
+
   try {
     const results = [];
     for (let i = 0; i < count; i++) {
@@ -2515,6 +2559,52 @@ app.post('/api/admin/dte/emit-manual', requireAdmin, async (req, res) => {
       observaciones: rec?.observaciones || null,
       total,
       numItems:      items.length,
+    });
+  } catch(e) { res.status(500).json({ error: e.message }); }
+});
+
+// GET /api/admin/dte/invalidables — DTEs PROCESADOS que se pueden anular (ambiente actual).
+app.get('/api/admin/dte/invalidables', requireAdmin, async (req, res) => {
+  try {
+    const [rows] = await db.execute(
+      `SELECT id, order_id, tipo_dte, numero_control, codigo_generacion, created_at
+         FROM dte_documents
+        WHERE estado='PROCESADO' AND ambiente=? AND tipo_dte<>'AN'
+        ORDER BY id DESC LIMIT 100`,
+      [cfg.DTE_AMBIENTE]
+    );
+    res.json((rows || []).map(r => ({
+      id: r.id, orderId: r.order_id, tipoDte: r.tipo_dte,
+      numeroControl: r.numero_control, codigoGeneracion: r.codigo_generacion, createdAt: r.created_at,
+    })));
+  } catch(e) { res.status(500).json({ error: e.message }); }
+});
+
+// POST /api/admin/dte/invalidar — anula un DTE PROCESADO específico.
+//   body: { dteId, tipoAnulacion?, motivoAnulacion?, codigoGeneracionR? }
+app.post('/api/admin/dte/invalidar', requireAdmin, async (req, res) => {
+  if (!cfg.DTE_ENABLED) return res.status(409).json({ error: 'DTE deshabilitado.' });
+  const dteId = parseInt((req.body && req.body.dteId), 10);
+  if (!dteId) return res.status(400).json({ error: 'Falta dteId.' });
+  try {
+    const [rows] = await db.execute('SELECT * FROM dte_documents WHERE id=?', [dteId]);
+    if (!rows || !rows.length) return res.status(404).json({ error: 'DTE no encontrado.' });
+    const doc = rows[0];
+    if (doc.estado !== 'PROCESADO' || !doc.sello_recibido) {
+      return res.status(409).json({ error: 'Solo se puede invalidar un DTE PROCESADO con sello.' });
+    }
+    const motivo = {
+      ...buildTestMotivoAnulacion(),
+      tipoAnulacion:   parseInt((req.body && req.body.tipoAnulacion), 10) || 2,
+      motivoAnulacion: (req.body && req.body.motivoAnulacion) || 'Anulación solicitada por el emisor',
+      codigoGeneracionR: (req.body && req.body.codigoGeneracionR) || null,
+    };
+    const rec = await dteSvc.invalidarDte(doc, motivo);
+    res.json({
+      ok:            rec && rec.estado === 'PROCESADO',
+      estado:        rec?.estado || 'ERROR',
+      selloRecibido: rec?.selloRecibido || null,
+      observaciones: rec?.observaciones || null,
     });
   } catch(e) { res.status(500).json({ error: e.message }); }
 });

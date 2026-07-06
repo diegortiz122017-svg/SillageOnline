@@ -623,6 +623,149 @@ async function emitForOrder(order, options = {}) {
   }
 }
 
+// ════════════════════════════════════════════════════════════════════════════
+//  EVENTO DE INVALIDACIÓN (Anulación) — anula un DTE ya PROCESADO
+//  Esquema anulación v2. Endpoint aparte (DTE_ANULACION_URL). No es un tipo de
+//  DTE del cuerpo: referencia un DTE con sello y lo deja sin efecto.
+// ════════════════════════════════════════════════════════════════════════════
+
+// IVA del DTE a anular: FC/NC usan resumen.totalIva; el CCF lo lleva en el tributo 20.
+function _montoIvaDe(json) {
+  const r = json && json.resumen ? json.resumen : {};
+  if (typeof r.totalIva === 'number') return round2(r.totalIva);
+  if (Array.isArray(r.tributos)) {
+    const t = r.tributos.find(x => x && x.codigo === '20');
+    if (t && typeof t.valor === 'number') return round2(t.valor);
+  }
+  return 0;
+}
+
+// docRow = fila de dte_documents (con json_dte, sello, numero_control, etc.)
+// motivo = { tipoAnulacion, motivoAnulacion, nombreResponsable, tipDocResponsable,
+//            numDocResponsable, nombreSolicita, tipDocSolicita, numDocSolicita,
+//            codigoGeneracionR? }
+function buildAnulacion(docRow, motivo, opts) {
+  const { fecEmi: fecAnula, horEmi: horAnula } = nowSV();
+  const json = typeof docRow.json_dte === 'string' ? JSON.parse(docRow.json_dte) : docRow.json_dte;
+  const e    = cfg.DTE_EMISOR;
+  const rec  = (json && json.receptor) || {};
+  // Documento identificación del receptor: CCF/NC llevan numDocumento/tipoDocumento;
+  // la Factura de consumidor final puede no llevarlos.
+  const numDoc  = rec.numDocumento || rec.nit || null;
+  const tipoDoc = rec.tipoDocumento || (rec.nit ? '36' : null);
+
+  return {
+    identificacion: {
+      version:          2,
+      ambiente:         cfg.DTE_AMBIENTE,
+      codigoGeneracion: opts.codigoGeneracion,        // UUID del EVENTO (nuevo)
+      fecAnula,
+      horAnula,
+    },
+    emisor: {
+      nit:                 e.nit,
+      nombre:              e.nombre,
+      tipoEstablecimiento: '02',                       // CAT-009: 02 = Casa Matriz
+      telefono:            e.telefono,
+      correo:              e.correo,
+      codEstableMH:        null,
+      codEstable:          e.codEstable || null,
+      codPuntoVentaMH:     null,
+      codPuntoVenta:       e.codPuntoVenta || null,
+      nomEstablecimiento:  null,
+    },
+    documento: {
+      tipoDte:           docRow.tipo_dte,
+      codigoGeneracion:  docRow.codigo_generacion,     // DTE que se anula
+      codigoGeneracionR: motivo.codigoGeneracionR || null, // reemplazo (solo tipo 1)
+      selloRecibido:     docRow.sello_recibido,
+      numeroControl:     docRow.numero_control,
+      fecEmi:            (json.identificacion && json.identificacion.fecEmi) || fecAnula,
+      montoIva:          _montoIvaDe(json),
+      codigoDocumento:   null,
+      tipoDocumento:     tipoDoc,
+      numDocumento:      numDoc,
+      nombre:            rec.nombre || null,
+      telefono:          null,
+      correo:            rec.correo || null,
+    },
+    motivo: {
+      tipoAnulacion:     motivo.tipoAnulacion || 2,    // 2 = definitiva sin reemplazo
+      motivoAnulacion:   motivo.motivoAnulacion || null,
+      nombreResponsable: motivo.nombreResponsable,
+      tipDocResponsable: motivo.tipDocResponsable || '36',
+      numDocResponsable: motivo.numDocResponsable,
+      nombreSolicita:    motivo.nombreSolicita,
+      tipDocSolicita:    motivo.tipDocSolicita || '36',
+      numDocSolicita:    motivo.numDocSolicita,
+    },
+  };
+}
+
+// Transmitir el evento firmado al endpoint de anulación del MH.
+async function transmitirAnulacion(codigoGeneracion, documentoFirmado) {
+  const token = await getAuthToken();
+  const payload = {
+    ambiente:         cfg.DTE_AMBIENTE,
+    idEnvio:          Date.now() % 1e9,
+    version:          2,
+    documento:        documentoFirmado,
+    codigoGeneracion,
+  };
+  const r = await fetch(cfg.DTE_ANULACION_URL, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', 'Authorization': token, 'User-Agent': 'SillageDTE/1.0' },
+    body: JSON.stringify(payload),
+  });
+  return r.json();
+}
+
+// Orquestador: anula un DTE PROCESADO. Persiste el evento en dte_documents con
+// tipo_dte='AN'. Devuelve el registro con estado PROCESADO/RECHAZADO.
+async function invalidarDte(docRow, motivo) {
+  if (!cfg.DTE_ENABLED) return null;
+  if (docRow.estado !== 'PROCESADO' || !docRow.sello_recibido) {
+    throw new Error('Solo se puede invalidar un DTE PROCESADO con sello de recepción.');
+  }
+  const codigoGeneracion = uuidUpper();               // UUID del evento
+  const jsonAnula = buildAnulacion(docRow, motivo, { codigoGeneracion });
+
+  const base = {
+    orderId: docRow.order_id, tipoDte: 'AN', version: 2,
+    codigoGeneracion, numeroControl: 'ANULA-' + docRow.numero_control, jsonDte: jsonAnula,
+  };
+  try {
+    const firmado   = await firmar(jsonAnula);
+    const recepcion = await transmitirAnulacion(codigoGeneracion, firmado);
+    const estado    = recepcion.estado === 'PROCESADO' ? 'PROCESADO' : 'RECHAZADO';
+    const obsArr = Array.isArray(recepcion.observaciones)
+      ? recepcion.observaciones.filter(Boolean)
+      : (recepcion.observaciones ? [String(recepcion.observaciones)] : []);
+    const partes = [];
+    if (recepcion.descripcionMsg) partes.push(recepcion.descripcionMsg);
+    if (obsArr.length)            partes.push(obsArr.join(' | '));
+    let observaciones = partes.join(' — ') || null;
+    if (estado === 'RECHAZADO' && recepcion.codigoMsg) {
+      observaciones = '[' + recepcion.codigoMsg + '] ' + (observaciones || 'Rechazado sin descripción');
+    }
+    const rec = { ...base, jsonFirmado: firmado, selloRecibido: recepcion.selloRecibido || null, estado, observaciones };
+    await persist(rec);
+    // Si quedó PROCESADO, marcar el DTE original como anulado en sus observaciones.
+    if (estado === 'PROCESADO') {
+      await db.execute(
+        "UPDATE dte_documents SET estado='ANULADO', updated_at=? WHERE id=?",
+        [new Date(), docRow.id]
+      ).catch(() => {});
+    }
+    return rec;
+  } catch (e) {
+    const rec = { ...base, jsonFirmado: null, selloRecibido: null, estado: 'CONTINGENCIA', observaciones: e.message };
+    await persist(rec).catch(() => {});
+    console.error(`Invalidación del DTE ${docRow.codigo_generacion} quedó en contingencia:`, e.message);
+    return rec;
+  }
+}
+
 // URL pública de verificación en el portal de Hacienda (para QR / factura).
 function verificacionUrl(codigoGeneracion, fecEmi) {
   return `https://admin.factura.gob.sv/consultaPublica?ambiente=${cfg.DTE_AMBIENTE}` +
@@ -678,5 +821,7 @@ module.exports = {
   buildFactura,
   buildCreditoFiscal,
   buildNotaCredito,
+  buildAnulacion,
+  invalidarDte,
   IVA_RATE,
 };

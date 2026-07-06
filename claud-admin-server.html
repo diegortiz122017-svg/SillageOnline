@@ -1238,6 +1238,28 @@ tr:hover td{background:rgba(255,255,255,0.02)}
           <div id="dteManualOut" style="margin-top:1rem;font-size:0.7rem;line-height:1.8"></div>
         </div>
 
+        <!-- Invalidar (anular) un DTE ya procesado -->
+        <div style="background:rgba(255,255,255,0.03);border:1px solid var(--border-light);padding:1.2rem;margin-bottom:1.2rem">
+          <div style="font-size:0.6rem;letter-spacing:0.2em;text-transform:uppercase;color:var(--gold);margin-bottom:0.4rem">Invalidar un DTE (Evento de Invalidación)</div>
+          <div style="font-size:0.62rem;color:var(--muted);margin-bottom:1rem">Anula un DTE ya PROCESADO ante el MH. La invalidación es definitiva. Para pruebas de homologación usa los botones de arriba (“Evento de Invalidación”).</div>
+          <div style="display:flex;gap:0.6rem;flex-wrap:wrap;align-items:flex-end">
+            <div style="flex:1;min-width:240px">
+              <label class="dte-lbl">DTE a invalidar</label>
+              <select id="dteInvSelect" class="dte-inp" style="width:100%"><option value="">Cargando…</option></select>
+            </div>
+            <div>
+              <label class="dte-lbl">Tipo de anulación</label>
+              <select id="dteInvTipo" class="dte-inp">
+                <option value="2">2 — Definitiva (sin reemplazo)</option>
+                <option value="3">3 — Rescindir la operación</option>
+              </select>
+            </div>
+          </div>
+          <div style="margin-top:0.6rem"><label class="dte-lbl">Motivo</label><input id="dteInvMotivo" class="dte-inp" style="width:100%" placeholder="Motivo de la invalidación" value="Anulación solicitada por el emisor"/></div>
+          <button class="save-btn" style="margin-top:0.8rem;border:1px solid #d9534f;background:transparent;color:#d9534f" onclick="dteInvalidar()">Invalidar DTE</button>
+          <div id="dteInvOut" style="margin-top:1rem;font-size:0.7rem;line-height:1.8"></div>
+        </div>
+
         <!-- Emitir / reintentar DTE de un pedido -->
         <div style="background:rgba(255,255,255,0.03);border:1px solid var(--border-light);padding:1.2rem;margin-bottom:1.2rem">
           <div style="font-size:0.6rem;letter-spacing:0.2em;text-transform:uppercase;color:var(--gold);margin-bottom:1rem">Emitir / reintentar DTE de un pedido</div>
@@ -2179,6 +2201,7 @@ function renderDtePage(){
   loadHomologacion();
   loadDteDocuments();
   dteManualInit();
+  loadInvalidables();
 }
 function dteManualInit(){
   var box=document.getElementById('dteManualItems');
@@ -2500,6 +2523,35 @@ function dteManualReset(){
     var el=document.getElementById(id); if(el) el.value='';
   });
   dteManualRecalc();
+}
+
+// ── Invalidación de un DTE ────────────────────────────────
+function loadInvalidables(){
+  var sel=document.getElementById('dteInvSelect'); if(!sel) return;
+  adminFetch(API+'/admin/dte/invalidables',{}).then(function(r){return r?r.json():null;}).then(function(list){
+    if(!Array.isArray(list)||!list.length){ sel.innerHTML='<option value="">No hay DTEs procesados para anular</option>'; return; }
+    var tipoLbl={'01':'Factura','03':'CCF','05':'Nota de Crédito'};
+    sel.innerHTML='<option value="">— Elegir DTE —</option>'+list.map(function(d){
+      return '<option value="'+d.id+'">'+(tipoLbl[d.tipoDte]||d.tipoDte)+' · '+_dteEsc(d.numeroControl)+' · pedido '+_dteEsc(d.orderId)+'</option>';
+    }).join('');
+  }).catch(function(){ sel.innerHTML='<option value="">Error al cargar</option>'; });
+}
+function dteInvalidar(){
+  var out=document.getElementById('dteInvOut');
+  var dteId=document.getElementById('dteInvSelect').value;
+  if(!dteId){ out.innerHTML='<span style="color:#d9534f">Elige un DTE a invalidar.</span>'; return; }
+  if(!confirm('¿Invalidar este DTE? La anulación es definitiva ante el MH.')) return;
+  out.innerHTML='Invalidando…';
+  adminFetch(API+'/admin/dte/invalidar',{method:'POST',headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({dteId:parseInt(dteId,10),tipoAnulacion:parseInt(document.getElementById('dteInvTipo').value,10),motivoAnulacion:(document.getElementById('dteInvMotivo').value||'').trim()})
+  }).then(function(r){return r?r.json():null;}).then(function(d){
+    if(!d){ out.textContent='Sin respuesta.'; return; }
+    if(d.error){ out.innerHTML='<span style="color:#d9534f">'+_dteEsc(d.error)+'</span>'; return; }
+    out.innerHTML='Resultado: '+_dteChip(d.ok,d.estado||'—')+
+      (d.selloRecibido?' · Sello '+_dteEsc(d.selloRecibido).slice(0,16)+'…':'')+
+      (d.observaciones?'<div style="color:#d98a3a;margin-top:0.3rem">'+_dteEsc(d.observaciones)+'</div>':'');
+    if(d.ok){ loadInvalidables(); loadDteDocuments(); loadHomologacion(); }
+  }).catch(function(e){ out.innerHTML='<span style="color:#d9534f">Error: '+_dteEsc(e.message)+'</span>'; });
 }
 
 function dteToggleReceptor(){
