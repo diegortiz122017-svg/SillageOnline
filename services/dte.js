@@ -445,6 +445,112 @@ function buildNotaCredito(order, receptor, docRelacionado, opts) {
   };
 }
 
+// ════════════════════════════════════════════════════════════════════════════
+//  Nota de Crédito EXACTA — anula/ajusta el CCF referenciado por el MONTO TOTAL,
+//  copiando sus montos DIRECTAMENTE (sin recalcular desde una orden). El MH
+//  rechaza [020] resumen.totalIva si los importes de la NC no cuadran EXACTO
+//  con el CCF que dice estar ajustando — aunque la NC sea matemáticamente
+//  autoconsistente, si no coincide con lo que el MH tiene registrado para ese
+//  CCF, lo rechaza igual. Por eso aquí se copian totalGravada/totalIva/
+//  montoTotalOperacion tal cual vienen en ccfJson.resumen, sin recomputar.
+// ════════════════════════════════════════════════════════════════════════════
+function buildNotaCreditoExacta(ccfJson, receptor, opts) {
+  const { fecEmi, horEmi } = nowSV();
+  const refDoc = ccfJson.identificacion.codigoGeneracion;
+  const totalIvaCcf = round2(ccfJson.resumen.totalIva);
+
+  // Repartir el IVA total EXACTO del CCF entre los ítems (round2 en todos menos
+  // el último, que absorbe el remanente de redondeo) para que la suma dé,
+  // centavo a centavo, el mismo totalIva del CCF.
+  const items = ccfJson.cuerpoDocumento;
+  let ivaAsignado = 0;
+  const cuerpoDocumento = items.map((it, idx) => {
+    const esUltimo = idx === items.length - 1;
+    const totalIva = esUltimo
+      ? round2(totalIvaCcf - ivaAsignado)
+      : round2(it.ventaGravada * IVA_RATE);
+    ivaAsignado = round2(ivaAsignado + totalIva);
+    return {
+      numItem:         idx + 1,
+      tipoItem:        it.tipoItem,
+      numeroDocumento: refDoc,
+      cantidad:        it.cantidad,
+      codigo:          it.codigo,
+      codTributo:      it.codTributo,
+      uniMedida:       it.uniMedida,
+      descripcion:     it.descripcion,
+      precioUni:       it.precioUni,
+      montoDescu:      it.montoDescu,
+      ventaNoSuj:      it.ventaNoSuj,
+      ventaExenta:     it.ventaExenta,
+      ventaGravada:    it.ventaGravada,
+      tributos:        it.tributos,
+      noGravado:       it.noGravado,
+      ivaPerci:        0,
+      totalIva,
+      ivaRete:         0,
+    };
+  });
+
+  const resumen = {
+    totalNoSuj:          ccfJson.resumen.totalNoSuj,
+    totalExenta:         ccfJson.resumen.totalExenta,
+    totalGravada:        ccfJson.resumen.totalGravada,
+    subTotalVentas:      ccfJson.resumen.subTotalVentas,
+    totalDescu:          ccfJson.resumen.totalDescu,
+    tributos:            ccfJson.resumen.tributos,       // mismo array {codigo:'20',...,valor}
+    montoTotalOperacion: ccfJson.resumen.montoTotalOperacion,
+    ivaPerci:            0,
+    totalIva:            totalIvaCcf,                    // copiado tal cual del CCF
+    ivaRete:             0,
+    totalNoGravado:      ccfJson.resumen.totalNoGravado,
+    totalPagar:          ccfJson.resumen.montoTotalOperacion,
+    totalLetras:         numeroALetras(ccfJson.resumen.montoTotalOperacion),
+    condicionOperacion:  1,
+    observaciones:       null,
+    codigoRetencionMH:   null,
+  };
+
+  const identificacion = buildIdentificacion('05', 4, opts.numeroControl, opts.codigoGeneracion, fecEmi, horEmi);
+  identificacion.fusion = null;
+
+  const emisor = buildEmisor();
+  delete emisor.codEstable;
+  delete emisor.codPuntoVenta;
+
+  return {
+    identificacion,
+    documentoRelacionado: [{
+      tipoDocumento:   '03',
+      tipoGeneracion:  2,
+      numeroDocumento: refDoc,
+      fechaEmision:    ccfJson.identificacion.fecEmi,
+    }],
+    emisor,
+    receptor: {
+      tipoDocumento:   '36',
+      numDocumento:    receptor.nit,
+      nrc:             receptor.nrc || null,
+      nombre:          receptor.nombre,
+      codActividad:    receptor.codActividad,
+      descActividad:   receptor.descActividad,
+      nombreComercial: receptor.nombreComercial || null,
+      direccion: {
+        departamento: receptor.departamento,
+        municipio:    receptor.municipio,
+        distrito:     receptor.distrito,
+        complemento:  receptor.complemento,
+      },
+      telefono:        receptor.telefono || null,
+      correo:          receptor.correo || null,
+    },
+    ventaTercero:    null,
+    cuerpoDocumento,
+    resumen,
+    apendice:        null,
+  };
+}
+
 function buildIdentificacion(tipoDte, version, numControl, codGen, fecEmi, horEmi) {
   return {
     version,
@@ -606,7 +712,13 @@ async function emitForOrder(order, options = {}) {
   let jsonDte;
   if (tipoDte === '01')      jsonDte = buildFactura(order, opts);
   else if (tipoDte === '03') jsonDte = buildCreditoFiscal(order, options.receptor || {}, opts);
-  else if (tipoDte === '05') jsonDte = buildNotaCredito(order, options.receptor || {}, options.docRelacionado || {}, opts);
+  else if (tipoDte === '05') {
+    // Si viene el JSON completo del CCF referenciado, copiar sus montos EXACTOS
+    // (evita [020] por descuadre con lo que el MH tiene registrado del CCF).
+    jsonDte = options.ccfJsonExacto
+      ? buildNotaCreditoExacta(options.ccfJsonExacto, options.receptor || {}, opts)
+      : buildNotaCredito(order, options.receptor || {}, options.docRelacionado || {}, opts);
+  }
   else throw new Error('tipoDte no soportado: ' + tipoDte);
 
   // Si ya sabemos que el MH está caído, generar directamente en modo contingencia
@@ -1086,6 +1198,7 @@ module.exports = {
   buildFactura,
   buildCreditoFiscal,
   buildNotaCredito,
+  buildNotaCreditoExacta,
   buildAnulacion,
   invalidarDte,
   buildContingencia,

@@ -2434,19 +2434,12 @@ async function latestProcessedCCF() {
   ).catch(() => [[]]);
   if (!rows || !rows.length) return null;
   let fecEmi = new Date().toISOString().slice(0, 10);
-  let items = null;
+  let ccfJson = null;
   try {
-    const ccfJson = JSON.parse(rows[0].json_dte);
+    ccfJson = JSON.parse(rows[0].json_dte);
     fecEmi = ccfJson.identificacion.fecEmi || fecEmi;
-    items = (ccfJson.cuerpoDocumento || []).map(it => ({
-      name:  it.descripcion,
-      qty:   it.cantidad,
-      // precioUni del CCF es NETO (sin IVA) — se reconstruye el precio con IVA para que
-      // buildNotaCredito, al volver a quitarle el IVA, recupere el mismo monto neto.
-      price: Math.round(it.precioUni * 1.13 * 100) / 100,
-    }));
   } catch(e) {}
-  return { codigoGeneracion: rows[0].codigo_generacion, fecEmi, items };
+  return { codigoGeneracion: rows[0].codigo_generacion, fecEmi, ccfJson };
 }
 
 app.get('/api/admin/dte/homologacion', requireAdmin, async (req, res) => {
@@ -2522,16 +2515,15 @@ app.post('/api/admin/dte/homologacion/emit', requireAdmin, async (req, res) => {
           ? { ...buildTestReceptor(), nit: custom.nit, nrc: custom.nrc, nombre: custom.nombre, nombreComercial: custom.nombre }
           : buildTestReceptor();
       }
-      let order;
+      let order = null;
       if (tipoDte === '05') {
         const ccf = await latestProcessedCCF();
-        if (!ccf) { results.push({ estado: 'ERROR', observaciones: 'No hay un CCF PROCESADO para referenciar. Emite primero un CCF.' }); break; }
+        if (!ccf || !ccf.ccfJson) { results.push({ estado: 'ERROR', observaciones: 'No hay un CCF PROCESADO para referenciar. Emite primero un CCF.' }); break; }
         options.docRelacionado = ccf;
-        // La NC debe ajustar los MISMOS montos del CCF referenciado (si no, el MH
-        // rechaza [020] resumen.totalIva porque los importes no le "cuadran" al documento).
-        order = ccf.items && ccf.items.length
-          ? { id: 'NC-' + Date.now(), customer: 'Cliente de Prueba', email: cfg.DTE_EMISOR.correo, payment_method: 'cod', items: JSON.stringify(ccf.items), total: 0 }
-          : await buildRandomTestOrder({});
+        // Copiar los montos EXACTOS del CCF (sin recalcular) — evita [020] por
+        // descuadre con lo que el MH tiene registrado para ese CCF.
+        options.ccfJsonExacto = ccf.ccfJson;
+        order = { id: 'NC-' + Date.now() }; // no se usa: buildNotaCreditoExacta ignora `order`
       } else {
         order = await buildRandomTestOrder({});
       }
