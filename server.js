@@ -28,7 +28,7 @@ const security     = require('./middleware/security');
 const auth         = require('./middleware/auth');
 
 // ─── Aliases for backwards compatibility within this file ──────────────────
-const { getCatalogue, saveCatalogue, deleteProduct, getInventoryMap, invalidateInventory, getPricingMap, getActivity, getSetting, setSetting, getBrandHierarchy } = catalogueSvc;
+const { getCatalogue, saveCatalogue, deleteProduct, getInventoryMap, invalidateInventory, getPricingMap, invalidatePricing, getActivity, getSetting, setSetting, getBrandHierarchy } = catalogueSvc;
 const { calcIntensity } = require('./services/noteIntensity');
 const { calcChords }    = require('./services/chords');
 
@@ -4578,6 +4578,7 @@ app.post('/api/pricing', requireAdmin, async (req, res) => {
       [parseInt(pid), val.salePrice || '', val.onSale ? 1 : 0, n]
     );
   }
+  invalidatePricing(); // limpiar caché (60s) — si no, el broadcast y la tienda siguen sirviendo el precio/oferta viejo
   broadcast('pricing', await getPricingMap());
   await logActivity('Precios actualizados');
   res.json({ ok: true });
