@@ -965,14 +965,7 @@ tr:hover td{background:rgba(255,255,255,0.02)}
         </div><!-- end inv-tab-stock -->
         <!-- TAB: PRICING -->
         <div class="inner-tab-section" id="inv-tab-pricing">
-        <div class="page-sub">Los cambios se sincronizan con la tienda al instante</div>
-        <div class="tbl-wrap">
-          <table>
-            <thead><tr><th>Producto</th><th>Original</th><th>Precio Oferta ($)</th><th>En Oferta</th><th>Vista Previa</th></tr></thead>
-            <tbody id="priceBody"></tbody>
-          </table>
-        </div>
-        <div class="save-bar"><button class="save-btn" id="savePriceBtn">Guardar y Sincronizar</button><span class="saved-msg" id="priceMsg">✓ Sincronizado</span></div>
+        <div class="page-sub">La gestión de precios en oferta y el email de oferta se movieron a <b style="color:var(--gold)">Descuentos</b> en el menú lateral.</div>
 
         <!-- SHIPPING CONFIG -->
         <div style="margin-top:2.5rem;padding-top:2rem;border-top:1px solid var(--border)">
@@ -1025,64 +1018,6 @@ tr:hover td{background:rgba(255,255,255,0.02)}
           </div>
         </div>
 
-        <!-- SALE EMAIL BLAST -->
-        <div style="margin-top:2.5rem;padding-top:2rem;border-top:1px solid var(--border)">
-          <div class="page-title" style="font-size:1.2rem;margin-bottom:0.3rem">Email de Oferta</div>
-          <div class="page-sub" style="margin-bottom:1.5rem">Notifica a clientes registrados sobre ofertas activas. Se respetan las preferencias de marketing de cada usuario.</div>
-
-          <div style="display:flex;flex-direction:column;gap:1rem;max-width:580px">
-            <!-- Product selector -->
-            <div>
-              <label style="font-size:0.55rem;letter-spacing:0.18em;text-transform:uppercase;color:var(--muted);display:block;margin-bottom:0.4rem">Fragancia en oferta *</label>
-              <select id="saleEmailProduct" onchange="updateSaleEmailPreview()"
-                style="width:100%;background:var(--card);border:1px solid var(--border-light);color:var(--cream);font-family:'Jost',sans-serif;font-size:0.72rem;padding:0.55rem 0.8rem;outline:none">
-                <option value="">Seleccionar fragancia...</option>
-              </select>
-            </div>
-
-            <!-- Audience -->
-            <div>
-              <label style="font-size:0.55rem;letter-spacing:0.18em;text-transform:uppercase;color:var(--muted);display:block;margin-bottom:0.6rem">Audiencia</label>
-              <div style="display:flex;flex-direction:column;gap:0.5rem">
-                <label style="display:flex;align-items:flex-start;gap:0.7rem;cursor:pointer">
-                  <input type="radio" name="saleAudience" value="favorites" checked onchange="updateSaleEmailPreview()"
-                    style="margin-top:3px;accent-color:#b8955a"/>
-                  <span>
-                    <span style="font-size:0.72rem;color:var(--cream);display:block">Solo clientes con perfil afín</span>
-                    <span style="font-size:0.62rem;color:var(--muted)">Usuarios cuyo perfil de Nez incluye esta fragancia entre sus recomendadas</span>
-                  </span>
-                </label>
-                <label style="display:flex;align-items:flex-start;gap:0.7rem;cursor:pointer">
-                  <input type="radio" name="saleAudience" value="all" onchange="updateSaleEmailPreview()"
-                    style="margin-top:3px;accent-color:#b8955a"/>
-                  <span>
-                    <span style="font-size:0.72rem;color:var(--cream);display:block">Todos los clientes con marketing activo</span>
-                    <span style="font-size:0.62rem;color:var(--muted)">Todos los registrados que aceptaron emails de ofertas</span>
-                  </span>
-                </label>
-              </div>
-            </div>
-
-            <!-- Custom message -->
-            <div>
-              <label style="font-size:0.55rem;letter-spacing:0.18em;text-transform:uppercase;color:var(--muted);display:block;margin-bottom:0.4rem">Mensaje personalizado <span style="opacity:0.6">(opcional)</span></label>
-              <textarea id="saleEmailMsg" rows="2" placeholder="Ej: Solo por esta semana, aprovecha el precio especial."
-                style="width:100%;box-sizing:border-box;background:var(--card);border:1px solid var(--border-light);color:var(--cream);font-family:'Jost',sans-serif;font-size:0.72rem;padding:0.55rem 0.8rem;outline:none;resize:vertical"></textarea>
-            </div>
-
-            <!-- Preview -->
-            <div id="saleEmailPreview" style="display:none;background:rgba(184,149,90,0.06);border:1px solid rgba(184,149,90,0.2);padding:1rem;font-size:0.68rem;color:var(--muted);line-height:1.8"></div>
-
-            <!-- Send -->
-            <div style="display:flex;align-items:center;gap:1rem">
-              <button onclick="sendSaleEmail()" id="saleEmailBtn"
-                style="background:#b8955a;border:none;color:#0e0c0a;font-family:'Jost',sans-serif;font-size:0.62rem;letter-spacing:0.18em;text-transform:uppercase;padding:0.7rem 1.5rem;cursor:pointer;transition:background 0.2s">
-                Enviar Email de Oferta
-              </button>
-              <span id="saleEmailMsg" style="font-size:0.65rem;color:var(--muted)"></span>
-            </div>
-          </div>
-        </div>
         </div><!-- end inv-tab-pricing -->
       </div><!-- end page-inventory -->
 
@@ -1162,23 +1097,99 @@ tr:hover td{background:rgba(255,255,255,0.02)}
       </div>
       <!-- CÓDIGOS DE DESCUENTO -->
       <div class="page" id="page-promos">
-        <div class="page-hdr">
-          <div>
-            <div class="page-title">Códigos de Descuento</div>
-            <div class="page-sub">Cupones aplicables en el checkout de la tienda</div>
-          </div>
-          <button class="add-btn-lg" onclick="openPromoModal(null)">+ Nuevo Código</button>
-        </div>
-        <div class="tbl-wrap" style="overflow-x:auto">
-          <table id="promoTable" style="min-width:820px">
-            <thead><tr>
-              <th>Código</th><th>Tipo</th><th>Valor</th><th>Mín. pedido</th>
-              <th>Usos</th><th>Vence</th><th>Estado</th><th></th>
-            </tr></thead>
-            <tbody id="promoBody">
-              <tr><td colspan="8" style="text-align:center;padding:2rem;color:var(--muted)">Cargando…</td></tr>
-            </tbody>
+        <div class="page-title">Descuentos</div>
+        <div class="page-sub" style="margin-bottom:1.5rem">Ofertas por producto, códigos de cupón y notificaciones de ofertas — todo en un solo lugar</div>
+
+        <!-- OFERTAS POR PRODUCTO -->
+        <div class="page-title" style="font-size:1.2rem;margin-bottom:0.3rem">Ofertas por Producto</div>
+        <div class="page-sub" style="margin-bottom:1rem">Los cambios se sincronizan con la tienda al instante</div>
+        <div class="tbl-wrap">
+          <table>
+            <thead><tr><th>Producto</th><th>Original</th><th>Precio Oferta ($)</th><th>En Oferta</th><th>Vista Previa</th></tr></thead>
+            <tbody id="priceBody"></tbody>
           </table>
+        </div>
+        <div class="save-bar"><button class="save-btn" id="savePriceBtn">Guardar y Sincronizar</button><span class="saved-msg" id="priceMsg">✓ Sincronizado</span></div>
+
+        <!-- CÓDIGOS DE DESCUENTO -->
+        <div style="margin-top:2.5rem;padding-top:2rem;border-top:1px solid var(--border)">
+          <div class="page-hdr">
+            <div>
+              <div class="page-title" style="font-size:1.2rem">Códigos de Descuento</div>
+              <div class="page-sub">Cupones aplicables en el checkout de la tienda</div>
+            </div>
+            <button class="add-btn-lg" onclick="openPromoModal(null)">+ Nuevo Código</button>
+          </div>
+          <div class="tbl-wrap" style="overflow-x:auto">
+            <table id="promoTable" style="min-width:820px">
+              <thead><tr>
+                <th>Código</th><th>Tipo</th><th>Valor</th><th>Mín. pedido</th>
+                <th>Usos</th><th>Vence</th><th>Estado</th><th></th>
+              </tr></thead>
+              <tbody id="promoBody">
+                <tr><td colspan="8" style="text-align:center;padding:2rem;color:var(--muted)">Cargando…</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <!-- SALE EMAIL BLAST -->
+        <div style="margin-top:2.5rem;padding-top:2rem;border-top:1px solid var(--border)">
+          <div class="page-title" style="font-size:1.2rem;margin-bottom:0.3rem">Email de Oferta</div>
+          <div class="page-sub" style="margin-bottom:1.5rem">Notifica a clientes registrados sobre ofertas activas. Se respetan las preferencias de marketing de cada usuario.</div>
+
+          <div style="display:flex;flex-direction:column;gap:1rem;max-width:580px">
+            <!-- Product selector -->
+            <div>
+              <label style="font-size:0.55rem;letter-spacing:0.18em;text-transform:uppercase;color:var(--muted);display:block;margin-bottom:0.4rem">Fragancia en oferta *</label>
+              <select id="saleEmailProduct" onchange="updateSaleEmailPreview()"
+                style="width:100%;background:var(--card);border:1px solid var(--border-light);color:var(--cream);font-family:'Jost',sans-serif;font-size:0.72rem;padding:0.55rem 0.8rem;outline:none">
+                <option value="">Seleccionar fragancia...</option>
+              </select>
+            </div>
+
+            <!-- Audience -->
+            <div>
+              <label style="font-size:0.55rem;letter-spacing:0.18em;text-transform:uppercase;color:var(--muted);display:block;margin-bottom:0.6rem">Audiencia</label>
+              <div style="display:flex;flex-direction:column;gap:0.5rem">
+                <label style="display:flex;align-items:flex-start;gap:0.7rem;cursor:pointer">
+                  <input type="radio" name="saleAudience" value="favorites" checked onchange="updateSaleEmailPreview()"
+                    style="margin-top:3px;accent-color:#b8955a"/>
+                  <span>
+                    <span style="font-size:0.72rem;color:var(--cream);display:block">Solo clientes con perfil afín</span>
+                    <span style="font-size:0.62rem;color:var(--muted)">Usuarios cuyo perfil de Nez incluye esta fragancia entre sus recomendadas</span>
+                  </span>
+                </label>
+                <label style="display:flex;align-items:flex-start;gap:0.7rem;cursor:pointer">
+                  <input type="radio" name="saleAudience" value="all" onchange="updateSaleEmailPreview()"
+                    style="margin-top:3px;accent-color:#b8955a"/>
+                  <span>
+                    <span style="font-size:0.72rem;color:var(--cream);display:block">Todos los clientes con marketing activo</span>
+                    <span style="font-size:0.62rem;color:var(--muted)">Todos los registrados que aceptaron emails de ofertas</span>
+                  </span>
+                </label>
+              </div>
+            </div>
+
+            <!-- Custom message -->
+            <div>
+              <label style="font-size:0.55rem;letter-spacing:0.18em;text-transform:uppercase;color:var(--muted);display:block;margin-bottom:0.4rem">Mensaje personalizado <span style="opacity:0.6">(opcional)</span></label>
+              <textarea id="saleEmailMsg" rows="2" placeholder="Ej: Solo por esta semana, aprovecha el precio especial."
+                style="width:100%;box-sizing:border-box;background:var(--card);border:1px solid var(--border-light);color:var(--cream);font-family:'Jost',sans-serif;font-size:0.72rem;padding:0.55rem 0.8rem;outline:none;resize:vertical"></textarea>
+            </div>
+
+            <!-- Preview -->
+            <div id="saleEmailPreview" style="display:none;background:rgba(184,149,90,0.06);border:1px solid rgba(184,149,90,0.2);padding:1rem;font-size:0.68rem;color:var(--muted);line-height:1.8"></div>
+
+            <!-- Send -->
+            <div style="display:flex;align-items:center;gap:1rem">
+              <button onclick="sendSaleEmail()" id="saleEmailBtn"
+                style="background:#b8955a;border:none;color:#0e0c0a;font-family:'Jost',sans-serif;font-size:0.62rem;letter-spacing:0.18em;text-transform:uppercase;padding:0.7rem 1.5rem;cursor:pointer;transition:background 0.2s">
+                Enviar Email de Oferta
+              </button>
+              <span id="saleEmailMsg" style="font-size:0.65rem;color:var(--muted)"></span>
+            </div>
+          </div>
         </div>
       </div>
 
@@ -1440,7 +1451,7 @@ tr:hover td{background:rgba(255,255,255,0.02)}
     <div class="mob-drawer">
       <div class="mob-drawer-handle"></div>
       <div class="mob-drawer-title">Más opciones</div>
-      <button class="mob-drawer-item" data-page="pricing" onclick="navToFromDrawer('inventory')"><span class="mob-icon">💲</span>Inventario</button>
+      <button class="mob-drawer-item" data-page="promos" onclick="navToFromDrawer('promos')"><span class="mob-icon">🏷️</span>Descuentos</button>
       <button class="mob-drawer-item" data-page="bundles" onclick="navToFromDrawer('catalogo')"><span class="mob-icon">🎁</span>Catálogo</button>
       <button class="mob-drawer-item" data-page="decants" onclick="navToFromDrawer('decants')"><span class="mob-icon">🧪</span>Decants</button>
       <button class="mob-drawer-item" data-page="cod" onclick="navToFromDrawer('cod')"><span class="mob-icon">🛡️</span>COD</button>
@@ -1819,11 +1830,11 @@ function connectWS(){
           if(oos) oos.checked=!!inventory[pid].outOfStock;
         });
         if(currentPage==='inventory')renderInventory();
-        if(currentPage==='pricing')renderPricing();
+        if(currentPage==='promos')renderPricing();
         renderOverview();
       }
       if(msg.type==='bottle_inventory'){if(currentPage==='inventory')loadBottleInventory();}
-      if(msg.type==='pricing'){pricing=msg.payload;if(currentPage==='pricing')renderPricing();renderOverview();}
+      if(msg.type==='pricing'){pricing=msg.payload;if(currentPage==='promos')renderPricing();renderOverview();}
       if(msg.type==='new_order'){
         orders.unshift(msg.payload);
         if(currentPage==='orders')renderOrders();
@@ -1892,7 +1903,7 @@ function fetchAllData(){
     renderOverview();
     if(currentPage==='orders')    renderOrders();
     if(currentPage==='inventory') renderInventory();
-    if(currentPage==='pricing')   renderPricing();
+    if(currentPage==='promos')   renderPricing();
   }).catch(function(){});
 }
 
@@ -2075,7 +2086,7 @@ function navTo(page){
   if(page==='cod'){         renderCODPage(); }
   if(page==='clientes')  loadClientes();
   if(page==='dte')       renderDtePage();
-  if(page==='promos')    loadPromoCodes();
+  if(page==='promos'){    loadPromoCodes(); renderPricing(); setTimeout(initSaleEmailUI, 800); }
 }
 document.querySelectorAll('.nav-btn,.mob-tab').forEach(function(b){
   b.addEventListener('click',function(){
@@ -3984,7 +3995,7 @@ function loadCatalogue(){
       renderCatalogue();
       // Refresh inventory/pricing if open — they now reflect new catalogue
       if(currentPage==='inventory') renderInventory();
-      if(currentPage==='pricing')   renderPricing();
+      if(currentPage==='promos')   renderPricing();
     })
     .catch(function(){renderCatalogue();});
 }
