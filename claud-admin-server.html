@@ -791,6 +791,7 @@ tr:hover td{background:rgba(255,255,255,0.02)}
         <button class="nav-btn" data-page="cod"><span class="nav-icon">🛡️</span>COD</button>
         <div class="sb-section">Clientes</div>
         <button class="nav-btn" data-page="clientes"><span class="nav-icon">👤</span>Clientes</button>
+        <button class="nav-btn" data-page="promos"><span class="nav-icon">🏷️</span>Descuentos</button>
         <div class="sb-section">Fiscal</div>
         <button class="nav-btn" data-page="dte"><span class="nav-icon">📄</span>DTE</button>
       </div>
@@ -1159,6 +1160,28 @@ tr:hover td{background:rgba(255,255,255,0.02)}
           </table>
         </div>
       </div>
+      <!-- CÓDIGOS DE DESCUENTO -->
+      <div class="page" id="page-promos">
+        <div class="page-hdr">
+          <div>
+            <div class="page-title">Códigos de Descuento</div>
+            <div class="page-sub">Cupones aplicables en el checkout de la tienda</div>
+          </div>
+          <button class="add-btn-lg" onclick="openPromoModal(null)">+ Nuevo Código</button>
+        </div>
+        <div class="tbl-wrap" style="overflow-x:auto">
+          <table id="promoTable" style="min-width:820px">
+            <thead><tr>
+              <th>Código</th><th>Tipo</th><th>Valor</th><th>Mín. pedido</th>
+              <th>Usos</th><th>Vence</th><th>Estado</th><th></th>
+            </tr></thead>
+            <tbody id="promoBody">
+              <tr><td colspan="8" style="text-align:center;padding:2rem;color:var(--muted)">Cargando…</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
       <!-- DTE / FACTURA ELECTRÓNICA PAGE -->
       <div class="page" id="page-dte">
         <div class="page-title">Factura Electrónica (DTE)</div>
@@ -1546,6 +1569,53 @@ tr:hover td{background:rgba(255,255,255,0.02)}
 </div>
 
 <!-- COLLECTIONS MODAL -->
+<div id="promoModal" style="display:none;position:fixed;inset:0;z-index:9999;background:rgba(0,0,0,0.75);align-items:center;justify-content:center">
+  <div style="background:#1a1714;border:1px solid rgba(184,149,90,0.3);width:90%;max-width:420px;max-height:90vh;overflow-y:auto;border-radius:2px">
+    <div style="display:flex;justify-content:space-between;align-items:center;padding:1.2rem 1.5rem;border-bottom:1px solid rgba(184,149,90,0.15)">
+      <span id="promoModalTitle" style="font-family:'Cormorant Garamond',serif;font-size:1.2rem;color:#e8dcc8;font-weight:300">Nuevo Código</span>
+      <button onclick="closePromoModal()" style="background:none;border:none;color:#8a7f72;cursor:pointer;font-size:1.1rem;line-height:1">&#10005;</button>
+    </div>
+    <div style="padding:1.5rem;display:flex;flex-direction:column;gap:1rem">
+      <div>
+        <label style="display:block;font-size:0.6rem;letter-spacing:0.15em;text-transform:uppercase;color:#8a7f72;margin-bottom:0.4rem">Código</label>
+        <input id="promoCode" type="text" placeholder="VERANO20" maxlength="30" style="width:100%;box-sizing:border-box;background:#0e0c0a;border:1px solid rgba(184,149,90,0.2);color:#e8dcc8;font-size:0.78rem;padding:0.5rem 0.7rem;outline:none;text-transform:uppercase"/>
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:1rem">
+        <div>
+          <label style="display:block;font-size:0.6rem;letter-spacing:0.15em;text-transform:uppercase;color:#8a7f72;margin-bottom:0.4rem">Tipo</label>
+          <select id="promoType" style="width:100%;box-sizing:border-box;background:#0e0c0a;border:1px solid rgba(184,149,90,0.2);color:#e8dcc8;font-size:0.78rem;padding:0.5rem 0.7rem;outline:none">
+            <option value="percent">Porcentaje (%)</option>
+            <option value="fixed">Monto fijo ($)</option>
+          </select>
+        </div>
+        <div>
+          <label style="display:block;font-size:0.6rem;letter-spacing:0.15em;text-transform:uppercase;color:#8a7f72;margin-bottom:0.4rem">Valor</label>
+          <input id="promoValue" type="number" step="0.01" min="0" placeholder="20" style="width:100%;box-sizing:border-box;background:#0e0c0a;border:1px solid rgba(184,149,90,0.2);color:#e8dcc8;font-size:0.78rem;padding:0.5rem 0.7rem;outline:none"/>
+        </div>
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:1rem">
+        <div>
+          <label style="display:block;font-size:0.6rem;letter-spacing:0.15em;text-transform:uppercase;color:#8a7f72;margin-bottom:0.4rem">Pedido mínimo</label>
+          <input id="promoMinOrder" type="number" step="0.01" min="0" placeholder="$0.00" style="width:100%;box-sizing:border-box;background:#0e0c0a;border:1px solid rgba(184,149,90,0.2);color:#e8dcc8;font-size:0.78rem;padding:0.5rem 0.7rem;outline:none"/>
+        </div>
+        <div>
+          <label style="display:block;font-size:0.6rem;letter-spacing:0.15em;text-transform:uppercase;color:#8a7f72;margin-bottom:0.4rem">Usos máximos</label>
+          <input id="promoMaxUses" type="number" step="1" min="1" placeholder="Ilimitado" style="width:100%;box-sizing:border-box;background:#0e0c0a;border:1px solid rgba(184,149,90,0.2);color:#e8dcc8;font-size:0.78rem;padding:0.5rem 0.7rem;outline:none"/>
+        </div>
+      </div>
+      <div>
+        <label style="display:block;font-size:0.6rem;letter-spacing:0.15em;text-transform:uppercase;color:#8a7f72;margin-bottom:0.4rem">Vence (opcional)</label>
+        <input id="promoExpiresAt" type="date" style="width:100%;box-sizing:border-box;background:#0e0c0a;border:1px solid rgba(184,149,90,0.2);color:#e8dcc8;font-size:0.78rem;padding:0.5rem 0.7rem;outline:none;color-scheme:dark"/>
+      </div>
+      <label style="display:flex;align-items:center;gap:0.5rem;font-size:0.72rem;color:#e8dcc8">
+        <input id="promoActive" type="checkbox" checked/> Activo
+      </label>
+      <div id="promoModalErr" style="color:#d9534f;font-size:0.68rem"></div>
+      <button class="save-btn" style="width:100%" onclick="savePromo()">Guardar</button>
+    </div>
+  </div>
+</div>
+
 <div id="collectionModal" style="display:none;position:fixed;inset:0;z-index:9999;background:rgba(0,0,0,0.75);align-items:center;justify-content:center">
   <div style="background:#1a1714;border:1px solid rgba(184,149,90,0.3);width:90%;max-width:580px;max-height:90vh;overflow-y:auto;border-radius:2px">
     <div style="display:flex;justify-content:space-between;align-items:center;padding:1.2rem 1.5rem;border-bottom:1px solid rgba(184,149,90,0.15)">
@@ -2005,6 +2075,7 @@ function navTo(page){
   if(page==='cod'){         renderCODPage(); }
   if(page==='clientes')  loadClientes();
   if(page==='dte')       renderDtePage();
+  if(page==='promos')    loadPromoCodes();
 }
 document.querySelectorAll('.nav-btn,.mob-tab').forEach(function(b){
   b.addEventListener('click',function(){
@@ -2952,6 +3023,89 @@ function updateStatus(oid,status){
 // ════════════════════════════════════════════
 // CLIENTES
 // ════════════════════════════════════════════
+// ── Códigos de descuento ───────────────────────────────
+var _promoEditId = null;
+function loadPromoCodes(){
+  var tbody=document.getElementById('promoBody');
+  tbody.innerHTML='<tr><td colspan="8" style="text-align:center;padding:2rem;color:var(--muted);font-size:0.72rem">Cargando...</td></tr>';
+  adminFetch(API+'/admin/promo-codes',{}).then(function(r){return r?r.json():[];}).then(function(list){
+    if(!Array.isArray(list)||!list.length){
+      tbody.innerHTML='<tr><td colspan="8" style="text-align:center;padding:2rem;color:var(--muted);font-size:0.72rem">No hay códigos de descuento. Crea el primero.</td></tr>';
+      return;
+    }
+    tbody.innerHTML=list.map(function(p){
+      var valor = p.type==='percent' ? (parseFloat(p.value)+'%') : ('$'+parseFloat(p.value).toFixed(2));
+      var minOrder = p.min_order!=null ? ('$'+parseFloat(p.min_order).toFixed(2)) : '—';
+      var usos = p.used_count + (p.max_uses!=null ? (' / '+p.max_uses) : ' / ∞');
+      var vence = p.expires_at ? new Date(p.expires_at).toLocaleDateString() : '—';
+      var vencido = p.expires_at && new Date(p.expires_at) < new Date();
+      var estado = vencido ? '<span style="color:#d98a3a">Vencido</span>' : (p.active ? '<span style="color:#5fb87a">Activo</span>' : '<span style="color:var(--muted)">Inactivo</span>');
+      return '<tr>'+
+        '<td style="font-weight:500;letter-spacing:0.05em">'+esc(p.code)+'</td>'+
+        '<td>'+(p.type==='percent'?'Porcentaje':'Monto fijo')+'</td>'+
+        '<td>'+valor+'</td>'+
+        '<td>'+minOrder+'</td>'+
+        '<td>'+usos+'</td>'+
+        '<td>'+vence+'</td>'+
+        '<td>'+estado+'</td>'+
+        '<td style="white-space:nowrap">'+
+          '<button class="save-btn" style="padding:0.3rem 0.7rem;font-size:0.55rem" onclick="openPromoModal('+p.id+')">Editar</button> '+
+          '<button class="save-btn" style="padding:0.3rem 0.7rem;font-size:0.55rem;background:transparent;border:1px solid #d9534f;color:#d9534f" onclick="deletePromo('+p.id+',\''+esc(p.code)+'\')">Eliminar</button>'+
+        '</td>'+
+      '</tr>';
+    }).join('');
+    window._promoList = list;
+  }).catch(function(){ tbody.innerHTML='<tr><td colspan="8" style="text-align:center;padding:2rem;color:#d9534f">Error al cargar.</td></tr>'; });
+}
+function openPromoModal(id){
+  _promoEditId = id;
+  document.getElementById('promoModalErr').textContent='';
+  var p = id ? (window._promoList||[]).find(function(x){return x.id===id;}) : null;
+  document.getElementById('promoModalTitle').textContent = p ? 'Editar Código' : 'Nuevo Código';
+  document.getElementById('promoCode').value = p ? p.code : '';
+  document.getElementById('promoCode').disabled = !!p; // el código no se puede cambiar al editar
+  document.getElementById('promoType').value = p ? p.type : 'percent';
+  document.getElementById('promoValue').value = p ? p.value : '';
+  document.getElementById('promoMinOrder').value = p && p.min_order!=null ? p.min_order : '';
+  document.getElementById('promoMaxUses').value = p && p.max_uses!=null ? p.max_uses : '';
+  document.getElementById('promoExpiresAt').value = p && p.expires_at ? String(p.expires_at).slice(0,10) : '';
+  document.getElementById('promoActive').checked = p ? !!p.active : true;
+  document.getElementById('promoModal').style.display='flex';
+}
+function closePromoModal(){ document.getElementById('promoModal').style.display='none'; }
+function savePromo(){
+  var err=document.getElementById('promoModalErr');
+  err.textContent='';
+  var body={
+    code:  document.getElementById('promoCode').value.trim(),
+    type:  document.getElementById('promoType').value,
+    value: parseFloat(document.getElementById('promoValue').value),
+    active: document.getElementById('promoActive').checked,
+    minOrder: document.getElementById('promoMinOrder').value || null,
+    maxUses:  document.getElementById('promoMaxUses').value || null,
+    expiresAt: document.getElementById('promoExpiresAt').value || null,
+  };
+  if(!_promoEditId && !body.code){ err.textContent='El código es requerido.'; return; }
+  if(!body.value || body.value<=0){ err.textContent='Ingresa un valor válido.'; return; }
+  var url = _promoEditId ? (API+'/admin/promo-codes/'+_promoEditId) : (API+'/admin/promo-codes');
+  var method = _promoEditId ? 'PUT' : 'POST';
+  adminFetch(url,{method:method,headers:{'Content-Type':'application/json'},body:JSON.stringify(body)})
+    .then(function(r){return r?r.json():null;}).then(function(d){
+      if(!d){ err.textContent='Sin respuesta.'; return; }
+      if(d.error){ err.textContent=d.error; return; }
+      closePromoModal();
+      loadPromoCodes();
+      toast('Código guardado', body.code||'', 'ok');
+    }).catch(function(e){ err.textContent='Error: '+e.message; });
+}
+function deletePromo(id, code){
+  if(!confirm('¿Eliminar el código "'+code+'"? Esta acción no se puede deshacer.')) return;
+  adminFetch(API+'/admin/promo-codes/'+id,{method:'DELETE'}).then(function(r){return r?r.json():null;}).then(function(){
+    loadPromoCodes();
+    toast('Código eliminado', code, 'ok');
+  }).catch(function(){});
+}
+
 function loadClientes(){
   var tbody=document.getElementById('clientesBody');
   tbody.innerHTML='<tr><td colspan="5" style="text-align:center;padding:2rem;color:var(--muted);font-size:0.72rem">Cargando...</td></tr>';

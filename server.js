@@ -92,6 +92,22 @@ async function initDB() {
   `);
 
   await db.execute(`
+    CREATE TABLE IF NOT EXISTS promo_codes (
+      id          INT AUTO_INCREMENT PRIMARY KEY,
+      code        VARCHAR(30)  NOT NULL UNIQUE,
+      type        VARCHAR(10)  NOT NULL,           -- 'percent' | 'fixed'
+      value       DECIMAL(10,2) NOT NULL,
+      active      TINYINT(1)   DEFAULT 1,
+      min_order   DECIMAL(10,2) DEFAULT NULL,       -- subtotal mínimo requerido
+      max_uses    INT           DEFAULT NULL,       -- NULL = ilimitado
+      used_count  INT           DEFAULT 0,
+      expires_at  DATETIME      DEFAULT NULL,       -- NULL = sin vencimiento
+      created_at  DATETIME NOT NULL,
+      updated_at  DATETIME NOT NULL
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
+  `);
+
+  await db.execute(`
     CREATE TABLE IF NOT EXISTS inventory (
       product_id   INT PRIMARY KEY,
       stock        INT DEFAULT 99,
@@ -413,6 +429,8 @@ async function migrateOrders() {
     "followup_scheduled_at DATETIME DEFAULT NULL",
     "followup_sent_at      DATETIME DEFAULT NULL",
     "customer_ip    VARCHAR(100) DEFAULT NULL",
+    "promo_code     VARCHAR(30)  DEFAULT NULL",
+    "promo_discount DECIMAL(10,2) DEFAULT 0",
   ];
   for (const col of cols) {
     const colName = col.trim().split(' ')[0];
@@ -2964,6 +2982,99 @@ setInterval(async () => {
 
 app.get('/api/catalogue', async (req, res) => res.json(await getCatalogue()));
 
+// ════════════════════════════════════════════════════════════════════════════
+//  CÓDIGOS DE DESCUENTO (promo codes)
+// ════════════════════════════════════════════════════════════════════════════
+// Valida un código contra la DB y calcula el descuento para un subtotal dado.
+// Reutilizado por el endpoint público /promo/validate y por la creación real
+// del pedido (nunca se confía en el descuento que mande el cliente).
+async function validatePromoCode(rawCode, subtotal) {
+  const code = String(rawCode || '').trim().toUpperCase();
+  if (!code) return { ok: false, error: 'Ingresa un código.' };
+  const [rows] = await db.execute('SELECT * FROM promo_codes WHERE code=?', [code]);
+  if (!rows.length) return { ok: false, error: 'Código no válido.' };
+  const p = rows[0];
+  if (!p.active) return { ok: false, error: 'Este código ya no está activo.' };
+  if (p.expires_at && new Date(p.expires_at) < new Date()) return { ok: false, error: 'Este código ha expirado.' };
+  if (p.max_uses != null && p.used_count >= p.max_uses) return { ok: false, error: 'Este código alcanzó su límite de usos.' };
+  if (p.min_order != null && subtotal < parseFloat(p.min_order)) {
+    return { ok: false, error: `Este código requiere un pedido mínimo de $${parseFloat(p.min_order).toFixed(2)}.` };
+  }
+  const value = parseFloat(p.value);
+  let discount = p.type === 'percent'
+    ? Math.round(subtotal * value / 100 * 100) / 100
+    : Math.min(value, subtotal);
+  discount = Math.max(0, Math.round(discount * 100) / 100);
+  return { ok: true, id: p.id, code: p.code, type: p.type, value, discount };
+}
+
+// Público — usado por el checkout mientras el cliente escribe el código.
+// El frontend (tienda.html applyPromo) manda `cartTotal` y espera {ok:true,...}
+// en éxito o {ok:false,error} en fallo — replicado exacto aquí.
+app.post('/api/promo/validate', async (req, res) => {
+  const subtotal = Math.max(0, parseFloat(req.body.cartTotal ?? req.body.subtotal) || 0);
+  const result = await validatePromoCode(req.body.code, subtotal).catch(() => ({ ok: false, error: 'Error al validar el código.' }));
+  if (!result.ok) return res.json({ ok: false, error: result.error });
+  res.json({ ok: true, code: result.code, type: result.type, value: result.value, discount: result.discount });
+});
+
+// ── Admin: CRUD de códigos de descuento ───────────────────────────────────────
+app.get('/api/admin/promo-codes', requireAdmin, async (req, res) => {
+  const [rows] = await db.execute('SELECT * FROM promo_codes ORDER BY created_at DESC');
+  res.json(rows);
+});
+
+app.post('/api/admin/promo-codes', requireAdmin, async (req, res) => {
+  const b = req.body || {};
+  const code = String(b.code || '').trim().toUpperCase().replace(/[^A-Z0-9_-]/g, '').slice(0, 30);
+  const type = (b.type === 'fixed') ? 'fixed' : 'percent';
+  const value = parseFloat(b.value);
+  if (!code) return res.status(400).json({ error: 'El código es requerido.' });
+  if (!value || value <= 0 || (type === 'percent' && value > 100)) {
+    return res.status(400).json({ error: type === 'percent' ? 'El porcentaje debe ser entre 1 y 100.' : 'El monto debe ser mayor a 0.' });
+  }
+  const n = new Date();
+  try {
+    await db.execute(
+      `INSERT INTO promo_codes (code, type, value, active, min_order, max_uses, expires_at, created_at, updated_at)
+       VALUES (?,?,?,?,?,?,?,?,?)`,
+      [code, type, value, b.active === false ? 0 : 1,
+       b.minOrder ? parseFloat(b.minOrder) : null,
+       b.maxUses ? parseInt(b.maxUses, 10) : null,
+       b.expiresAt ? new Date(b.expiresAt) : null,
+       n, n]
+    );
+    await logActivity(`Código de descuento creado: ${code}`);
+    res.json({ ok: true });
+  } catch(e) {
+    if (e.code === 'ER_DUP_ENTRY') return res.status(400).json({ error: 'Ese código ya existe.' });
+    res.status(500).json({ error: e.message });
+  }
+});
+
+app.put('/api/admin/promo-codes/:id', requireAdmin, async (req, res) => {
+  const b = req.body || {};
+  const type = (b.type === 'fixed') ? 'fixed' : 'percent';
+  const value = parseFloat(b.value);
+  if (!value || value <= 0 || (type === 'percent' && value > 100)) {
+    return res.status(400).json({ error: type === 'percent' ? 'El porcentaje debe ser entre 1 y 100.' : 'El monto debe ser mayor a 0.' });
+  }
+  await db.execute(
+    `UPDATE promo_codes SET type=?, value=?, active=?, min_order=?, max_uses=?, expires_at=?, updated_at=? WHERE id=?`,
+    [type, value, b.active === false ? 0 : 1,
+     b.minOrder ? parseFloat(b.minOrder) : null,
+     b.maxUses ? parseInt(b.maxUses, 10) : null,
+     b.expiresAt ? new Date(b.expiresAt) : null,
+     new Date(), parseInt(req.params.id, 10)]
+  );
+  res.json({ ok: true });
+});
+
+app.delete('/api/admin/promo-codes/:id', requireAdmin, async (req, res) => {
+  await db.execute('DELETE FROM promo_codes WHERE id=?', [parseInt(req.params.id, 10)]);
+  res.json({ ok: true });
+});
+
 // ── Helper: deduct inventory and broadcast ────────────
 // ── DTE: emit a Factura Electrónica for a paid order ─────────────────────────
 // Gated by cfg.DTE_ENABLED (no-op when off). Never throws into the caller —
@@ -3193,6 +3304,7 @@ app.post('/api/orders', orderLimiter, async (req, res) => {
   }
 
   // ── Verify total server-side (prevents price tampering from client) ───────
+  let promoResult = null;
   try {
     const catalogue  = await getCatalogue();
     const invMap     = await getInventoryMap();
@@ -3283,11 +3395,23 @@ app.post('/api/orders', orderLimiter, async (req, res) => {
 
       serverTotal += unitPrice * qty;
     }
-    // Fetch shipping cost from settings
+    // El envío gratis se evalúa sobre el subtotal de ÍTEMS antes del descuento
+    // (igual que el frontend: getShipping() usa cartSum(), no el total con
+    // descuento aplicado) — si se evaluara después, un descuento que baje el
+    // subtotal por debajo del umbral generaría "total no coincide".
     const shippingCost      = parseFloat(await getSetting('shipping_cost', '5')) || 5;
     const shippingThreshold = parseFloat(await getSetting('shipping_threshold', '50')) || 50;
-    if (serverTotal < shippingThreshold) serverTotal += shippingCost;
-    serverTotal = Math.round(serverTotal * 100) / 100;
+    const shipping = serverTotal < shippingThreshold ? shippingCost : 0;
+
+    // ── Código de descuento — validado server-side, nunca se confía en lo que
+    // mande el cliente. Se aplica sobre el subtotal de ítems (antes de envío).
+    if (req.body.promoCode) {
+      promoResult = await validatePromoCode(req.body.promoCode, serverTotal);
+      if (!promoResult.ok) return res.status(400).json({ error: promoResult.error });
+      serverTotal = Math.max(0, Math.round((serverTotal - promoResult.discount) * 100) / 100);
+    }
+
+    serverTotal = Math.round((serverTotal + shipping) * 100) / 100;
 
     const clientTotal = Math.round(parseFloat(req.body.total || 0) * 100) / 100;
     if (Math.abs(serverTotal - clientTotal) > 0.02) {
@@ -3325,19 +3449,25 @@ app.post('/api/orders', orderLimiter, async (req, res) => {
     paymentMethod,
     status:        'Procesando',
     paymentStatus,
-    trackerStep:   1
+    trackerStep:   1,
+    promoCode:     promoResult && promoResult.ok ? promoResult.code : null,
+    promoDiscount: promoResult && promoResult.ok ? promoResult.discount : 0,
   };
 
   await db.execute(
-    `INSERT INTO orders (id,customer,email,phone,address,city,state_province,country,items,total,status,payment_status,payment_method,tracker_step,customer_id,customer_ip,created_at,updated_at)
-     VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
+    `INSERT INTO orders (id,customer,email,phone,address,city,state_province,country,items,total,status,payment_status,payment_method,tracker_step,customer_id,customer_ip,promo_code,promo_discount,created_at,updated_at)
+     VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
     [order.id, order.customer, order.email, order.phone, order.address,
      order.city, order.state, order.country,
      JSON.stringify(order.items), order.total,
      order.status, order.paymentStatus, order.paymentMethod,
      parseInt(order.trackerStep), customerId ? parseInt(customerId) : null,
-     req.codClientIp || null, n, n]
+     req.codClientIp || null, order.promoCode, order.promoDiscount, n, n]
   );
+
+  if (promoResult && promoResult.ok) {
+    await db.execute('UPDATE promo_codes SET used_count = used_count + 1, updated_at=? WHERE id=?', [n, promoResult.id]).catch(() => {});
+  }
 
   // Save shipping info to customer profile if logged in
   if (customerId) {
