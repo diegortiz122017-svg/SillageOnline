@@ -2843,6 +2843,7 @@ function connectWS() {
           decantsEnabled = !!msg.payload.enabled;
           if(!decantsEnabled) removeDecantsFromCart();
           renderCart();
+          buildGrid();
           if(_detailOpenPid) openDetail(_detailOpenPid);
         }
       } catch(err) {}
@@ -3526,8 +3527,10 @@ function buildGrid(){
                 var dp5  = p.decantPrice5 ? parseFloat(p.decantPrice5) : Math.round(dp10 * 0.55);
                 var html = '<div class="card-price-pills">';
                 html += '<span class="card-price-pill bottle">Botella <b>$'+ep+'</b></span>';
-                html += '<span class="card-price-pill d10">10ml <b>$'+dp10+'</b></span>';
-                if(p.luxury) html += '<span class="card-price-pill d5">5ml <b>$'+dp5+'</b></span>';
+                if(decantsEnabled){
+                  html += '<span class="card-price-pill d10">10ml <b>$'+dp10+'</b></span>';
+                  if(p.luxury) html += '<span class="card-price-pill d5">5ml <b>$'+dp5+'</b></span>';
+                }
                 html += '</div>';
                 return html;
               })()+
@@ -3773,7 +3776,7 @@ function openDetail(pid){
     '</div>'+
     '<div class="size-selector" id="sizeSel">'+
       '<button class="size-opt active" data-type="full" data-price="'+ep+'" data-size="'+p.size+'">'+
-        '<span class="so-label">Frasco Completo</span>'+
+        '<span class="so-label">Botella</span>'+
         '<span class="so-size">'+p.size+'</span>'+
         '<span class="so-price">$'+ep+'</span>'+
       '</button>'+
@@ -4316,7 +4319,12 @@ fetch(API+'/settings/decants')
   .then(function(r){return r.json();})
   .then(function(data){
     decantsEnabled = data.enabled !== false;
-    if(!decantsEnabled) removeDecantsFromCart();
+    if(!decantsEnabled){
+      removeDecantsFromCart();
+      // La grilla puede haberse construido ya con el valor por defecto (true)
+      // antes de que resolviera este fetch — reconstruir para ocultar los pills.
+      if(typeof buildGrid==='function') buildGrid();
+    }
   }).catch(function(){});
 
 // Quita del carrito cualquier decant/muestra que haya quedado de antes de desactivar la venta.
@@ -7298,6 +7306,7 @@ function somAddMsg(role, text, recs){
           '<div style="display:flex;flex-direction:column;align-items:flex-end;gap:0.15rem">'+
             '<span class="som-rec-price">$'+esc(String(p.price))+'</span>'+
             (function(){
+              if(!decantsEnabled) return '';
               var dp10 = p.decantPrice ? parseFloat(p.decantPrice) : Math.round((getPr(p.id).onSale&&getPr(p.id).salePrice?Math.round(+getPr(p.id).salePrice):parseFloat(p.price))*0.30);
               var dp5  = p.decantPrice5 ? parseFloat(p.decantPrice5) : Math.round(dp10 * 0.55);
               if(p.luxury){
