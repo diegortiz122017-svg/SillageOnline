@@ -1349,12 +1349,13 @@ app.get('/', async (req, res) => {
         const BASE   = process.env.BASE_URL || 'https://sillage-sv.com';
         const imgUrl = (p.photos && p.photos[0])
           ? (p.photos[0].startsWith('http') ? p.photos[0] : BASE + p.photos[0])
-          : `${BASE}/og-default.jpg`;
+          : `${BASE}/apple-touch-icon.png`; // og-default.jpg no existe (404) — fallback a un asset real
         const title  = `${p.brand} ${p.name} — Sillage Parfumerie`;
         const desc   = p.tagline
           ? `${p.tagline} · ${p.conc || 'Eau de Parfum'} · Desde $${p.price}`
           : `${p.conc || 'Eau de Parfum'} de ${p.brand}. Disponible en Sillage Parfumerie, El Salvador.`;
         const url    = `${BASE}/?producto=${productoId}`;
+        const shippingCost = parseFloat(await getSetting('shipping_cost', '5')) || 5;
 
         let html = fs.readFileSync(index, 'utf8');
         // Replace generic OG tags with product-specific ones
@@ -1387,6 +1388,30 @@ app.get('/', async (req, res) => {
             priceCurrency: 'USD',
             availability: 'https://schema.org/InStock',
             seller: { '@type': 'Organization', name: 'Sillage Parfumerie' },
+            // Política real: Art. 06 de Términos — 8 días hábiles, producto sin abrir/sellado.
+            hasMerchantReturnPolicy: {
+              '@type': 'MerchantReturnPolicy',
+              applicableCountry: 'SV',
+              returnPolicyCategory: 'https://schema.org/MerchantReturnFiniteReturnWindow',
+              merchantReturnDays: 8,
+              returnMethod: 'https://schema.org/ReturnByMail',
+              returnFees: 'https://schema.org/ReturnFeesCustomerResponsibility',
+            },
+            // Tiempos reales de /envios (Gran San Salvador a Interior del país).
+            shippingDetails: {
+              '@type': 'OfferShippingDetails',
+              shippingRate: {
+                '@type': 'MonetaryAmount',
+                value: shippingCost,
+                currency: 'USD',
+              },
+              shippingDestination: { '@type': 'DefinedRegion', addressCountry: 'SV' },
+              deliveryTime: {
+                '@type': 'ShippingDeliveryTime',
+                handlingTime:  { '@type': 'QuantitativeValue', minValue: 0, maxValue: 1, unitCode: 'DAY' },
+                transitTime:   { '@type': 'QuantitativeValue', minValue: 1, maxValue: 7, unitCode: 'DAY' },
+              },
+            },
           },
           additionalProperty: [
             p.conc   ? { '@type': 'PropertyValue', name: 'Concentración', value: p.conc }   : null,
