@@ -359,8 +359,9 @@ async function initDB() {
       tipo_dte        VARCHAR(2)  NOT NULL,
       cod_estable     VARCHAR(4)  NOT NULL DEFAULT 'M001',
       cod_punto_venta VARCHAR(15) NOT NULL DEFAULT '001',
+      ambiente        VARCHAR(2)  NOT NULL DEFAULT '00',
       seq             BIGINT      NOT NULL DEFAULT 0,
-      PRIMARY KEY (tipo_dte, cod_estable, cod_punto_venta)
+      PRIMARY KEY (tipo_dte, cod_estable, cod_punto_venta, ambiente)
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
   `);
   // Migración para tablas existentes (PK antigua = solo tipo_dte): numerar por
@@ -369,6 +370,13 @@ async function initDB() {
   try { await db.execute("ALTER TABLE dte_correlativos ADD COLUMN cod_estable VARCHAR(4) NOT NULL DEFAULT 'M001'"); } catch(e) {}
   try { await db.execute("ALTER TABLE dte_correlativos ADD COLUMN cod_punto_venta VARCHAR(15) NOT NULL DEFAULT '001'"); } catch(e) {}
   try { await db.execute("ALTER TABLE dte_correlativos DROP PRIMARY KEY, ADD PRIMARY KEY (tipo_dte, cod_estable, cod_punto_venta)"); } catch(e) {}
+  // Migración: separar el correlativo por ambiente — si no, el primer documento de
+  // PRODUCCIÓN continuaría la numeración donde quedaron las pruebas de homologación
+  // (ej. arrancar en 91 en vez de 1). Las filas existentes (todas de pruebas) quedan
+  // marcadas como ambiente='00' antes de mover la PK.
+  try { await db.execute("ALTER TABLE dte_correlativos ADD COLUMN ambiente VARCHAR(2) NOT NULL DEFAULT '00'"); } catch(e) {}
+  try { await db.execute("UPDATE dte_correlativos SET ambiente='00' WHERE ambiente IS NULL OR ambiente=''"); } catch(e) {}
+  try { await db.execute("ALTER TABLE dte_correlativos DROP PRIMARY KEY, ADD PRIMARY KEY (tipo_dte, cod_estable, cod_punto_venta, ambiente)"); } catch(e) {}
 
   await db.execute(`
     CREATE TABLE IF NOT EXISTS bottle_inventory (
@@ -2706,7 +2714,7 @@ app.post('/api/admin/dte/invalidar', requireAdmin, async (req, res) => {
 app.get('/api/admin/dte/status', requireAdmin, async (req, res) => {
   try {
     const [counts] = await db.execute('SELECT estado, COUNT(*) c FROM dte_documents GROUP BY estado').catch(() => [[]]);
-    const [corr]   = await db.execute('SELECT tipo_dte, cod_estable, cod_punto_venta, seq FROM dte_correlativos ORDER BY tipo_dte, cod_estable, cod_punto_venta').catch(() => [[]]);
+    const [corr]   = await db.execute('SELECT tipo_dte, cod_estable, cod_punto_venta, ambiente, seq FROM dte_correlativos ORDER BY ambiente, tipo_dte, cod_estable, cod_punto_venta').catch(() => [[]]);
     const byEstado = {};
     (counts || []).forEach(r => { byEstado[r.estado] = r.c; });
     res.json({

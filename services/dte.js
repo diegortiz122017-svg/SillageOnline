@@ -574,14 +574,16 @@ function buildIdentificacion(tipoDte, version, numControl, codGen, fecEmi, horEm
 async function nextCorrelativo(tipoDte) {
   const codEstable    = cfg.DTE_EMISOR.codEstable    || 'M001';
   const codPuntoVenta = cfg.DTE_EMISOR.codPuntoVenta || '001';
+  // Separado por ambiente: producción arranca en 1, no continúa donde quedaron
+  // las pruebas de homologación (ambiente 00 y 01 son contadores independientes).
   await db.execute(
-    `INSERT INTO dte_correlativos (tipo_dte, cod_estable, cod_punto_venta, seq) VALUES (?, ?, ?, 1)
+    `INSERT INTO dte_correlativos (tipo_dte, cod_estable, cod_punto_venta, ambiente, seq) VALUES (?, ?, ?, ?, 1)
      ON DUPLICATE KEY UPDATE seq = seq + 1`,
-    [tipoDte, codEstable, codPuntoVenta]
+    [tipoDte, codEstable, codPuntoVenta, cfg.DTE_AMBIENTE]
   );
   const [rows] = await db.execute(
-    'SELECT seq FROM dte_correlativos WHERE tipo_dte=? AND cod_estable=? AND cod_punto_venta=?',
-    [tipoDte, codEstable, codPuntoVenta]
+    'SELECT seq FROM dte_correlativos WHERE tipo_dte=? AND cod_estable=? AND cod_punto_venta=? AND ambiente=?',
+    [tipoDte, codEstable, codPuntoVenta, cfg.DTE_AMBIENTE]
   );
   return rows[0].seq;
 }
