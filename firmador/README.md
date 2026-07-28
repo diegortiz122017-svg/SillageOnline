@@ -37,8 +37,8 @@ El `entrypoint.sh` decodifica el certificado y lo escribe en
 DTE_ENABLED=true
 DTE_AMBIENTE=00
 DTE_FIRMADOR_URL=http://firmador.railway.internal:8113/firmardocumento/
-DTE_CERT_PWD=qZ6+phx!qm%-4RnyVi          # clave privada del certificado
-DTE_API_PWD=<contraseña del portal MH>   # misma con la que inicias sesión en Hacienda
+DTE_CERT_PWD=<clave privada del certificado>
+DTE_API_PWD=<contraseña del Sistema de Transmisión del MH — distinta por ambiente>
 ```
 
 (`DTE_API_USER` = NIT, ya es el default.)
