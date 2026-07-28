@@ -3347,18 +3347,22 @@ app.post('/api/orders', orderLimiter, async (req, res) => {
     }
 
     // Validate standalone items
+    const decantsEnabled = (await getSetting('decants_enabled', '1')) !== '0';
     for (const item of standaloneItems) {
       const pid  = parseInt(item.productId, 10);
       const qty  = parseInt(item.qty, 10) || 1;
-      const type = (item.type || 'full').toLowerCase(); // 'full' | 'decant' | 'bottle' | 'sample'
+      const type = (item.type || 'full').toLowerCase(); // 'full' | 'decant' | 'decant5' | 'bottle' | 'sample'
       const prod = catalogue.find(p => p.id === pid);
       if (!prod) return res.status(400).json({ error: `Producto no encontrado: ${pid}` });
       if (invMap[pid]?.outOfStock) return res.status(400).json({ error: `Producto agotado: ${prod.brand} ${prod.name}` });
+      if (!decantsEnabled && (type === 'decant' || type === 'decant5' || type === 'sample')) {
+        return res.status(400).json({ error: 'La venta de decants está temporalmente desactivada. Solo se aceptan frascos completos.' });
+      }
       const pr           = priceMap[pid] || {};
       const fullPrice    = (pr.onSale && pr.salePrice) ? parseFloat(pr.salePrice) : parseFloat(prod.price);
 
       let unitPrice;
-      if (type === 'decant' || type === 'sample') {
+      if (type === 'decant' || type === 'decant5' || type === 'sample') {
         const sizeStr = String(item.size || '');
         const is5ml   = sizeStr.includes('5ml') || sizeStr === '5';
         const sizeMl  = is5ml ? 5 : 10;
@@ -4939,6 +4943,25 @@ app.post('/api/sommelier/chat', sommelierBurst, sommelierLimiter, async (req, re
     ? `\n\nPRODUCTOS YA RECOMENDADOS EN ESTA CONVERSACIÓN: IDs ${avoidIds.join(', ')}. Pasa estos IDs en el parámetro exclude_ids al llamar search_catalogue para obtener opciones frescas. Si el catálogo no tiene suficientes alternativas puedes repetir alguno justificándolo.`
     : '';
 
+  // Si la venta de decants está desactivada, Nez no debe ofrecerlos ni mencionar su precio —
+  // el catálogo (search_catalogue) tampoco expondrá decant10/decant5 en el resultado.
+  const decantsEnabled = (await getSetting('decants_enabled', '1')) !== '0';
+  const decantSalesLine = decantsEnabled
+    ? 'Presupuesto limitado → menciona el precio del decant. Para fragancias luxury el resultado incluye decant10:$XX y decant5:$XX — el 5ml es la entrada más accesible.'
+    : 'La venta de decants está temporalmente desactivada — NO los ofrezcas ni menciones su precio. Si preguntan por decants o muestras, indica con naturalidad que por ahora solo hay frasco completo disponible.';
+  const decantHigieneLines = decantsEnabled
+    ? '\n- Cada decant es fraccionado bajo estrictas normas de higiene — el mismo producto que encuentras en una tienda de lujo.\n- Los decants vienen en viales de cristal con casing de aluminio — el aluminio protege de la luz directa que degrada la composición química del perfume, y el cristal preserva la fragancia sin alterar su aroma. Es el mismo estándar que usan las casas de perfumería de lujo para sus muestras.'
+    : '';
+  const decantValueLine = decantsEnabled
+    ? '\n- El decant es la forma más inteligente de probar un perfume de lujo antes de invertir en el frasco completo — ningún competidor te da esa seguridad.'
+    : '';
+  const priceObjectionLine = decantsEnabled
+    ? '- "Está caro" / "es mucho" → ofrece el decant: "Puedes probarla en decant por $XX — vial de cristal, mismo perfume, sin compromiso."\n- "¿Por qué cuesta tanto?" → explica brevemente: ingredientes premium, duración, proyección, autenticidad garantizada. Redirige al decant. SIEMPRE llama search_catalogue para obtener el ID del producto y mostrar su tarjeta — nunca respondas una objeción de precio sin tarjeta.\n- Si el decant también está fuera de rango → busca con max_price ajustado y presenta alternativas con tarjetas.'
+    : '- "Está caro" / "es mucho" → explica brevemente: ingredientes premium, duración, proyección, autenticidad garantizada. SIEMPRE llama search_catalogue para obtener el ID del producto y mostrar su tarjeta — nunca respondas una objeción de precio sin tarjeta.\n- "¿Por qué cuesta tanto?" → misma explicación, con confianza. Si el precio sigue fuera de rango → busca con max_price ajustado y presenta alternativas con tarjetas.';
+  const closingDecantLine = decantsEnabled
+    ? '\n- "El decant es exactamente para esto. Lo tienes en la tarjeta."\n- "Si te convence en decant, el frasco siempre va a estar aquí."'
+    : '';
+
   // Override gender context if current message signals shopping for someone else
   let genderOverride = '';
   if (shoppingForOther) {
@@ -4993,7 +5016,7 @@ FORMATO — MUY IMPORTANTE:
 - Sin párrafos largos. Sin explicaciones de notas. Directo.
 
 RECOMENDACIONES: 1-3 según contexto. Sin precios. Si stock:low_stock → menciona sutilmente.
-Presupuesto limitado → menciona el precio del decant. Para fragancias luxury el resultado incluye decant10:$XX y decant5:$XX — el 5ml es la entrada más accesible.
+${decantSalesLine}
 
 GÉNERO: perfil con género → úsalo siempre. Sin género → pregunta UNA vez. Unisex válido para cualquier género.
 
@@ -5007,17 +5030,12 @@ CIERRE: Cuando el cliente muestre interés o decisión, cierra directo: "La encu
 ÚLTIMO TURNO: Si es tu último mensaje disponible en esta consulta, NUNCA termines con una pregunta — el cliente no podrá responder. Cierra con una recomendación final clara y dirige a las tarjetas con una de las frases del CIERRE FINAL.
 
 VALORES DE SILLAGE — úsalos en objeciones:
-- Autenticidad garantizada: importamos de distribuidores mayoristas autorizados en EE.UU., con todos los registros sanitarios de El Salvador. Sin réplicas, sin alteraciones.
-- Cada decant es fraccionado bajo estrictas normas de higiene — el mismo producto que encuentras en una tienda de lujo.
-- Los decants vienen en viales de cristal con casing de aluminio — el aluminio protege de la luz directa que degrada la composición química del perfume, y el cristal preserva la fragancia sin alterar su aroma. Es el mismo estándar que usan las casas de perfumería de lujo para sus muestras.
+- Autenticidad garantizada: importamos de distribuidores mayoristas autorizados en EE.UU., con todos los registros sanitarios de El Salvador. Sin réplicas, sin alteraciones.${decantHigieneLines}
 - Entrega: Gran San Salvador 1-3 días hábiles, Interior del país 3-7 días, Centroamérica 7-15 días.
-- Política de devoluciones disponible.
-- El decant es la forma más inteligente de probar un perfume de lujo antes de invertir en el frasco completo — ningún competidor te da esa seguridad.
+- Política de devoluciones disponible.${decantValueLine}
 
 OBJECIONES DE PRECIO:
-- "Está caro" / "es mucho" → ofrece el decant: "Puedes probarla en decant por $XX — vial de cristal, mismo perfume, sin compromiso."
-- "¿Por qué cuesta tanto?" → explica brevemente: ingredientes premium, duración, proyección, autenticidad garantizada. Redirige al decant. SIEMPRE llama search_catalogue para obtener el ID del producto y mostrar su tarjeta — nunca respondas una objeción de precio sin tarjeta.
-- Si el decant también está fuera de rango → busca con max_price ajustado y presenta alternativas con tarjetas.
+${priceObjectionLine}
 - Nunca te disculpes por el precio — defiéndelo con confianza.
 - REGLA CRÍTICA: Cada vez que menciones o recomiendes un producto — en cualquier contexto, incluyendo objeciones — DEBES escribir su nombre en **negritas** así: **Armaf Club de Nuit Intense**. Sin negritas no aparece la tarjeta. Sin tarjeta no hay venta.
 
@@ -5026,10 +5044,8 @@ OBJECIONES DE COMPETENCIA / CONFIANZA:
 - Si pregunta por autenticidad → responde con confianza total y sin rodeos.
 
 CIERRE FINAL — varía el cierre, nunca repitas la misma frase:
-- "Están en las tarjetas — es un buen momento para probarla."
-- "El decant es exactamente para esto. Lo tienes en la tarjeta."
+- "Están en las tarjetas — es un buen momento para probarla."${closingDecantLine}
 - "Pocas formas mejores de conocer una fragancia antes de comprometerte con el frasco."
-- "Si te convence en decant, el frasco siempre va a estar aquí."
 Nunca uses "cualquiera es una excelente elección" — es genérico y no cierra nada.
 
 EVITA REPETIR: No uses los mismos argumentos dos veces en la misma conversación. Si ya mencionaste "distribuidores autorizados", en la siguiente objeción usa otro ángulo — el vial de cristal, los tiempos de entrega, la política de devoluciones, o simplemente confía en el producto sin justificarlo.
@@ -5085,10 +5101,12 @@ Responde en el idioma del cliente.`
                          args.note  ? [args.note.toLowerCase()]  : [];
       const excludeIds = new Set((args.exclude_ids||[]).map(Number));
 
-      // Cache key — based on search params (excluding exclude_ids which vary per conversation)
+      // Cache key — based on search params (excluding exclude_ids which vary per conversation).
+      // Incluye decantsEnabled: si se desactiva la venta de decants, el caché de 30 min no debe
+      // seguir sirviendo resultados con precios de decant ya horneados en el texto.
       const cacheKey = JSON.stringify({ families, noteTerms,
         gender: args.gender, max_price: args.max_price, min_price: args.min_price,
-        season: args.season, intensity: args.intensity });
+        season: args.season, intensity: args.intensity, decantsEnabled });
       const cached = getToolCache(cacheKey);
       if (cached) {
         // Still apply exclude_ids filter on cached result
@@ -5248,13 +5266,16 @@ Responde en el idioma del cliente.`
         const effPrice = (pr.onSale && pr.salePrice) ? Math.round(+pr.salePrice) : parseFloat(p.price);
         const stockLabel = inv.lowStock ? 'low_stock' : 'in_stock';
         const priceLabel = (pr.onSale && pr.salePrice) ? `$${effPrice} (sale, was $${p.price})` : `$${effPrice}`;
-        const decantP  = p.decantPrice  ? parseFloat(p.decantPrice)  : Math.round(effPrice * 0.30);
-        const decant5P = p.decantPrice5 ? parseFloat(p.decantPrice5) : Math.round(decantP * 0.55);
-        const decantLabel = p.luxury
-          ? `decant10:$${decantP} decant5:$${decant5P}`
-          : `decant:$${decantP}`;
+        // Sin decantsEnabled, ni el precio ni la palabra "decant" llegan al modelo —
+        // así Nez no puede mencionarlos aunque el prompt fallara en suprimirlo.
+        let decantLabel = '';
+        if (decantsEnabled) {
+          const decantP  = p.decantPrice  ? parseFloat(p.decantPrice)  : Math.round(effPrice * 0.30);
+          const decant5P = p.decantPrice5 ? parseFloat(p.decantPrice5) : Math.round(decantP * 0.55);
+          decantLabel = p.luxury ? `decant10:$${decantP} decant5:$${decant5P}` : `decant:$${decantP}`;
+        }
         const parts = [
-          `id:${p.id} ${p.brand} ${p.name} ${priceLabel} ${decantLabel} ${p.g}`,
+          `id:${p.id} ${p.brand} ${p.name} ${priceLabel}${decantLabel ? ' ' + decantLabel : ''} ${p.g}`,
           p.family   ? `family:${p.family}`       : null,
           p.notes    ? `notes:${p.notes}`          : null,
           p.top      ? `top:${p.top}`              : null,
@@ -6062,6 +6083,20 @@ app.get('/api/settings/shipping', async (req, res) => {
   const freeMsg   = await getSetting('shipping_free_msg', 'Envío gratis en pedidos mayores a');
   const paidMsg   = await getSetting('shipping_paid_msg', 'Envío estándar');
   res.json({ cost, threshold, freeMsg, paidMsg });
+});
+
+// Interruptor global: venta de decants/muestras en toda la tienda.
+app.get('/api/settings/decants', async (req, res) => {
+  const enabled = (await getSetting('decants_enabled', '1')) !== '0';
+  res.json({ enabled });
+});
+
+app.post('/api/settings/decants', requireAdmin, async (req, res) => {
+  const enabled = !!req.body.enabled;
+  await setSetting('decants_enabled', enabled ? '1' : '0');
+  broadcast('decants_update', { enabled });
+  await logActivity(`Venta de decants ${enabled ? 'activada' : 'desactivada'}`);
+  res.json({ ok: true, enabled });
 });
 
 app.post('/api/settings/shipping', requireAdmin, async (req, res) => {

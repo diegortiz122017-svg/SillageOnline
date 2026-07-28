@@ -2839,6 +2839,12 @@ function connectWS() {
           if(!isNaN(_wst)) shippingThreshold = _wst;
           renderCart();
         }
+        if (msg.type === 'decants_update') {
+          decantsEnabled = !!msg.payload.enabled;
+          if(!decantsEnabled) removeDecantsFromCart();
+          renderCart();
+          if(_detailOpenPid) openDetail(_detailOpenPid);
+        }
       } catch(err) {}
     };
 
@@ -3685,8 +3691,10 @@ document.getElementById('searchBox').addEventListener('input',function(){fSearch
 // DETAIL
 // ════════════════════════════════════════════
 var curSlide=0;
+var _detailOpenPid=null;
 function openDetail(pid){
   var p=P.find(function(x){return x.id===pid;});if(!p)return;
+  _detailOpenPid=pid;
   curSlide=0;
   document.getElementById('bcBrand').textContent=p.brand;
   document.getElementById('bcName').textContent=p.name;
@@ -3769,6 +3777,7 @@ function openDetail(pid){
         '<span class="so-size">'+p.size+'</span>'+
         '<span class="so-price">$'+ep+'</span>'+
       '</button>'+
+      (decantsEnabled ? (
       '<button class="size-opt" data-type="decant" data-price="'+decantPrice+'" data-size="10ml">'+
         '<span class="so-label">Decant</span>'+
         '<span class="so-size">10ml</span>'+
@@ -3780,6 +3789,7 @@ function openDetail(pid){
           '<span class="so-size">5ml</span>'+
           '<span class="so-price">$'+(p.decantPrice5?parseFloat(p.decantPrice5):Math.round(decantPrice*0.55))+'</span>'+
         '</button>'
+      ) : '')
       ) : '')+
     '</div>'+
     '<p class="decant-note" id="decantNote" style="display:none">Un decant es una muestra en frasco de viaje. Perfecto para probar antes de invertir en el frasco completo.</p>'+
@@ -4002,6 +4012,7 @@ function openDetail(pid){
 function closeDetail(){
   document.getElementById('detailOverlay').classList.remove('open');
   document.body.style.overflow='';
+  _detailOpenPid=null;
   // Restore base URL
   if(window.history.state && window.history.state.producto){
     window.history.pushState({}, '', '/tienda');
@@ -4287,6 +4298,7 @@ function saveCart(){
   try{localStorage.setItem('sillage_cart',JSON.stringify(cart));}catch(e){}
 }
 var shippingCost=5, shippingThreshold=50;
+var decantsEnabled=true; // asume activo hasta confirmar con el servidor
 
 // Fetch shipping config from server
 fetch(API+'/settings/shipping')
@@ -4298,6 +4310,23 @@ fetch(API+'/settings/shipping')
     shippingThreshold = isNaN(_t) ? 50 : _t;
     renderCart();
   }).catch(function(){});
+
+// Fetch decants on/off switch from server
+fetch(API+'/settings/decants')
+  .then(function(r){return r.json();})
+  .then(function(data){
+    decantsEnabled = data.enabled !== false;
+    if(!decantsEnabled) removeDecantsFromCart();
+  }).catch(function(){});
+
+// Quita del carrito cualquier decant/muestra que haya quedado de antes de desactivar la venta.
+function removeDecantsFromCart(){
+  var had = cart.some(function(i){return i.type==='decant'||i.type==='decant5'||i.type==='sample';});
+  if(!had) return;
+  cart = cart.filter(function(i){return i.type!=='decant'&&i.type!=='decant5'&&i.type!=='sample';});
+  saveCart(); renderCart();
+  toast('Decants no disponibles','Se quitaron del carrito — vuelve a intentar con el frasco completo');
+}
 
 function updateDetailCartBtn(){var qty=cartQty();var el=document.getElementById('detailCartCount');if(!el)return;el.textContent=qty;el.classList.toggle('show',qty>0);var btn=document.getElementById('detailCartBtn');if(btn){btn.classList.remove('flash');void btn.offsetWidth;btn.classList.add('flash');}}
 function cartQty(){return cart.reduce(function(s,i){return s+i.qty;},0);}
@@ -4337,6 +4366,9 @@ function addToCart(pid){
 function addToCartWithOptions(pid, label, price, size, type){
   var p=P.find(function(x){return x.id===pid;});if(!p)return;
   if(getInv(pid).outOfStock){toast('Sin Stock','Este artículo no está disponible');return;}
+  if(!decantsEnabled && (type==='decant'||type==='decant5'||type==='sample')){
+    toast('No disponible','La venta de decants está desactivada por el momento');return;
+  }
   // Check decant inventory if applicable
   if(type === 'decant' || type === 'decant5'){
     var sizeMl = parseFloat(size) || (type === 'decant5' ? 5 : 10);
@@ -5176,6 +5208,7 @@ function loadBundles(){
 
 // bundlesGrid removed from homepage
 function addBundleToCart(id, bundle){
+  if(!decantsEnabled){ toast('No disponible','La venta de decants está desactivada por el momento'); return; }
   // Check if this exact bundle is already in the cart
   var alreadyInCart = cart.some(function(i){ return i.bundleId === id; });
   if(alreadyInCart){

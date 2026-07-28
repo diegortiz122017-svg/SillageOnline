@@ -1376,6 +1376,19 @@ tr:hover td{background:rgba(255,255,255,0.02)}
           </div>
           <button class="save-btn" onclick="saveDecantInventory()" style="margin-left:auto">Guardar Cambios</button>
         </div>
+
+        <!-- Interruptor global: venta de decants en toda la tienda -->
+        <div style="background:rgba(255,255,255,0.03);border:1px solid var(--border-light);padding:1.2rem;margin-bottom:1.5rem;display:flex;align-items:center;justify-content:space-between;gap:1rem;flex-wrap:wrap">
+          <div>
+            <div style="font-size:0.6rem;letter-spacing:0.2em;text-transform:uppercase;color:var(--gold);margin-bottom:0.3rem">Venta de Decants</div>
+            <div style="font-size:0.68rem;color:var(--muted)">Al desactivar, la tienda deja de ofrecer decants/muestras — solo se pueden comprar frascos completos. El inventario y precios no se pierden.</div>
+          </div>
+          <div style="display:flex;align-items:center;gap:0.6rem;white-space:nowrap">
+            <span id="decantsEnabledLabel" style="font-size:0.7rem;color:var(--cream)">Cargando…</span>
+            <label class="tog-wrap"><span class="tog"><input type="checkbox" id="decantsEnabledTog" onchange="toggleDecantsEnabled()"><span class="tog-track wc"></span><span class="tog-thumb"></span></span></label>
+          </div>
+        </div>
+
         <div id="decantInventoryList"></div>
       </div>
 
@@ -2082,7 +2095,7 @@ function navTo(page){
       renderCollections();
     },50); return;
   }
-  if(page==='decants'){     renderDecantInventory(); }
+  if(page==='decants'){     renderDecantInventory(); loadDecantsEnabled(); }
   if(page==='cod'){         renderCODPage(); }
   if(page==='clientes')  loadClientes();
   if(page==='dte')       renderDtePage();
@@ -5119,6 +5132,30 @@ function markNoShow(orderId){
   .then(function(res){
     if(res&&res.ok){ fetchAllData(); toast('Registrado','No-show registrado','ok'); }
   });
+}
+
+// ── Interruptor global: venta de decants ─────────────
+function loadDecantsEnabled(){
+  var lbl=document.getElementById('decantsEnabledLabel');
+  var tog=document.getElementById('decantsEnabledTog');
+  if(!lbl||!tog) return;
+  fetch(API+'/settings/decants').then(function(r){return r.json();}).then(function(d){
+    tog.checked = !!d.enabled;
+    lbl.textContent = d.enabled ? 'Activa' : 'Desactivada';
+    lbl.style.color = d.enabled ? 'var(--success)' : '#d9534f';
+  }).catch(function(){ lbl.textContent='Error al cargar'; });
+}
+function toggleDecantsEnabled(){
+  var tog=document.getElementById('decantsEnabledTog');
+  var lbl=document.getElementById('decantsEnabledLabel');
+  var enabled = tog.checked;
+  adminFetch(API+'/settings/decants',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({enabled:enabled})})
+    .then(function(r){return r?r.json():null;}).then(function(d){
+      if(!d||!d.ok){ tog.checked=!enabled; toast('Error','No se pudo actualizar','err'); return; }
+      lbl.textContent = enabled ? 'Activa' : 'Desactivada';
+      lbl.style.color = enabled ? 'var(--success)' : '#d9534f';
+      toast(enabled?'Decants activados':'Decants desactivados', enabled?'La tienda vuelve a ofrecer decants':'La tienda ya no ofrece decants', 'ok');
+    }).catch(function(){ tog.checked=!enabled; toast('Error','No se pudo conectar','err'); });
 }
 
 // ── DECANT INVENTORY ─────────────────────────────────
