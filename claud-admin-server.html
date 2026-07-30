@@ -792,6 +792,7 @@ tr:hover td{background:rgba(255,255,255,0.02)}
         <div class="sb-section">Clientes</div>
         <button class="nav-btn" data-page="clientes"><span class="nav-icon">👤</span>Clientes</button>
         <button class="nav-btn" data-page="promos"><span class="nav-icon">🏷️</span>Descuentos</button>
+        <button class="nav-btn" data-page="emails"><span class="nav-icon">✉️</span>Emails</button>
         <div class="sb-section">Fiscal</div>
         <button class="nav-btn" data-page="dte"><span class="nav-icon">📄</span>DTE</button>
       </div>
@@ -1190,6 +1191,42 @@ tr:hover td{background:rgba(255,255,255,0.02)}
               <span id="saleEmailMsg" style="font-size:0.65rem;color:var(--muted)"></span>
             </div>
           </div>
+        </div>
+      </div>
+
+      <!-- EMAILS -->
+      <div class="page" id="page-emails">
+        <div class="page-title">Emails</div>
+        <div class="page-sub" style="margin-bottom:1.5rem">Redacta correos manuales y revisa el historial enviado vía Resend</div>
+
+        <div style="background:rgba(255,255,255,0.03);border:1px solid var(--border-light);padding:1.2rem;margin-bottom:1.5rem">
+          <div style="font-size:0.6rem;letter-spacing:0.2em;text-transform:uppercase;color:var(--gold);margin-bottom:1rem">Redactar Email</div>
+          <div style="display:flex;flex-direction:column;gap:0.8rem;max-width:600px">
+            <div>
+              <label class="dte-lbl">Para</label>
+              <input id="emailTo" class="dte-inp" type="email" style="width:100%" placeholder="cliente@correo.com"/>
+            </div>
+            <div>
+              <label class="dte-lbl">Asunto</label>
+              <input id="emailSubject" class="dte-inp" style="width:100%" placeholder="Asunto del correo"/>
+            </div>
+            <div>
+              <label class="dte-lbl">Mensaje</label>
+              <textarea id="emailBody" rows="8" style="width:100%;box-sizing:border-box;background:var(--card);border:1px solid var(--border-light);color:var(--cream);font-family:'Jost',sans-serif;font-size:0.75rem;padding:0.6rem 0.8rem;outline:none;resize:vertical" placeholder="Escribe el mensaje... (separa párrafos con una línea en blanco)"></textarea>
+            </div>
+            <div id="emailSendErr" style="color:#d9534f;font-size:0.68rem"></div>
+            <button class="save-btn" style="width:fit-content" onclick="sendManualEmail()">Enviar Email</button>
+          </div>
+        </div>
+
+        <div style="font-size:0.6rem;letter-spacing:0.2em;text-transform:uppercase;color:var(--gold);margin-bottom:0.8rem">Historial de Envíos</div>
+        <div class="tbl-wrap" style="overflow-x:auto">
+          <table style="min-width:760px">
+            <thead><tr><th>Fecha</th><th>Para</th><th>Asunto</th><th>Estado</th><th></th></tr></thead>
+            <tbody id="emailsBody">
+              <tr><td colspan="5" style="text-align:center;padding:2rem;color:var(--muted)">Cargando…</td></tr>
+            </tbody>
+          </table>
         </div>
       </div>
 
@@ -2100,6 +2137,7 @@ function navTo(page){
   if(page==='clientes')  loadClientes();
   if(page==='dte')       renderDtePage();
   if(page==='promos'){    loadPromoCodes(); renderPricing(); setTimeout(initSaleEmailUI, 800); }
+  if(page==='emails')    loadSentEmails();
 }
 document.querySelectorAll('.nav-btn,.mob-tab').forEach(function(b){
   b.addEventListener('click',function(){
@@ -3049,6 +3087,59 @@ function updateStatus(oid,status){
 // ════════════════════════════════════════════
 // ── Códigos de descuento ───────────────────────────────
 var _promoEditId = null;
+// ── Emails (Resend) ────────────────────────────────────
+function loadSentEmails(){
+  var tbody=document.getElementById('emailsBody');
+  if(!tbody) return;
+  adminFetch(API+'/admin/emails',{}).then(function(r){return r?r.json():[];}).then(function(list){
+    if(!Array.isArray(list)||!list.length){
+      tbody.innerHTML='<tr><td colspan="5" style="text-align:center;padding:2rem;color:var(--muted)">Aún no se han enviado emails.</td></tr>';
+      return;
+    }
+    tbody.innerHTML=list.map(function(e){
+      var estado = e.status==='sent' ? '<span style="color:#5fb87a">Enviado</span>' : '<span style="color:#d9534f">Error</span>';
+      var fecha = new Date(e.created_at).toLocaleString();
+      return '<tr>'+
+        '<td style="white-space:nowrap;font-size:0.68rem">'+esc(fecha)+'</td>'+
+        '<td>'+esc(e.to_email)+'</td>'+
+        '<td>'+esc(e.subject||'—')+'</td>'+
+        '<td>'+estado+'</td>'+
+        '<td><button class="save-btn" style="padding:0.25rem 0.6rem;font-size:0.55rem" onclick="viewSentEmail('+e.id+')">Ver</button></td>'+
+      '</tr>';
+    }).join('');
+    window._sentEmails = list;
+  }).catch(function(){ tbody.innerHTML='<tr><td colspan="5" style="text-align:center;padding:2rem;color:#d9534f">Error al cargar.</td></tr>'; });
+}
+function viewSentEmail(id){
+  var e=(window._sentEmails||[]).find(function(x){return x.id===id;});
+  if(!e) return;
+  var w=window.open('', '_blank');
+  if(e.status==='error'){
+    w.document.write('<pre style="font-family:monospace;padding:2rem;white-space:pre-wrap">Error al enviar:\n\n'+(e.error||'')+'</pre>');
+  } else {
+    w.document.write(e.body_html || '<p>Sin contenido guardado.</p>');
+  }
+  w.document.close();
+}
+function sendManualEmail(){
+  var err=document.getElementById('emailSendErr');
+  err.textContent='';
+  var to=document.getElementById('emailTo').value.trim();
+  var subject=document.getElementById('emailSubject').value.trim();
+  var body=document.getElementById('emailBody').value.trim();
+  if(!to||!subject||!body){ err.textContent='Completa destinatario, asunto y mensaje.'; return; }
+  adminFetch(API+'/admin/emails/send',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({to:to,subject:subject,body:body})})
+    .then(function(r){return r?r.json():null;}).then(function(d){
+      if(!d){ err.textContent='Sin respuesta.'; return; }
+      if(d.error){ err.textContent=d.error; return; }
+      document.getElementById('emailTo').value='';
+      document.getElementById('emailSubject').value='';
+      document.getElementById('emailBody').value='';
+      toast('Email enviado', to, 'ok');
+      loadSentEmails();
+    }).catch(function(e){ err.textContent='Error: '+e.message; });
+}
+
 function loadPromoCodes(){
   var tbody=document.getElementById('promoBody');
   tbody.innerHTML='<tr><td colspan="8" style="text-align:center;padding:2rem;color:var(--muted);font-size:0.72rem">Cargando...</td></tr>';

@@ -48,6 +48,15 @@ const WOMPI_CLIENT_ID     = process.env.WOMPI_CLIENT_ID     || null;
 const WOMPI_CLIENT_SECRET = process.env.WOMPI_CLIENT_SECRET || null;
 const WOMPI_PUBLIC_KEY    = process.env.WOMPI_PUBLIC_KEY    || null; // pub_... from Wompi panel
 
+// PayPal — tarjeta de crédito/débito vía Smart Buttons (Orders API v2).
+const PAYPAL_CLIENT_ID     = process.env.PAYPAL_CLIENT_ID     || null;
+const PAYPAL_CLIENT_SECRET = process.env.PAYPAL_CLIENT_SECRET || null;
+// 'sandbox' (pruebas) o 'live' (cobros reales) — cambia el host de la API de PayPal.
+const PAYPAL_MODE = process.env.PAYPAL_MODE === 'live' ? 'live' : 'sandbox';
+const PAYPAL_API_BASE = PAYPAL_MODE === 'live'
+  ? 'https://api-m.paypal.com'
+  : 'https://api-m.sandbox.paypal.com';
+
 // ─── AI ───────────────────────────────────────────────────────────────────────
 const OPENAI_API_KEY = process.env.OPENAI_API_KEY || null;
 
@@ -148,6 +157,7 @@ module.exports = {
   DB,
   RESEND_API_KEY, FROM_EMAIL, EMAIL_HOLA, EMAIL_PEDIDOS, ADMIN_NOTIFY_EMAIL,
   WOMPI_CLIENT_ID, WOMPI_CLIENT_SECRET, WOMPI_PUBLIC_KEY,
+  PAYPAL_CLIENT_ID, PAYPAL_CLIENT_SECRET, PAYPAL_MODE, PAYPAL_API_BASE,
   OPENAI_API_KEY,
   ADMIN_USER, ADMIN_PASS,
   DTE_ENABLED, DTE_AMBIENTE, DTE_MH_BASE,

@@ -41,7 +41,7 @@ async function logActivity(msg) {
 }
 const { requireAdmin, requireCustomer, optionalCustomer, createSession, validateSession, destroySession } = auth;
 const { authLimiter, customerAuthLimiter, getIp } = security;
-const { ADMIN_USER, ADMIN_PASS, PORT, BASE_URL, OPENAI_API_KEY, WOMPI_CLIENT_ID, WOMPI_CLIENT_SECRET, WOMPI_PUBLIC_KEY, EMAIL_HOLA, EMAIL_PEDIDOS, SESSION_TTL_CUSTOMER, SESSION_TTL_ADMIN, RESEND_API_KEY, NODE_ENV, IS_PROD, ANON_SESSION_TTL, ANON_WS_LIMIT, ANON_SOMMELIER_MAX, REG_SOMMELIER_LIMIT, ANON_SOMMELIER_LIMIT, CACHE_TTL_TOOL, CACHE_TTL_REPLY } = cfg;
+const { ADMIN_USER, ADMIN_PASS, PORT, BASE_URL, OPENAI_API_KEY, WOMPI_CLIENT_ID, WOMPI_CLIENT_SECRET, WOMPI_PUBLIC_KEY, PAYPAL_CLIENT_ID, PAYPAL_CLIENT_SECRET, PAYPAL_API_BASE, EMAIL_HOLA, EMAIL_PEDIDOS, SESSION_TTL_CUSTOMER, SESSION_TTL_ADMIN, RESEND_API_KEY, NODE_ENV, IS_PROD, ANON_SESSION_TTL, ANON_WS_LIMIT, ANON_SOMMELIER_MAX, REG_SOMMELIER_LIMIT, ANON_SOMMELIER_LIMIT, CACHE_TTL_TOOL, CACHE_TTL_REPLY } = cfg;
 
 // ── BTCPay Server ─────────────────────────────────────
 const BTCPAY_URL            = process.env.BTCPAY_URL || 'https://btcpay.davidcoen.it';
@@ -88,6 +88,20 @@ async function initDB() {
       updated_at     DATETIME NOT NULL,
       INDEX idx_created (created_at DESC),
       INDEX idx_customer (customer_id)
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
+  `);
+
+  await db.execute(`
+    CREATE TABLE IF NOT EXISTS sent_emails (
+      id          INT AUTO_INCREMENT PRIMARY KEY,
+      to_email    VARCHAR(255) NOT NULL,
+      subject     VARCHAR(255) NULL,
+      body_html   LONGTEXT     NULL,
+      resend_id   VARCHAR(100) NULL,
+      status      VARCHAR(20)  NOT NULL,        -- 'sent' | 'error'
+      error       TEXT         NULL,
+      created_at  DATETIME NOT NULL,
+      INDEX idx_created (created_at DESC)
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
   `);
 
@@ -321,6 +335,17 @@ async function initDB() {
       expires_at   DATETIME     NOT NULL,       -- 30 min window
       created_at   DATETIME     NOT NULL,
       INDEX idx_expires (expires_at)
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
+  `);
+
+  await db.execute(`
+    CREATE TABLE IF NOT EXISTS paypal_pending (
+      paypal_order_id VARCHAR(40)  PRIMARY KEY,   -- PayPal order id (from Orders API v2)
+      order_id        VARCHAR(40)  NOT NULL,
+      order_data      LONGTEXT     NOT NULL,       -- full order JSON snapshot
+      customer_id     INT          NULL,
+      amount_usd      DECIMAL(10,2) NOT NULL,
+      created_at      DATETIME     NOT NULL
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
   `);
 
@@ -588,6 +613,18 @@ function emailTemplate(bodyHtml) {
 </div></body></html>`;
 }
 
+// Resend no tiene un endpoint para "listar todos los enviados" — se registra
+// cada envío en nuestra propia tabla para poder verlos en el panel admin.
+async function logSentEmail({ to, subject, html, resendId, status, error }) {
+  try {
+    await db.execute(
+      `INSERT INTO sent_emails (to_email, subject, body_html, resend_id, status, error, created_at)
+       VALUES (?,?,?,?,?,?,?)`,
+      [to, subject || null, html || null, resendId || null, status, error || null, new Date()]
+    );
+  } catch(e) { console.error('logSentEmail error:', e.message); }
+}
+
 async function sendEmail({ to, subject, html, from }) {
   if (!RESEND_API_KEY) return;
   try {
@@ -605,10 +642,16 @@ async function sendEmail({ to, subject, html, from }) {
       })
     });
     const data = await res.json();
-    if (!res.ok) console.error('❌ Resend error:', data);
-    else console.log('✅ Email sent to', to, '— id:', data.id);
+    if (!res.ok) {
+      console.error('❌ Resend error:', data);
+      await logSentEmail({ to, subject, html, status: 'error', error: JSON.stringify(data) });
+    } else {
+      console.log('✅ Email sent to', to, '— id:', data.id);
+      await logSentEmail({ to, subject, html, resendId: data.id, status: 'sent' });
+    }
   } catch(e) {
     console.error('❌ Resend fetch error:', e.message);
+    await logSentEmail({ to, subject, html, status: 'error', error: e.message });
   }
 }
 
@@ -3108,6 +3151,32 @@ app.delete('/api/admin/promo-codes/:id', requireAdmin, async (req, res) => {
   res.json({ ok: true });
 });
 
+// ── Admin: redactar y enviar emails + ver historial de envíos (vía Resend) ────
+app.get('/api/admin/emails', requireAdmin, async (req, res) => {
+  const [rows] = await db.execute('SELECT * FROM sent_emails ORDER BY created_at DESC LIMIT 200');
+  res.json(rows);
+});
+
+app.post('/api/admin/emails/send', requireAdmin, async (req, res) => {
+  if (!RESEND_API_KEY) return res.status(503).json({ error: 'Resend no está configurado (falta RESEND_API_KEY).' });
+  const to      = String(req.body.to || '').trim();
+  const subject = String(req.body.subject || '').trim().slice(0, 255);
+  const bodyRaw = String(req.body.body || '').trim();
+  const emailRe = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/;
+  if (!emailRe.test(to)) return res.status(400).json({ error: 'Correo de destino inválido.' });
+  if (!subject) return res.status(400).json({ error: 'El asunto es requerido.' });
+  if (!bodyRaw) return res.status(400).json({ error: 'El mensaje no puede estar vacío.' });
+
+  // El mensaje se escribe como texto plano en el textarea — se convierte a HTML
+  // simple (párrafos por línea en blanco) y se envuelve en la plantilla de marca.
+  const bodyHtml = bodyRaw.split(/\n{2,}/).map(p =>
+    `<p style="margin:0 0 16px;color:#2a231c;font-size:14px;line-height:1.7">${escHtml(p).replace(/\n/g, '<br/>')}</p>`
+  ).join('');
+  await sendEmail({ to, subject, html: emailTemplate(bodyHtml) });
+  await logActivity(`Email manual enviado a ${to} — "${subject}"`);
+  res.json({ ok: true });
+});
+
 // ── Helper: deduct inventory and broadcast ────────────
 // ── DTE: emit a Factura Electrónica for a paid order ─────────────────────────
 // Gated by cfg.DTE_ENABLED (no-op when off). Never throws into the caller —
@@ -3815,6 +3884,295 @@ setInterval(async () => {
   try {
     const [r] = await db.execute('DELETE FROM wompi_pending WHERE expires_at < NOW()');
     if (r.affectedRows > 0) console.log(`Wompi cleanup: removed ${r.affectedRows} expired pending order(s)`);
+  } catch(e) { /* ignore */ }
+}, 30 * 60 * 1000);
+
+// ═══════════════════════════════════════════════════════
+//  PAYPAL INTEGRATION
+//  Tarjeta de crédito/débito vía PayPal Smart Buttons (Orders API v2).
+//  Igual que Wompi: el pedido solo se crea/marca Pagado cuando el SERVIDOR
+//  confirma la captura contra la API de PayPal — nunca se confía en el cliente.
+// ═══════════════════════════════════════════════════════
+
+// Recalcula el total del pedido igual que /api/orders (bundles, ítems, decants,
+// envío, código de promo) — nunca se confía en el total que mande el cliente.
+// Devuelve { ok:true, total, promoResult } o { ok:false, status, error }.
+async function computeServerTotal(rawItems, promoCode, clientTotal) {
+  if (!Array.isArray(rawItems) || !rawItems.length) {
+    return { ok: false, status: 400, error: 'El pedido no tiene productos.' };
+  }
+  try {
+    const catalogue = await getCatalogue();
+    const invMap    = await getInventoryMap();
+    const priceMap  = await getPricingMap();
+    let   serverTotal = 0;
+
+    const bundleGroups = {};
+    const standaloneItems = [];
+    for (const item of rawItems) {
+      if (item.bundleId) {
+        if (!bundleGroups[item.bundleId]) bundleGroups[item.bundleId] = { items: [], bundleName: item.bundleName };
+        bundleGroups[item.bundleId].items.push(item);
+      } else {
+        standaloneItems.push(item);
+      }
+    }
+
+    for (const [bundleId, group] of Object.entries(bundleGroups)) {
+      const firstItem = group.items[0];
+      const qty = parseInt(firstItem.qty, 10) || 1;
+      const clientBundleTotal = group.items.reduce((s, i) => s + parseFloat(i.price || 0) * parseInt(i.qty, 10), 0);
+      const bundleDefId = firstItem.bundleId?.split('_')[1];
+      if (bundleDefId) {
+        const [bRows] = await db.execute('SELECT price FROM bundles WHERE id=? AND active=1', [parseInt(bundleDefId)]);
+        if (bRows.length) {
+          const dbBundlePrice = parseFloat(bRows[0].price) * qty;
+          if (Math.abs(clientBundleTotal - dbBundlePrice) > 0.02) {
+            return { ok: false, status: 400, error: 'El precio del bundle no coincide. Por favor recarga la página.' };
+          }
+          serverTotal += dbBundlePrice;
+          continue;
+        }
+      }
+      serverTotal += clientBundleTotal;
+    }
+
+    const decantsEnabled = (await getSetting('decants_enabled', '1')) !== '0';
+    for (const item of standaloneItems) {
+      const pid  = parseInt(item.productId, 10);
+      const qty  = parseInt(item.qty, 10) || 1;
+      const type = (item.type || 'full').toLowerCase();
+      const prod = catalogue.find(p => p.id === pid);
+      if (!prod) return { ok: false, status: 400, error: `Producto no encontrado: ${pid}` };
+      if (invMap[pid]?.outOfStock) return { ok: false, status: 400, error: `Producto agotado: ${prod.brand} ${prod.name}` };
+      if (!decantsEnabled && (type === 'decant' || type === 'decant5' || type === 'sample')) {
+        return { ok: false, status: 400, error: 'La venta de decants está temporalmente desactivada. Solo se aceptan frascos completos.' };
+      }
+      const pr        = priceMap[pid] || {};
+      const fullPrice = (pr.onSale && pr.salePrice) ? parseFloat(pr.salePrice) : parseFloat(prod.price);
+
+      let unitPrice;
+      if (type === 'decant' || type === 'decant5' || type === 'sample') {
+        const sizeStr = String(item.size || '');
+        const is5ml   = sizeStr.includes('5ml') || sizeStr === '5';
+        const sizeMl  = is5ml ? 5 : 10;
+        const [decantRows] = await db.execute(
+          'SELECT stock FROM decant_inventory WHERE product_id=? AND size_ml=?', [pid, sizeMl]
+        );
+        if (decantRows.length && decantRows[0].stock !== null) {
+          const availableDecants = parseInt(decantRows[0].stock);
+          if (availableDecants < qty) {
+            return { ok: false, status: 400, error: availableDecants === 0
+              ? `Decant ${sizeMl}ml de ${prod.brand} ${prod.name} está agotado.`
+              : `Solo quedan ${availableDecants} decant${availableDecants > 1 ? 's' : ''} de ${sizeMl}ml de ${prod.brand} ${prod.name}.` };
+          }
+        }
+        const price10 = prod.decantPrice ? parseFloat(prod.decantPrice) : Math.round(fullPrice * 0.30);
+        const price5  = prod.decantPrice5 ? parseFloat(prod.decantPrice5) : Math.round(price10 * 0.55);
+        const catalogDecantPrice = is5ml ? price5 : price10;
+        const clientUnitPrice = parseFloat(item.unitPrice || 0);
+        unitPrice = (clientUnitPrice > 0 && Math.abs(clientUnitPrice - catalogDecantPrice) <= 1.00) ? clientUnitPrice : catalogDecantPrice;
+      } else {
+        unitPrice = parseFloat(item.unitPrice || fullPrice);
+        if (unitPrice < 0.50) unitPrice = fullPrice;
+      }
+      serverTotal += unitPrice * qty;
+    }
+
+    const shippingCost      = parseFloat(await getSetting('shipping_cost', '5')) || 5;
+    const shippingThreshold = parseFloat(await getSetting('shipping_threshold', '50')) || 50;
+    const shipping = serverTotal < shippingThreshold ? shippingCost : 0;
+
+    let promoResult = null;
+    if (promoCode) {
+      promoResult = await validatePromoCode(promoCode, serverTotal);
+      if (!promoResult.ok) return { ok: false, status: 400, error: promoResult.error };
+      serverTotal = Math.max(0, Math.round((serverTotal - promoResult.discount) * 100) / 100);
+    }
+
+    serverTotal = Math.round((serverTotal + shipping) * 100) / 100;
+
+    const clientTotalRounded = Math.round(parseFloat(clientTotal || 0) * 100) / 100;
+    if (Math.abs(serverTotal - clientTotalRounded) > 0.02) {
+      return { ok: false, status: 400, error: 'El total del pedido no coincide. Por favor recarga la página e intenta de nuevo.' };
+    }
+
+    return { ok: true, total: serverTotal, promoResult };
+  } catch(e) {
+    console.error('computeServerTotal error:', e.message);
+    return { ok: false, status: 500, error: 'Error al validar el pedido.' };
+  }
+}
+
+let _paypalToken    = null;
+let _paypalTokenExp = 0;
+async function getPaypalToken() {
+  if (_paypalToken && Date.now() < _paypalTokenExp - 60000) return _paypalToken;
+  if (!PAYPAL_CLIENT_ID || !PAYPAL_CLIENT_SECRET) throw new Error('PayPal not configured');
+  const auth = Buffer.from(`${PAYPAL_CLIENT_ID}:${PAYPAL_CLIENT_SECRET}`).toString('base64');
+  const resp = await fetch(`${PAYPAL_API_BASE}/v1/oauth2/token`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/x-www-form-urlencoded', 'Authorization': `Basic ${auth}` },
+    body: 'grant_type=client_credentials',
+  });
+  if (!resp.ok) throw new Error(`PayPal auth failed: ${resp.status}`);
+  const data = await resp.json();
+  _paypalToken    = data.access_token;
+  _paypalTokenExp = Date.now() + (data.expires_in * 1000);
+  return _paypalToken;
+}
+
+// GET /api/paypal/config — expone solo el Client ID público (nunca el secret).
+app.get('/api/paypal/config', (req, res) => {
+  if (!PAYPAL_CLIENT_ID) return res.status(503).json({ error: 'PayPal no configurado' });
+  res.json({ clientId: PAYPAL_CLIENT_ID });
+});
+
+// POST /api/paypal/create-order — valida el total server-side y crea la orden en PayPal.
+// El pedido de Sillage AÚN no se crea aquí — solo se guarda un snapshot pendiente,
+// igual que wompi_pending, hasta que /capture-order confirme el pago.
+app.post('/api/paypal/create-order', orderLimiter, async (req, res) => {
+  if (!PAYPAL_CLIENT_ID || !PAYPAL_CLIENT_SECRET) return res.status(503).json({ error: 'PayPal no configurado' });
+
+  const rawEmail = String(req.body.email || '').toLowerCase().trim();
+  const emailRe  = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/;
+  if (!rawEmail || !emailRe.test(rawEmail)) return res.status(400).json({ error: 'Correo electrónico inválido.' });
+  if (!req.body.customer || !String(req.body.customer).trim()) return res.status(400).json({ error: 'Nombre requerido.' });
+
+  const validated = await computeServerTotal(req.body.items, req.body.promoCode, req.body.total);
+  if (!validated.ok) return res.status(validated.status).json({ error: validated.error });
+
+  const customerToken   = req.headers['x-customer-token'];
+  const customerSession = customerToken ? validateSession(customerToken) : null;
+  const customerId      = (customerSession && customerSession.role === 'customer') ? customerSession.user.id : null;
+
+  const orderId = 'SLG-' + Date.now().toString(36).toUpperCase() + '-' + Math.random().toString(36).substr(2,4).toUpperCase();
+  const orderSnapshot = {
+    id:            orderId,
+    customer:      String(req.body.customer || '').slice(0, 200).replace(/[<>]/g, ''),
+    email:         rawEmail.slice(0, 200),
+    phone:         req.body.phone ? String(req.body.phone).slice(0, 30).replace(/[^0-9+\-\s()]/g, '') : null,
+    address:       String(req.body.fullAddress || req.body.address || '').slice(0, 500).replace(/[<>]/g, ''),
+    city:          req.body.city    ? String(req.body.city).slice(0,   100).replace(/[<>]/g, '') : null,
+    state:         req.body.state   ? String(req.body.state).slice(0,  100).replace(/[<>]/g, '') : null,
+    country:       req.body.country ? String(req.body.country).slice(0,100).replace(/[<>]/g, '') : null,
+    items:         req.body.items || [],
+    total:         validated.total,
+    promoCode:     validated.promoResult && validated.promoResult.ok ? validated.promoResult.code : null,
+    promoDiscount: validated.promoResult && validated.promoResult.ok ? validated.promoResult.discount : 0,
+  };
+
+  try {
+    const token = await getPaypalToken();
+    const resp  = await fetch(`${PAYPAL_API_BASE}/v2/checkout/orders`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+      body: JSON.stringify({
+        intent: 'CAPTURE',
+        purchase_units: [{
+          reference_id: orderId,
+          description:  `Sillage Parfumerie — Pedido ${orderId}`.slice(0, 127),
+          amount: { currency_code: 'USD', value: validated.total.toFixed(2) },
+        }],
+      }),
+    });
+    if (!resp.ok) {
+      const err = await resp.text();
+      console.error('PayPal create order failed:', err);
+      return res.status(502).json({ error: 'No se pudo iniciar el pago con PayPal. Intenta de nuevo.' });
+    }
+    const data = await resp.json();
+    await db.execute(
+      `INSERT INTO paypal_pending (paypal_order_id, order_id, order_data, customer_id, amount_usd, created_at)
+       VALUES (?, ?, ?, ?, ?, ?)`,
+      [data.id, orderId, JSON.stringify(orderSnapshot), customerId || null, validated.total, new Date()]
+    );
+    res.json({ ok: true, paypalOrderId: data.id });
+  } catch(e) {
+    console.error('PayPal create-order error:', e.message);
+    res.status(500).json({ error: 'No se pudo iniciar el pago.' });
+  }
+});
+
+// POST /api/paypal/capture-order/:id — captura el pago contra la API de PayPal.
+// Solo si PayPal confirma estado COMPLETED se crea el pedido real y se dispara
+// todo el pipeline post-pago (inventario, DTE, email, promo) — igual que Wompi.
+app.post('/api/paypal/capture-order/:id', async (req, res) => {
+  const paypalOrderId = String(req.params.id || '').slice(0, 60);
+  if (!paypalOrderId) return res.status(400).json({ error: 'Falta el ID de la orden.' });
+
+  try {
+    const [rows] = await db.execute('SELECT * FROM paypal_pending WHERE paypal_order_id=?', [paypalOrderId]);
+    if (!rows.length) return res.status(404).json({ error: 'Orden de pago no encontrada o ya procesada.' });
+    const pending  = rows[0];
+    const orderObj = JSON.parse(pending.order_data);
+
+    // Idempotencia: si ya se creó y quedó Pagado, no reprocesar (doble clic / reintento del cliente).
+    const [exists] = await db.execute('SELECT id, payment_status FROM orders WHERE id=?', [orderObj.id]);
+    if (exists.length && exists[0].payment_status === 'Pagado') {
+      return res.json({ ok: true, order: orderObj, alreadyProcessed: true });
+    }
+
+    const token = await getPaypalToken();
+    const resp  = await fetch(`${PAYPAL_API_BASE}/v2/checkout/orders/${paypalOrderId}/capture`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+    });
+    const capture = await resp.json();
+    const status  = capture?.status || capture?.purchase_units?.[0]?.payments?.captures?.[0]?.status;
+    if (!resp.ok || status !== 'COMPLETED') {
+      console.warn('PayPal capture not completed:', JSON.stringify(capture));
+      return res.status(402).json({ error: 'El pago no pudo completarse. Intenta de nuevo o usa otro método.' });
+    }
+
+    const now = new Date();
+    if (exists.length) {
+      await db.execute(
+        `UPDATE orders SET status='Procesando', payment_status='Pagado', payment_method='paypal', updated_at=? WHERE id=?`,
+        [now, orderObj.id]
+      );
+    } else {
+      await db.execute(
+        `INSERT INTO orders (id,customer,email,phone,address,city,state_province,country,items,total,status,payment_status,payment_method,tracker_step,customer_id,promo_code,promo_discount,created_at,updated_at)
+         VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
+        [orderObj.id, orderObj.customer, orderObj.email, orderObj.phone, orderObj.address,
+         orderObj.city, orderObj.state, orderObj.country, JSON.stringify(orderObj.items), orderObj.total,
+         'Procesando', 'Pagado', 'paypal', 1, pending.customer_id || null,
+         orderObj.promoCode || null, orderObj.promoDiscount || 0, pending.created_at, now]
+      );
+      if (orderObj.promoCode) {
+        await db.execute('UPDATE promo_codes SET used_count = used_count + 1, updated_at=? WHERE code=?', [now, orderObj.promoCode]).catch(() => {});
+      }
+    }
+
+    await deductInventory(orderObj.items);
+    await deductBottleInventory(orderObj.items);
+    if (pending.customer_id) {
+      await db.execute('UPDATE consult_counts SET count=0, last_reset=? WHERE customer_id=?',
+        [now.toISOString().slice(0,10), pending.customer_id]).catch(() => {});
+    }
+    await db.execute('DELETE FROM paypal_pending WHERE paypal_order_id=?', [paypalOrderId]);
+
+    const fullOrder = { ...orderObj, status: 'Procesando', paymentStatus: 'Pagado', payment_method: 'paypal' };
+    broadcastAdmin('new_order', fullOrder);
+    await logActivity(`Pago PayPal confirmado — pedido ${orderObj.id} de ${orderObj.customer} — $${parseFloat(orderObj.total||0).toFixed(2)}`);
+    try { await sendOrderConfirmation(fullOrder); } catch(e) { console.error('PayPal confirm email error:', e.message); }
+    try { await notifyAdmins(fullOrder); } catch(e) {}
+    try { await emitDteForOrder(orderObj.id); } catch(e) { console.error('PayPal DTE error:', e.message); }
+
+    res.json({ ok: true, order: fullOrder });
+  } catch(e) {
+    console.error('PayPal capture-order error:', e.message);
+    res.status(500).json({ error: 'No se pudo confirmar el pago. Contáctanos si el cargo aparece en tu cuenta.' });
+  }
+});
+
+// Cleanup: remove paypal_pending rows older than 2h (abandoned checkouts)
+setInterval(async () => {
+  try {
+    const cutoff = new Date(Date.now() - 2 * 60 * 60 * 1000);
+    const [r] = await db.execute('DELETE FROM paypal_pending WHERE created_at < ?', [cutoff]);
+    if (r.affectedRows > 0) console.log(`PayPal cleanup: removed ${r.affectedRows} expired pending order(s)`);
   } catch(e) { /* ignore */ }
 }, 30 * 60 * 1000);
 

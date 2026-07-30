@@ -2450,11 +2450,11 @@ footer{background:var(--dark);padding:3.5rem 4rem;text-align:center;border-top:1
       <div class="m-section" id="ms2">
         <p class="f-label-top">Selecciona tu método de pago</p>
         <div class="pay-methods">
-          <button class="pay-method active" id="pmWompi" onclick="selectPayMethod('wompi')"><span class="pm-icon">&#128179;</span><div><span class="pm-name">Tarjeta de Crédito / Débito</span><span class="pm-sub">Visa, Mastercard — via Wompi</span></div></button>
+          <button class="pay-method active" id="pmPaypal" onclick="selectPayMethod('paypal')"><span class="pm-icon">&#128179;</span><div><span class="pm-name">Tarjeta de Crédito / Débito</span><span class="pm-sub">Visa, Mastercard — via PayPal</span></div></button>
           <button class="pay-method" id="pmBtcpay" onclick="selectPayMethod('btcpay')"><span class="pm-icon">&#9889;</span><div><span class="pm-name">Bitcoin / Lightning</span><span class="pm-sub">Paga con cualquier wallet BTC</span></div></button>
           <button class="pay-method" id="pmCod" onclick="selectPayMethod('cod')"><span class="pm-icon">&#128181;</span><div><span class="pm-name">Pago contra Entrega</span><span class="pm-sub">Paga en efectivo al recibir</span></div></button>
         </div>
-        <div id="pmInfoWompi" class="pm-info"><div class="sec-row"><span class="sec-badge">&#128274; SSL</span><span class="sec-badge">Wompi</span><span class="sec-badge">&#10003; Seguro</span></div><p style="font-size:0.68rem;color:var(--muted);line-height:1.7;margin-top:0.8rem">Serás redirigido a la pasarela segura de Wompi.</p></div>
+        <div id="pmInfoPaypal" class="pm-info"><div class="sec-row"><span class="sec-badge">&#128274; SSL</span><span class="sec-badge">PayPal</span><span class="sec-badge">&#10003; Seguro</span></div><p style="font-size:0.68rem;color:var(--muted);line-height:1.7;margin-top:0.8rem">Pagas con tarjeta a través de PayPal — no necesitas cuenta PayPal.</p></div>
         <div id="pmInfoBtcpay" class="pm-info" style="display:none"><p style="font-size:0.68rem;color:var(--muted);line-height:1.7">Serás redirigido a una página de pago segura donde podrás pagar con <strong style="color:var(--gold)">Bitcoin on-chain o Lightning Network</strong>.<br><span style="font-size:0.62rem">Compatible con Chivo Wallet, Phoenix, Muun, y cualquier wallet Bitcoin.</span></p></div>
         <div id="pmInfoCod" class="pm-info" style="display:none">
           <p style="font-size:0.68rem;color:var(--muted);line-height:1.7">Pagarás en efectivo cuando recibas tu pedido.</p>
@@ -2494,6 +2494,7 @@ footer{background:var(--dark);padding:3.5rem 4rem;text-align:center;border-top:1
         <div class="m-summary wb"><div class="ms-title">Enviando a</div><p style="font-size:0.75rem;color:var(--charcoal);line-height:1.7" id="mDelivery"></p></div>
         <div class="m-summary wb"><div class="ms-title">Método de Pago</div><p style="font-size:0.75rem;color:var(--charcoal)" id="mPayment"></p></div>
         <div class="m-actions"><button class="m-btn-s" id="s3back">&#8592; Atrás</button><button class="m-btn-p" id="s3place">Realizar Pedido</button></div>
+        <div id="paypalButtonContainer" style="display:none;margin-top:0.8rem"></div>
       </div>
       <div class="m-section" id="ms4">
         <div class="success-wrap">
@@ -4880,7 +4881,7 @@ function v1(){
   if(gv('fe')&&!/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(gv('fe'))){se('ee','Correo inválido');sfe('fe',true);ok=false;}
   return ok;
 }
-var selectedPayMethod='wompi';
+var selectedPayMethod='paypal';
 var _codMinOrder = 25; // loaded from server
 
 function selectPayMethod(method){
@@ -4931,11 +4932,23 @@ function fillReview(){
   document.getElementById('mSummaryTotal').textContent='$'+total.toFixed(2);
   document.getElementById('mDelivery').textContent=gv('fn')+' \u00b7 '+gv('fa')+', '+gv('fc')+(gv('fs')?' '+gv('fs'):'')+', '+gv('fco');
   var pmLabels={
-    'wompi':  'Tarjeta de Crédito / Débito — Wompi',
+    'paypal': 'Tarjeta de Crédito / Débito — PayPal',
     'btcpay': 'Bitcoin / Lightning Network',
     'cod':    'Pago contra Entrega'
   };
   document.getElementById('mPayment').textContent = pmLabels[selectedPayMethod] || selectedPayMethod;
+
+  // PayPal usa su propio botón en vez de "Realizar Pedido" — el botón normal
+  // sigue sirviendo para BTC/COD.
+  var placeBtnEl = document.getElementById('s3place');
+  var ppContainer = document.getElementById('paypalButtonContainer');
+  if(selectedPayMethod==='paypal'){
+    if(placeBtnEl) placeBtnEl.style.display='none';
+    if(ppContainer){ ppContainer.style.display='block'; renderPaypalButtons(); }
+  } else {
+    if(placeBtnEl) placeBtnEl.style.display='';
+    if(ppContainer) ppContainer.style.display='none';
+  }
 }
 document.getElementById('s1next').addEventListener('click',function(){
   if(!v1()) return;
@@ -4991,14 +5004,13 @@ function placeOrder(){
     .finally(function(){ _doPlaceOrder(); });
 }
 
-function _doPlaceOrder(){
+// Construye orderItems + orderData a partir del carrito actual — usado tanto por
+// el flujo normal (/api/orders) como por PayPal (/api/paypal/create-order).
+function buildOrderData(){
   var email=gv('fe');
-  // Build order items — bundle items share bundlePrice split across them for line-item display
-  var _bundlePriceAssigned = {};
   var orderItems=cart.map(function(it){
     var nm=it.label||(it.p.brand+' '+it.p.name);
     if(it.bundleId){
-      // Distribute bundle price evenly across items for server-side line items
       var perItem = parseFloat((it.bundlePrice / it.bundleCount).toFixed(2));
       return{
         productId:  it.p.id,
@@ -5032,6 +5044,12 @@ function _doPlaceOrder(){
     promoCode:     _appliedPromo ? _appliedPromo.code : null,
     promoDiscount: _appliedPromo ? parseFloat(_appliedPromo.discount) : 0
   };
+  return { orderData: orderData, orderItems: orderItems, total: total, email: email };
+}
+
+function _doPlaceOrder(){
+  var built = buildOrderData();
+  var orderData = built.orderData, orderItems = built.orderItems, total = built.total, email = built.email;
 
   var placeBtn=document.getElementById('s3place');
   placeBtn.textContent='Procesando...';
@@ -5073,46 +5091,9 @@ function _doPlaceOrder(){
         // btcpay selected but no invoiceId returned — close modal and show error
         closeBTCPayModal();
       }
-      document.getElementById('successOid').textContent='Pedido '+order.id;
-      document.getElementById('notifyEmail').textContent=email;
-      var invLink=document.getElementById('invoiceLink');
-      if(invLink) invLink.href=API+'/orders/'+order.id+'/invoice';
-      if(invLink) invLink.onclick=function(e){
-        e.preventDefault();
-        openInvoice(order.id);
-      };
-      document.getElementById('successItems').innerHTML='<div class="ms-title">Tu Pedido</div>'+
-        orderItems.map(function(i){return'<div class="ms-row"><span>'+i.name+' \u00d7'+i.qty+'</span><span class="ms-price">$'+parseFloat(i.total||0).toFixed(2)+'</span></div>';}).join('')+
-        '<div class="ms-div"></div><div class="ms-total"><span class="ms-total-lbl">Total Pagado</span><span class="ms-total-val">$'+total.toLocaleString()+'</span></div>';
-      resetTracker();
-      goStep(4);
-      // Store ALL form data NOW before cart/form reset clears them
-      window._porOrderId = order.id;
-      window._porName    = gv('fn');
-      window._porEmail   = email;
-      window._porPhone   = gv('fph');
-      window._porAddress = gv('fa');
-      window._porCity    = gv('fc');
-      window._porState   = gv('fs');
-      window._porZip     = '';
-      window._porCountry = gv('fco');
-      cart=[];renderCart();saveCart();
+      renderOrderSuccess(order, orderItems, total, email);
       placeBtn.textContent='Realizar Pedido';
       placeBtn.disabled=false;
-      // Show registration prompt only to guests
-      if(typeof currentCustomer==='undefined'||!currentCustomer){
-        var prompt=document.getElementById('porPrompt');
-        if(prompt){
-          prompt.style.display='block';
-          var pwField=document.getElementById('porPassword');
-          if(pwField)pwField.value='';
-          var pf=document.getElementById('porForm');
-          var ps=document.getElementById('porSuccess');
-          if(pf)pf.style.display='block';
-          if(ps)ps.style.display='none';
-          document.getElementById('porErr').textContent='';
-        }
-      }
     })
     .catch(function(err){
       console.error(err);
@@ -5120,6 +5101,47 @@ function _doPlaceOrder(){
       placeBtn.textContent='Realizar Pedido';
       placeBtn.disabled=false;
     });
+}
+
+// Pantalla de \u00e9xito compartida \u2014 usada por el flujo normal (/api/orders) y por
+// PayPal (que confirma el pago en /api/paypal/capture-order antes de llegar aqu\u00ed).
+function renderOrderSuccess(order, orderItems, total, email){
+  document.getElementById('successOid').textContent='Pedido '+order.id;
+  document.getElementById('notifyEmail').textContent=email;
+  var invLink=document.getElementById('invoiceLink');
+  if(invLink) invLink.href=API+'/orders/'+order.id+'/invoice';
+  if(invLink) invLink.onclick=function(e){
+    e.preventDefault();
+    openInvoice(order.id);
+  };
+  document.getElementById('successItems').innerHTML='<div class="ms-title">Tu Pedido</div>'+
+    orderItems.map(function(i){return'<div class="ms-row"><span>'+i.name+' \u00d7'+i.qty+'</span><span class="ms-price">$'+parseFloat(i.total||0).toFixed(2)+'</span></div>';}).join('')+
+    '<div class="ms-div"></div><div class="ms-total"><span class="ms-total-lbl">Total Pagado</span><span class="ms-total-val">$'+parseFloat(total).toLocaleString()+'</span></div>';
+  resetTracker();
+  goStep(4);
+  window._porOrderId = order.id;
+  window._porName    = gv('fn');
+  window._porEmail   = email;
+  window._porPhone   = gv('fph');
+  window._porAddress = gv('fa');
+  window._porCity    = gv('fc');
+  window._porState   = gv('fs');
+  window._porZip     = '';
+  window._porCountry = gv('fco');
+  cart=[];renderCart();saveCart();
+  if(typeof currentCustomer==='undefined'||!currentCustomer){
+    var prompt=document.getElementById('porPrompt');
+    if(prompt){
+      prompt.style.display='block';
+      var pwField=document.getElementById('porPassword');
+      if(pwField)pwField.value='';
+      var pf=document.getElementById('porForm');
+      var ps=document.getElementById('porSuccess');
+      if(pf)pf.style.display='block';
+      if(ps)ps.style.display='none';
+      document.getElementById('porErr').textContent='';
+    }
+  }
 }
 
 function resetTracker(){
@@ -5595,6 +5617,58 @@ var _wompiPublicKey = null;
     .then(function(d){ if(d.publicKey) _wompiPublicKey = d.publicKey; })
     .catch(function(){});
 })();
+
+// ── PayPal (tarjeta) ─────────────────────────────────────
+var _paypalSdkLoading = null; // promise, evita cargar el script dos veces
+function loadPaypalSdk(){
+  if(window.paypal) return Promise.resolve();
+  if(_paypalSdkLoading) return _paypalSdkLoading;
+  _paypalSdkLoading = fetch(API+'/paypal/config').then(function(r){return r.json();}).then(function(cfg){
+    if(!cfg.clientId) throw new Error('PayPal no configurado');
+    return new Promise(function(resolve, reject){
+      var s=document.createElement('script');
+      s.src='https://www.paypal.com/sdk/js?client-id='+encodeURIComponent(cfg.clientId)+'&currency=USD&intent=capture';
+      s.onload=resolve; s.onerror=function(){reject(new Error('No se pudo cargar PayPal'));};
+      document.head.appendChild(s);
+    });
+  });
+  return _paypalSdkLoading;
+}
+var _paypalRendered=false;
+function renderPaypalButtons(){
+  var container=document.getElementById('paypalButtonContainer');
+  if(!container) return;
+  loadPaypalSdk().then(function(){
+    if(_paypalRendered) return; // ya renderizado, no duplicar botones
+    _paypalRendered=true;
+    paypal.Buttons({
+      style:{ layout:'vertical', color:'gold', shape:'rect', label:'pay' },
+      createOrder: function(){
+        var built = buildOrderData();
+        window._paypalLastBuilt = built;
+        return fetch(API+'/paypal/create-order',{
+          method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(built.orderData)
+        }).then(function(r){return r.json();}).then(function(res){
+          if(!res.ok) throw new Error(res.error||'No se pudo iniciar el pago.');
+          return res.paypalOrderId;
+        }).catch(function(e){ toast('Error', e.message||'No se pudo iniciar el pago con PayPal.',''); throw e; });
+      },
+      onApprove: function(data){
+        return fetch(API+'/paypal/capture-order/'+encodeURIComponent(data.orderID),{method:'POST'})
+          .then(function(r){return r.json();}).then(function(res){
+            if(!res.ok) throw new Error(res.error||'No se pudo confirmar el pago.');
+            var built = window._paypalLastBuilt || {};
+            renderOrderSuccess(res.order, built.orderItems||res.order.items||[], res.order.total||built.total, built.email||res.order.email);
+          }).catch(function(e){ toast('Error', e.message||'No se pudo confirmar el pago.',''); });
+      },
+      onCancel: function(){ toast('Pago cancelado','Puedes intentarlo de nuevo cuando quieras',''); },
+      onError: function(err){ console.error('PayPal error:', err); toast('Error','Ocurrió un problema con PayPal. Intenta de nuevo.',''); },
+    }).render('#paypalButtonContainer');
+  }).catch(function(e){
+    console.error(e);
+    container.innerHTML='<p style="font-size:0.7rem;color:var(--error)">No se pudo cargar PayPal. Intenta recargar la página.</p>';
+  });
+}
 
 function openWompiWidget(reference, amountCents, order, fallbackUrl) {
   if (!_wompiPublicKey) {
