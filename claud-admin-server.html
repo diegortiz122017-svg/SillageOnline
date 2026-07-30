@@ -1203,6 +1203,15 @@ tr:hover td{background:rgba(255,255,255,0.02)}
           <div style="font-size:0.6rem;letter-spacing:0.2em;text-transform:uppercase;color:var(--gold);margin-bottom:1rem">Redactar Email</div>
           <div style="display:flex;flex-direction:column;gap:0.8rem;max-width:600px">
             <div>
+              <label class="dte-lbl">Plantilla</label>
+              <select id="emailTemplateSelect" class="dte-inp" style="width:100%" onchange="applyEmailTemplate(this.value)">
+                <option value="blank">En blanco</option>
+                <option value="bac">Contacto formal — BAC Credomatic</option>
+                <option value="cuscatlan">Contacto formal — Banco Cuscatlán</option>
+                <option value="pasarela">Contacto formal — Otra pasarela regional</option>
+              </select>
+            </div>
+            <div>
               <label class="dte-lbl">Para</label>
               <input id="emailTo" class="dte-inp" type="email" style="width:100%" placeholder="cliente@correo.com"/>
             </div>
@@ -3121,6 +3130,31 @@ function viewSentEmail(id){
   }
   w.document.close();
 }
+// ── Plantillas de contacto formal ──────────────────────
+var EMAIL_TEMPLATES = {
+  blank: {
+    subject: '',
+    body: 'Estimados,\n\nMi nombre es Diego Ortiz, represento a Sillage, Sociedad por Acciones Simplificada de Capital Variable (NIT 0823-050526-101-6), operadora de la tienda en línea Sillage Parfumerie (sillage-sv.com).\n\n[Cuerpo del mensaje — motivo del contacto]\n\n[Preguntas o solicitud específica]\n\nQuedo atento a su respuesta.\n\nSaludos cordiales,\nDiego Ortiz\nSillage Parfumerie'
+  },
+  bac: {
+    subject: 'Solicitud de información — Pasarela de pagos para e-commerce (Sillage Parfumerie)',
+    body: 'Estimados,\n\nMi nombre es Diego Ortiz, represento a Sillage, Sociedad por Acciones Simplificada de Capital Variable (NIT 0823-050526-101-6), operadora de la tienda en línea Sillage Parfumerie (sillage-sv.com), dedicada a la venta de fragancias en El Salvador.\n\nEstamos buscando integrar un botón de pago con tarjeta de crédito/débito directamente en nuestro sitio web, mediante API con confirmación por webhook, para procesar los cobros sin redirigir al cliente fuera de nuestra plataforma.\n\nAgradecería que me compartieran:\n1. Requisitos de afiliación como comercio (documentación, tipo de cuenta bancaria requerida).\n2. Si cuentan con documentación técnica de API y ambiente de pruebas (sandbox).\n3. Comisiones por transacción y tiempo estimado de aprobación e integración.\n\nQuedo atento a su respuesta. Con gusto puedo agendar una llamada si es más conveniente.\n\nSaludos cordiales,\nDiego Ortiz\nSillage Parfumerie'
+  },
+  cuscatlan: {
+    subject: 'Solicitud de información — Solución de pagos en línea para comercio afiliado',
+    body: 'Estimados,\n\nMi nombre es Diego Ortiz, represento a Sillage, Sociedad por Acciones Simplificada de Capital Variable (NIT 0823-050526-101-6), operadora de la tienda en línea Sillage Parfumerie (sillage-sv.com).\n\nQuisiera conocer las soluciones de pago digital que ofrece Banco Cuscatlán para comercios de e-commerce, específicamente:\n\n1. Si cuentan con un botón de pago integrable vía API (con webhook de confirmación) para procesar cobros directamente en nuestro sitio, o si el servicio disponible es únicamente de link de pago (redirección a página externa).\n2. Requisitos de afiliación (cuenta bancaria, documentación, contrato).\n3. Documentación técnica disponible y si existe ambiente de pruebas.\n4. Comisiones y tiempo estimado de aprobación.\n\nQuedo atento a orientación sobre el proceso a seguir.\n\nSaludos cordiales,\nDiego Ortiz\nSillage Parfumerie'
+  },
+  pasarela: {
+    subject: 'Consulta — Disponibilidad de servicio para comercio registrado en El Salvador',
+    body: 'Estimados,\n\nMi nombre es Diego Ortiz, represento a Sillage Parfumerie (sillage-sv.com), tienda en línea de fragancias registrada como empresa en El Salvador (NIT 0823-050526-101-6).\n\nAntes de avanzar con la integración, quisiera confirmar:\n\n1. ¿Su plataforma acepta comercios registrados en El Salvador (no solo tarjetas emitidas ahí, sino la cuenta de comercio en sí)?\n2. ¿Ofrecen un botón de pago integrable vía API con webhook, o el modelo es de link de pago/redirección?\n3. Requisitos de afiliación y documentación necesaria.\n4. Comisiones, moneda de liquidación (USD) y tiempo estimado de aprobación.\n\nQuedo atento a su respuesta.\n\nSaludos cordiales,\nDiego Ortiz\nSillage Parfumerie'
+  }
+};
+function applyEmailTemplate(key){
+  var t=EMAIL_TEMPLATES[key]||EMAIL_TEMPLATES.blank;
+  document.getElementById('emailSubject').value=t.subject;
+  document.getElementById('emailBody').value=t.body;
+}
+
 function sendManualEmail(){
   var err=document.getElementById('emailSendErr');
   err.textContent='';
