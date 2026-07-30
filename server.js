@@ -613,6 +613,27 @@ function emailTemplate(bodyHtml) {
 </div></body></html>`;
 }
 
+// Diseño formal — sin colores/marca de Sillage, estilo carta de negocio. Para
+// contactar bancos/proveedores donde una plantilla dorada/negra no encaja.
+function formalEmailTemplate(bodyHtml) {
+  return `<!DOCTYPE html><html lang="es"><head><meta charset="UTF-8"/></head>
+<body style="margin:0;padding:0;background:#ffffff;font-family:Arial,Helvetica,sans-serif">
+<div style="max-width:600px;margin:0 auto;padding:32px 24px;color:#1a1a1a">
+  ${bodyHtml}
+  <div style="margin-top:32px;padding-top:16px;border-top:1px solid #ddd;font-size:12px;color:#666">
+    Sillage, Sociedad por Acciones Simplificada de Capital Variable — NIT 0823-050526-101-6
+  </div>
+</div></body></html>`;
+}
+
+// Convierte texto plano (párrafos separados por línea en blanco) a HTML simple.
+function bodyToHtml(bodyRaw, formal) {
+  const color = formal ? '#1a1a1a' : '#2a231c';
+  return bodyRaw.split(/\n{2,}/).map(p =>
+    `<p style="margin:0 0 16px;color:${color};font-size:14px;line-height:1.7">${escHtml(p).replace(/\n/g, '<br/>')}</p>`
+  ).join('');
+}
+
 // Resend no tiene un endpoint para "listar todos los enviados" — se registra
 // cada envío en nuestra propia tabla para poder verlos en el panel admin.
 async function logSentEmail({ to, subject, html, resendId, status, error }) {
@@ -622,7 +643,7 @@ async function logSentEmail({ to, subject, html, resendId, status, error }) {
        VALUES (?,?,?,?,?,?,?)`,
       [to, subject || null, html || null, resendId || null, status, error || null, new Date()]
     );
-  } catch(e) { console.error('logSentEmail error:', e.message); }
+  } catch(e) { /* non-fatal: no bloquea el envío si el log falla */ console.error('logSentEmail error:', e.message); }
 }
 
 async function sendEmail({ to, subject, html, from }) {
@@ -3157,24 +3178,34 @@ app.get('/api/admin/emails', requireAdmin, async (req, res) => {
   res.json(rows);
 });
 
+// design: 'branded' (dorado/negro Sillage) | 'formal' (carta de negocio, sin marca)
 app.post('/api/admin/emails/send', requireAdmin, async (req, res) => {
   if (!RESEND_API_KEY) return res.status(503).json({ error: 'Resend no está configurado (falta RESEND_API_KEY).' });
   const to      = String(req.body.to || '').trim();
   const subject = String(req.body.subject || '').trim().slice(0, 255);
   const bodyRaw = String(req.body.body || '').trim();
+  const design  = req.body.design === 'formal' ? 'formal' : 'branded';
   const emailRe = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/;
   if (!emailRe.test(to)) return res.status(400).json({ error: 'Correo de destino inválido.' });
   if (!subject) return res.status(400).json({ error: 'El asunto es requerido.' });
   if (!bodyRaw) return res.status(400).json({ error: 'El mensaje no puede estar vacío.' });
 
-  // El mensaje se escribe como texto plano en el textarea — se convierte a HTML
-  // simple (párrafos por línea en blanco) y se envuelve en la plantilla de marca.
-  const bodyHtml = bodyRaw.split(/\n{2,}/).map(p =>
-    `<p style="margin:0 0 16px;color:#2a231c;font-size:14px;line-height:1.7">${escHtml(p).replace(/\n/g, '<br/>')}</p>`
-  ).join('');
-  await sendEmail({ to, subject, html: emailTemplate(bodyHtml) });
+  const bodyHtml = bodyToHtml(bodyRaw, design === 'formal');
+  const html = design === 'formal' ? formalEmailTemplate(bodyHtml) : emailTemplate(bodyHtml);
+  await sendEmail({ to, subject, html });
   await logActivity(`Email manual enviado a ${to} — "${subject}"`);
   res.json({ ok: true });
+});
+
+// Vista previa — arma el HTML sin enviar nada, para revisar antes de mandar.
+app.post('/api/admin/emails/preview', requireAdmin, (req, res) => {
+  const subject = String(req.body.subject || '').trim();
+  const bodyRaw = String(req.body.body || '').trim();
+  const design  = req.body.design === 'formal' ? 'formal' : 'branded';
+  if (!bodyRaw) return res.status(400).json({ error: 'El mensaje no puede estar vacío.' });
+  const bodyHtml = bodyToHtml(bodyRaw, design === 'formal');
+  const html = design === 'formal' ? formalEmailTemplate(bodyHtml) : emailTemplate(bodyHtml);
+  res.json({ ok: true, html, subject });
 });
 
 // ── Helper: deduct inventory and broadcast ────────────

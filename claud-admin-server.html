@@ -1202,14 +1202,23 @@ tr:hover td{background:rgba(255,255,255,0.02)}
         <div style="background:rgba(255,255,255,0.03);border:1px solid var(--border-light);padding:1.2rem;margin-bottom:1.5rem">
           <div style="font-size:0.6rem;letter-spacing:0.2em;text-transform:uppercase;color:var(--gold);margin-bottom:1rem">Redactar Email</div>
           <div style="display:flex;flex-direction:column;gap:0.8rem;max-width:600px">
-            <div>
-              <label class="dte-lbl">Plantilla</label>
-              <select id="emailTemplateSelect" class="dte-inp" style="width:100%" onchange="applyEmailTemplate(this.value)">
-                <option value="blank">En blanco</option>
-                <option value="bac">Contacto formal — BAC Credomatic</option>
-                <option value="cuscatlan">Contacto formal — Banco Cuscatlán</option>
-                <option value="pasarela">Contacto formal — Otra pasarela regional</option>
-              </select>
+            <div style="display:flex;gap:0.8rem">
+              <div style="flex:1">
+                <label class="dte-lbl">Plantilla (texto)</label>
+                <select id="emailTemplateSelect" class="dte-inp" style="width:100%" onchange="applyEmailTemplate(this.value)">
+                  <option value="blank">En blanco</option>
+                  <option value="bac">Contacto formal — BAC Credomatic</option>
+                  <option value="cuscatlan">Contacto formal — Banco Cuscatlán</option>
+                  <option value="pasarela">Contacto formal — Otra pasarela regional</option>
+                </select>
+              </div>
+              <div style="flex:1">
+                <label class="dte-lbl">Diseño (apariencia)</label>
+                <select id="emailDesignSelect" class="dte-inp" style="width:100%">
+                  <option value="formal">Formal — sin marca (para bancos/proveedores)</option>
+                  <option value="branded">Sillage — con marca (dorado/negro, para clientes)</option>
+                </select>
+              </div>
             </div>
             <div>
               <label class="dte-lbl">Para</label>
@@ -1224,7 +1233,10 @@ tr:hover td{background:rgba(255,255,255,0.02)}
               <textarea id="emailBody" rows="8" style="width:100%;box-sizing:border-box;background:var(--card);border:1px solid var(--border-light);color:var(--cream);font-family:'Jost',sans-serif;font-size:0.75rem;padding:0.6rem 0.8rem;outline:none;resize:vertical" placeholder="Escribe el mensaje... (separa párrafos con una línea en blanco)"></textarea>
             </div>
             <div id="emailSendErr" style="color:#d9534f;font-size:0.68rem"></div>
-            <button class="save-btn" style="width:fit-content" onclick="sendManualEmail()">Enviar Email</button>
+            <div style="display:flex;gap:0.6rem">
+              <button class="save-btn" style="width:fit-content;background:transparent;border:1px solid var(--gold);color:var(--gold)" onclick="previewManualEmail()">Vista previa</button>
+              <button class="save-btn" style="width:fit-content" onclick="sendManualEmail()">Enviar Email</button>
+            </div>
           </div>
         </div>
 
@@ -3153,16 +3165,35 @@ function applyEmailTemplate(key){
   var t=EMAIL_TEMPLATES[key]||EMAIL_TEMPLATES.blank;
   document.getElementById('emailSubject').value=t.subject;
   document.getElementById('emailBody').value=t.body;
+  // Las plantillas de contacto a bancos/proveedores van con diseño formal por defecto.
+  if(key!=='blank') document.getElementById('emailDesignSelect').value='formal';
 }
 
+function previewManualEmail(){
+  var err=document.getElementById('emailSendErr');
+  err.textContent='';
+  var subject=document.getElementById('emailSubject').value.trim();
+  var body=document.getElementById('emailBody').value.trim();
+  var design=document.getElementById('emailDesignSelect').value;
+  if(!body){ err.textContent='Escribe el mensaje para poder ver la vista previa.'; return; }
+  adminFetch(API+'/admin/emails/preview',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({subject:subject,body:body,design:design})})
+    .then(function(r){return r?r.json():null;}).then(function(d){
+      if(!d){ err.textContent='Sin respuesta.'; return; }
+      if(d.error){ err.textContent=d.error; return; }
+      var w=window.open('', '_blank');
+      w.document.write(d.html);
+      w.document.close();
+    }).catch(function(e){ err.textContent='Error: '+e.message; });
+}
 function sendManualEmail(){
   var err=document.getElementById('emailSendErr');
   err.textContent='';
   var to=document.getElementById('emailTo').value.trim();
   var subject=document.getElementById('emailSubject').value.trim();
   var body=document.getElementById('emailBody').value.trim();
+  var design=document.getElementById('emailDesignSelect').value;
   if(!to||!subject||!body){ err.textContent='Completa destinatario, asunto y mensaje.'; return; }
-  adminFetch(API+'/admin/emails/send',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({to:to,subject:subject,body:body})})
+  adminFetch(API+'/admin/emails/send',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({to:to,subject:subject,body:body,design:design})})
     .then(function(r){return r?r.json():null;}).then(function(d){
       if(!d){ err.textContent='Sin respuesta.'; return; }
       if(d.error){ err.textContent=d.error; return; }
