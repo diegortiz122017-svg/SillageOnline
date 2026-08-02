@@ -464,6 +464,7 @@ async function migrateOrders() {
     "customer_ip    VARCHAR(100) DEFAULT NULL",
     "promo_code     VARCHAR(30)  DEFAULT NULL",
     "promo_discount DECIMAL(10,2) DEFAULT 0",
+    "wompi_reference VARCHAR(60) DEFAULT NULL",
   ];
   for (const col of cols) {
     const colName = col.trim().split(' ')[0];
@@ -3847,8 +3848,8 @@ app.post('/api/wompi/webhook', express.json(), async (req, res) => {
     if (exists.length) {
       // Order row created at checkout (Pendiente) → confirm payment on it
       await db.execute(
-        `UPDATE orders SET status='Procesando', payment_status='Pagado', payment_method='wompi', updated_at=? WHERE id=?`,
-        [now, orderObj.id]
+        `UPDATE orders SET status='Procesando', payment_status='Pagado', payment_method='wompi', wompi_reference=?, updated_at=? WHERE id=?`,
+        [reference, now, orderObj.id]
       );
     } else {
       // Create the real order (deferred-creation path)
@@ -3856,13 +3857,13 @@ app.post('/api/wompi/webhook', express.json(), async (req, res) => {
         `INSERT INTO orders
            (id,customer,email,phone,address,city,state_province,country,
             items,total,status,payment_status,payment_method,tracker_step,
-            customer_id,created_at,updated_at)
-         VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
+            customer_id,wompi_reference,created_at,updated_at)
+         VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
         [orderObj.id, orderObj.customer, orderObj.email, orderObj.phone,
          orderObj.address, orderObj.city, orderObj.state, orderObj.country,
          JSON.stringify(items), orderObj.total,
          'Procesando', 'Pagado', 'wompi', 1,
-         custId || null, pending.created_at, now]
+         custId || null, reference, pending.created_at, now]
       );
     }
 
@@ -3892,6 +3893,8 @@ app.post('/api/wompi/webhook', express.json(), async (req, res) => {
 
 // GET /api/wompi/status?ref=<reference> — polled by frontend on redirect fallback
 // Returns whether the webhook has already processed the payment
+// Devuelve el pedido completo una vez pagado — para que la pantalla de éxito
+// se pueda armar después de un redirect completo (no solo un toast).
 app.get('/api/wompi/status', async (req, res) => {
   const ref = req.query.ref;
   if (!ref || ref.length > 80) return res.status(400).json({ error: 'Invalid ref' });
@@ -3902,9 +3905,15 @@ app.get('/api/wompi/status', async (req, res) => {
     );
     if (pending.length) return res.json({ status: 'pending' });
 
-    // If order exists with this reference in datosAdicionales or by checking order_id
-    // We stored order_id in wompi_pending — check orders table
-    res.json({ status: 'paid' });
+    const [rows] = await db.execute(
+      'SELECT id, customer, email, items, total, payment_status FROM orders WHERE wompi_reference=?', [ref]
+    );
+    if (!rows.length || rows[0].payment_status !== 'Pagado') return res.json({ status: 'pending' });
+    const o = rows[0];
+    res.json({
+      status: 'paid',
+      order: { id: o.id, customer: o.customer, email: o.email, total: o.total, items: JSON.parse(o.items || '[]') },
+    });
   } catch(e) {
     res.status(500).json({ error: 'Server error' });
   }

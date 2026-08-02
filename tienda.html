@@ -2309,11 +2309,11 @@ footer{background:var(--dark);padding:3.5rem 4rem;text-align:center;border-top:1
       <div class="m-section" id="ms2">
         <p class="f-label-top">Selecciona tu método de pago</p>
         <div class="pay-methods">
-          <button class="pay-method active" id="pmPaypal" onclick="selectPayMethod('paypal')"><span class="pm-icon">&#128179;</span><div><span class="pm-name">Tarjeta de Crédito / Débito</span><span class="pm-sub">Visa, Mastercard — via PayPal</span></div></button>
+          <button class="pay-method active" id="pmWompi" onclick="selectPayMethod('wompi')"><span class="pm-icon">&#128179;</span><div><span class="pm-name">Tarjeta de Crédito / Débito</span><span class="pm-sub">Visa, Mastercard — via Wompi</span></div></button>
           <button class="pay-method" id="pmBtcpay" onclick="selectPayMethod('btcpay')"><span class="pm-icon">&#9889;</span><div><span class="pm-name">Bitcoin / Lightning</span><span class="pm-sub">Paga con cualquier wallet BTC</span></div></button>
           <button class="pay-method" id="pmCod" onclick="selectPayMethod('cod')"><span class="pm-icon">&#128181;</span><div><span class="pm-name">Pago contra Entrega</span><span class="pm-sub">Paga en efectivo al recibir</span></div></button>
         </div>
-        <div id="pmInfoPaypal" class="pm-info"><div class="sec-row"><span class="sec-badge">&#128274; SSL</span><span class="sec-badge">PayPal</span><span class="sec-badge">&#10003; Seguro</span></div><p style="font-size:0.68rem;color:var(--muted);line-height:1.7;margin-top:0.8rem">Pagas con tarjeta a través de PayPal — no necesitas cuenta PayPal.</p></div>
+        <div id="pmInfoWompi" class="pm-info"><div class="sec-row"><span class="sec-badge">&#128274; SSL</span><span class="sec-badge">Wompi</span><span class="sec-badge">&#10003; Seguro</span></div><p style="font-size:0.68rem;color:var(--muted);line-height:1.7;margin-top:0.8rem">Serás redirigido a la pasarela segura de Wompi.</p></div>
         <div id="pmInfoBtcpay" class="pm-info" style="display:none"><p style="font-size:0.68rem;color:var(--muted);line-height:1.7">Serás redirigido a una página de pago segura donde podrás pagar con <strong style="color:var(--gold)">Bitcoin on-chain o Lightning Network</strong>.<br><span style="font-size:0.62rem">Compatible con Chivo Wallet, Phoenix, Muun, y cualquier wallet Bitcoin.</span></p></div>
         <div id="pmInfoCod" class="pm-info" style="display:none">
           <p style="font-size:0.68rem;color:var(--muted);line-height:1.7">Pagarás en efectivo cuando recibas tu pedido.</p>
@@ -4704,7 +4704,7 @@ function v1(){
   if(gv('fe')&&!/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(gv('fe'))){se('ee','Correo inválido');sfe('fe',true);ok=false;}
   return ok;
 }
-var selectedPayMethod='paypal';
+var selectedPayMethod='wompi';
 var _codMinOrder = 25; // loaded from server
 
 function selectPayMethod(method){
@@ -4755,6 +4755,7 @@ function fillReview(){
   document.getElementById('mSummaryTotal').textContent='$'+total.toFixed(2);
   document.getElementById('mDelivery').textContent=gv('fn')+' \u00b7 '+gv('fa')+', '+gv('fc')+(gv('fs')?' '+gv('fs'):'')+', '+gv('fco');
   var pmLabels={
+    'wompi':  'Tarjeta de Crédito / Débito — Wompi',
     'paypal': 'Tarjeta de Crédito / Débito — PayPal',
     'btcpay': 'Bitcoin / Lightning Network',
     'cod':    'Pago contra Entrega'
@@ -5575,24 +5576,27 @@ function _wompiHandleCancel(order) {
   goStep(2);
 }
 
-// Handle ?wompi_ref= in URL (fallback redirect flow)
+// Handle ?wompi_ref= in URL (fallback redirect flow) — el cliente vuelve al
+// sitio después de pagar en la página hosteada de Wompi (no en el widget
+// embebido). Se le muestra la MISMA pantalla de confirmación completa, no
+// solo un toast — igual que cuando el widget confirma en el momento.
 (function checkWompiRedirect() {
   var params = new URLSearchParams(window.location.search);
   var ref    = params.get('wompi_ref');
   if (!ref) return;
   window.history.replaceState({}, '', window.location.pathname);
-  // Poll the server briefly to check if webhook already confirmed
   var attempts = 0;
   var interval = setInterval(function() {
     attempts++;
     fetch('/api/wompi/status?ref=' + encodeURIComponent(ref))
       .then(function(r){ return r.json(); })
       .then(function(d){
-        if (d.status === 'paid') {
+        if (d.status === 'paid' && d.order) {
           clearInterval(interval);
-          toast('Pago confirmado', 'Tu pedido ha sido procesado.', 'ok');
-        } else if (attempts >= 6) {
+          _wompiHandleSuccess(d.order);
+        } else if (attempts >= 10) {
           clearInterval(interval);
+          toast('Verificando tu pago', 'Si ya pagaste, tu pedido se confirmará en unos minutos — revisa tu correo.', '');
         }
       })
       .catch(function(){ clearInterval(interval); });
