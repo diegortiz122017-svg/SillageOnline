@@ -656,13 +656,15 @@ async function persist(rec) {
   await db.execute(
     `INSERT INTO dte_documents
        (order_id, tipo_dte, version, ambiente, codigo_generacion, numero_control,
-        sello_recibido, estado, observaciones, json_dte, json_firmado, created_at, updated_at)
-     VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)`,
+        sello_recibido, estado, observaciones, json_dte, json_firmado,
+        customer, email, total, created_at, updated_at)
+     VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
     [
       rec.orderId, rec.tipoDte, rec.version, cfg.DTE_AMBIENTE,
       rec.codigoGeneracion, rec.numeroControl,
       rec.selloRecibido || null, rec.estado, rec.observaciones || null,
       JSON.stringify(rec.jsonDte), rec.jsonFirmado || null,
+      rec.customer || null, rec.email || null, rec.total != null ? rec.total : null,
       new Date(), new Date(),
     ]
   );
@@ -735,6 +737,12 @@ async function emitForOrder(order, options = {}) {
   const base = {
     orderId: order.id, tipoDte, version,
     codigoGeneracion, numeroControl: numControl, jsonDte,
+    // Denormalizado — order_id no siempre tiene una fila real en `orders`
+    // (emisión manual desde el admin genera un pedido solo en memoria), así
+    // que el reporte mensual no puede depender de un JOIN.
+    customer: order.customer || null,
+    email:    order.email    || null,
+    total:    order.total != null ? order.total : null,
   };
 
   let firmado;

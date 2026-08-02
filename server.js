@@ -378,6 +378,21 @@ async function initDB() {
       INDEX idx_estado (estado)
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
   `);
+  // Denormalizado — order_id de una emisión manual (panel admin) no siempre
+  // tiene fila en `orders`, así que el reporte mensual no puede depender de
+  // un JOIN. Nuevas emisiones ya guardan esto directo (ver services/dte.js);
+  // backfill best-effort para documentos previos que sí tengan pedido real.
+  try { await db.execute("ALTER TABLE dte_documents ADD COLUMN customer VARCHAR(255) NULL"); } catch(e) {}
+  try { await db.execute("ALTER TABLE dte_documents ADD COLUMN email    VARCHAR(255) NULL"); } catch(e) {}
+  try { await db.execute("ALTER TABLE dte_documents ADD COLUMN total    DECIMAL(10,2) NULL"); } catch(e) {}
+  try {
+    await db.execute(`
+      UPDATE dte_documents d
+      JOIN orders o ON o.id = d.order_id
+      SET d.customer = o.customer, d.email = o.email, d.total = o.total
+      WHERE d.customer IS NULL
+    `);
+  } catch(e) {}
 
   await db.execute(`
     CREATE TABLE IF NOT EXISTS dte_correlativos (
@@ -5038,12 +5053,11 @@ app.get('/api/admin/dte/export', requireAdmin, async (req, res) => {
   const month = /^\d{4}-\d{2}$/.test(req.query.month || '') ? req.query.month : new Date().toISOString().slice(0, 7);
   try {
     const [rows] = await db.execute(
-      `SELECT d.tipo_dte, d.numero_control, d.codigo_generacion, d.sello_recibido, d.estado, d.created_at,
-              d.order_id, o.customer, o.email, o.total
-         FROM dte_documents d
-         LEFT JOIN orders o ON o.id = d.order_id
-        WHERE d.ambiente = ? AND DATE_FORMAT(d.created_at, '%Y-%m') = ?
-        ORDER BY d.created_at ASC`,
+      `SELECT tipo_dte, numero_control, codigo_generacion, sello_recibido, estado, created_at,
+              order_id, customer, email, total
+         FROM dte_documents
+        WHERE ambiente = ? AND DATE_FORMAT(created_at, '%Y-%m') = ?
+        ORDER BY created_at ASC`,
       [cfg.DTE_AMBIENTE, month]
     );
     const tipoLbl = { '01': 'Factura', '03': 'CCF', '05': 'Nota de Crédito', 'AN': 'Anulación', 'CG': 'Contingencia' };
