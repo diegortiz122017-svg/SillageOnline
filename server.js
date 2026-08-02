@@ -5031,6 +5031,35 @@ app.get('/api/orders/export', requireAdmin, async (req, res) => {
   res.send(lines.join('\n'));
 });
 
+// GET /api/admin/dte/export?month=YYYY-MM — reporte CSV de DTEs emitidos en el mes.
+// Por defecto usa el mes en curso. Solo incluye documentos del ambiente activo
+// (DTE_AMBIENTE) para no mezclar pruebas de homologación con producción.
+app.get('/api/admin/dte/export', requireAdmin, async (req, res) => {
+  const month = /^\d{4}-\d{2}$/.test(req.query.month || '') ? req.query.month : new Date().toISOString().slice(0, 7);
+  try {
+    const [rows] = await db.execute(
+      `SELECT d.tipo_dte, d.numero_control, d.codigo_generacion, d.sello_recibido, d.estado, d.created_at,
+              d.order_id, o.customer, o.email, o.total
+         FROM dte_documents d
+         LEFT JOIN orders o ON o.id = d.order_id
+        WHERE d.ambiente = ? AND DATE_FORMAT(d.created_at, '%Y-%m') = ?
+        ORDER BY d.created_at ASC`,
+      [cfg.DTE_AMBIENTE, month]
+    );
+    const tipoLbl = { '01': 'Factura', '03': 'CCF', '05': 'Nota de Crédito', 'AN': 'Anulación', 'CG': 'Contingencia' };
+    const esc = v => `"${String(v == null ? '' : v).replace(/"/g, '""')}"`;
+    const lines = ['Fecha,Tipo,N. Control,Codigo Generacion,Estado,Sello Recibido,Pedido,Cliente,Correo,Total'];
+    rows.forEach(r => lines.push([
+      r.created_at, tipoLbl[r.tipo_dte] || r.tipo_dte, r.numero_control, r.codigo_generacion,
+      r.estado, r.sello_recibido || '', r.order_id, r.customer || '', r.email || '',
+      r.total != null ? parseFloat(r.total).toFixed(2) : '',
+    ].map(esc).join(',')));
+    res.setHeader('Content-Type', 'text/csv; charset=utf-8');
+    res.setHeader('Content-Disposition', `attachment; filename="sillage-dte-${month}.csv"`);
+    res.send('﻿' + lines.join('\n')); // BOM — para que Excel abra bien los acentos
+  } catch(e) { res.status(500).json({ error: e.message }); }
+});
+
 app.patch('/api/orders/:id', requireAdmin, async (req, res) => {
   const { status, trackerStep, trackingNumber, paymentStatus } = req.body;
   const [existing] = await db.execute('SELECT * FROM orders WHERE id=?', [req.params.id]);
