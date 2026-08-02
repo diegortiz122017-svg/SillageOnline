@@ -1437,6 +1437,8 @@ footer{background:var(--dark);padding:3.5rem 4rem;text-align:center;border-top:1
 .pay-method{display:flex;align-items:center;gap:0.8rem;padding:0.9rem 1rem;border:1px solid rgba(184,149,90,0.2);background:transparent;cursor:pointer;text-align:left;transition:all 0.25s;width:100%;color:var(--cream)}
 .pay-method:hover{border-color:rgba(184,149,90,0.5)}
 .pay-method.active{border-color:var(--gold);background:rgba(184,149,90,0.06)}
+.pay-method:disabled{cursor:not-allowed;opacity:0.45}
+.pay-method:disabled:hover{border-color:rgba(184,149,90,0.2)}
 .pm-icon{font-size:1.2rem;flex-shrink:0}
 .pm-name{font-family:'Jost',sans-serif;font-size:0.72rem;letter-spacing:0.05em;color:var(--charcoal);display:block}
 .pm-sub{font-size:0.58rem;color:var(--muted);display:block;margin-top:0.1rem}
@@ -2309,13 +2311,13 @@ footer{background:var(--dark);padding:3.5rem 4rem;text-align:center;border-top:1
       <div class="m-section" id="ms2">
         <p class="f-label-top">Selecciona tu método de pago</p>
         <div class="pay-methods">
-          <button class="pay-method active" id="pmWompi" onclick="selectPayMethod('wompi')"><span class="pm-icon">&#128179;</span><div><span class="pm-name">Tarjeta de Crédito / Débito</span><span class="pm-sub">Visa, Mastercard — via Wompi</span></div></button>
+          <button class="pay-method disabled" id="pmWompi" disabled title="Próximamente"><span class="pm-icon">&#128179;</span><div><span class="pm-name">Tarjeta de Crédito / Débito</span><span class="pm-sub">Próximamente</span></div></button>
           <button class="pay-method" id="pmBtcpay" onclick="selectPayMethod('btcpay')"><span class="pm-icon">&#9889;</span><div><span class="pm-name">Bitcoin / Lightning</span><span class="pm-sub">Paga con cualquier wallet BTC</span></div></button>
-          <button class="pay-method" id="pmCod" onclick="selectPayMethod('cod')"><span class="pm-icon">&#128181;</span><div><span class="pm-name">Pago contra Entrega</span><span class="pm-sub">Paga en efectivo al recibir</span></div></button>
+          <button class="pay-method active" id="pmCod" onclick="selectPayMethod('cod')"><span class="pm-icon">&#128181;</span><div><span class="pm-name">Pago contra Entrega</span><span class="pm-sub">Paga en efectivo al recibir</span></div></button>
         </div>
-        <div id="pmInfoWompi" class="pm-info"><div class="sec-row"><span class="sec-badge">&#128274; SSL</span><span class="sec-badge">Wompi</span><span class="sec-badge">&#10003; Seguro</span></div><p style="font-size:0.68rem;color:var(--muted);line-height:1.7;margin-top:0.8rem">Serás redirigido a la pasarela segura de Wompi.</p></div>
+        <div id="pmInfoWompi" class="pm-info" style="display:none"><p style="font-size:0.68rem;color:var(--muted);line-height:1.7">El pago con tarjeta estará disponible muy pronto.</p></div>
         <div id="pmInfoBtcpay" class="pm-info" style="display:none"><p style="font-size:0.68rem;color:var(--muted);line-height:1.7">Serás redirigido a una página de pago segura donde podrás pagar con <strong style="color:var(--gold)">Bitcoin on-chain o Lightning Network</strong>.<br><span style="font-size:0.62rem">Compatible con Chivo Wallet, Phoenix, Muun, y cualquier wallet Bitcoin.</span></p></div>
-        <div id="pmInfoCod" class="pm-info" style="display:none">
+        <div id="pmInfoCod" class="pm-info">
           <p style="font-size:0.68rem;color:var(--muted);line-height:1.7">Pagarás en efectivo cuando recibas tu pedido.</p>
           <div id="codRequirements" style="margin-top:0.6rem;padding:0.6rem 0.8rem;background:rgba(184,149,90,0.06);border-left:2px solid rgba(184,149,90,0.4);font-size:0.65rem;color:var(--muted);line-height:1.7">
             <strong style="color:var(--charcoal)">Requisitos para pago contra entrega:</strong><br/>
@@ -4570,6 +4572,7 @@ function goStep(n){
 }
 function openCheckout(){
   closeCart();goStep(1);
+  selectPayMethod('cod'); // default method — refreshes min-order note from server
   // Hide consent notice for logged-in users — they accepted at registration
   var notice = document.getElementById('checkoutConsentNotice');
   if(notice) notice.style.display = (typeof currentCustomer !== 'undefined' && currentCustomer) ? 'none' : '';
@@ -4704,7 +4707,7 @@ function v1(){
   if(gv('fe')&&!/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(gv('fe'))){se('ee','Correo inválido');sfe('fe',true);ok=false;}
   return ok;
 }
-var selectedPayMethod='wompi';
+var selectedPayMethod='cod';
 var _codMinOrder = 25; // loaded from server
 
 function selectPayMethod(method){
