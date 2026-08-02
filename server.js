@@ -1328,7 +1328,7 @@ app.use(function(req, res, next) {
   if (req.headers['x-admin-token']) return next();              // legacy
   const _s = validateSession(req.headers['x-session-token']);
   if (_s && _s.role === 'admin') return next();
-  return security.rateLimit()(req, res, next);
+  return security.globalApiLimiter(req, res, next);
 });                                                    // global rate limit (/api only, admin exempt)
 
 // Additional security headers not covered by middleware

@@ -58,22 +58,34 @@ function httpsRedirect(req, res, next) {
   next();
 }
 
-// ─── Global rate limiter ──────────────────────────────────────────────────────
-const _rlStore = new Map();
-
+// ─── Rate limiter factory — each call gets its OWN isolated store ────────────
+// Previously every limiter (global API limiter, authLimiter, ...) shared one
+// module-level Map keyed only by IP. That meant browsing the storefront (which
+// fires many /api/ calls) and then hitting /api/auth/login incremented the
+// SAME counter, so admin login could 429 from shop traffic alone — never from
+// an actual failed login attempt. Each limiter now owns its own Map.
 function rateLimit({ max = cfg.RATE_LIMIT_MAX, window = cfg.RATE_LIMIT_WINDOW } = {}) {
+  const store = new Map();
+
+  setInterval(() => {
+    const cutoff = Date.now() - window;
+    for (const [ip, entry] of store) {
+      if (entry.start < cutoff) store.delete(ip);
+    }
+  }, 10 * 60 * 1000).unref();
+
   return (req, res, next) => {
     const ip = getIp(req);   // real per-user client IP (see getIp below)
 
     const now   = Date.now();
-    const entry = _rlStore.get(ip) || { count: 0, start: now };
+    const entry = store.get(ip) || { count: 0, start: now };
 
     if (now - entry.start > window) {
       entry.count = 0;
       entry.start = now;
     }
     entry.count++;
-    _rlStore.set(ip, entry);
+    store.set(ip, entry);
 
     if (entry.count > max) {
       return res.status(429).json({ error: 'Too many requests — please wait.' });
@@ -82,14 +94,13 @@ function rateLimit({ max = cfg.RATE_LIMIT_MAX, window = cfg.RATE_LIMIT_WINDOW } 
   };
 }
 
+// Dedicated limiter for admin login — isolated from all other API traffic.
 const authLimiter = rateLimit({ max: 10, window: 15 * 60 * 1000 });
 
-setInterval(() => {
-  const cutoff = Date.now() - cfg.RATE_LIMIT_WINDOW;
-  for (const [ip, entry] of _rlStore) {
-    if (entry.start < cutoff) _rlStore.delete(ip);
-  }
-}, 10 * 60 * 1000).unref();
+// Single persistent instance for general /api/ traffic (uses cfg defaults).
+// Created once at module load — NOT per-request, otherwise a fresh Map would
+// reset the counter on every request and rate limiting would never trigger.
+const globalApiLimiter = rateLimit();
 
 // ─── Request size limit ───────────────────────────────────────────────────────
 const bodyLimit = '50kb';
@@ -133,6 +144,7 @@ module.exports = {
   httpsRedirect,
   rateLimit,
   authLimiter,
+  globalApiLimiter,
   customerAuthLimiter,
   bodyLimit,
   getIp,
