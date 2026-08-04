@@ -3108,9 +3108,14 @@ app.get('/api/inventory', async (req, res) => res.json(await getInventoryMap()))
 app.get('/api/pricing',   async (req, res) => res.json(await getPricingMap()));
 // GET /api/session/init — issues a server-signed anonymous session ID
 // Frontend must call this first; sessions not issued by the server are rejected
-// Rate limited: max 10 new sessions per IP per hour to prevent session farming
+// Rate limited: max 5 new sessions per IP per hour to prevent session farming.
+// Reusing an existing session (?existing=) never counts against this, so a
+// normal repeat visitor (localStorage intact) never hits it — only genuinely
+// new sessions do. 5/hour still leaves headroom for a real shopper bouncing
+// through Meta's in-app browser (which sometimes drops localStorage between
+// opens), while raising the cost for a farm requesting dozens per IP.
 const _sessionInitTracker = new Map();
-const SESSION_INIT_MAX    = 10;
+const SESSION_INIT_MAX    = 5;
 const SESSION_INIT_WINDOW = 60 * 60 * 1000; // 1 hour
 
 app.get('/api/session/init', (req, res) => {
@@ -3124,6 +3129,10 @@ app.get('/api/session/init', (req, res) => {
   const ip = (req.headers['x-forwarded-for']
     ? req.headers['x-forwarded-for'].split(',').map(s => s.trim()).filter(Boolean).pop()
     : null) || req.socket.remoteAddress || 'unknown';
+  // Solo para contexto visual en el log de actividad del admin — NUNCA se usa
+  // para relajar la verificación, el User-Agent lo controla el cliente y
+  // cualquier bot puede falsificarlo con solo copiar el de un navegador real.
+  const ua = String(req.headers['user-agent'] || 'sin User-Agent').slice(0, 120);
 
   const now    = Date.now();
   const record = _sessionInitTracker.get(ip) || { count: 0, start: now };
@@ -3132,12 +3141,12 @@ app.get('/api/session/init', (req, res) => {
   _sessionInitTracker.set(ip, record);
 
   if (record.count > SESSION_INIT_MAX) {
-    trackAbuse('bot_farm', ip, { detail: `${record.count} new sessions requested` });
+    trackAbuse('bot_farm', ip, { detail: `${record.count} new sessions requested — UA: ${ua}` });
     return res.status(429).json({ error: 'Too many session requests. Try again later.' });
   }
 
   // Track every new session issuance (not reuse) for bot farm detection
-  trackAbuse('bot_farm', ip);
+  trackAbuse('bot_farm', ip, { detail: `UA: ${ua}` });
   const sessionId = issueAnonSession();
   res.json({ sessionId });
 });
@@ -5317,8 +5326,17 @@ app.post('/api/sommelier/chat', sommelierBurst, sommelierLimiter, async (req, re
   // Behavioral fingerprint score — _h sent by frontend
   // Score 0 = no browser interaction (direct API call / bot)
   // Score 100 = clear human behavior
+  // Threshold raised 10→20: previously a bot only had to wait 3s and call
+  // (timeOnPage>3000 alone = 15pts) to pass. 20 forces at least a second
+  // signal too (scroll, or waiting past 10s). Kept modest on purpose — most
+  // of the score comes from mouseMove (getBFScore() in tienda.html), which
+  // touch/mobile visitors never trigger, so a real mobile shopper arriving
+  // from a Meta ad who scrolls a little or lingers a few seconds still
+  // clears this easily. This is a client-reported value the browser
+  // computes — it raises the bar for lazy bots, it isn't a hard guarantee
+  // against a scripted one that fakes it.
   const bfScore = parseInt(req.body._h) || 0;
-  if (!isRegistered && bfScore < 10) {
+  if (!isRegistered && bfScore < 20) {
     // Very likely a bot — silent slow response to waste their time
     await new Promise(r => setTimeout(r, 3000));
     return res.status(403).json({ error: 'verification_failed', message: 'Verificación fallida. Por favor recarga la página.' });
