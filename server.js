@@ -662,7 +662,7 @@ async function logSentEmail({ to, subject, html, resendId, status, error }) {
   } catch(e) { /* non-fatal: no bloquea el envío si el log falla */ console.error('logSentEmail error:', e.message); }
 }
 
-async function sendEmail({ to, subject, html, from }) {
+async function sendEmail({ to, subject, html, from, attachments }) {
   if (!RESEND_API_KEY) return;
   try {
     const res = await fetch('https://api.resend.com/emails', {
@@ -675,7 +675,8 @@ async function sendEmail({ to, subject, html, from }) {
         from: from || `Sillage Parfumerie <${EMAIL_HOLA}>`,
         to: [to],
         subject,
-        html
+        html,
+        ...(attachments && attachments.length ? { attachments } : {}),
       })
     });
     const data = await res.json();
@@ -826,7 +827,10 @@ async function notifyAdmins(order) {
   }
 }
 
-async function sendOrderConfirmation(order) {
+// dte: registro devuelto por emitDteForOrder (opcional) — cuando viene con
+// estado PROCESADO, el correo incluye los datos fiscales del documento y
+// adjunta el DTE firmado (el mismo JWS transmitido a Hacienda).
+async function sendOrderConfirmation(order, dte) {
   const itemsHtml = order.items.map(i =>
     `<tr><td style="padding:8px 12px;border-bottom:1px solid #f0e6d0;color:#1a1714">${escHtml(i.name)}</td>
      <td style="padding:8px 12px;border-bottom:1px solid #f0e6d0;color:#1a1714;text-align:center">×${i.qty}</td>
@@ -840,6 +844,21 @@ async function sendOrderConfirmation(order) {
       <p style="font-size:10px;letter-spacing:3px;text-transform:uppercase;color:#b8955a;margin:0 0 12px">Una nota de Nez, tu sommelier</p>
       <p style="font-family:Georgia,serif;font-size:14px;color:#4a3f35;line-height:1.9;margin:0;font-style:italic">${escHtml(nezNote).replace(/\n/g,'<br/>')}</p>
     </div>` : '';
+
+  const dteReady = dte && dte.estado === 'PROCESADO' && dte.selloRecibido;
+  const dteBlock = dteReady ? (() => {
+    const tipoLbl = { '01': 'Factura Electrónica', '03': 'Comprobante de Crédito Fiscal', '05': 'Nota de Crédito' }[dte.tipoDte] || 'Documento Tributario Electrónico';
+    const fecEmi  = dte.jsonDte?.identificacion?.fecEmi;
+    const verifUrl = dteSvc.verificacionUrl(dte.codigoGeneracion, fecEmi);
+    return `
+    <div style="padding:12px 16px;background:#faf8f4;border:1px solid #e8d8b8;margin-bottom:16px;font-size:12px;color:#4a3f35;line-height:1.9">
+      <span style="font-size:10px;letter-spacing:3px;text-transform:uppercase;color:#8a7f72">${escHtml(tipoLbl)}</span><br/>
+      N.º de Control: <strong>${escHtml(dte.numeroControl)}</strong><br/>
+      Código de Generación: <strong>${escHtml(dte.codigoGeneracion)}</strong><br/>
+      <a href="${verifUrl}" style="color:#b8955a">Verificar en el Ministerio de Hacienda →</a>
+      <p style="font-size:11px;color:#8a7f72;margin:8px 0 0">Adjuntamos tu documento tributario electrónico a este correo.</p>
+    </div>`;
+  })() : '';
 
   const html = emailTemplate(`
     <h2 style="font-family:Georgia,serif;font-size:24px;font-weight:300;color:#1a1714;margin:0 0 8px">Pedido Confirmado ✨</h2>
@@ -859,14 +878,20 @@ async function sendOrderConfirmation(order) {
       <span style="font-size:11px;text-transform:uppercase;color:#8a7f72">Total</span>
       <span style="font-family:Georgia,serif;font-size:22px;color:#1a1714;float:right">$${parseFloat(order.total||0).toFixed(2)}</span>
     </div>
+    ${dteBlock}
     ${nezBlock}
     <p style="font-size:12px;color:#8a7f72;line-height:1.8;margin-top:16px">Enviando a: ${escHtml(order.address)}</p>`);
+
+  const attachments = dteReady && dte.jsonFirmado
+    ? [{ filename: `DTE-${dte.codigoGeneracion}.json`, content: Buffer.from(String(dte.jsonFirmado), 'utf8').toString('base64') }]
+    : undefined;
 
   await sendEmail({
     to: order.email,
     subject: `✨ Pedido Confirmado — ${escHtml(order.id)} | Sillage Parfumerie`,
     from: `Sillage Pedidos <${EMAIL_PEDIDOS}>`,
-    html
+    html,
+    attachments,
   });
 }
 
@@ -2719,10 +2744,22 @@ app.post('/api/admin/dte/emit-manual', requireAdmin, async (req, res) => {
     const options = { tipoDte };
     if (tipoDte === '03' || tipoDte === '05') {
       const r = b.receptor || {};
-      if (!r.nit || !r.nrc || !r.nombre) {
-        return res.status(400).json({ error: 'CCF/NC requieren NIT, NRC y nombre del receptor.' });
+      // El esquema oficial del MH exige TODOS estos campos en el receptor de un
+      // CCF/NC. Antes se rellenaban con un "receptor de prueba" hardcodeado
+      // (teléfono/correo/dirección falsos) cuando el admin no los daba — un DTE
+      // real terminaba con datos de una empresa ficticia. Ahora son obligatorios.
+      const required = ['nit', 'nrc', 'nombre', 'telefono', 'complemento', 'departamento', 'municipio', 'distrito', 'codActividad', 'descActividad'];
+      const missing  = required.filter(k => !String(r[k] || '').trim());
+      if (missing.length) {
+        return res.status(400).json({ error: `CCF/NC requiere los datos completos del receptor. Falta: ${missing.join(', ')}.` });
       }
-      options.receptor = { ...buildTestReceptor(), nit: r.nit, nrc: r.nrc, nombre: r.nombre, nombreComercial: r.nombre };
+      options.receptor = {
+        nit: r.nit, nrc: r.nrc, nombre: r.nombre, nombreComercial: r.nombre,
+        telefono: r.telefono, complemento: r.complemento,
+        departamento: r.departamento, municipio: r.municipio, distrito: r.distrito,
+        codActividad: r.codActividad, descActividad: r.descActividad,
+        correo: r.correo || null, // buildReceptorCCF cae a order.email si viene vacío
+      };
     }
     if (tipoDte === '05') {
       const ccf = await latestProcessedCCF();
@@ -3897,9 +3934,10 @@ app.post('/api/wompi/webhook', express.json(), async (req, res) => {
     const fullOrder = { ...orderObj, status: 'Procesando', paymentStatus: 'Pagado', payment_method: 'wompi' };
     broadcastAdmin('new_order', fullOrder);
     await logActivity(`Pago Wompi confirmado — pedido ${orderObj.id} de ${orderObj.customer} — $${parseFloat(orderObj.total||0).toFixed(2)}`);
-    try { await sendOrderConfirmation(fullOrder); } catch(e) { console.error('Wompi confirm email error:', e.message); }
+    let wompiDte = null;
+    try { wompiDte = await emitDteForOrder(orderObj.id); } catch(e) { console.error('Wompi DTE error:', e.message); }
+    try { await sendOrderConfirmation(fullOrder, wompiDte); } catch(e) { console.error('Wompi confirm email error:', e.message); }
     try { await notifyAdmins(fullOrder); } catch(e) {}
-    try { await emitDteForOrder(orderObj.id); } catch(e) { console.error('Wompi DTE error:', e.message); }
     console.log(`Wompi order created on payment: ${orderObj.id} — ref ${reference}`);
   } catch(e) {
     console.error('Wompi webhook processing error:', e.message);
@@ -4211,9 +4249,10 @@ app.post('/api/paypal/capture-order/:id', async (req, res) => {
     const fullOrder = { ...orderObj, status: 'Procesando', paymentStatus: 'Pagado', payment_method: 'paypal' };
     broadcastAdmin('new_order', fullOrder);
     await logActivity(`Pago PayPal confirmado — pedido ${orderObj.id} de ${orderObj.customer} — $${parseFloat(orderObj.total||0).toFixed(2)}`);
-    try { await sendOrderConfirmation(fullOrder); } catch(e) { console.error('PayPal confirm email error:', e.message); }
+    let paypalDte = null;
+    try { paypalDte = await emitDteForOrder(orderObj.id); } catch(e) { console.error('PayPal DTE error:', e.message); }
+    try { await sendOrderConfirmation(fullOrder, paypalDte); } catch(e) { console.error('PayPal confirm email error:', e.message); }
     try { await notifyAdmins(fullOrder); } catch(e) {}
-    try { await emitDteForOrder(orderObj.id); } catch(e) { console.error('PayPal DTE error:', e.message); }
 
     res.json({ ok: true, order: fullOrder });
   } catch(e) {
@@ -4552,9 +4591,10 @@ app.post('/api/btcpay/webhook', async (req, res) => {
       const fullOrder = { ...orderObj, status: 'Procesando', paymentStatus: 'Pagado', payment_method: 'btcpay' };
       broadcastAdmin('new_order', fullOrder);
       await logActivity(`Pago BTCPay confirmado (${type}) — pedido ${orderObj.id} de ${orderObj.customer} — $${parseFloat(orderObj.total||0).toFixed(2)}`);
-      try { await sendOrderConfirmation(fullOrder); } catch(e) { console.error('BTCPay confirmation email error:', e.message); }
+      let btcpayDte = null;
+      try { btcpayDte = await emitDteForOrder(orderObj.id); } catch(e) { console.error('BTCPay DTE error:', e.message); }
+      try { await sendOrderConfirmation(fullOrder, btcpayDte); } catch(e) { console.error('BTCPay confirmation email error:', e.message); }
       try { await notifyAdmins(fullOrder); } catch(e) {}
-      try { await emitDteForOrder(orderObj.id); } catch(e) { console.error('BTCPay DTE error:', e.message); }
       console.log(`BTCPay order created on payment: ${orderObj.id} — invoice ${invoiceId}`);
 
     } else {

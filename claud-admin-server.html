@@ -1316,11 +1316,18 @@ tr:hover td{background:rgba(255,255,255,0.02)}
             <button class="save-btn" style="background:transparent;border:1px solid var(--gold);color:var(--gold)" onclick="dteManualFillDemo()">Datos de prueba</button>
           </div>
 
-          <!-- Datos del receptor (solo CCF/NC) -->
+          <!-- Datos del receptor (solo CCF/NC) — el MH exige TODOS estos campos -->
           <div id="dteManualReceptor" style="display:flex;gap:0.6rem;flex-wrap:wrap;margin-bottom:0.9rem">
             <div><label class="dte-lbl">NIT receptor (14 dígitos)</label><input id="dteManualNit" class="dte-inp" placeholder="06140812951023"/></div>
             <div><label class="dte-lbl">NRC receptor</label><input id="dteManualNrc" class="dte-inp" placeholder="899100"/></div>
             <div style="flex:1;min-width:200px"><label class="dte-lbl">Nombre / razón social</label><input id="dteManualNom" class="dte-inp" style="width:100%" placeholder="Empresa Receptora, S.A. de C.V."/></div>
+            <div><label class="dte-lbl">Teléfono receptor</label><input id="dteManualTel" class="dte-inp" placeholder="25551234"/></div>
+            <div style="flex:2;min-width:220px"><label class="dte-lbl">Dirección del receptor</label><input id="dteManualDir" class="dte-inp" style="width:100%" placeholder="Dirección fiscal completa"/></div>
+            <div><label class="dte-lbl">Depto. (CAT-012)</label><input id="dteManualDepto" class="dte-inp" style="width:60px" placeholder="08"/></div>
+            <div><label class="dte-lbl">Municipio (CAT-013)</label><input id="dteManualMuni" class="dte-inp" style="width:60px" placeholder="23"/></div>
+            <div><label class="dte-lbl">Distrito (CAT-008)</label><input id="dteManualDist" class="dte-inp" style="width:60px" placeholder="11"/></div>
+            <div><label class="dte-lbl">Cód. Actividad (CAT-019)</label><input id="dteManualCodAct" class="dte-inp" style="width:90px" placeholder="47722"/></div>
+            <div style="flex:1;min-width:200px"><label class="dte-lbl">Descripción actividad</label><input id="dteManualDescAct" class="dte-inp" style="width:100%" placeholder="Venta al por menor de..."/></div>
           </div>
 
           <!-- Datos del cliente (nombre/correo) -->
@@ -2667,7 +2674,15 @@ function dteManualFillDemo(){
   document.getElementById('dteManualNit').value='06140812951023';
   document.getElementById('dteManualNrc').value='899100';
   document.getElementById('dteManualNom').value='EMPRESA RECEPTORA DE PRUEBA, S.A. DE C.V.';
+  document.getElementById('dteManualTel').value='25551234';
+  document.getElementById('dteManualDir').value='Km 40 Carretera al Puerto, San Juan Talpa, La Paz';
+  document.getElementById('dteManualDepto').value='08';
+  document.getElementById('dteManualMuni').value='23';
+  document.getElementById('dteManualDist').value='11';
+  document.getElementById('dteManualCodAct').value='47722';
+  document.getElementById('dteManualDescAct').value='Venta al por menor de productos cosméticos y de tocador';
   document.getElementById('dteManualCliente').value='Cliente de Prueba';
+  document.getElementById('dteManualCorreo').value='receptor-prueba@example.com';
   document.getElementById('dteManualItems').innerHTML='';
   dteManualAddItem('Perfume de prueba 50ml',1,79.90);
   dteManualAddItem('Decant 10ml',2,12.50);
@@ -2688,8 +2703,18 @@ function dteManualEmit(){
     var nit=(document.getElementById('dteManualNit').value||'').trim();
     var nrc=(document.getElementById('dteManualNrc').value||'').trim();
     var nom=(document.getElementById('dteManualNom').value||'').trim();
-    if(!nit||!nrc||!nom){ out.innerHTML='<span style="color:#d9534f">El CCF/NC requiere NIT, NRC y nombre del receptor.</span>'; return; }
-    body.receptor={nit:nit,nrc:nrc,nombre:nom};
+    var tel=(document.getElementById('dteManualTel').value||'').trim();
+    var dir=(document.getElementById('dteManualDir').value||'').trim();
+    var depto=(document.getElementById('dteManualDepto').value||'').trim();
+    var muni=(document.getElementById('dteManualMuni').value||'').trim();
+    var dist=(document.getElementById('dteManualDist').value||'').trim();
+    var codAct=(document.getElementById('dteManualCodAct').value||'').trim();
+    var descAct=(document.getElementById('dteManualDescAct').value||'').trim();
+    if(!nit||!nrc||!nom||!tel||!dir||!depto||!muni||!dist||!codAct||!descAct){
+      out.innerHTML='<span style="color:#d9534f">El CCF/NC requiere todos los datos del receptor: NIT, NRC, nombre, teléfono, dirección, departamento, municipio, distrito y actividad económica.</span>';
+      return;
+    }
+    body.receptor={nit:nit,nrc:nrc,nombre:nom,telefono:tel,complemento:dir,departamento:depto,municipio:muni,distrito:dist,codActividad:codAct,descActividad:descAct};
   }
   out.innerHTML='Emitiendo…';
   adminFetch(API+'/admin/dte/emit-manual',{
@@ -2710,7 +2735,7 @@ function dteManualEmit(){
 function dteManualReset(){
   document.getElementById('dteManualItems').innerHTML='';
   dteManualAddItem('',1,'');
-  ['dteManualNit','dteManualNrc','dteManualNom','dteManualCliente','dteManualCorreo'].forEach(function(id){
+  ['dteManualNit','dteManualNrc','dteManualNom','dteManualTel','dteManualDir','dteManualDepto','dteManualMuni','dteManualDist','dteManualCodAct','dteManualDescAct','dteManualCliente','dteManualCorreo'].forEach(function(id){
     var el=document.getElementById(id); if(el) el.value='';
   });
   dteManualRecalc();
