@@ -4369,6 +4369,15 @@ function getShipping(){
   return sub >= shippingThreshold ? 0 : shippingCost;
 }
 function orderTotal(){return Math.max(0, cartSum() + getShipping() - getPromoDiscount());}
+// Agregar al carrito un producto que Nez recomendó es una señal de seguimiento
+// más fuerte que solo verlo — refuerza el perfil con sus atributos reales.
+function _reinforceProfileIfRecommended(pid){
+  if(typeof _somProfile !== 'undefined' && _somProfile && (_somProfile.recommended_ids||[]).map(Number).indexOf(+pid) !== -1){
+    var prod = P.find(function(x){return x.id===pid;});
+    if(prod && typeof enrichProfileFromProduct === 'function') enrichProfileFromProduct(prod);
+  }
+}
+
 function addToCart(pid){
   var p=P.find(function(x){return x.id===pid;});if(!p)return;
   if(getInv(pid).outOfStock){toast('Sin Stock','Este artículo no está disponible');return;}
@@ -4377,6 +4386,7 @@ function addToCart(pid){
   if(ex)ex.qty++;
   else cart.push({p:p,qty:1,type:'full',label:p.brand+' '+p.name,unitPrice:effectivePrice(p),size:p.size});
   renderCart();saveCart();
+  _reinforceProfileIfRecommended(pid);
 }
 
 function addToCartWithOptions(pid, label, price, size, type){
@@ -4397,6 +4407,7 @@ function addToCartWithOptions(pid, label, price, size, type){
   else cart.push({p:p,qty:1,type:type,label:label,unitPrice:price,size:size});
   renderCart();
   saveCart();
+  _reinforceProfileIfRecommended(pid);
 }
 function removeFromCart(pid){cart=cart.filter(function(i){return i.p.id!==pid;});renderCart();saveCart();}
 function changeQty(pid,d){var it=cart.find(function(i){return i.p.id===pid;});if(!it)return;it.qty=Math.max(1,it.qty+d);renderCart();saveCart();}
@@ -7404,20 +7415,10 @@ function somAddMsg(role, text, recs){
           '<span class="som-rec-arrow">&#8594;</span>'+
         '</div>';
       card.addEventListener('click', function(){
-        // If no profile yet, build a minimal one from what we know and save it
-        if(!_somProfile && _somMessages.length > 0){
-          var minProfile = {
-            gender_pref: (typeof currentCustomer !== 'undefined' && currentCustomer && currentCustomer.gender) || 'U',
-            families: [], notes: [], intensity: 'moderate', occasions: [], season: 'All',
-            price_min: 0, price_max: 500, avoid: [], recommended_ids: [p.id]
-          };
-          saveAndApplyScentProfile(minProfile);
-        } else if(_somProfile){
-          // Add clicked product to recommended_ids
-          var rids = (_somProfile.recommended_ids||[]).map(Number);
-          if(rids.indexOf(+p.id) === -1){ rids.push(+p.id); _somProfile.recommended_ids = rids; }
-          saveAndApplyScentProfile(_somProfile);
-        }
+        // Selecting a recommendation is itself a taste signal — enrich the
+        // profile with this product's real attributes (family/notes/intensity),
+        // not just its ID.
+        enrichProfileFromProduct(p);
         closeSommelierModal();
         setTimeout(function(){ openDetail(p.id); }, 200);
       });
@@ -7730,6 +7731,42 @@ function mergeProfiles(existing, incoming){
   }
 
   return merged;
+}
+
+// ── Enrich scent profile from product SELECTIONS/follow-ups, not just chat ───
+// Clicking into or adding one of Nez's recommendations is a stronger, more
+// reliable taste signal than parsing conversation text — feed it through the
+// same merge pipeline used for chat-derived profiles so it accumulates the
+// same way. gender_pref is NEVER set here on purpose — it's the one field that
+// must come from what the customer explicitly says, never deduced from a
+// product they viewed or bought (could be a gift, or just curiosity).
+// Nota → familia olfativa. El catálogo no siempre trae `product.family` poblado,
+// así que la familia se deduce de los ingredientes reales (igual criterio que
+// famKeywords usa para texto de conversación, pero aquí son nombres de nota).
+var _noteToFamily = {
+  sandalwood:'woody', cedar:'woody', oud:'woody', patchouli:'woody', vetiver:'woody', santal:'woody', ambroxan:'woody',
+  bergamot:'citrus', citrus:'citrus', grapefruit:'citrus', orange:'citrus', pineapple:'gourmand',
+  rose:'floral', jasmine:'floral', iris:'floral',
+  vanilla:'gourmand', musk:'oriental', amber:'oriental', tobacco:'oriental', leather:'oriental',
+  pepper:'spicy',
+};
+function enrichProfileFromProduct(product){
+  if(!product) return;
+  var noteText = [(product.notes||''),(product.top||''),(product.mid||''),(product.base||'')].join(' ').toLowerCase();
+  var noteKeywords = Object.keys(_noteToFamily);
+  var matchedNotes = noteKeywords.filter(function(n){ return noteText.indexOf(n) !== -1; });
+  var families = product.family ? [String(product.family).toLowerCase()] : [];
+  matchedNotes.forEach(function(n){
+    var fam = _noteToFamily[n];
+    if(families.indexOf(fam) === -1) families.push(fam);
+  });
+  var incoming = {
+    families: families.slice(0,3),
+    notes: matchedNotes.slice(0,4),
+    recommended_ids: [product.id]
+  };
+  if(product.sillage) incoming.intensity = String(product.sillage).toLowerCase();
+  saveAndApplyScentProfile(incoming);
 }
 
 function saveAndApplyScentProfile(profile){
