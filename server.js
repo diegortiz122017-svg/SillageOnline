@@ -5426,74 +5426,93 @@ app.post('/api/sommelier/chat', sommelierBurst, sommelierLimiter, async (req, re
   const explicitMale   = /(hombre|masculin|para él|para mi esposo|para mi novio|para mi papá|para mi hijo)/i.test(lastUserMsg);
   const explicitFemale = /(mujer|femenin|para ella|para mi esposa|para mi novia|para mi mamá|para mi hija)/i.test(lastUserMsg);
 
-  // ── Load and merge up to 7 saved profiles for registered customers ──────
+  // ── Load and merge saved profile(s) — registered (up to 7) or anonymous (1) ──
+  // Anonymous sessions used to save their profile fine but never got it back:
+  // Nez had no memory of them across a page reload (e.g. jumping between
+  // index.html and tienda.html — two separate pages, same session_id). Now
+  // both paths go through the same frequency-weighted merge.
   let profileContext = '';
   let mergedProfile = null;
-  if (isRegistered) {
-    try {
+  try {
+    let profileRows = [];
+    let touchQuery = null, touchArgs = null;
+    let label = '';
+    if (isRegistered) {
       const customerId2 = customerSession.user.id;
-      const [profileRows] = await db.execute(
+      [profileRows] = await db.execute(
         'SELECT profile FROM scent_profiles WHERE customer_id=? ORDER BY created_at DESC LIMIT 7',
         [customerId2]
       );
-      if (profileRows.length) {
-        // Merge profiles: frequency-weighted aggregation
-        const profiles = profileRows.map(r => { try { return JSON.parse(r.profile); } catch(e) { return null; } }).filter(Boolean);
-        const total = profiles.length;
+      touchQuery = 'UPDATE scent_profiles SET last_used=? WHERE customer_id=?';
+      touchArgs  = [new Date(), customerId2];
+      label = 'PERFIL CONSOLIDADO DEL CLIENTE (basado en ' + profileRows.length + ' sesión' + (profileRows.length > 1 ? 'es' : '') + ' previas)';
+    } else if (sessionId) {
+      [profileRows] = await db.execute(
+        'SELECT profile FROM scent_profiles WHERE session_id=? AND customer_id IS NULL ORDER BY updated_at DESC LIMIT 1',
+        [sessionId]
+      );
+      touchQuery = 'UPDATE scent_profiles SET last_used=? WHERE session_id=? AND customer_id IS NULL';
+      touchArgs  = [new Date(), sessionId];
+      label = 'PERFIL DEL CLIENTE (de esta misma sesión, aunque el chat se haya reiniciado)';
+    }
 
-        // Gender: majority vote
-        const genderVotes = { M: 0, F: 0, U: 0 };
-        profiles.forEach(p => { if (p.gender_pref) genderVotes[p.gender_pref] = (genderVotes[p.gender_pref]||0) + 1; });
-        const gender_pref = Object.entries(genderVotes).sort((a,b) => b[1]-a[1])[0][0];
+    if (profileRows.length) {
+      // Merge profiles: frequency-weighted aggregation (degenerates cleanly to
+      // a single profile's own values when there's only one row, as for anon).
+      const profiles = profileRows.map(r => { try { return JSON.parse(r.profile); } catch(e) { return null; } }).filter(Boolean);
+      const total = profiles.length;
 
-        // Families: count occurrences, keep those appearing in >20% of profiles
-        const famCount = {};
-        profiles.forEach(p => (p.families||[]).forEach(f => { famCount[f] = (famCount[f]||0) + 1; }));
-        const families = Object.entries(famCount).filter(([,c]) => c >= Math.max(1, total * 0.2)).sort((a,b) => b[1]-a[1]).map(([f]) => f).slice(0,5);
+      // Gender: majority vote
+      const genderVotes = { M: 0, F: 0, U: 0 };
+      profiles.forEach(p => { if (p.gender_pref) genderVotes[p.gender_pref] = (genderVotes[p.gender_pref]||0) + 1; });
+      const gender_pref = Object.entries(genderVotes).sort((a,b) => b[1]-a[1])[0][0];
 
-        // Intensity: most common
-        const intCount = {};
-        profiles.forEach(p => { if (p.intensity) intCount[p.intensity] = (intCount[p.intensity]||0) + 1; });
-        const intensity = Object.entries(intCount).sort((a,b) => b[1]-a[1])[0]?.[0] || null;
+      // Families: count occurrences, keep those appearing in >20% of profiles
+      const famCount = {};
+      profiles.forEach(p => (p.families||[]).forEach(f => { famCount[f] = (famCount[f]||0) + 1; }));
+      const families = Object.entries(famCount).filter(([,c]) => c >= Math.max(1, total * 0.2)).sort((a,b) => b[1]-a[1]).map(([f]) => f).slice(0,5);
 
-        // Season: most common (excluding 'All')
-        const seaCount = {};
-        profiles.forEach(p => { if (p.season && p.season !== 'All') seaCount[p.season] = (seaCount[p.season]||0) + 1; });
-        const season = Object.entries(seaCount).sort((a,b) => b[1]-a[1])[0]?.[0] || 'All';
+      // Intensity: most common
+      const intCount = {};
+      profiles.forEach(p => { if (p.intensity) intCount[p.intensity] = (intCount[p.intensity]||0) + 1; });
+      const intensity = Object.entries(intCount).sort((a,b) => b[1]-a[1])[0]?.[0] || null;
 
-        // Price: average of provided max prices
-        const prices = profiles.map(p => p.price_max).filter(Boolean);
-        const price_max = prices.length ? Math.round(prices.reduce((a,b) => a+b, 0) / prices.length) : null;
+      // Season: most common (excluding 'All')
+      const seaCount = {};
+      profiles.forEach(p => { if (p.season && p.season !== 'All') seaCount[p.season] = (seaCount[p.season]||0) + 1; });
+      const season = Object.entries(seaCount).sort((a,b) => b[1]-a[1])[0]?.[0] || 'All';
 
-        // Avoid: union of all avoid lists
-        const avoidSet = new Set();
-        profiles.forEach(p => (p.avoid||[]).forEach(a => avoidSet.add(a)));
+      // Price: average of provided max prices
+      const prices = profiles.map(p => p.price_max).filter(Boolean);
+      const price_max = prices.length ? Math.round(prices.reduce((a,b) => a+b, 0) / prices.length) : null;
 
-        // Recommended IDs: all unique IDs seen across sessions
-        const recIdSet = new Set();
-        profiles.forEach(p => (p.recommended_ids||[]).forEach(id => recIdSet.add(Number(id))));
+      // Avoid: union of all avoid lists
+      const avoidSet = new Set();
+      profiles.forEach(p => (p.avoid||[]).forEach(a => avoidSet.add(a)));
 
-        mergedProfile = { gender_pref, families, intensity, season, price_max, avoid: [...avoidSet], recommended_ids: [...recIdSet] };
+      // Recommended IDs: all unique IDs seen across sessions
+      const recIdSet = new Set();
+      profiles.forEach(p => (p.recommended_ids||[]).forEach(id => recIdSet.add(Number(id))));
 
-        const parts = [];
-        if (gender_pref !== 'U') parts.push(gender_pref === 'M' ? 'Prefiere fragancias masculinas' : 'Prefiere fragancias femeninas');
-        if (families.length) parts.push(`Familias favoritas: ${families.join(', ')}`);
-        if (intensity) parts.push(`Intensidad preferida: ${intensity}`);
-        if (season && season !== 'All') parts.push(`Temporada: ${season}`);
-        if (avoidSet.size) parts.push(`Evita: ${[...avoidSet].join(', ')}`);
-        if (price_max) parts.push(`Presupuesto promedio: hasta $${price_max}`);
+      mergedProfile = { gender_pref, families, intensity, season, price_max, avoid: [...avoidSet], recommended_ids: [...recIdSet] };
 
-        if (parts.length) {
-          const genderLine = gender_pref !== 'U'
-            ? `\n\nGÉNERO DEL CLIENTE: ${gender_pref === 'M' ? 'Masculino' : 'Femenino'}. Pasa gender:"${gender_pref}" al llamar search_catalogue SIEMPRE, salvo que el cliente pida explícitamente fragancias para otro género o diga que compra para alguien más.`
-            : '';
-          profileContext = '\n\nPERFIL CONSOLIDADO DEL CLIENTE (basado en ' + total + ' sesión' + (total > 1 ? 'es' : '') + ' previas): ' + parts.join(' | ') + '. Úsalo para orientar tus recomendaciones naturalmente, sin mencionarlo explícitamente.' + genderLine;
-        }
-        // Update last_used on all rows
-        await db.execute('UPDATE scent_profiles SET last_used=? WHERE customer_id=?', [new Date(), customerId2]);
+      const parts = [];
+      if (gender_pref !== 'U') parts.push(gender_pref === 'M' ? 'Prefiere fragancias masculinas' : 'Prefiere fragancias femeninas');
+      if (families.length) parts.push(`Familias favoritas: ${families.join(', ')}`);
+      if (intensity) parts.push(`Intensidad preferida: ${intensity}`);
+      if (season && season !== 'All') parts.push(`Temporada: ${season}`);
+      if (avoidSet.size) parts.push(`Evita: ${[...avoidSet].join(', ')}`);
+      if (price_max) parts.push(`Presupuesto promedio: hasta $${price_max}`);
+
+      if (parts.length) {
+        const genderLine = gender_pref !== 'U'
+          ? `\n\nGÉNERO DEL CLIENTE: ${gender_pref === 'M' ? 'Masculino' : 'Femenino'}. Pasa gender:"${gender_pref}" al llamar search_catalogue SIEMPRE, salvo que el cliente pida explícitamente fragancias para otro género o diga que compra para alguien más.`
+          : '';
+        profileContext = '\n\n' + label + ': ' + parts.join(' | ') + '. Úsalo para orientar tus recomendaciones naturalmente, sin mencionarlo explícitamente.' + genderLine;
       }
-    } catch(e) { console.warn('Profile load error:', e.message); }
-  }
+      if (touchQuery) await db.execute(touchQuery, touchArgs);
+    }
+  } catch(e) { console.warn('Profile load error:', e.message); }
 
   // Extract IDs already recommended in this conversation to avoid repeats
   const alreadyRecommended = [];

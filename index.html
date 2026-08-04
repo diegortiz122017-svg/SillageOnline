@@ -7234,6 +7234,49 @@ function getBFScore(){
   return Math.min(score, 100);
 }
 
+// ── Persist the chat transcript across pages (index.html ↔ tienda.html) ──────
+// _somMessages only ever lived in memory, so a full page navigation (they're
+// two separate documents, not one SPA) wiped the visible conversation even
+// though the session/profile survived. Mirrors the pattern already used for
+// sillage_scent_profile: localStorage, tied to and validated against the
+// current session id, with the same TTL the server uses for anon sessions.
+var SOM_TRANSCRIPT_KEY = 'sillage_som_transcript';
+var SOM_TRANSCRIPT_TTL = 60 * 60 * 1000; // matches ANON_SESSION_TTL server-side
+function saveSomTranscript(){
+  try {
+    if(!_somMessages.length){ localStorage.removeItem(SOM_TRANSCRIPT_KEY); return; }
+    localStorage.setItem(SOM_TRANSCRIPT_KEY, JSON.stringify({
+      sessionId: _somSession, messages: _somMessages, question: _somQuestion, savedAt: Date.now()
+    }));
+  } catch(e){}
+}
+function restoreSomTranscript(){
+  try {
+    var stored = localStorage.getItem(SOM_TRANSCRIPT_KEY);
+    if(!stored) return;
+    var data = JSON.parse(stored);
+    // Only restore if it belongs to the SAME session the server just confirmed —
+    // a different/new session means the server has no memory of the old
+    // exchange either, so showing it would be misleading.
+    var stale = !data.sessionId || data.sessionId !== _somSession ||
+      !data.savedAt || (Date.now() - data.savedAt > SOM_TRANSCRIPT_TTL) ||
+      !Array.isArray(data.messages) || !data.messages.length;
+    if(stale){ localStorage.removeItem(SOM_TRANSCRIPT_KEY); return; }
+
+    _somMessages = data.messages;
+    _somQuestion = data.question || 0;
+    var container = document.getElementById('somMessages');
+    if(container){
+      container.innerHTML = '';
+      _somMessages.forEach(function(m){
+        var text = m.role === 'assistant' ? m.content.replace(/PERFIL_JSON:[\s\S]+$/, '').trim() : m.content;
+        if(text) somAddMsg(m.role === 'user' ? 'user' : 'bot', text, []);
+      });
+      updateSomProgress(_somQuestion);
+    }
+  } catch(e){}
+}
+
 // Validate existing session with server, or request a new one
 (function initSession(){
   var existing = _somSession;
@@ -7245,6 +7288,7 @@ function getBFScore(){
         _somSession = d.sessionId;
         localStorage.setItem('sillage_session_id', d.sessionId);
       }
+      restoreSomTranscript();
       // Connect WS after session confirmed — sessionId will be ready for store_connect
       connectWS();
     })
@@ -7263,6 +7307,7 @@ function openSommelierModal(){
   // If previous consultation is complete, start a new one automatically
   if(_somQuestion >= 5){
     _somMessages = []; _somQuestion = 0; _lastRecIds = [];
+    saveSomTranscript();
     var container = document.getElementById('somMessages');
     if(container) container.innerHTML = '';
     var input = document.getElementById('somInput');
@@ -7419,6 +7464,7 @@ function showSommelierProfileActive(profile){
 function newSommelierConsultation(){
   // Reset conversation but KEEP the profile
   _somMessages = []; _somQuestion = 0;
+  saveSomTranscript();
   var container = document.getElementById('somMessages');
   if(container) container.innerHTML = '';
   var input = document.getElementById('somInput');
@@ -7435,6 +7481,7 @@ function resetSommelierProfile(){
   if(invite) invite.style.display = 'block';
   if(active) active.style.display = 'none';
   _somMessages = []; _somProfile = null; _somQuestion = 0;
+  saveSomTranscript();
   var container = document.getElementById('somMessages');
   if(container) container.innerHTML = '';
   // Clear the server-side profile too (DB) — si no, al recargar se vuelve a traer
@@ -7479,6 +7526,7 @@ function sommelierStart(){
   _somMessages  = [];
   _somProfile   = null;
   _somQuestion  = 0;
+  saveSomTranscript();
   document.getElementById('somMessages').innerHTML = '';
   updateSomProgress(0);
 
@@ -7655,6 +7703,7 @@ function sommelierSend(){
 
   somAddMsg('user', text);
   _somMessages.push({ role: 'user', content: text });
+  saveSomTranscript();
   // Warn when approaching conversation limit
   var userCount = _somMessages.filter(function(m){ return m.role === 'user'; }).length;
   if(userCount === 4){
@@ -7671,6 +7720,7 @@ function sommelierSend(){
 function sommelierSendToAPI(primeText){
   if(primeText){
     _somMessages.push({ role: 'user', content: primeText });
+    saveSomTranscript();
     // Track consult usage for anonymous users on first message
     if(_somMessages.length === 1 && (typeof currentCustomer === 'undefined' || !currentCustomer)){
       var today2 = new Date().toISOString().slice(0,10);
@@ -7812,6 +7862,7 @@ function sommelierSendToAPI(primeText){
       somAddMsg('bot', reply, []);
     }
     _somMessages.push({ role: 'assistant', content: reply });
+    saveSomTranscript();
 
     // If profile extracted — save it and reorder catalogue
     if(profile){
