@@ -7522,9 +7522,12 @@ function clearSommelierConsultLimit(){
   if(input) input.placeholder = 'Escribe tu respuesta...';
 }
 function sommelierStart(){
-  // Clear state for new session
+  // Clear conversation state for a new chat thread — deliberately does NOT
+  // touch _somProfile. Preferences the customer already gave Nez (or that we
+  // inferred from their picks) should survive a fresh conversation; the only
+  // place that's meant to forget them is the explicit "Restablecer" button
+  // (resetSommelierProfile()).
   _somMessages  = [];
-  _somProfile   = null;
   _somQuestion  = 0;
   saveSomTranscript();
   document.getElementById('somMessages').innerHTML = '';
