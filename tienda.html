@@ -2007,6 +2007,14 @@ footer{background:var(--dark);padding:3.5rem 4rem;text-align:center;border-top:1
   .tpz-actions{gap:0.4rem}
   .tpz-btn{padding:0.3rem 0.7rem}
 }
+@media(max-width:640px){
+  /* Below this width the action buttons squeeze the chips into a narrow
+     column (6 chips wrapping 3-deep next to "Refinar/Restablecer"). Stack
+     instead: chips get the full row, actions drop to their own row. */
+  .tienda-profile-zone{flex-direction:column;align-items:flex-start}
+  .tpz-left{width:100%}
+  .tpz-actions{width:100%}
+}
 </style>
 <script type="application/ld+json">
 {
@@ -8136,6 +8144,7 @@ function renderTiendaProfile(){
 
   var hasProfile = profile && (
     (profile.families && profile.families.length) ||
+    (profile.notes && profile.notes.length) ||
     (profile.occasions && profile.occasions.length) ||
     profile.gender_pref
   );
@@ -8144,26 +8153,45 @@ function renderTiendaProfile(){
     profileZone.style.display = 'flex';
     nezInvite.style.display = 'none';
 
-    // Build chips
-    var chips = [];
     var familyLabels = {
       woody:'Amaderado', fresh:'Fresco', oriental:'Oriental', floral:'Floral',
       citrus:'Cítrico', aquatic:'Acuático', gourmand:'Gourmand', chypre:'Chypre',
       fougere:'Fougère', spicy:'Especiado', powdery:'Empolvado', green:'Verde'
     };
+    var noteLabels = {
+      sandalwood:'Sándalo', santal:'Sándalo', oud:'Oud', vanilla:'Vainilla', musk:'Almizcle',
+      cedar:'Cedro', patchouli:'Pachulí', rose:'Rosa', jasmine:'Jazmín',
+      bergamot:'Bergamota', vetiver:'Vetiver', amber:'Ámbar', leather:'Cuero',
+      iris:'Iris', tobacco:'Tabaco', citrus:'Cítrico', pineapple:'Piña',
+      ambroxan:'Ambroxán', pepper:'Pimienta'
+    };
+    var intensityLabels = {light:'Ligero', moderate:'Moderado', strong:'Intenso', 'very strong':'Muy intenso'};
+
+    // Build chips in priority order — most identity-defining first — so a
+    // rich profile (conversación + notas + selecciones) shows a varied
+    // snapshot across categories, not just families, within the 6-chip cap.
+    var chips = [];
     if(profile.gender_pref && profile.gender_pref !== 'U'){
       chips.push(profile.gender_pref === 'M' ? 'Masculino' : 'Femenino');
     }
-    (profile.families||[]).slice(0,3).forEach(function(f){
+    (profile.families||[]).slice(0,2).forEach(function(f){
       chips.push(familyLabels[f.toLowerCase()] || (f.charAt(0).toUpperCase()+f.slice(1)));
     });
-    (profile.occasions||[]).slice(0,2).forEach(function(o){
+    (profile.notes||[]).slice(0,2).forEach(function(n){
+      chips.push(noteLabels[n.toLowerCase()] || (n.charAt(0).toUpperCase()+n.slice(1)));
+    });
+    if(profile.intensity && profile.intensity.toLowerCase() !== 'moderate'){
+      chips.push(intensityLabels[profile.intensity.toLowerCase()] || profile.intensity);
+    }
+    if(profile.season && profile.season !== 'All'){
+      chips.push(translateSeason(profile.season));
+    }
+    if(profile.price_max && profile.price_max < 500){
+      chips.push('Hasta $'+profile.price_max);
+    }
+    (profile.occasions||[]).slice(0,1).forEach(function(o){
       chips.push(o.charAt(0).toUpperCase()+o.slice(1));
     });
-    if(profile.intensity && profile.intensity !== 'moderate'){
-      var iLabels = {light:'Ligero',moderate:'Moderado',strong:'Intenso','very strong':'Muy intenso'};
-      chips.push(iLabels[profile.intensity] || profile.intensity);
-    }
 
     chipsEl.innerHTML = chips.slice(0,6).map(function(ch){
       return '<span class="tpz-chip">'+esc(ch)+'</span>';
