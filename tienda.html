@@ -3997,7 +3997,10 @@ function openDetail(pid){
   picks.forEach(function(s, idx){
     var isRand = randPick && s.id === randPick.id;
     var sc=document.createElement('div');sc.className='sugg-card';
-    sc.innerHTML='<div class="sugg-img">'+svg(s.c,s.s,'sm')+'</div>'+
+    var suggImg = (s.photos && s.photos.length)
+      ? '<img src="'+esc(cdnImg(s.photos[0],300))+'" alt="'+esc(s.brand+' '+s.name)+'" style="width:100%;height:100%;object-fit:contain" loading="lazy"/>'
+      : svg(s.c,s.s,'sm');
+    sc.innerHTML='<div class="sugg-img">'+suggImg+'</div>'+
       (isRand ? '<span class="sugg-random-badge">Descubre</span>' : '')+
       '<div class="sugg-body"><div class="sugg-brand">'+esc(s.brand)+'</div><div class="sugg-name">'+esc(s.name)+'</div><div class="sugg-price">$'+effectivePrice(s)+'</div></div>'+
       '<button class="sugg-plus" data-id="'+s.id+'">+</button>';
