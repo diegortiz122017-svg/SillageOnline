@@ -5598,6 +5598,7 @@ PERFIL_JSON — al final cuando presentes fragancias (sin texto después):
 PERFIL_JSON:{...}
 Ejemplo: PERFIL_JSON:{"gender_pref":"M","families":["oriental","woody"],"notes":["amber","oud"],"intensity":"strong","occasions":["evening"],"season":"Fall","price_min":0,"price_max":500,"avoid":[],"recommended_ids":[33,40,22]}
 Campos: gender_pref, families (NON-EMPTY), notes, intensity, occasions, season, price_min, price_max, avoid, recommended_ids, gift (true solo en consultas de regalo).
+CRÍTICO — ACUMULA, no solo lo de este turno: incluye TODO lo que ya sabes del cliente de TODA la conversación hasta ahora, no solo lo que dijo en su último mensaje. Si en un mensaje anterior mencionó género, intensidad, ocasión, temporada o presupuesto, vuelve a incluirlo en CADA PERFIL_JSON aunque no lo haya repetido ahora — nunca omitas un campo solo porque ya lo dijiste en un turno previo.
 SOLO omite PERFIL_JSON si únicamente haces una pregunta.
 
 CIERRE: Cuando el cliente muestre interés o decisión, cierra directo: "La encuentras en las tarjetas de abajo — agrégala al carrito desde ahí." Si ya eligió, confirma y cierra: "Perfecto. La tienes en la tarjeta de abajo." No preguntes "¿te gustaría agregarla?" — simplemente indica dónde está.
