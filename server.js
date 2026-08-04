@@ -827,6 +827,29 @@ async function notifyAdmins(order) {
   }
 }
 
+// ─── Compartido entre sendOrderConfirmation y sendDteReadyEmail ──────────────
+function dteIsReady(dte) {
+  return !!(dte && dte.estado === 'PROCESADO' && dte.selloRecibido);
+}
+function buildDteEmailBlock(dte) {
+  if (!dteIsReady(dte)) return '';
+  const tipoLbl = { '01': 'Factura Electrónica', '03': 'Comprobante de Crédito Fiscal', '05': 'Nota de Crédito' }[dte.tipoDte] || 'Documento Tributario Electrónico';
+  const fecEmi  = dte.jsonDte?.identificacion?.fecEmi;
+  const verifUrl = dteSvc.verificacionUrl(dte.codigoGeneracion, fecEmi);
+  return `
+    <div style="padding:12px 16px;background:#faf8f4;border:1px solid #e8d8b8;margin-bottom:16px;font-size:12px;color:#4a3f35;line-height:1.9">
+      <span style="font-size:10px;letter-spacing:3px;text-transform:uppercase;color:#8a7f72">${escHtml(tipoLbl)}</span><br/>
+      N.º de Control: <strong>${escHtml(dte.numeroControl)}</strong><br/>
+      Código de Generación: <strong>${escHtml(dte.codigoGeneracion)}</strong><br/>
+      <a href="${verifUrl}" style="color:#b8955a">Verificar en el Ministerio de Hacienda →</a>
+      <p style="font-size:11px;color:#8a7f72;margin:8px 0 0">Adjuntamos tu documento tributario electrónico a este correo.</p>
+    </div>`;
+}
+function buildDteAttachments(dte) {
+  if (!dteIsReady(dte) || !dte.jsonFirmado) return undefined;
+  return [{ filename: `DTE-${dte.codigoGeneracion}.json`, content: Buffer.from(String(dte.jsonFirmado), 'utf8').toString('base64') }];
+}
+
 // dte: registro devuelto por emitDteForOrder (opcional) — cuando viene con
 // estado PROCESADO, el correo incluye los datos fiscales del documento y
 // adjunta el DTE firmado (el mismo JWS transmitido a Hacienda).
@@ -844,21 +867,6 @@ async function sendOrderConfirmation(order, dte) {
       <p style="font-size:10px;letter-spacing:3px;text-transform:uppercase;color:#b8955a;margin:0 0 12px">Una nota de Nez, tu sommelier</p>
       <p style="font-family:Georgia,serif;font-size:14px;color:#4a3f35;line-height:1.9;margin:0;font-style:italic">${escHtml(nezNote).replace(/\n/g,'<br/>')}</p>
     </div>` : '';
-
-  const dteReady = dte && dte.estado === 'PROCESADO' && dte.selloRecibido;
-  const dteBlock = dteReady ? (() => {
-    const tipoLbl = { '01': 'Factura Electrónica', '03': 'Comprobante de Crédito Fiscal', '05': 'Nota de Crédito' }[dte.tipoDte] || 'Documento Tributario Electrónico';
-    const fecEmi  = dte.jsonDte?.identificacion?.fecEmi;
-    const verifUrl = dteSvc.verificacionUrl(dte.codigoGeneracion, fecEmi);
-    return `
-    <div style="padding:12px 16px;background:#faf8f4;border:1px solid #e8d8b8;margin-bottom:16px;font-size:12px;color:#4a3f35;line-height:1.9">
-      <span style="font-size:10px;letter-spacing:3px;text-transform:uppercase;color:#8a7f72">${escHtml(tipoLbl)}</span><br/>
-      N.º de Control: <strong>${escHtml(dte.numeroControl)}</strong><br/>
-      Código de Generación: <strong>${escHtml(dte.codigoGeneracion)}</strong><br/>
-      <a href="${verifUrl}" style="color:#b8955a">Verificar en el Ministerio de Hacienda →</a>
-      <p style="font-size:11px;color:#8a7f72;margin:8px 0 0">Adjuntamos tu documento tributario electrónico a este correo.</p>
-    </div>`;
-  })() : '';
 
   const html = emailTemplate(`
     <h2 style="font-family:Georgia,serif;font-size:24px;font-weight:300;color:#1a1714;margin:0 0 8px">Pedido Confirmado ✨</h2>
@@ -878,20 +886,41 @@ async function sendOrderConfirmation(order, dte) {
       <span style="font-size:11px;text-transform:uppercase;color:#8a7f72">Total</span>
       <span style="font-family:Georgia,serif;font-size:22px;color:#1a1714;float:right">$${parseFloat(order.total||0).toFixed(2)}</span>
     </div>
-    ${dteBlock}
+    ${buildDteEmailBlock(dte)}
     ${nezBlock}
     <p style="font-size:12px;color:#8a7f72;line-height:1.8;margin-top:16px">Enviando a: ${escHtml(order.address)}</p>`);
-
-  const attachments = dteReady && dte.jsonFirmado
-    ? [{ filename: `DTE-${dte.codigoGeneracion}.json`, content: Buffer.from(String(dte.jsonFirmado), 'utf8').toString('base64') }]
-    : undefined;
 
   await sendEmail({
     to: order.email,
     subject: `✨ Pedido Confirmado — ${escHtml(order.id)} | Sillage Parfumerie`,
     from: `Sillage Pedidos <${EMAIL_PEDIDOS}>`,
     html,
-    attachments,
+    attachments: buildDteAttachments(dte),
+  });
+}
+
+// Correos que se confirman DESPUÉS del pedido inicial (contra entrega al
+// entregar, o confirmación manual de pago desde el admin) ya mandaron su
+// "Pedido Confirmado" sin DTE — este es el correo de seguimiento con la
+// factura, para esos casos donde no hay un segundo "confirmación" al que
+// enganchar el adjunto.
+async function sendDteReadyEmail(order, dte) {
+  if (!dteIsReady(dte)) return;
+  const html = emailTemplate(`
+    <h2 style="font-family:Georgia,serif;font-size:24px;font-weight:300;color:#1a1714;margin:0 0 8px">Tu factura electrónica está lista 🧾</h2>
+    <p style="font-size:13px;color:#8a7f72;margin:0 0 24px">Hola <strong style="color:#1a1714">${escHtml(order.customer)}</strong>, adjuntamos el documento tributario electrónico de tu pedido.</p>
+    <div style="background:#faf8f4;border:1px solid #e8d8b8;padding:12px 16px;margin-bottom:24px">
+      <span style="font-size:10px;letter-spacing:3px;text-transform:uppercase;color:#8a7f72">Número de Pedido</span><br/>
+      <span style="font-family:Georgia,serif;font-size:18px;color:#b8955a">${escHtml(order.id)}</span>
+    </div>
+    ${buildDteEmailBlock(dte)}`);
+
+  await sendEmail({
+    to: order.email,
+    subject: `🧾 Tu factura electrónica — ${escHtml(order.id)} | Sillage Parfumerie`,
+    from: `Sillage Pedidos <${EMAIL_PEDIDOS}>`,
+    html,
+    attachments: buildDteAttachments(dte),
   });
 }
 
@@ -4616,7 +4645,10 @@ app.post('/api/btcpay/webhook', async (req, res) => {
           await deductBottleInventory(items);
           broadcastAdmin('order_update', { id: orderId, status: 'Procesando', paymentStatus: 'Pagado' });
           await logActivity(`Pago BTCPay confirmado (fallback) para pedido ${orderId}`);
-          try { await emitDteForOrder(orderId); } catch(e) { console.error('BTCPay DTE (fallback) error:', e.message); }
+          try {
+            const fallbackDte = await emitDteForOrder(orderId);
+            await sendDteReadyEmail(orderRows[0], fallbackDte);
+          } catch(e) { console.error('BTCPay DTE (fallback) error:', e.message); }
         }
       } else {
         console.warn(`BTCPay webhook: invoice ${invoiceId} settled but no pending record found — possible expiry`);
@@ -5133,10 +5165,11 @@ app.patch('/api/orders/:id', requireAdmin, async (req, res) => {
 
   // Confirmación de pago manual (admin) → emite el DTE (opción A, sin esperar webhook).
   // Útil cuando el webhook de Wompi/BTCPay no llega o para pruebas. Dedup-guarded.
+  let manualPagoDte = null;
   if (paymentStatus === 'Pagado' && prevPayment !== 'Pagado') {
     broadcastAdmin('order_update', { id: req.params.id, paymentStatus: 'Pagado' });
     await logActivity(`Pago confirmado manualmente para pedido ${escHtml(req.params.id)}`);
-    try { await emitDteForOrder(req.params.id); } catch(e) { console.error('DTE (pago manual) error:', e.message); }
+    try { manualPagoDte = await emitDteForOrder(req.params.id); } catch(e) { console.error('DTE (pago manual) error:', e.message); }
   }
   const [updated] = await db.execute('SELECT * FROM orders WHERE id=?', [req.params.id]);
   const order = {
@@ -5145,6 +5178,9 @@ app.patch('/api/orders/:id', requireAdmin, async (req, res) => {
     address: updated[0].address,
     tracking_number: updated[0].tracking_number
   };
+  // El "Pedido Confirmado" ya se mandó sin DTE (se emite hasta que se confirma
+  // el pago) — este es el correo de seguimiento con la factura adjunta.
+  if (manualPagoDte) { try { await sendDteReadyEmail(order, manualPagoDte); } catch(e) { console.error('DTE ready email (pago manual) error:', e.message); } }
   broadcastAdmin('order_update', { id: order.id, status: order.status, trackerStep: order.tracker_step });
   await logActivity(`Pedido ${escHtml(order.id)} → ${order.status}`);
 
@@ -5168,7 +5204,10 @@ app.patch('/api/orders/:id', requireAdmin, async (req, res) => {
       order.payment_status = 'Pagado';
       broadcastAdmin('order_update', { id: order.id, status: order.status, paymentStatus: 'Pagado', trackerStep: order.tracker_step });
       await logActivity(`Pago BTCPay confirmado manualmente para pedido ${escHtml(order.id)}`);
-      try { await emitDteForOrder(order.id); } catch(e) { console.error('DTE (BTCPay manual) error:', e.message); }
+      try {
+        const btcpayManualDte = await emitDteForOrder(order.id);
+        await sendDteReadyEmail(order, btcpayManualDte);
+      } catch(e) { console.error('DTE (BTCPay manual) error:', e.message); }
     }
 
     // COD → Entregado: mark as Pagado (payment collected on delivery)
@@ -5177,7 +5216,10 @@ app.patch('/api/orders/:id', requireAdmin, async (req, res) => {
       order.payment_status = 'Pagado';
       broadcastAdmin('order_update', { id: order.id, status: order.status, paymentStatus: 'Pagado', trackerStep: order.tracker_step });
       await logActivity(`Pago COD confirmado para pedido ${escHtml(order.id)}`);
-      try { await emitDteForOrder(order.id); } catch(e) { console.error('DTE (COD) error:', e.message); }
+      try {
+        const codDte = await emitDteForOrder(order.id);
+        await sendDteReadyEmail(order, codDte);
+      } catch(e) { console.error('DTE (COD) error:', e.message); }
     }
 
     // COD → No Entregado: track no-show and auto-block after threshold
