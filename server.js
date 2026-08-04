@@ -5412,7 +5412,13 @@ app.post('/api/sommelier/chat', sommelierBurst, sommelierLimiter, async (req, re
             ? rows[0].last_reset.toISOString().slice(0, 10)
             : String(rows[0].last_reset).slice(0, 10);
           if (lastReset === today && rows[0].count > LIMIT) {
-            return res.status(403).json({ error: 'consult_limit' });
+            // Same message the first-message path builds — sin esto el frontend
+            // cae a un texto genérico que siempre invita a "regístrate", incluso
+            // a un cliente que ya tiene cuenta y solo agotó sus 4 consultas.
+            const msg = isRegistered
+              ? `Has usado tus ${REG_LIMIT} consultas de hoy. Realiza una compra para reiniciar tu límite, o vuelve mañana.`
+              : `Has usado tus ${ANON_LIMIT} consultas gratuitas de hoy. Regístrate para obtener ${REG_LIMIT} consultas diarias.`;
+            return res.status(403).json({ error: 'consult_limit', message: msg });
           }
         }
       }

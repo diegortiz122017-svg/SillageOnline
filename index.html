@@ -7938,9 +7938,16 @@ function sommelierSendToAPI(primeText){
       sendBtn.disabled = true;
       input.placeholder = 'Conversación finalizada';
     } else if(err.message === 'CONSULT_LIMIT'){
-      var _limitMsg = (err.serverMsg) || 'Has alcanzado el límite de consultas de hoy. Regístrate para obtener 4 consultas diarias.';
+      var _isLoggedInNow = (typeof currentCustomer !== 'undefined' && !!currentCustomer) || (typeof customerToken !== 'undefined' && !!customerToken);
+      var _limitMsg = err.serverMsg || (_isLoggedInNow
+        ? 'Has alcanzado tu límite de consultas de hoy. Realiza una compra para reiniciar tu límite, o vuelve mañana.'
+        : 'Has alcanzado el límite de consultas de hoy. Regístrate para obtener 4 consultas diarias.');
       somAddMsg('bot', _limitMsg);
-      setTimeout(function(){ if(typeof openAuth==='function') openAuth('register'); }, 2000);
+      // Solo invitar a registrarse si de verdad no tiene cuenta — antes se abría
+      // el modal de registro aunque el cliente ya estuviera logueado.
+      if(!_isLoggedInNow){
+        setTimeout(function(){ if(typeof openAuth==='function') openAuth('register'); }, 2000);
+      }
     } else if(err.message === 'GEMINI_NOT_CONFIGURED'){
       somAddMsg('bot', 'El sommelier aún no está configurado.');
     } else if(err.message === 'RATE_LIMIT'){
