@@ -40,7 +40,7 @@ footer{text-align:center;padding:2rem;font-size:0.6rem;letter-spacing:0.1em;colo
 
 <main>
   <h1>Política de Privacidad</h1>
-  <span class="updated">Última actualización: Abril 2026</span>
+  <span class="updated">Última actualización: Agosto 2026</span>
 
   <div class="highlight">
     Esta política explica cómo Sillage Parfumerie recopila, usa y protege tu información personal. Al realizar una compra, crear una cuenta, o usar nuestra tienda, aceptas los términos descritos aquí.
@@ -56,6 +56,7 @@ footer{text-align:center;padding:2rem;font-size:0.6rem;letter-spacing:0.1em;colo
     <li><strong>Datos de pedido:</strong> dirección de entrega, productos comprados, método de pago, historial de órdenes</li>
     <li><strong>Perfil olfativo:</strong> preferencias de fragancias que compartes con Nez, nuestro sommelier de IA — familias, notas, ocasiones, presupuesto</li>
     <li><strong>Sesión anónima:</strong> un identificador temporal (sessionId) almacenado en tu navegador para mantener tu carrito, perfil olfativo de sesión, y límites de uso de Nez. No está vinculado a tu identidad a menos que crees una cuenta</li>
+    <li><strong>Actividad de navegación:</strong> registramos internamente eventos como páginas visitadas, apertura del chat de Nez, productos vistos, productos agregados al carrito e inicio de compra — vinculados a tu sessionId o cuenta. Junto con estos eventos guardamos tu dirección IP y el user-agent de tu navegador, principalmente para detectar tráfico automatizado/abusivo y entender el uso general de la tienda. No se usa para publicidad ni se comparte con redes de anuncios</li>
     <li><strong>Datos de checkout:</strong> cuando inicias el proceso de compra y proporcionas tu correo, lo guardamos temporalmente para enviarte un recordatorio si no completas tu pedido (ver sección 4)</li>
     <li><strong>Preferencias de comunicación:</strong> si deseas recibir emails de marketing y/o seguimiento (solo usuarios registrados)</li>
   </ul>
@@ -102,6 +103,7 @@ footer{text-align:center;padding:2rem;font-size:0.6rem;letter-spacing:0.1em;colo
     <li>Datos de cuenta y pedidos: mientras la cuenta esté activa, y hasta 2 años después de la última actividad</li>
     <li>Perfil olfativo (Nez): 90 días de inactividad, luego se elimina automáticamente</li>
     <li>Sesiones anónimas: el sessionId persiste en tu navegador hasta que lo borres. Los datos asociados en servidor expiran a los 90 días de inactividad</li>
+    <li>Actividad de navegación (analítica interna): se elimina automáticamente a los 90 días</li>
     <li>Carritos abandonados: el registro se elimina una vez enviado el recordatorio o completado el pedido</li>
     <li>Tokens de revocación de sesión: hasta el vencimiento natural del token</li>
   </ul>
@@ -112,7 +114,7 @@ footer{text-align:center;padding:2rem;font-size:0.6rem;letter-spacing:0.1em;colo
     <li>Comunicaciones cifradas mediante HTTPS / TLS 1.2+</li>
     <li>Contraseñas almacenadas con hash PBKDF2 — nunca en texto plano</li>
     <li>Tokens de sesión firmados con HMAC-SHA256</li>
-    <li>Rate limiting y detección de abuso</li>
+    <li>Rate limiting y detección de abuso (incluye registrar la dirección IP de las solicitudes)</li>
     <li>Sin acceso de terceros a datos de pago completos</li>
   </ul>
 
@@ -135,7 +137,7 @@ footer{text-align:center;padding:2rem;font-size:0.6rem;letter-spacing:0.1em;colo
     <li>Guardar tu perfil olfativo local para una experiencia más fluida con Nez</li>
     <li>Recordar si ya viste el aviso de privacidad</li>
   </ul>
-  <p>No hay pixels de seguimiento de terceros ni publicidad personalizada en nuestra plataforma.</p>
+  <p>No hay pixels de seguimiento de terceros ni publicidad personalizada en nuestra plataforma. Sí registramos actividad de navegación en nuestros propios servidores (ver sección 2) para analítica interna y seguridad — es distinto de un pixel de tercero: esos datos nunca salen de nuestra infraestructura ni se comparten con redes publicitarias.</p>
 
   <h2>11. Menores de edad</h2>
   <p>Nuestra tienda no está dirigida a menores de 18 años. No recopilamos intencionalmente datos de menores.</p>
