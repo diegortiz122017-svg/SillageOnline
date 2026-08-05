@@ -3710,6 +3710,7 @@ var slideCount=4; // se ajusta por producto a la cantidad real de fotos (mínimo
 var _detailOpenPid=null;
 function openDetail(pid){
   var p=P.find(function(x){return x.id===pid;});if(!p)return;
+  trackEvent('product_view', {id:pid});
   _detailOpenPid=pid;
   curSlide=0;
   document.getElementById('bcBrand').textContent=p.brand;
@@ -4397,6 +4398,7 @@ function addToCart(pid){
   if(ex)ex.qty++;
   else cart.push({p:p,qty:1,type:'full',label:p.brand+' '+p.name,unitPrice:effectivePrice(p),size:p.size});
   renderCart();saveCart();
+  trackEvent('cart_add', {id:pid});
   _reinforceProfileIfRecommended(pid);
 }
 
@@ -4418,6 +4420,7 @@ function addToCartWithOptions(pid, label, price, size, type){
   else cart.push({p:p,qty:1,type:type,label:label,unitPrice:price,size:size});
   renderCart();
   saveCart();
+  trackEvent('cart_add', {id:pid,type:type});
   _reinforceProfileIfRecommended(pid);
 }
 function removeFromCart(pid){cart=cart.filter(function(i){return i.p.id!==pid;});renderCart();saveCart();}
@@ -4594,6 +4597,7 @@ function goStep(n){
 }
 function openCheckout(){
   closeCart();goStep(1);
+  trackEvent('checkout_start');
   selectPayMethod('cod'); // default method — refreshes min-order note from server
   // Hide consent notice for logged-in users — they accepted at registration
   var notice = document.getElementById('checkoutConsentNotice');
@@ -7084,6 +7088,25 @@ function getBFScore(){
 // current session id, with the same TTL the server uses for anon sessions.
 var SOM_TRANSCRIPT_KEY = 'sillage_som_transcript';
 var SOM_TRANSCRIPT_TTL = 60 * 60 * 1000; // matches ANON_SESSION_TTL server-side
+
+// ── First-party activity tracking (pageview, nez_open, nez_message, ...) ─────
+// Fire-and-forget beacon to our own /api/track — no third-party pixels, tied to
+// the same anonymous sessionId already used for Nez/carrito.
+function trackEvent(eventType, meta){
+  try {
+    var headers = { 'Content-Type': 'application/json' };
+    if(typeof customerToken !== 'undefined' && customerToken) headers['x-customer-token'] = customerToken;
+    fetch(API + '/track', {
+      method: 'POST',
+      headers: headers,
+      body: JSON.stringify({
+        sessionId: _somSession, eventType: eventType,
+        page: location.pathname, meta: meta || null
+      })
+    }).catch(function(){});
+  } catch(e){}
+}
+
 function saveSomTranscript(){
   try {
     if(!_somMessages.length){ localStorage.removeItem(SOM_TRANSCRIPT_KEY); return; }
@@ -7131,6 +7154,7 @@ function restoreSomTranscript(){
         localStorage.setItem('sillage_session_id', d.sessionId);
       }
       restoreSomTranscript();
+      trackEvent('pageview');
       // Connect WS after session confirmed — sessionId will be ready for store_connect
       connectWS();
     })
@@ -7144,6 +7168,7 @@ function restoreSomTranscript(){
 
 function openSommelierModal(){
   _somOpen = true;
+  trackEvent('nez_open');
   _bf.modalOpenedAt = Date.now();
   _bf.interactionBeforeModal = _bf.mouseMove > 0 || _bf.scrolled;
   // If previous consultation is complete, start a new one automatically
@@ -7509,6 +7534,7 @@ function sommelierSend(){
   somAddMsg('user', text);
   _somMessages.push({ role: 'user', content: text });
   saveSomTranscript();
+  trackEvent('nez_message');
   // Warn when approaching conversation limit
   var userCount = _somMessages.filter(function(m){ return m.role === 'user'; }).length;
   if(userCount === 4){

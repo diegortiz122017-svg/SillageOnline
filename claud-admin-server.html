@@ -905,6 +905,20 @@ tr:hover td{background:rgba(255,255,255,0.02)}
             </div>
           </div>
 
+          <!-- Tráfico -->
+          <div class="an-section">
+            <div class="an-title">Tráfico</div>
+            <div class="an-grid-3">
+              <div class="an-card"><div class="an-val gold" id="an-tr-sessions">—</div><div class="an-lbl">Visitantes (sesiones)</div><div class="an-sub" id="an-tr-pageviews"></div></div>
+              <div class="an-card"><div class="an-val" id="an-tr-duration">—</div><div class="an-lbl">Tiempo promedio</div></div>
+              <div class="an-card"><div class="an-val" id="an-tr-checkout">—</div><div class="an-lbl">Iniciaron checkout</div></div>
+            </div>
+            <div class="an-card">
+              <div class="an-title" style="margin-bottom:0.6rem;font-size:0.7rem">Embudo</div>
+              <div id="an-tr-funnel"></div>
+            </div>
+          </div>
+
           <!-- Top products + brands -->
           <div class="an-grid">
             <div class="an-section">
@@ -925,6 +939,17 @@ tr:hover td{background:rgba(255,255,255,0.02)}
             <button onclick="clearAbuseAlerts()" style="background:none;border:none;color:#8a7f72;font-size:0.6rem;letter-spacing:0.1em;text-transform:uppercase;cursor:pointer">Limpiar</button>
           </div>
           <div id="abuseList"></div>
+        </div>
+
+        <!-- Session/IP activity search -->
+        <div class="act-wrap" style="margin-bottom:1.5rem">
+          <div class="act-title">Buscar actividad por sesión o IP</div>
+          <div style="display:flex;gap:0.5rem;margin:0.6rem 0 1rem">
+            <input id="actSearchInput" type="text" placeholder="sessionId (ss-...) o IP" onkeydown="if(event.key==='Enter')searchActivity()"
+              style="flex:1;padding:0.5rem 0.7rem;background:transparent;border:1px solid rgba(184,149,90,0.25);color:inherit;font-size:0.7rem;font-family:inherit"/>
+            <button onclick="searchActivity()" style="padding:0.5rem 1rem;background:transparent;border:1px solid rgba(184,149,90,0.4);color:#b8955a;font-size:0.62rem;letter-spacing:0.1em;text-transform:uppercase;cursor:pointer">Buscar</button>
+          </div>
+          <div id="actSearchResults" style="font-size:0.68rem"></div>
         </div>
 
         <div class="act-wrap"><div class="act-title">Actividad Reciente</div><div id="actList"></div></div>
@@ -1866,6 +1891,45 @@ function esc(str){
     .replace(/>/g,'&gt;')
     .replace(/"/g,'&quot;')
     .replace(/'/g,'&#39;');
+}
+
+// Busca la línea de tiempo de actividad de una sesión o IP — /api/track es
+// público (lo llama el navegador de cualquier visitante), así que TODO lo que
+// venga de ahí (page, meta, sessionId, ip) se escapa antes de insertarlo.
+var ACT_EVENT_LABELS = {
+  pageview:'Cargó página', nez_open:'Abrió a Nez', nez_message:'Escribió a Nez',
+  product_view:'Vio producto', cart_add:'Agregó al carrito', checkout_start:'Inició checkout'
+};
+function searchActivity(){
+  var input = document.getElementById('actSearchInput');
+  var resultsEl = document.getElementById('actSearchResults');
+  var val = (input && input.value || '').trim();
+  if(!val){ if(resultsEl) resultsEl.innerHTML=''; return; }
+  if(resultsEl) resultsEl.innerHTML = '<div style="color:#8a7f72">Buscando…</div>';
+  var isSession = val.indexOf('ss-') === 0;
+  var url = API + '/admin/activity?' + (isSession ? 'session=' : 'ip=') + encodeURIComponent(val);
+  adminFetch(url, {})
+    .then(function(r){ return r ? r.json() : null; })
+    .then(function(d){
+      if(!resultsEl) return;
+      if(!d || !d.events){ resultsEl.innerHTML = '<div style="color:#c05050">Error al buscar.</div>'; return; }
+      if(!d.events.length){ resultsEl.innerHTML = '<div style="color:#8a7f72">Sin actividad registrada para eso.</div>'; return; }
+      resultsEl.innerHTML = '<div style="max-height:360px;overflow-y:auto"><table style="width:100%;border-collapse:collapse">'+
+        '<thead><tr style="text-align:left;color:#8a7f72;font-size:0.58rem;text-transform:uppercase;letter-spacing:0.08em">'+
+        '<th style="padding:0.3rem 0.5rem 0.3rem 0">Hora</th><th>Evento</th><th>Página</th>'+(isSession?'<th>IP</th>':'<th>Sesión</th>')+'</tr></thead><tbody>'+
+        d.events.map(function(e){
+          var t = e.createdAt ? new Date(e.createdAt).toLocaleString('es-SV') : '';
+          var label = ACT_EVENT_LABELS[e.eventType] || e.eventType;
+          return '<tr style="border-top:1px solid rgba(184,149,90,0.08)">'+
+            '<td style="padding:0.35rem 0.5rem 0.35rem 0;white-space:nowrap">'+esc(t)+'</td>'+
+            '<td>'+esc(label)+(e.meta?' <span style="color:#8a7f72">'+esc(e.meta)+'</span>':'')+'</td>'+
+            '<td style="color:#8a7f72">'+esc(e.page)+'</td>'+
+            '<td style="color:#8a7f72;font-size:0.6rem">'+esc(isSession ? e.ip : e.sessionId)+'</td>'+
+          '</tr>';
+        }).join('')+
+        '</tbody></table></div>';
+    })
+    .catch(function(){ if(resultsEl) resultsEl.innerHTML = '<div style="color:#c05050">Error al buscar.</div>'; });
 }
 
 var API = window.location.origin + '/api';
@@ -2907,6 +2971,32 @@ function renderAnalytics(d){
       var h=Math.max(4,Math.round((x.revenue/max)*56));
       var dateStr=x.date?x.date.slice(5):'';
       return '<div class="an-bar" style="height:'+h+'px"><div class="an-bar-tip">'+dateStr+'<br>'+fmtRev(x.revenue)+'</div></div>';
+    }).join('');
+  }
+  // Traffic
+  var t=d.traffic||{};
+  var totalSessions=t.uniqueSessions||0;
+  set('an-tr-sessions', fmtN(totalSessions));
+  set('an-tr-pageviews', fmtN(t.pageviews||0)+' páginas vistas');
+  var avgSec=t.avgSessionSeconds||0;
+  set('an-tr-duration', Math.floor(avgSec/60)+':'+String(avgSec%60).padStart(2,'0'));
+  set('an-tr-checkout', fmtN(t.startedCheckout||0));
+  var funnelEl=document.getElementById('an-tr-funnel');
+  if(funnelEl){
+    var steps=[
+      {label:'Visitantes',val:totalSessions},
+      {label:'Vieron un producto',val:t.viewedProduct||0},
+      {label:'Agregaron al carrito',val:t.addedToCart||0},
+      {label:'Iniciaron checkout',val:t.startedCheckout||0},
+      {label:'Abrieron a Nez',val:t.nezOpened||0},
+      {label:'Le escribieron a Nez',val:t.nezMessaged||0},
+    ];
+    funnelEl.innerHTML=steps.map(function(s){
+      var pct=totalSessions?Math.round((s.val/totalSessions)*100):0;
+      return '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:0.4rem;font-size:0.68rem">'+
+        '<span style="color:var(--muted)">'+s.label+'</span>'+
+        '<span>'+fmtN(s.val)+' <span style="color:var(--muted)">('+pct+'%)</span></span>'+
+      '</div>';
     }).join('');
   }
   // Top products

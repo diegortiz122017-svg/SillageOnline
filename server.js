@@ -193,6 +193,26 @@ async function initDB() {
   `);
 
   await db.execute(`
+    CREATE TABLE IF NOT EXISTS activity_events (
+      id          BIGINT AUTO_INCREMENT PRIMARY KEY,
+      session_id  VARCHAR(100) DEFAULT NULL,
+      customer_id INT DEFAULT NULL,
+      event_type  VARCHAR(30)  NOT NULL,
+      page        VARCHAR(255) DEFAULT NULL,
+      meta        VARCHAR(255) DEFAULT NULL,
+      ip          VARCHAR(100) DEFAULT NULL,
+      user_agent  VARCHAR(255) DEFAULT NULL,
+      created_at  DATETIME NOT NULL,
+      INDEX idx_session (session_id),
+      INDEX idx_customer (customer_id),
+      INDEX idx_created (created_at),
+      INDEX idx_event (event_type)
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
+  `);
+  // Cleanup: eventos de actividad más viejos de 90 días (mismo criterio que scent_profiles)
+  try { await db.execute('DELETE FROM activity_events WHERE created_at < DATE_SUB(NOW(), INTERVAL 90 DAY)'); } catch(e) {}
+
+  await db.execute(`
     CREATE TABLE IF NOT EXISTS scent_profiles (
       id          INT AUTO_INCREMENT PRIMARY KEY,
       customer_id INT DEFAULT NULL,
@@ -3157,6 +3177,69 @@ setInterval(() => {
   for (const [ip, rec] of _sessionInitTracker.entries())
     if (rec.start < cutoff) _sessionInitTracker.delete(ip);
 }, 60 * 60 * 1000);
+
+// POST /api/track — lightweight first-party activity event (pageview, nez_open,
+// nez_message, product_view, cart_add, checkout_start). No third-party pixels —
+// stored in our own DB, tied to the same anonymous sessionId already used for
+// Nez/carrito. Rate limited so this new public endpoint can't itself become an
+// abuse/log-flooding vector.
+const ACTIVITY_EVENT_TYPES = new Set(['pageview', 'nez_open', 'nez_message', 'product_view', 'cart_add', 'checkout_start']);
+const trackLimiter = rateLimit(60, 10 * 60 * 1000); // 60 eventos / 10min / IP — de sobra para navegar de verdad
+
+app.post('/api/track', trackLimiter, async (req, res) => {
+  const { sessionId, eventType, page, meta } = req.body || {};
+  if (!ACTIVITY_EVENT_TYPES.has(eventType)) return res.status(400).json({ error: 'Invalid event type' });
+
+  const customerToken   = req.headers['x-customer-token'];
+  const customerSession = customerToken ? validateSession(customerToken) : null;
+  const customerId      = (customerSession && customerSession.role === 'customer') ? customerSession.user.id : null;
+
+  let metaStr = null;
+  if (meta != null) {
+    metaStr = (typeof meta === 'string' ? meta : JSON.stringify(meta)).slice(0, 255);
+  }
+
+  try {
+    await db.execute(
+      `INSERT INTO activity_events (session_id, customer_id, event_type, page, meta, ip, user_agent, created_at)
+       VALUES (?,?,?,?,?,?,?,?)`,
+      [
+        sessionId ? String(sessionId).slice(0, 100) : null,
+        customerId,
+        eventType,
+        page ? String(page).slice(0, 255) : null,
+        metaStr,
+        getIp(req),
+        String(req.headers['user-agent'] || '').slice(0, 255) || null,
+        new Date(),
+      ]
+    );
+    res.json({ ok: true });
+  } catch(e) {
+    res.status(500).json({ error: 'Track failed' });
+  }
+});
+
+// GET /api/admin/activity?session=X  or  ?ip=X — línea de tiempo completa de una
+// sesión, o todas las sesiones vistas desde una IP (para investigar tráfico
+// sospechoso: qué hizo esa sesión además de pedir sesiones nuevas).
+app.get('/api/admin/activity', requireAdmin, async (req, res) => {
+  const session = req.query.session ? String(req.query.session).slice(0, 100) : null;
+  const ip      = req.query.ip      ? String(req.query.ip).slice(0, 100)      : null;
+  if (!session && !ip) return res.status(400).json({ error: 'Provee session o ip' });
+  try {
+    const [rows] = session
+      ? await db.execute('SELECT * FROM activity_events WHERE session_id=? ORDER BY created_at ASC LIMIT 500', [session])
+      : await db.execute('SELECT * FROM activity_events WHERE ip=? ORDER BY created_at ASC LIMIT 500', [ip]);
+    res.json({
+      events: rows.map(r => ({
+        id: r.id, sessionId: r.session_id, customerId: r.customer_id,
+        eventType: r.event_type, page: r.page, meta: r.meta,
+        ip: r.ip, userAgent: r.user_agent, createdAt: r.created_at,
+      })),
+    });
+  } catch(e) { res.status(500).json({ error: 'Query failed' }); }
+});
 
 // ── BTCPay pending cleanup ────────────────────────────
 // Delete expired pending orders every 30 min (invoice expired, user never paid)
@@ -7010,6 +7093,33 @@ app.get('/api/analytics', requireAdmin, async (req, res) => {
       FROM orders GROUP BY payment_method
     `);
 
+    // ── Traffic / activity funnel ──────────────────────
+    // Cuenta sesiones distintas por evento — responde "cuánta gente entró vs.
+    // cuánta hizo X", que antes no se podía calcular (no había registro de visitas).
+    const [trafficRows] = await db.query(`
+      SELECT
+        COUNT(DISTINCT session_id)                                                       AS uniqueSessions,
+        COUNT(CASE WHEN event_type='pageview' THEN 1 END)                                AS pageviews,
+        COUNT(DISTINCT CASE WHEN event_type='nez_open'        THEN session_id END)       AS nezOpened,
+        COUNT(DISTINCT CASE WHEN event_type='nez_message'     THEN session_id END)       AS nezMessaged,
+        COUNT(DISTINCT CASE WHEN event_type='product_view'    THEN session_id END)       AS viewedProduct,
+        COUNT(DISTINCT CASE WHEN event_type='cart_add'        THEN session_id END)       AS addedToCart,
+        COUNT(DISTINCT CASE WHEN event_type='checkout_start'  THEN session_id END)       AS startedCheckout
+      FROM activity_events
+      WHERE DATE(created_at) BETWEEN ? AND ?
+    `, [rangeFrom, rangeTo]);
+
+    // Duración de sesión promedio — diferencia entre primer y último evento por sesión
+    const [durationRows] = await db.query(`
+      SELECT AVG(TIMESTAMPDIFF(SECOND, minTs, maxTs)) AS avgSessionSeconds
+      FROM (
+        SELECT session_id, MIN(created_at) AS minTs, MAX(created_at) AS maxTs
+        FROM activity_events
+        WHERE DATE(created_at) BETWEEN ? AND ? AND session_id IS NOT NULL
+        GROUP BY session_id
+      ) t
+    `, [rangeFrom, rangeTo]);
+
     res.json({
       range:      { from: rangeFrom, to: rangeTo },
       revenue:    revRows[0],
@@ -7018,7 +7128,8 @@ app.get('/api/analytics', requireAdmin, async (req, res) => {
       topBrands,
       customers:  custRows[0],
       nez:      { ...nezRows[0], ...consultRows[0] },
-      paymentMethods: pmRows.map(r => ({ method: r.payment_method, count: r.cnt, revenue: parseFloat(r.rev||0) }))
+      paymentMethods: pmRows.map(r => ({ method: r.payment_method, count: r.cnt, revenue: parseFloat(r.rev||0) })),
+      traffic: { ...trafficRows[0], avgSessionSeconds: Math.round(durationRows[0].avgSessionSeconds || 0) },
     });
   } catch(e) {
     console.error('Analytics error:', e.message);
