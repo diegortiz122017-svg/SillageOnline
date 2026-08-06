@@ -783,6 +783,7 @@ tr:hover td{background:rgba(255,255,255,0.02)}
         <div class="sb-section">Operaciones</div>
         <button class="nav-btn active" data-page="overview"><span class="nav-icon">📊</span>Resumen</button>
         <button class="nav-btn" data-page="orders"><span class="nav-icon">🧾</span>Pedidos</button>
+        <button class="nav-btn" data-page="trafico"><span class="nav-icon">🌐</span>Tráfico</button>
         <div class="sb-section">Inventario</div>
         <button class="nav-btn" data-page="inventory"><span class="nav-icon">📦</span>Inventario</button>
         <div class="sb-section">Catálogo</div>
@@ -905,20 +906,6 @@ tr:hover td{background:rgba(255,255,255,0.02)}
             </div>
           </div>
 
-          <!-- Tráfico -->
-          <div class="an-section">
-            <div class="an-title">Tráfico</div>
-            <div class="an-grid-3">
-              <div class="an-card"><div class="an-val gold" id="an-tr-sessions">—</div><div class="an-lbl">Visitantes (sesiones)</div><div class="an-sub" id="an-tr-pageviews"></div></div>
-              <div class="an-card"><div class="an-val" id="an-tr-duration">—</div><div class="an-lbl">Tiempo promedio</div></div>
-              <div class="an-card"><div class="an-val" id="an-tr-checkout">—</div><div class="an-lbl">Iniciaron checkout</div></div>
-            </div>
-            <div class="an-card">
-              <div class="an-title" style="margin-bottom:0.6rem;font-size:0.7rem">Embudo</div>
-              <div id="an-tr-funnel"></div>
-            </div>
-          </div>
-
           <!-- Top products + brands -->
           <div class="an-grid">
             <div class="an-section">
@@ -932,6 +919,25 @@ tr:hover td{background:rgba(255,255,255,0.02)}
           </div>
         </div>
 
+        <div class="act-wrap"><div class="act-title">Actividad Reciente</div><div id="actList"></div></div>
+      </div>
+
+      <div class="page" id="page-trafico">
+        <div style="display:flex;align-items:flex-start;justify-content:space-between;flex-wrap:wrap;gap:0.8rem;margin-bottom:0.5rem">
+          <div>
+            <div class="page-title">Tráfico</div>
+            <div class="page-sub" style="margin-bottom:0">Visitas, embudo de conversión y detección de tráfico sospechoso</div>
+          </div>
+        </div>
+        <div class="time-filter" style="margin-bottom:1.2rem">
+          <span class="tf-label">Período</span>
+          <button class="tf-btn" onclick="setTimeRange(7)"   data-range="7">7 días</button>
+          <button class="tf-btn active" onclick="setTimeRange(30)"  data-range="30">30 días</button>
+          <button class="tf-btn" onclick="setTimeRange(90)"  data-range="90">90 días</button>
+          <button class="tf-btn" onclick="setTimeRange(365)" data-range="365">Este año</button>
+          <button class="tf-btn" onclick="setTimeRange(0)"   data-range="0">Todo</button>
+        </div>
+
         <!-- Abuse Alerts Panel -->
         <div id="abusePanel" style="display:none;margin-bottom:1.5rem;padding:1rem 1.2rem;background:rgba(192,80,80,0.06);border:1px solid rgba(192,80,80,0.3);border-radius:2px">
           <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:0.8rem">
@@ -939,6 +945,20 @@ tr:hover td{background:rgba(255,255,255,0.02)}
             <button onclick="clearAbuseAlerts()" style="background:none;border:none;color:#8a7f72;font-size:0.6rem;letter-spacing:0.1em;text-transform:uppercase;cursor:pointer">Limpiar</button>
           </div>
           <div id="abuseList"></div>
+        </div>
+
+        <!-- Traffic summary + funnel -->
+        <div class="an-section">
+          <div class="an-title">Resumen</div>
+          <div class="an-grid-3">
+            <div class="an-card"><div class="an-val gold" id="an-tr-sessions">—</div><div class="an-lbl">Visitantes (sesiones)</div><div class="an-sub" id="an-tr-pageviews"></div></div>
+            <div class="an-card"><div class="an-val" id="an-tr-duration">—</div><div class="an-lbl">Tiempo promedio</div></div>
+            <div class="an-card"><div class="an-val" id="an-tr-checkout">—</div><div class="an-lbl">Iniciaron checkout</div></div>
+          </div>
+          <div class="an-card">
+            <div class="an-title" style="margin-bottom:0.6rem;font-size:0.7rem">Embudo</div>
+            <div id="an-tr-funnel"></div>
+          </div>
         </div>
 
         <!-- Session/IP activity search -->
@@ -952,8 +972,19 @@ tr:hover td{background:rgba(255,255,255,0.02)}
           <div id="actSearchResults" style="font-size:0.68rem"></div>
         </div>
 
-        <div class="act-wrap"><div class="act-title">Actividad Reciente</div><div id="actList"></div></div>
+        <!-- Traffic by IP — forensic table for spotting bot patterns -->
+        <div class="act-wrap">
+          <div class="act-title" style="display:flex;justify-content:space-between;align-items:center">
+            <span>Tráfico por IP</span>
+            <span style="font-size:0.58rem;color:var(--muted);font-weight:400;text-transform:none;letter-spacing:0.02em" id="trIpSub"></span>
+          </div>
+          <div style="font-size:0.6rem;color:var(--muted);margin:0.4rem 0 0.8rem;line-height:1.5">
+            Agrupado por IP. Marcado en rojo: varias sesiones o varios User-Agent distintos desde la misma IP, o visitas sin ninguna interacción real — el mismo patrón que confirma tráfico de bot/farm en vez de visitantes reales.
+          </div>
+          <div id="trIpTable" style="overflow-x:auto"><div style="color:var(--muted);font-size:0.7rem">Cargando…</div></div>
+        </div>
       </div>
+
       <div class="page" id="page-inventory">
         <div class="page-title">Inventario</div>
         <div class="inner-tabs">
@@ -2212,6 +2243,7 @@ function navTo(page){
   }
   if(page==='pricing'){  renderPricing(); loadShippingConfig(); setTimeout(initSaleEmailUI, 800); loadNotifEmails(); }
   if(page==='orders'){   renderOrders(); fetchAllData(); }
+  if(page==='trafico'){  if(sessionToken) loadAnalytics(); loadTrafficByIp(); }
   if(page==='catalogo'){ loadCatalogue(); }
   if(page==='bundles'){
     switchToPage('catalogo');
@@ -2933,6 +2965,60 @@ function loadAnalytics(){
     })
     .then(function(d){ if(d) renderAnalytics(d); })
     .catch(function(){});
+}
+
+// Tráfico por IP — trae activity_events agrupado por IP para que patrones de
+// bot/farm (varias sesiones o varios UA desde una sola IP, o pageviews sin
+// ninguna interacción real) se vean a simple vista sin tener que investigar
+// IP por IP como se hizo manualmente antes.
+function loadTrafficByIp(){
+  if(!sessionToken) return;
+  var days = activeRange>0 ? activeRange : 90;
+  var tbl = document.getElementById('trIpTable');
+  if(tbl) tbl.innerHTML = '<div style="color:var(--muted);font-size:0.7rem">Cargando…</div>';
+  adminFetch(API+'/admin/traffic-by-ip?days='+days,{})
+    .then(function(r){ return r ? r.json() : null; })
+    .then(function(d){ if(d) renderTrafficByIp(d); })
+    .catch(function(){ if(tbl) tbl.innerHTML = '<div style="color:#c05050;font-size:0.7rem">Error al cargar.</div>'; });
+}
+function renderTrafficByIp(d){
+  var tbl = document.getElementById('trIpTable');
+  var sub = document.getElementById('trIpSub');
+  if(sub) sub.textContent = 'Últimos '+fmtN(d.days)+' días · '+fmtN((d.ips||[]).length)+' IPs';
+  if(!tbl) return;
+  var rows = d.ips || [];
+  if(!rows.length){ tbl.innerHTML = '<div style="color:var(--muted);font-size:0.7rem">Sin tráfico registrado en este período.</div>'; return; }
+  tbl.innerHTML = '<table style="width:100%;border-collapse:collapse;min-width:760px">'+
+    '<thead><tr style="text-align:left;color:#8a7f72;font-size:0.58rem;text-transform:uppercase;letter-spacing:0.06em">'+
+      '<th style="padding:0.3rem 0.6rem 0.3rem 0">IP</th>'+
+      '<th style="padding:0.3rem 0.6rem">Sesiones</th>'+
+      '<th style="padding:0.3rem 0.6rem">User-Agents</th>'+
+      '<th style="padding:0.3rem 0.6rem">Vieron producto</th>'+
+      '<th style="padding:0.3rem 0.6rem">Carrito</th>'+
+      '<th style="padding:0.3rem 0.6rem">Nez</th>'+
+      '<th style="padding:0.3rem 0.6rem">Primera vez</th>'+
+      '<th style="padding:0.3rem 0.6rem">Última vez</th>'+
+      '<th style="padding:0.3rem 0 0.3rem 0.6rem">User-Agent (muestra)</th>'+
+    '</tr></thead><tbody>'+
+    rows.map(function(row){
+      var noInteraction = row.pageviews>0 && !row.productViewSessions && !row.cartAddSessions && !row.nezOpenSessions && !row.checkoutSessions;
+      var farmPattern = row.sessionCount>=3 && row.uaCount>=2;
+      var suspicious = noInteraction || farmPattern;
+      var rowStyle = suspicious ? 'border-top:1px solid rgba(192,80,80,0.15);background:rgba(192,80,80,0.05)' : 'border-top:1px solid rgba(184,149,90,0.08)';
+      var ipStyle = suspicious ? 'color:#c05050' : '';
+      return '<tr style="'+rowStyle+'">'+
+        '<td style="padding:0.4rem 0.6rem 0.4rem 0;font-family:monospace;font-size:0.66rem;'+ipStyle+'" title="'+(suspicious?'Patrón sospechoso':'')+'">'+esc(row.ip)+(suspicious?' ⚠':'')+'</td>'+
+        '<td style="padding:0.4rem 0.6rem">'+fmtN(row.sessionCount)+'</td>'+
+        '<td style="padding:0.4rem 0.6rem'+(row.uaCount>=2?';color:#c05050':'')+'">'+fmtN(row.uaCount)+'</td>'+
+        '<td style="padding:0.4rem 0.6rem;color:var(--muted)">'+fmtN(row.productViewSessions)+'</td>'+
+        '<td style="padding:0.4rem 0.6rem;color:var(--muted)">'+fmtN(row.cartAddSessions)+'</td>'+
+        '<td style="padding:0.4rem 0.6rem;color:var(--muted)">'+fmtN(row.nezOpenSessions)+'</td>'+
+        '<td style="padding:0.4rem 0.6rem;color:var(--muted);white-space:nowrap">'+esc(fmtActTime(row.firstSeen))+'</td>'+
+        '<td style="padding:0.4rem 0.6rem;color:var(--muted);white-space:nowrap">'+esc(fmtActTime(row.lastSeen))+'</td>'+
+        '<td style="padding:0.4rem 0 0.4rem 0.6rem;color:var(--muted);font-size:0.6rem;max-width:280px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="'+esc(row.sampleUA||'')+'">'+esc(row.sampleUA||'—')+'</td>'+
+      '</tr>';
+    }).join('')+
+    '</tbody></table>';
 }
 
 function renderAnalytics(d){

@@ -3248,6 +3248,40 @@ app.get('/api/admin/activity', requireAdmin, async (req, res) => {
   } catch(e) { res.status(500).json({ error: 'Query failed' }); }
 });
 
+// GET /api/admin/traffic-by-ip?days=N — agrega activity_events por IP para
+// detectar patrones de bot/abuso a simple vista: muchas sesiones o muchos
+// user-agents distintos desde una sola IP, o mucho pageview sin ninguna
+// interacción real (mismo patrón que confirmamos manualmente con el "bot
+// farm" de Datacamp Limited, ahora visible sin tener que investigarlo caso
+// por caso).
+app.get('/api/admin/traffic-by-ip', requireAdmin, async (req, res) => {
+  let days = parseInt(req.query.days) || 7;
+  days = Math.min(Math.max(days, 1), 90);
+  try {
+    const [rows] = await db.query(`
+      SELECT
+        ip,
+        COUNT(DISTINCT session_id)                                                AS sessionCount,
+        COUNT(DISTINCT user_agent)                                                AS uaCount,
+        COUNT(*)                                                                  AS events,
+        COUNT(CASE WHEN event_type='pageview' THEN 1 END)                        AS pageviews,
+        COUNT(DISTINCT CASE WHEN event_type='product_view'   THEN session_id END) AS productViewSessions,
+        COUNT(DISTINCT CASE WHEN event_type='cart_add'       THEN session_id END) AS cartAddSessions,
+        COUNT(DISTINCT CASE WHEN event_type='nez_open'       THEN session_id END) AS nezOpenSessions,
+        COUNT(DISTINCT CASE WHEN event_type='checkout_start' THEN session_id END) AS checkoutSessions,
+        MIN(created_at) AS firstSeen,
+        MAX(created_at) AS lastSeen,
+        MAX(user_agent) AS sampleUA
+      FROM activity_events
+      WHERE ip IS NOT NULL AND created_at >= DATE_SUB(NOW(), INTERVAL ? DAY)
+      GROUP BY ip
+      ORDER BY events DESC
+      LIMIT 100
+    `, [days]);
+    res.json({ days, ips: rows });
+  } catch(e) { res.status(500).json({ error: 'Query failed' }); }
+});
+
 // ── BTCPay pending cleanup ────────────────────────────
 // Delete expired pending orders every 30 min (invoice expired, user never paid)
 setInterval(async () => {
