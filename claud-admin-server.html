@@ -979,7 +979,7 @@ tr:hover td{background:rgba(255,255,255,0.02)}
             <span style="font-size:0.58rem;color:var(--muted);font-weight:400;text-transform:none;letter-spacing:0.02em" id="trIpSub"></span>
           </div>
           <div style="font-size:0.6rem;color:var(--muted);margin:0.4rem 0 0.8rem;line-height:1.5">
-            Agrupado por IP. Marcado en rojo: 4 o más sesiones <strong>y</strong> 2 o más User-Agent distintos desde la misma IP — el mismo patrón que confirma tráfico de bot/farm en vez de un par de visitantes reales compartiendo conexión.
+            Agrupado por IP. Marcado en rojo: 4 o más sesiones <strong>y</strong> 2 o más User-Agent distintos desde la misma IP <strong>y</strong> ninguna de esas sesiones vio producto, agregó al carrito, abrió a Nez o inició checkout — el patrón real de bot/farm, no un par de visitantes reales compartiendo conexión que sí navegaron el catálogo.
           </div>
           <div id="trIpTable" style="overflow-x:auto"><div style="color:var(--muted);font-size:0.7rem">Cargando…</div></div>
         </div>
@@ -3004,12 +3004,14 @@ function renderTrafficByIp(d){
       '<th style="padding:0.3rem 0 0.3rem 0.6rem">User-Agent (muestra)</th>'+
     '</tr></thead><tbody>'+
     rows.map(function(row){
-      // No marcamos "sin interacción" solo — es el comportamiento normal de la
-      // mayoría de visitantes reales (rebote simple) y marcarlo generaba ruido,
-      // no señal. Lo que sí destaca es una sola IP generando varias sesiones
-      // con varios user-agents distintos — el patrón real que confirmó el
-      // "bot farm" de Datacamp Limited investigado antes.
-      var suspicious = row.sessionCount>=4 && row.uaCount>=2;
+      // Ni "varias sesiones/UA" ni "sin interacción" solos son señal — lo primero
+      // pasa con wifi compartido o CGNAT de operadora, lo segundo con cualquier
+      // rebote normal. Lo que sí confirma bot/farm (patrón real de Datacamp
+      // Limited investigado antes) es la combinación: una IP generando varias
+      // sesiones con varios user-agents SIN que ninguna de esas sesiones haya
+      // interactuado de verdad (ni vio producto, ni carrito, ni Nez, ni checkout).
+      var noRealInteraction = !row.productViewSessions && !row.cartAddSessions && !row.nezOpenSessions && !row.checkoutSessions;
+      var suspicious = row.sessionCount>=4 && row.uaCount>=2 && noRealInteraction;
       var rowStyle = suspicious ? 'border-top:1px solid rgba(192,80,80,0.15);background:rgba(192,80,80,0.05)' : 'border-top:1px solid rgba(184,149,90,0.08)';
       var ipStyle = suspicious ? 'color:#c05050' : '';
       return '<tr style="'+rowStyle+'">'+
