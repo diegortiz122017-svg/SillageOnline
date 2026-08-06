@@ -1798,12 +1798,12 @@ footer{background:var(--dark);padding:3.5rem 4rem;text-align:center;border-top:1
   text-align:left;transition:all 0.2s;width:100%;
 }
 .som-rec-btn:hover{color:#e8dcc8;border-bottom-color:rgba(184,149,90,0.4);padding-left:0.4rem}
-.som-quickstart{display:flex;flex-wrap:nowrap;gap:0.45rem;margin:0.9rem 0 0.4rem 1rem}
+.som-quickstart{display:flex;flex-direction:column;gap:0.5rem;margin:0.9rem 0 0.4rem 1rem}
 .som-qs-btn{
-  flex:1;min-width:0;display:flex;align-items:center;justify-content:center;gap:0.35rem;
+  width:100%;box-sizing:border-box;display:flex;align-items:center;justify-content:flex-start;gap:0.6rem;
   background:rgba(184,149,90,0.05);border:1px solid rgba(184,149,90,0.22);border-radius:10px;
-  color:#d4af7a;font-family:'Jost',sans-serif;font-size:0.58rem;letter-spacing:0.02em;
-  padding:0.55rem 0.4rem;cursor:pointer;white-space:nowrap;transition:all 0.2s;
+  color:#d4af7a;font-family:'Jost',sans-serif;font-size:0.66rem;letter-spacing:0.02em;
+  padding:0.7rem 0.9rem;cursor:pointer;transition:all 0.2s;
 }
 .som-qs-btn:hover{background:rgba(184,149,90,0.12);border-color:rgba(184,149,90,0.45);color:#e8dcc8}
 .som-qs-btn svg{flex-shrink:0}
@@ -7494,7 +7494,7 @@ function renderSomQuickStart(){
     var b = document.createElement('button');
     b.className = 'som-qs-btn';
     b.type = 'button';
-    b.innerHTML = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#b8955a" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">'+opt.icon+'</svg>'+opt.label;
+    b.innerHTML = '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#b8955a" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">'+opt.icon+'</svg>'+opt.label;
     b.addEventListener('click', function(){ somQuickStart(opt.text); });
     qsDiv.appendChild(b);
   });
