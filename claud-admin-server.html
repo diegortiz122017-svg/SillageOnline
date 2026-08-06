@@ -1588,11 +1588,13 @@ tr:hover td{background:rgba(255,255,255,0.02)}
     <div class="mob-drawer">
       <div class="mob-drawer-handle"></div>
       <div class="mob-drawer-title">Más opciones</div>
+      <button class="mob-drawer-item" data-page="trafico" onclick="navToFromDrawer('trafico')"><span class="mob-icon">🌐</span>Tráfico</button>
       <button class="mob-drawer-item" data-page="promos" onclick="navToFromDrawer('promos')"><span class="mob-icon">🏷️</span>Descuentos</button>
       <button class="mob-drawer-item" data-page="bundles" onclick="navToFromDrawer('catalogo')"><span class="mob-icon">🎁</span>Catálogo</button>
       <button class="mob-drawer-item" data-page="decants" onclick="navToFromDrawer('decants')"><span class="mob-icon">🧪</span>Decants</button>
       <button class="mob-drawer-item" data-page="cod" onclick="navToFromDrawer('cod')"><span class="mob-icon">🛡️</span>COD</button>
       <button class="mob-drawer-item" data-page="clientes" onclick="navToFromDrawer('clientes')"><span class="mob-icon">👤</span>Clientes</button>
+      <button class="mob-drawer-item" data-page="emails" onclick="navToFromDrawer('emails')"><span class="mob-icon">✉️</span>Emails</button>
       <button class="mob-drawer-item" data-page="dte" onclick="navToFromDrawer('dte')"><span class="mob-icon">📄</span>DTE</button>
     </div>
   </div>
@@ -2442,10 +2444,11 @@ function renderOverview(){
 function handleExpiredSession(){
   sessionToken = null;
   localStorage.removeItem('sillage_admin_token');
-  document.getElementById('loginWrap').style.display='flex';
-  document.getElementById('appWrap').style.display='none';
-  document.getElementById('loginErr').textContent='Tu sesión expiró. Por favor inicia sesión de nuevo.';
-  document.getElementById('loginErr').style.display='block';
+  localStorage.removeItem('sillage_admin_ts');
+  if(ws){ ws.close(); ws=null; }
+  document.getElementById('dashboard').classList.remove('show');
+  document.getElementById('loginScreen').style.display='flex';
+  document.getElementById('lerr').textContent='Tu sesión expiró. Por favor inicia sesión de nuevo.';
 }
 
 // Centralized fetch wrapper — auto-handles 401 on any admin API call
