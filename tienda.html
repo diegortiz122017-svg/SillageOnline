@@ -1563,6 +1563,7 @@ footer{background:var(--dark);padding:3.5rem 4rem;text-align:center;border-top:1
 .som-modal{
   width:100%;max-width:500px;max-height:85vh;
   background:#1a1714;border:1px solid rgba(184,149,90,0.3);
+  border-radius:20px;overflow:hidden;
   display:flex;flex-direction:column;
   box-shadow:0 24px 80px rgba(0,0,0,0.7);
   transform:translateY(16px);opacity:0;
@@ -1797,6 +1798,15 @@ footer{background:var(--dark);padding:3.5rem 4rem;text-align:center;border-top:1
   text-align:left;transition:all 0.2s;width:100%;
 }
 .som-rec-btn:hover{color:#e8dcc8;border-bottom-color:rgba(184,149,90,0.4);padding-left:0.4rem}
+.som-quickstart{display:flex;flex-wrap:nowrap;gap:0.45rem;margin:0.9rem 0 0.4rem 1rem}
+.som-qs-btn{
+  flex:1;min-width:0;display:flex;align-items:center;justify-content:center;gap:0.35rem;
+  background:rgba(184,149,90,0.05);border:1px solid rgba(184,149,90,0.22);border-radius:10px;
+  color:#d4af7a;font-family:'Jost',sans-serif;font-size:0.58rem;letter-spacing:0.02em;
+  padding:0.55rem 0.4rem;cursor:pointer;white-space:nowrap;transition:all 0.2s;
+}
+.som-qs-btn:hover{background:rgba(184,149,90,0.12);border-color:rgba(184,149,90,0.45);color:#e8dcc8}
+.som-qs-btn svg{flex-shrink:0}
 .som-input-row{
   display:flex;border-top:1px solid rgba(184,149,90,0.1);flex-shrink:0;background:rgba(184,149,90,0.02);
 }
@@ -7454,6 +7464,43 @@ function sommelierStart(){
     _greeting = 'Hola, soy Nez — tu sommelier en Sillage. ¿Qué tipo de fragancia buscás, o para qué ocasión?';
   }
   somAddMsg('bot', _greeting);
+  renderSomQuickStart();
+}
+
+// Botones de inicio rápido — solo en el saludo inicial (sommelierStart se
+// llama únicamente cuando _somMessages está vacío), para bajar la barrera de
+// "no sé qué escribirle a Nez" que es la causa más probable de que casi nadie
+// le mande un primer mensaje.
+var _SOM_QS_OPTIONS = [
+  { label:'Para diario', text:'Busco algo para uso diario',
+    icon:'<circle cx="12" cy="12" r="4"/><path d="M12 3v2M12 19v2M4.2 4.2l1.4 1.4M18.4 18.4l1.4 1.4M3 12h2M19 12h2M4.2 19.8l1.4-1.4M18.4 5.6l1.4-1.4"/>' },
+  { label:'Un regalo', text:'Busco un regalo',
+    icon:'<rect x="4" y="9" width="16" height="11" rx="1"/><path d="M4 9h16M12 9v11M12 9c-1.5-3-5-4-5-1.5S9 9 12 9zM12 9c1.5-3 5-4 5-1.5S15 9 12 9z"/>' },
+  { label:'Sorpréndeme', text:'Sorpréndeme, recomendame algo',
+    icon:'<path d="M12 3v4M12 17v4M3 12h4M17 12h4M6 6l2 2M16 16l2 2M18 6l-2 2M8 16l-2 2"/>' }
+];
+function renderSomQuickStart(){
+  var container = document.getElementById('somMessages');
+  if(!container) return;
+  var qsDiv = document.createElement('div');
+  qsDiv.className = 'som-quickstart';
+  qsDiv.id = 'somQuickStart';
+  _SOM_QS_OPTIONS.forEach(function(opt){
+    var b = document.createElement('button');
+    b.className = 'som-qs-btn';
+    b.type = 'button';
+    b.innerHTML = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#b8955a" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">'+opt.icon+'</svg>'+opt.label;
+    b.addEventListener('click', function(){ somQuickStart(opt.text); });
+    qsDiv.appendChild(b);
+  });
+  container.appendChild(qsDiv);
+}
+function somQuickStart(text){
+  var qs = document.getElementById('somQuickStart');
+  if(qs) qs.remove();
+  var input = document.getElementById('somInput');
+  if(input) input.value = text;
+  sommelierSend();
 }
 
 function updateSomProgress(n){
@@ -7520,6 +7567,8 @@ function sommelierSend(){
   var text  = input.value.trim();
   if(!text) return;
   input.value = '';
+  var qs = document.getElementById('somQuickStart');
+  if(qs) qs.remove();
 
   somAddMsg('user', text);
   _somMessages.push({ role: 'user', content: text });
