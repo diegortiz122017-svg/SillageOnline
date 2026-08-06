@@ -2388,16 +2388,17 @@ function renderOverview(){
   activity.slice(0,15).forEach(function(a){
     var row = document.createElement('div');
     row.className = 'act-row';
+    var displayTime = fmtActTime(a.time);
     var orderMatch = a.msg.match(/Nuevo pedido ([^ ]+)/);
     if(orderMatch){
       var oid = orderMatch[1];
       row.style.cssText = 'cursor:pointer;border-left:2px solid rgba(184,149,90,0.3);padding-left:0.6rem;transition:border-color 0.2s';
-      row.innerHTML = '<span class="act-msg">'+a.msg+'</span><span class="act-time">'+a.time+' <span style="color:var(--gold);font-size:0.5rem;letter-spacing:0.1em">VER →</span></span>';
+      row.innerHTML = '<span class="act-msg">'+a.msg+'</span><span class="act-time">'+displayTime+' <span style="color:var(--gold);font-size:0.5rem;letter-spacing:0.1em">VER →</span></span>';
       row.addEventListener('click', function(){ goToOrder(oid); });
       row.addEventListener('mouseenter', function(){ this.style.borderColor='var(--gold)'; });
       row.addEventListener('mouseleave', function(){ this.style.borderColor='rgba(184,149,90,0.3)'; });
     } else {
-      row.innerHTML = '<span class="act-msg">'+a.msg+'</span><span class="act-time">'+a.time+'</span>';
+      row.innerHTML = '<span class="act-msg">'+a.msg+'</span><span class="act-time">'+displayTime+'</span>';
     }
     actFrag.appendChild(row);
   });
@@ -2899,6 +2900,20 @@ function dteEmitForOrder(){
 // ── ANALYTICS ─────────────────────────────────────
 function fmtRev(v){ return '$'+(+v||0).toFixed(2).replace(/\B(?=(\d{3})+(?!\d))/g,','); }
 function fmtN(v){ return (parseInt(v)||0).toLocaleString(); }
+// Formats an activity timestamp in the admin's OWN browser timezone (this
+// machine is in El Salvador) instead of trusting whatever the server sent —
+// both the live WS push and the reloaded/persisted list now send a raw
+// timestamp for exactly this reason (see logActivity() in server.js).
+function fmtActTime(t){
+  if(!t) return '';
+  var d = new Date(t);
+  if(isNaN(d.getTime())) return String(t); // already a formatted string (older cached data) — show as-is
+  var now = new Date();
+  var sameDay = d.toDateString() === now.toDateString();
+  return sameDay
+    ? d.toLocaleTimeString('es-SV', {hour:'2-digit', minute:'2-digit'})
+    : d.toLocaleDateString('es-SV', {day:'numeric', month:'short'}) + ', ' + d.toLocaleTimeString('es-SV', {hour:'2-digit', minute:'2-digit'});
+}
 function set(id,val){ var el=document.getElementById(id); if(el) el.textContent=val; }
 
 function loadAnalytics(){

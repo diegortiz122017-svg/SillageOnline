@@ -36,7 +36,11 @@ const { calcChords }    = require('./services/chords');
 async function logActivity(msg) {
   await catalogueSvc.logActivity(msg);
   if (typeof broadcastAdmin === 'function') {
-    broadcastAdmin('activity', { msg, time: new Date().toLocaleTimeString() });
+    // Raw timestamp, not pre-formatted — toLocaleTimeString() here would bake in
+    // the SERVER's timezone (UTC on Railway) regardless of who's viewing. Format
+    // client-side instead, same as the persisted activity list already does,
+    // so it renders in the admin's own browser timezone (El Salvador).
+    broadcastAdmin('activity', { msg, time: new Date().toISOString() });
   }
 }
 const { requireAdmin, requireCustomer, optionalCustomer, createSession, validateSession, destroySession } = auth;
@@ -2285,7 +2289,10 @@ app.get('/api/orders/:id/invoice', optionalCustomer, async (req, res) => {
   const order  = orderRow;
   const items  = JSON.parse(order.items || '[]');
   const total  = parseFloat(order.total || 0).toFixed(2);
-  const date   = new Date(order.created_at).toLocaleDateString('es-ES', { day:'numeric', month:'long', year:'numeric' });
+  // timeZone explícito — esto se renderiza en el servidor (sin navegador del
+  // cliente de por medio), así que sin esto sale en la zona horaria del
+  // proceso (UTC en Railway), no la de El Salvador.
+  const date   = new Date(order.created_at).toLocaleDateString('es-ES', { day:'numeric', month:'long', year:'numeric', timeZone: 'America/El_Salvador' });
 
   // ── DTE legal data (if a Factura Electrónica was accepted by Hacienda) ──────
   let dte = null, dteQr = '';
