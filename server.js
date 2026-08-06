@@ -53,6 +53,67 @@ const BTCPAY_STORE_ID       = process.env.BTCPAY_STORE_ID;
 const BTCPAY_API_KEY        = process.env.BTCPAY_API_KEY;
 const BTCPAY_WEBHOOK_SECRET = process.env.BTCPAY_WEBHOOK_SECRET;
 
+// ── Meta Pixel / Conversions API ─────────────────────────
+// Pixel ID is not secret — it's public in every page's HTML (fbq('init', ...)).
+// The access token IS secret and lives in Railway env vars; if it's not set,
+// CAPI calls no-op entirely (site still works, just no server-side signal —
+// same "built but gated until credentials exist" pattern as the DTE integration).
+const META_PIXEL_ID          = '1786874329392274';
+const META_CAPI_ACCESS_TOKEN = process.env.META_CAPI_ACCESS_TOKEN;
+
+function _sha256Lower(str) {
+  return crypto.createHash('sha256').update(String(str).trim().toLowerCase()).digest('hex');
+}
+
+// Sends a server-side Purchase event to Meta's Conversions API. Mirrors the
+// same fbq('track', eventName, ...) calls fired client-side in tienda.html /
+// index.html — eventId must match the client-side eventID for the same order
+// so Meta dedupes instead of double-counting the sale. Ad-blockers and iOS
+// tracking prevention increasingly block the client pixel, so this server
+// path is what actually feeds Meta's optimization once those block it.
+// Never throws — a failed ad-tracking call must never break checkout.
+async function sendMetaCAPIEvent(eventName, { req, email, value, contentIds, eventId } = {}) {
+  if (!META_CAPI_ACCESS_TOKEN) return;
+  try {
+    const userData = {};
+    if (email) userData.em = [_sha256Lower(email)];
+    if (req) {
+      const ip = getIp(req);
+      if (ip) userData.client_ip_address = ip;
+      const ua = req.headers['user-agent'];
+      if (ua) userData.client_user_agent = ua;
+    }
+    const payload = {
+      data: [{
+        event_name: eventName,
+        event_time: Math.floor(Date.now() / 1000),
+        event_id: eventId,
+        action_source: 'website',
+        event_source_url: BASE_URL || 'https://sillage-sv.com',
+        user_data: userData,
+        custom_data: {
+          value,
+          currency: 'USD',
+          content_ids: contentIds || [],
+          content_type: 'product',
+        },
+      }],
+      access_token: META_CAPI_ACCESS_TOKEN,
+    };
+    const resp = await fetch(`https://graph.facebook.com/v20.0/${META_PIXEL_ID}/events`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    });
+    if (!resp.ok) {
+      const errText = await resp.text().catch(() => '');
+      console.error('Meta CAPI error:', resp.status, errText.slice(0, 300));
+    }
+  } catch(e) {
+    console.error('Meta CAPI request failed:', e.message);
+  }
+}
+
 const app    = express();
 const server = http.createServer(app);
 const wss    = new WebSocket.Server({ server });
@@ -3920,6 +3981,11 @@ app.post('/api/orders', orderLimiter, async (req, res) => {
   await logActivity(`Nuevo pedido ${escHtml(order.id)} de ${escHtml(order.customer)} — $${parseFloat(order.total||0).toFixed(2)}`);
   try { await sendOrderConfirmation(order); } catch(e) {}
   try { await notifyAdmins(order); } catch(e) {}
+  sendMetaCAPIEvent('Purchase', {
+    req, email: order.email, value: parseFloat(order.total) || 0,
+    contentIds: (order.items || []).map(i => String(i.productId)),
+    eventId: 'order_' + order.id,
+  });
   res.json({ ok: true, order, wompiUrl: null, btcpayUrl: null, btcpayInvoiceId: null });
 });
 
@@ -4415,6 +4481,11 @@ app.post('/api/paypal/capture-order/:id', async (req, res) => {
     try { paypalDte = await emitDteForOrder(orderObj.id); } catch(e) { console.error('PayPal DTE error:', e.message); }
     try { await sendOrderConfirmation(fullOrder, paypalDte); } catch(e) { console.error('PayPal confirm email error:', e.message); }
     try { await notifyAdmins(fullOrder); } catch(e) {}
+    sendMetaCAPIEvent('Purchase', {
+      req, email: fullOrder.email, value: parseFloat(fullOrder.total) || 0,
+      contentIds: (fullOrder.items || []).map(i => String(i.productId)),
+      eventId: 'order_' + fullOrder.id,
+    });
 
     res.json({ ok: true, order: fullOrder });
   } catch(e) {
@@ -4757,6 +4828,14 @@ app.post('/api/btcpay/webhook', async (req, res) => {
       try { btcpayDte = await emitDteForOrder(orderObj.id); } catch(e) { console.error('BTCPay DTE error:', e.message); }
       try { await sendOrderConfirmation(fullOrder, btcpayDte); } catch(e) { console.error('BTCPay confirmation email error:', e.message); }
       try { await notifyAdmins(fullOrder); } catch(e) {}
+      // No req here worth sending — this is BTCPay's server calling us, not the
+      // customer's browser, so client_ip/user_agent would be wrong. Email alone
+      // is still a strong match signal for Meta.
+      sendMetaCAPIEvent('Purchase', {
+        email: fullOrder.email, value: parseFloat(fullOrder.total) || 0,
+        contentIds: items.map(i => String(i.productId)),
+        eventId: 'order_' + fullOrder.id,
+      });
       console.log(`BTCPay order created on payment: ${orderObj.id} — invoice ${invoiceId}`);
 
     } else {
@@ -4782,6 +4861,11 @@ app.post('/api/btcpay/webhook', async (req, res) => {
             const fallbackDte = await emitDteForOrder(orderId);
             await sendDteReadyEmail(orderRows[0], fallbackDte);
           } catch(e) { console.error('BTCPay DTE (fallback) error:', e.message); }
+          sendMetaCAPIEvent('Purchase', {
+            email: orderRows[0].email, value: parseFloat(orderRows[0].total) || 0,
+            contentIds: items.map(i => String(i.productId)),
+            eventId: 'order_' + orderId,
+          });
         }
       } else {
         console.warn(`BTCPay webhook: invoice ${invoiceId} settled but no pending record found — possible expiry`);
@@ -5341,6 +5425,12 @@ app.patch('/api/orders/:id', requireAdmin, async (req, res) => {
         const btcpayManualDte = await emitDteForOrder(order.id);
         await sendDteReadyEmail(order, btcpayManualDte);
       } catch(e) { console.error('DTE (BTCPay manual) error:', e.message); }
+      // req here is the admin's own session, not the customer's — omit IP/UA.
+      sendMetaCAPIEvent('Purchase', {
+        email: order.email, value: parseFloat(order.total) || 0,
+        contentIds: (order.items || []).map(i => String(i.productId)),
+        eventId: 'order_' + order.id,
+      });
     }
 
     // COD → Entregado: mark as Pagado (payment collected on delivery)

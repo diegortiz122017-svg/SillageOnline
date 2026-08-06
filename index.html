@@ -2147,6 +2147,23 @@ footer{background:var(--dark);padding:3.5rem 4rem;text-align:center;border-top:1
   <!-- Wompi embedded payment widget -->
   <script src="https://checkout.wompi.sv/widget.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.5/gsap.min.js" defer></script>
+  <!-- Meta Pixel Code -->
+  <script>
+  !function(f,b,e,v,n,t,s)
+  {if(f.fbq)return;n=f.fbq=function(){n.callMethod?
+  n.callMethod.apply(n,arguments):n.queue.push(arguments)};
+  if(!f._fbq)f._fbq=n;n.push=n;n.loaded=!0;n.version='2.0';
+  n.queue=[];t=b.createElement(e);t.async=!0;
+  t.src=v;s=b.getElementsByTagName(e)[0];
+  s.parentNode.insertBefore(t,s)}(window, document,'script',
+  'https://connect.facebook.net/en_US/fbevents.js');
+  fbq('init', '1786874329392274');
+  fbq('track', 'PageView');
+  </script>
+  <noscript><img height="1" width="1" style="display:none"
+  src="https://www.facebook.com/tr?id=1786874329392274&ev=PageView&noscript=1"
+  /></noscript>
+  <!-- End Meta Pixel Code -->
 </head>
 <body>
 
@@ -3898,6 +3915,7 @@ var _detailOpenPid=null;
 function openDetail(pid){
   var p=P.find(function(x){return x.id===pid;});if(!p)return;
   trackEvent('product_view', {id:pid});
+  if(typeof fbq==='function') fbq('track','ViewContent',{content_ids:[String(pid)],content_type:'product',value:effectivePrice(p),currency:'USD'});
   _detailOpenPid=pid;
   curSlide=0;
   document.getElementById('bcBrand').textContent=p.brand;
@@ -4569,6 +4587,7 @@ function addToCart(pid){
   else cart.push({p:p,qty:1,type:'full',label:p.brand+' '+p.name,unitPrice:effectivePrice(p),size:p.size});
   renderCart();saveCart();
   trackEvent('cart_add', {id:pid});
+  if(typeof fbq==='function') fbq('track','AddToCart',{content_ids:[String(pid)],content_type:'product',value:effectivePrice(p),currency:'USD'});
   _reinforceProfileIfRecommended(pid);
 }
 
@@ -4591,6 +4610,7 @@ function addToCartWithOptions(pid, label, price, size, type){
   renderCart();
   saveCart();
   trackEvent('cart_add', {id:pid,type:type});
+  if(typeof fbq==='function') fbq('track','AddToCart',{content_ids:[String(pid)],content_type:'product',value:parseFloat(price)||0,currency:'USD'});
   _reinforceProfileIfRecommended(pid);
 }
 function removeFromCart(pid){cart=cart.filter(function(i){return i.p.id!==pid;});renderCart();saveCart();}
@@ -4768,6 +4788,7 @@ function goStep(n){
 function openCheckout(){
   closeCart();goStep(1);
   trackEvent('checkout_start');
+  if(typeof fbq==='function') fbq('track','InitiateCheckout',{content_ids:cart.map(function(i){return String(i.p.id);}),content_type:'product',value:cartSum(),currency:'USD',num_items:cart.reduce(function(s,i){return s+i.qty;},0)});
   selectPayMethod('cod'); // default method — refreshes min-order note from server
   // Hide consent notice for logged-in users — they accepted at registration
   var notice = document.getElementById('checkoutConsentNotice');
@@ -5106,6 +5127,8 @@ function _doPlaceOrder(){
         placeBtn.disabled=false;
         _btcPayInvoiceId=res.btcpayInvoiceId;
         _btcPayOrderId=res.order.id;
+        _btcPayOrderTotal=total;
+        _btcPayOrderItems=orderItems;
         _btcPayFetchAndRender();
         _btcPayStartPolling();
         return;
@@ -5140,6 +5163,7 @@ function renderOrderSuccess(order, orderItems, total, email){
   document.getElementById('successItems').innerHTML='<div class="ms-title">Tu Pedido</div>'+
     orderItems.map(function(i){return'<div class="ms-row"><span>'+i.name+' \u00d7'+i.qty+'</span><span class="ms-price">$'+parseFloat(i.total||0).toFixed(2)+'</span></div>';}).join('')+
     '<div class="ms-div"></div><div class="ms-total"><span class="ms-total-lbl">Total Pagado</span><span class="ms-total-val">$'+parseFloat(total).toLocaleString()+'</span></div>';
+  if(typeof fbq==='function') fbq('track','Purchase',{content_ids:orderItems.map(function(i){return String(i.productId);}),content_type:'product',value:parseFloat(total)||0,currency:'USD'},{eventID:'order_'+order.id});
   resetTracker();
   goStep(4);
   window._porOrderId = order.id;
@@ -5806,6 +5830,8 @@ function _wompiHandleCancel(order) {
 var _btcPayPollTimer   = null;
 var _btcPayInvoiceId   = null;
 var _btcPayOrderId     = null;
+var _btcPayOrderTotal  = null;
+var _btcPayOrderItems  = null;
 var _btcPayTab         = 'lightning'; // default tab
 var _btcPayPendingOpen = false; // modal pre-opened before server responds
 
@@ -6021,6 +6047,13 @@ function _btcPayStartPolling() {
           dot.className = 'btcpay-status-dot paid';
           txt.textContent = 'Pago confirmado ✓';
           clearInterval(_btcPayPollTimer); _btcPayPollTimer = null;
+          if(typeof fbq==='function'){
+            var _btcOid = _btcPayOrderId || d.orderId || '';
+            fbq('track','Purchase',{
+              content_ids:(_btcPayOrderItems||[]).map(function(i){return String(i.productId);}),
+              content_type:'product', value:parseFloat(_btcPayOrderTotal)||0, currency:'USD'
+            },{eventID:'order_'+_btcOid});
+          }
           setTimeout(function(){
             closeBTCPayModal();
             cart=[]; renderCart(); saveCart();
