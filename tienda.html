@@ -1758,7 +1758,7 @@ footer{background:var(--dark);padding:3.5rem 4rem;text-align:center;border-top:1
   flex:1;overflow-y:auto;
   padding:1.4rem 1.6rem;
   display:flex;flex-direction:column;gap:0;
-  min-height:220px;
+  min-height:340px;
   scrollbar-width:thin;scrollbar-color:rgba(184,149,90,0.1) transparent;
 }
 .som-msg{
@@ -7482,9 +7482,14 @@ var _SOM_QS_OPTIONS = [
 function renderSomQuickStart(){
   var container = document.getElementById('somMessages');
   if(!container) return;
+  // Wrapper takes up any leftover space in .som-messages (flex:1) and pushes
+  // the actual button row to the bottom via justify-content, so the options
+  // sit just above the input box instead of right under the greeting.
+  var wrap = document.createElement('div');
+  wrap.id = 'somQuickStart';
+  wrap.style.cssText = 'flex:1;display:flex;flex-direction:column;justify-content:flex-end;min-height:0';
   var qsDiv = document.createElement('div');
   qsDiv.className = 'som-quickstart';
-  qsDiv.id = 'somQuickStart';
   _SOM_QS_OPTIONS.forEach(function(opt){
     var b = document.createElement('button');
     b.className = 'som-qs-btn';
@@ -7493,7 +7498,8 @@ function renderSomQuickStart(){
     b.addEventListener('click', function(){ somQuickStart(opt.text); });
     qsDiv.appendChild(b);
   });
-  container.appendChild(qsDiv);
+  wrap.appendChild(qsDiv);
+  container.appendChild(wrap);
 }
 function somQuickStart(text){
   var qs = document.getElementById('somQuickStart');
