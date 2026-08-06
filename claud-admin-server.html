@@ -3001,9 +3001,12 @@ function renderTrafficByIp(d){
       '<th style="padding:0.3rem 0 0.3rem 0.6rem">User-Agent (muestra)</th>'+
     '</tr></thead><tbody>'+
     rows.map(function(row){
-      var noInteraction = row.pageviews>0 && !row.productViewSessions && !row.cartAddSessions && !row.nezOpenSessions && !row.checkoutSessions;
-      var farmPattern = row.sessionCount>=3 && row.uaCount>=2;
-      var suspicious = noInteraction || farmPattern;
+      // No marcamos "sin interacción" solo — es el comportamiento normal de la
+      // mayoría de visitantes reales (rebote simple) y marcarlo generaba ruido,
+      // no señal. Lo que sí destaca es una sola IP generando varias sesiones
+      // con varios user-agents distintos — el patrón real que confirmó el
+      // "bot farm" de Datacamp Limited investigado antes.
+      var suspicious = row.sessionCount>=4 && row.uaCount>=2;
       var rowStyle = suspicious ? 'border-top:1px solid rgba(192,80,80,0.15);background:rgba(192,80,80,0.05)' : 'border-top:1px solid rgba(184,149,90,0.08)';
       var ipStyle = suspicious ? 'color:#c05050' : '';
       return '<tr style="'+rowStyle+'">'+
