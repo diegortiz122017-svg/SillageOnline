@@ -2335,7 +2335,7 @@ footer{background:var(--dark);padding:3.5rem 4rem;text-align:center;border-top:1
 <footer>
   <div class="f-logo">Sillage</div>
   <p class="f-tag">El rastro que deja una fragancia en el aire</p>
-  <div class="f-links"><a href="/nosotros">Nosotros</a><a href="/privacidad" onclick="openPrivacyModal(event)">Privacidad</a><a href="/terminos">Términos</a><a href="/envios">Envíos</a><a href="/devoluciones">Devoluciones</a><a href="/cdn-cgi/l/email-protection#b0d3dfdec4d1d3c4f0c3d9dcdcd1d7d59dc3c69ed3dfdd">Contacto</a></div>
+  <div class="f-links"><a href="/nosotros">Nosotros</a><a href="/privacidad" target="_blank" rel="noopener">Privacidad</a><a href="/terminos">Términos</a><a href="/envios">Envíos</a><a href="/devoluciones">Devoluciones</a><a href="/cdn-cgi/l/email-protection#b0d3dfdec4d1d3c4f0c3d9dcdcd1d7d59dc3c69ed3dfdd">Contacto</a></div>
   <p class="f-copy">&copy; 2026 Sillage Parfumerie. Todos los derechos reservados.</p>
   <p class="f-copy" style="opacity:0.6;margin-top:0.3rem">Sillage, Sociedad por Acciones Simplificada de Capital Variable — NIT 0823-050526-101-6 — El Salvador</p>
 </footer>
@@ -2524,7 +2524,7 @@ footer{background:var(--dark);padding:3.5rem 4rem;text-align:center;border-top:1
               </div>
               <div class="por-err" id="porErr"></div>
               <p style="font-size:0.62rem;color:var(--charcoal);line-height:1.6;margin-bottom:0.5rem;opacity:0.75">
-                Al crear cuenta aceptas nuestra <a href="/privacidad" onclick="openPrivacyModal(event)" style="color:var(--gold);text-decoration:none;cursor:pointer">Política de Privacidad</a>.
+                Al crear cuenta aceptas nuestra <a href="/privacidad" target="_blank" rel="noopener" style="color:var(--gold);text-decoration:none;cursor:pointer">Política de Privacidad</a>.
                 Podrás recibir recomendaciones de Nez — cancelables en cualquier momento.
               </p>
               <button class="por-btn" id="porBtn" onclick="postOrderRegister()">Crear Cuenta Gratis</button>
@@ -2772,7 +2772,7 @@ footer{background:var(--dark);padding:3.5rem 4rem;text-align:center;border-top:1
       </div>
       <div class="auth-err" id="regErr"></div>
       <p style="font-size:0.62rem;color:var(--charcoal);line-height:1.6;margin-bottom:0.8rem;opacity:0.75">
-        Al crear tu cuenta aceptas nuestra <a href="/privacidad" onclick="openPrivacyModal(event)" style="color:var(--gold);text-decoration:none;cursor:pointer">Política de Privacidad</a>.
+        Al crear tu cuenta aceptas nuestra <a href="/privacidad" target="_blank" rel="noopener" style="color:var(--gold);text-decoration:none;cursor:pointer">Política de Privacidad</a>.
         Podrás recibir recomendaciones personalizadas de Nez — puedes cancelarlas en cualquier momento desde tu correo.
       </p>
       <button class="auth-submit" id="regSubmit" onclick="doRegister()">Crear Cuenta</button>
@@ -4375,15 +4375,6 @@ function _autoHidePrivacyBanner(){
   dismissPrivacyBanner();
 }
 
-function openPrivacyModal(e){
-  if(e){e.preventDefault();}
-  document.getElementById('privacyModalBg').style.display='block';
-  document.body.style.overflow='hidden';
-}
-function closePrivacyModal(){
-  document.getElementById('privacyModalBg').style.display='none';
-  document.body.style.overflow='';
-}
 
 function bundleUrl(b){
   return 'https://sillage-sv.com/bundle/'+slugify(b.name);
@@ -8541,7 +8532,7 @@ function buildStoreCta(){
          gap:1rem;flex-wrap:wrap">
   <p style="font-size:0.62rem;color:#8a7f72;line-height:1.6;margin:0;flex:1;min-width:200px">
     Usamos localStorage para tu carrito, sesión y perfil de Nez.
-    <a href="/privacidad" onclick="openPrivacyModal(event)"
+    <a href="/privacidad" target="_blank" rel="noopener"
        style="color:#b8955a;text-decoration:none">Política de Privacidad</a>
   </p>
   <button onclick="dismissPrivacyBanner()"
@@ -8551,133 +8542,6 @@ function buildStoreCta(){
            flex-shrink:0">
     Entendido
   </button>
-</div>
-
-<!-- PRIVACY POLICY MODAL -->
-<div id="privacyModalBg" onclick="if(event.target===this)closePrivacyModal()"
-  style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.7);z-index:9999;
-         padding:1rem;overflow-y:auto;-webkit-overflow-scrolling:touch">
-  <div style="background:#fff;max-width:600px;margin:2rem auto;border:1px solid #e8d8b8;
-              border-radius:0;position:relative;max-height:85vh;overflow-y:auto">
-    <div style="position:sticky;top:0;background:#fff;padding:1rem 1.5rem;border-bottom:1px solid #e8d8b8;
-                display:flex;justify-content:space-between;align-items:center;z-index:1">
-      <span style="font-size:0.6rem;letter-spacing:0.2em;text-transform:uppercase;color:#b8955a">Política de Privacidad</span>
-      <button onclick="closePrivacyModal()"
-        style="background:none;border:none;font-size:1.2rem;cursor:pointer;color:#8a7f72;line-height:1">&#10005;</button>
-    </div>
-    <div style="padding:1.5rem;font-family:'Jost',sans-serif;font-size:0.78rem;color:#1a1714;line-height:1.8">
-      <style scoped>
-        #privacyModalBg h1{font-family:Cormorant Garamond,serif;font-size:1.4rem;font-weight:300;margin-bottom:0.3rem}
-        #privacyModalBg h2{font-family:Cormorant Garamond,serif;font-size:1.1rem;font-weight:400;margin:1.5rem 0 0.5rem;color:#1a1714}
-        #privacyModalBg h3{font-size:0.8rem;font-weight:500;margin:1rem 0 0.3rem;text-transform:uppercase;letter-spacing:0.1em;color:#8a7f72}
-        #privacyModalBg p{margin-bottom:0.8rem;color:#4a3f35}
-        #privacyModalBg ul,#privacyModalBg ol{padding-left:1.2rem;margin-bottom:0.8rem}
-        #privacyModalBg li{margin-bottom:0.3rem;color:#4a3f35}
-        #privacyModalBg .updated{font-size:0.65rem;color:#8a7f72;display:block;margin-bottom:1.2rem}
-        #privacyModalBg .highlight{background:#faf8f4;border-left:3px solid #b8955a;padding:0.8rem 1rem;margin-bottom:1.2rem;font-size:0.72rem}
-        #privacyModalBg a{color:#b8955a}
-      </style>
-      <h1>Política de Privacidad</h1>
-  <span class="updated">Última actualización: Abril 2025</span>
-
-  <div class="highlight">
-    Esta política explica cómo Sillage Parfumerie recopila, usa y protege tu información personal. Al realizar una compra o crear una cuenta, aceptas los términos descritos aquí.
-  </div>
-
-  <h2>1. Quiénes somos</h2>
-  <p>Sillage Parfumerie es una tienda de perfumería de lujo con sede en El Salvador, accesible en <a href="https://sillage-sv.com">sillage-sv.com</a>. Operamos como comercio electrónico y somos responsables del tratamiento de tus datos personales.</p>
-
-  <h2>2. Qué información recopilamos</h2>
-  <p>Recopilamos la siguiente información cuando interactúas con nuestra tienda:</p>
-  <ul>
-    <li><strong>Datos de cuenta:</strong> nombre, correo electrónico, contraseña (almacenada con hash seguro), número de teléfono</li>
-    <li><strong>Datos de pedido:</strong> dirección de entrega, productos comprados, método de pago, historial de órdenes</li>
-    <li><strong>Perfil olfativo:</strong> preferencias de fragancias que compartes con Nez, nuestro sommelier de IA — familias, notas, ocasiones, presupuesto</li>
-    <li><strong>Datos de navegación:</strong> sessionId anónimo para funcionalidad de la tienda (expira en 60 minutos)</li>
-    <li><strong>Preferencias de comunicación:</strong> si deseas recibir emails de marketing y/o seguimiento</li>
-  </ul>
-  <p><strong>No almacenamos datos de tarjeta de crédito.</strong> Los pagos son procesados de forma segura por Wompi y Chivo.</p>
-
-  <h2>3. Cómo usamos tu información</h2>
-  <ul>
-    <li><strong>Procesar y entregar tus pedidos</strong> — incluyendo confirmaciones, actualizaciones de estado y notificaciones de entrega</li>
-    <li><strong>Personalizar recomendaciones de Nez</strong> — el sommelier usa tu perfil olfativo para sugerirte fragancias relevantes</li>
-    <li><strong>Emails de seguimiento</strong> — aproximadamente 2 semanas después de tu entrega, Nez puede enviarte recomendaciones personalizadas basadas en lo que compraste. Puedes desactivar esto en cualquier momento</li>
-    <li><strong>Emails de marketing</strong> — novedades, llegadas y ofertas especiales. Solo si lo tienes habilitado</li>
-    <li><strong>Mejorar nuestro servicio</strong> — análisis interno de ventas y comportamiento de la tienda</li>
-    <li><strong>Seguridad</strong> — prevención de fraude, protección contra abusos</li>
-  </ul>
-
-  <h2>4. Comunicaciones por email</h2>
-  <p>Enviamos dos tipos de emails:</p>
-  <ul>
-    <li><strong>Transaccionales</strong> (no opcionales): confirmación de pedido, notificación de envío, confirmación de entrega. Estos se envían siempre porque son parte del servicio que contrataste</li>
-    <li><strong>Marketing y seguimiento</strong> (opcionales): recomendaciones de Nez, novedades del catálogo, ofertas. Puedes gestionar estas preferencias en cualquier momento</li>
-  </ul>
-  <p>Todo email de marketing o seguimiento incluye un enlace para <strong>gestionar tus preferencias</strong> o cancelar la suscripción con un solo click. También puedes escribirnos a <a href="mailto:hola@sillage-sv.com">hola@sillage-sv.com</a>.</p>
-
-  <h2>5. Compartir información con terceros</h2>
-  <p>No vendemos ni alquilamos tus datos personales. Compartimos información únicamente con:</p>
-  <ul>
-    <li><strong>Wompi / Chivo:</strong> procesadores de pago, solo reciben los datos necesarios para completar la transacción</li>
-    <li><strong>Resend:</strong> plataforma de envío de emails transaccionales</li>
-    <li><strong>OpenAI:</strong> para generar las respuestas de Nez. Las conversaciones pueden incluir tus preferencias de fragancia, pero no incluyen datos de pago ni información de identificación directa más allá de tu nombre si lo mencionas en el chat</li>
-    <li><strong>Cloudinary:</strong> almacenamiento de imágenes del catálogo</li>
-    <li><strong>Railway:</strong> infraestructura de hosting</li>
-  </ul>
-
-  <h2>6. Retención de datos</h2>
-  <ul>
-    <li>Datos de cuenta y pedidos: mientras la cuenta esté activa, y hasta 2 años después de la última actividad</li>
-    <li>Perfil olfativo (Nez): 90 días de inactividad, luego se elimina automáticamente</li>
-    <li>Sesiones anónimas: 60 minutos</li>
-    <li>Tokens de revocación de sesión: hasta el vencimiento natural del token</li>
-  </ul>
-
-  <h2>7. Seguridad</h2>
-  <p>Implementamos medidas de seguridad técnicas que incluyen:</p>
-  <ul>
-    <li>Comunicaciones cifradas mediante HTTPS / TLS 1.2+</li>
-    <li>Contraseñas almacenadas con hash PBKDF2 — nunca en texto plano</li>
-    <li>Tokens de sesión firmados con HMAC-SHA256</li>
-    <li>Rate limiting y detección de abuso</li>
-    <li>Sin acceso de terceros a datos de pago completos</li>
-  </ul>
-
-  <h2>8. Tus derechos</h2>
-  <p>Tienes derecho a:</p>
-  <ul>
-    <li><strong>Acceder</strong> a los datos que tenemos sobre ti</li>
-    <li><strong>Corregir</strong> información incorrecta</li>
-    <li><strong>Eliminar</strong> tu cuenta y datos asociados</li>
-    <li><strong>Gestionar</strong> tus preferencias de comunicación en cualquier momento desde el enlace de cada email o desde tu cuenta</li>
-    <li><strong>Portabilidad:</strong> solicitar una copia de tus datos en formato legible</li>
-  </ul>
-  <p>Para ejercer cualquiera de estos derechos, escríbenos a <a href="mailto:hola@sillage-sv.com">hola@sillage-sv.com</a>.</p>
-
-  <h2>9. Cookies y sesiones</h2>
-  <p>No usamos cookies de seguimiento ni publicidad. Usamos <strong>localStorage</strong> del navegador únicamente para:</p>
-  <ul>
-    <li>Mantener tu sesión activa mientras navegas</li>
-    <li>Recordar tu carrito de compras</li>
-    <li>Guardar tu perfil olfativo local para una experiencia más fluida con Nez</li>
-  </ul>
-  <p>No hay pixels de seguimiento de terceros ni publicidad personalizada en nuestra plataforma.</p>
-
-  <h2>10. Menores de edad</h2>
-  <p>Nuestra tienda no está dirigida a menores de 18 años. No recopilamos intencionalmente datos de menores.</p>
-
-  <h2>11. Cambios a esta política</h2>
-  <p>Podemos actualizar esta política ocasionalmente. Si los cambios son significativos, te notificaremos por email si tienes una cuenta registrada. La fecha de "última actualización" al inicio de esta página indica cuándo se realizaron los últimos cambios.</p>
-
-  <h2>12. Contacto</h2>
-  <p>Para cualquier consulta sobre privacidad o el uso de tus datos:</p>
-  <ul>
-    <li>Email: <a href="mailto:hola@sillage-sv.com">hola@sillage-sv.com</a></li>
-    <li>Sitio web: <a href="https://sillage-sv.com">sillage-sv.com</a></li>
-  </ul>
-    </div>
-  </div>
 </div>
 </body>
 </html>
