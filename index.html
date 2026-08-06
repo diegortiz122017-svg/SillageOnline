@@ -4108,7 +4108,7 @@ function openDetail(pid){
     var lbl  = document.getElementById('dWishMobLbl') || (btn2 && btn2.nextElementSibling);
     if(btn1){ btn1.classList.toggle('on',saved); btn1.textContent=saved?'♥':'♡'; }
     if(btn2){ btn2.classList.toggle('saved',saved); btn2.textContent=saved?'♥ En favoritos':'♡ Guardar'; }
-    if(saved) toast(esc(p.brand+' '+p.name),'Añadido a favoritos','ok');
+    if(saved){ toast(esc(p.brand+' '+p.name),'Añadido a favoritos','ok'); _fbqWishlist(pid); }
   }
   document.getElementById('dWishBtn').addEventListener('click', toggleWish);
   var mobWish = document.getElementById('dWishMob');
@@ -6698,12 +6698,17 @@ function syncLocalFavsToDb(){
   }).catch(function(){});
 }
 
+function _fbqWishlist(pid){
+  if(typeof fbq!=='function') return;
+  var p=P.find(function(x){return x.id===+pid;});
+  fbq('track','AddToWishlist',{content_ids:[String(pid)],content_type:'product',value:p?effectivePrice(p):0,currency:'USD'});
+}
 function toggleFav(e, pid){
   e.stopPropagation();
   if(!currentCustomer){
     var favs = getFavs();
     var idx  = favs.indexOf(+pid);
-    if(idx === -1){ favs.push(+pid); toast('Guardado','A\u00f1adido a favoritos','ok'); }
+    if(idx === -1){ favs.push(+pid); toast('Guardado','A\u00f1adido a favoritos','ok'); _fbqWishlist(pid); }
     else          { favs.splice(idx,1); }
     saveFavs(favs);
     var btn = e.currentTarget;
@@ -6717,7 +6722,7 @@ function toggleFav(e, pid){
   var btn = e.currentTarget;
   btn.classList.toggle('saved', isFav(pid));
   btn.textContent = isFav(pid) ? '\u2665' : '\u2661';
-  if(wasAdded) toast('','A\u00f1adido a favoritos','ok');
+  if(wasAdded){ toast('','A\u00f1adido a favoritos','ok'); _fbqWishlist(pid); }
   customerFetch(API+'/customer/favorites', {
     method:'POST', headers:{'Content-Type':'application/json'},
     body: JSON.stringify({ productId: pid })
