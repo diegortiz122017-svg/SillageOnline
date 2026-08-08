@@ -981,6 +981,13 @@ tr:hover td{background:rgba(255,255,255,0.02)}
           <div style="font-size:0.6rem;color:var(--muted);margin:0.4rem 0 0.8rem;line-height:1.5">
             Agrupado por IP. Marcado en rojo: 4 o más sesiones <strong>y</strong> 2 o más User-Agent distintos desde la misma IP <strong>y</strong> ninguna de esas sesiones vio producto, agregó al carrito, abrió a Nez o inició checkout — el patrón real de bot/farm, no un par de visitantes reales compartiendo conexión que sí navegaron el catálogo.
           </div>
+          <div style="display:flex;gap:0.6rem;align-items:center;flex-wrap:wrap;margin-bottom:0.7rem">
+            <input id="trIpFilterInput" type="text" placeholder="Filtrar por IP..." oninput="_trIpSetFilter(this.value)"
+              style="flex:1;min-width:160px;padding:0.4rem 0.6rem;background:transparent;border:1px solid rgba(184,149,90,0.25);color:inherit;font-size:0.68rem;font-family:inherit"/>
+            <label style="display:flex;align-items:center;gap:0.4rem;font-size:0.62rem;color:var(--muted);cursor:pointer;white-space:nowrap">
+              <input type="checkbox" id="trIpOnlySusp" onchange="_trIpSetOnlySuspicious(this.checked)"/> Solo sospechosas
+            </label>
+          </div>
           <div id="trIpTable" style="overflow-x:auto"><div style="color:var(--muted);font-size:0.7rem">Cargando…</div></div>
         </div>
       </div>
@@ -2974,6 +2981,12 @@ function loadAnalytics(){
 // bot/farm (varias sesiones o varios UA desde una sola IP, o pageviews sin
 // ninguna interacción real) se vean a simple vista sin tener que investigar
 // IP por IP como se hizo manualmente antes.
+var _trIpRows = [];
+var _trIpDays = null;
+var _trIpFilterText = '';
+var _trIpOnlySuspicious = false;
+var _trIpSort = { col: 'sessionCount', dir: 'desc' };
+
 function loadTrafficByIp(){
   if(!sessionToken) return;
   var days = activeRange>0 ? activeRange : 90;
@@ -2984,34 +2997,65 @@ function loadTrafficByIp(){
     .then(function(d){ if(d) renderTrafficByIp(d); })
     .catch(function(){ if(tbl) tbl.innerHTML = '<div style="color:#c05050;font-size:0.7rem">Error al cargar.</div>'; });
 }
+// Ni "varias sesiones/UA" ni "sin interacción" solos son señal — lo primero
+// pasa con wifi compartido o CGNAT de operadora, lo segundo con cualquier
+// rebote normal. Lo que sí confirma bot/farm (patrón real de Datacamp
+// Limited investigado antes) es la combinación: una IP generando varias
+// sesiones con varios user-agents SIN que ninguna de esas sesiones haya
+// interactuado de verdad (ni vio producto, ni carrito, ni Nez, ni checkout).
+function _trIpIsSuspicious(row){
+  var noRealInteraction = !row.productViewSessions && !row.cartAddSessions && !row.nezOpenSessions && !row.checkoutSessions;
+  return row.sessionCount>=4 && row.uaCount>=2 && noRealInteraction;
+}
+function _trIpSetFilter(val){ _trIpFilterText = (val||'').trim().toLowerCase(); _trIpRenderTable(); }
+function _trIpSetOnlySuspicious(val){ _trIpOnlySuspicious = !!val; _trIpRenderTable(); }
+function _trIpSetSort(col){
+  if(_trIpSort.col === col){ _trIpSort.dir = _trIpSort.dir === 'desc' ? 'asc' : 'desc'; }
+  else { _trIpSort = { col: col, dir: col === 'ip' ? 'asc' : 'desc' }; }
+  _trIpRenderTable();
+}
 function renderTrafficByIp(d){
+  _trIpRows = d.ips || [];
+  _trIpDays = d.days;
+  _trIpRenderTable();
+}
+function _trIpRenderTable(){
   var tbl = document.getElementById('trIpTable');
   var sub = document.getElementById('trIpSub');
-  if(sub) sub.textContent = 'Últimos '+fmtN(d.days)+' días · '+fmtN((d.ips||[]).length)+' IPs';
   if(!tbl) return;
-  var rows = d.ips || [];
-  if(!rows.length){ tbl.innerHTML = '<div style="color:var(--muted);font-size:0.7rem">Sin tráfico registrado en este período.</div>'; return; }
+  var rows = _trIpRows.slice();
+  if(_trIpFilterText) rows = rows.filter(function(r){ return (r.ip||'').toLowerCase().indexOf(_trIpFilterText) !== -1; });
+  if(_trIpOnlySuspicious) rows = rows.filter(_trIpIsSuspicious);
+
+  var col = _trIpSort.col, dir = _trIpSort.dir === 'asc' ? 1 : -1;
+  rows.sort(function(a,b){
+    var av = a[col], bv = b[col];
+    if(col === 'ip'){ av = av||''; bv = bv||''; return av.localeCompare(bv) * dir; }
+    if(col === 'firstSeen' || col === 'lastSeen'){ av = new Date(av).getTime()||0; bv = new Date(bv).getTime()||0; return (av-bv) * dir; }
+    return ((av||0) - (bv||0)) * dir;
+  });
+
+  if(sub) sub.textContent = 'Últimos '+fmtN(_trIpDays)+' días · '+fmtN(rows.length)+' de '+fmtN(_trIpRows.length)+' IPs';
+  if(!_trIpRows.length){ tbl.innerHTML = '<div style="color:var(--muted);font-size:0.7rem">Sin tráfico registrado en este período.</div>'; return; }
+  if(!rows.length){ tbl.innerHTML = '<div style="color:var(--muted);font-size:0.7rem">Ninguna IP coincide con el filtro.</div>'; return; }
+
+  var cols = [
+    {key:'ip',label:'IP'}, {key:'sessionCount',label:'Sesiones'}, {key:'uaCount',label:'User-Agents'},
+    {key:'productViewSessions',label:'Vieron producto'}, {key:'cartAddSessions',label:'Carrito'},
+    {key:'nezOpenSessions',label:'Nez'}, {key:'firstSeen',label:'Primera vez'}, {key:'lastSeen',label:'Última vez'},
+  ];
+  var theadCells = cols.map(function(c,i){
+    var arrow = _trIpSort.col === c.key ? (_trIpSort.dir === 'asc' ? ' ▲' : ' ▼') : '';
+    var pad = i===0 ? 'padding:0.3rem 0.6rem 0.3rem 0' : 'padding:0.3rem 0.6rem';
+    return '<th style="'+pad+';cursor:pointer;user-select:none;white-space:nowrap" onclick="_trIpSetSort(\''+c.key+'\')">'+c.label+arrow+'</th>';
+  }).join('') + '<th style="padding:0.3rem 0 0.3rem 0.6rem">User-Agent (muestra)</th>';
+
   tbl.innerHTML = '<table style="width:100%;border-collapse:collapse;min-width:760px">'+
     '<thead><tr style="text-align:left;color:#8a7f72;font-size:0.58rem;text-transform:uppercase;letter-spacing:0.06em">'+
-      '<th style="padding:0.3rem 0.6rem 0.3rem 0">IP</th>'+
-      '<th style="padding:0.3rem 0.6rem">Sesiones</th>'+
-      '<th style="padding:0.3rem 0.6rem">User-Agents</th>'+
-      '<th style="padding:0.3rem 0.6rem">Vieron producto</th>'+
-      '<th style="padding:0.3rem 0.6rem">Carrito</th>'+
-      '<th style="padding:0.3rem 0.6rem">Nez</th>'+
-      '<th style="padding:0.3rem 0.6rem">Primera vez</th>'+
-      '<th style="padding:0.3rem 0.6rem">Última vez</th>'+
-      '<th style="padding:0.3rem 0 0.3rem 0.6rem">User-Agent (muestra)</th>'+
+      theadCells+
     '</tr></thead><tbody>'+
     rows.map(function(row){
-      // Ni "varias sesiones/UA" ni "sin interacción" solos son señal — lo primero
-      // pasa con wifi compartido o CGNAT de operadora, lo segundo con cualquier
-      // rebote normal. Lo que sí confirma bot/farm (patrón real de Datacamp
-      // Limited investigado antes) es la combinación: una IP generando varias
-      // sesiones con varios user-agents SIN que ninguna de esas sesiones haya
-      // interactuado de verdad (ni vio producto, ni carrito, ni Nez, ni checkout).
-      var noRealInteraction = !row.productViewSessions && !row.cartAddSessions && !row.nezOpenSessions && !row.checkoutSessions;
-      var suspicious = row.sessionCount>=4 && row.uaCount>=2 && noRealInteraction;
+      var suspicious = _trIpIsSuspicious(row);
       var rowStyle = suspicious ? 'border-top:1px solid rgba(192,80,80,0.15);background:rgba(192,80,80,0.05)' : 'border-top:1px solid rgba(184,149,90,0.08)';
       var ipStyle = suspicious ? 'color:#c05050' : '';
       return '<tr style="'+rowStyle+'">'+
