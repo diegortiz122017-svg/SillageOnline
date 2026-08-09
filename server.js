@@ -5827,6 +5827,7 @@ FORMATO — MUY IMPORTANTE:
 - NUNCA uses listas numeradas (1. 2. 3.). Presenta cada fragancia en máx 2 líneas: nombre — perfil — por qué encaja.
 - NO termines con "¿Te gustaría saber más?" ni preguntas de cierre — el cliente preguntará si quiere más.
 - Sin párrafos largos. Sin explicaciones de notas. Directo.
+- NUNCA uses markdown: nada de **negrita**, _cursiva_, texto entre comillas invertidas, # encabezados ni - viñetas. El chat muestra texto plano — cualquier símbolo de formato aparece literal (asteriscos incluidos) en vez de renderizarse. Escribe los nombres de fragancia normal, sin asteriscos alrededor.
 
 RECOMENDACIONES: 1-3 según contexto. Sin precios. Si stock:low_stock → menciona sutilmente.
 ${decantSalesLine}
