@@ -6051,16 +6051,23 @@ Responde en el idioma del cliente.`
       const top = scored.filter(x => x.score > -999).slice(0, 8);
 
       if (!top.length) {
-        // Full fallback: gender + price only
+        // Full fallback: gender + price only — pero el stock sigue siendo un
+        // filtro duro, igual que en la búsqueda principal (línea ~5985). Sin
+        // esto, una combinación muy específica (ej. "mujer + playa + fresco")
+        // que no encuentra suficientes coincidencias reales caía aquí y podía
+        // recomendar un producto agotado.
         const fallback = catalogue
           .filter(p => !excludeIds.has(Number(p.id)))
+          .filter(p => !(invMap[p.id] || {}).outOfStock)
           .filter(p => !args.gender || args.gender === 'any' || p.g === args.gender || p.g === 'U')
           .filter(p => !args.max_price || parseFloat(p.price) <= args.max_price)
           .filter(p => !args.min_price || parseFloat(p.price) >= args.min_price)
           .slice(0, 8);
-        if (!fallback.length) return 'Catálogo vacío — agrega fragancias desde el panel de administración.';
-        return fallback.map(p =>
-          [
+        if (!fallback.length) return 'Sin resultados: nada en stock coincide con esos criterios ahora mismo. No inventes un producto — sugiere ampliar el rango de precio/familia o pide otro detalle.';
+        return fallback.map(p => {
+          const inv = invMap[p.id] || {};
+          const stockLabel = inv.lowStock ? 'low_stock' : 'in_stock';
+          return [
             `id:${p.id} ${p.brand} ${p.name} $${p.price} ${p.g}`,
             p.family  ? `family:${p.family}`    : null,
             p.notes   ? `notes:${p.notes}`      : null,
@@ -6071,8 +6078,9 @@ Responde en el idioma del cliente.`
             p.sillage ? `sillage:${p.sillage}`  : null,
             p.season  ? `season:${p.season}`    : null,
             p.tagline ? `tagline:"${p.tagline}"`: null,
-          ].filter(Boolean).join(' | ')
-        ).join('\n');
+            `[stock:${stockLabel}]`,
+          ].filter(Boolean).join(' | ');
+        }).join('\n');
       }
 
       const result = top.map(({p, score}) => {
