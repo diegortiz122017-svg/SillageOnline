@@ -3079,8 +3079,12 @@ function renderAnalytics(d){
   // Update section label with current range
   var rangeLabel = document.getElementById('an-range-label');
   if(rangeLabel && rng.from){
-    var f=new Date(rng.from).toLocaleDateString('es-ES',{day:'numeric',month:'short'});
-    var t=new Date(rng.to||rng.from).toLocaleDateString('es-ES',{day:'numeric',month:'short',year:'numeric'});
+    // rng.from/rng.to son strings "YYYY-MM-DD" del servidor — new Date(str) sin hora
+    // los interpreta como medianoche UTC, y toLocaleDateString los muestra en la zona
+    // horaria del navegador (El Salvador, UTC-6), corriendo la fecha un día hacia atrás.
+    // Forzar T00:00:00 hace que se interprete como medianoche LOCAL, no UTC.
+    var f=new Date(rng.from+'T00:00:00').toLocaleDateString('es-ES',{day:'numeric',month:'short'});
+    var t=new Date((rng.to||rng.from)+'T00:00:00').toLocaleDateString('es-ES',{day:'numeric',month:'short',year:'numeric'});
     rangeLabel.textContent = f+' — '+t;
   }
   // Revenue — show range total prominently, fixed periods as context
