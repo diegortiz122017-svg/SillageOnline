@@ -104,6 +104,7 @@ async function sendMetaCAPIEvent(eventName, { req, email, value, contentIds, eve
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(payload),
+      signal: AbortSignal.timeout(8000),
     });
     if (!resp.ok) {
       const errText = await resp.text().catch(() => '');
@@ -274,6 +275,11 @@ async function initDB() {
       INDEX idx_event (event_type)
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
   `);
+  // GET /api/admin/traffic-by-ip groups by ip with a created_at range filter —
+  // without this, that query does a full table scan on a table that only
+  // grows (90-day retention still means real volume). Added after the table
+  // already existed in production, so it needs its own migration statement.
+  try { await db.execute('ALTER TABLE activity_events ADD INDEX idx_ip_created (ip, created_at)'); } catch(e) {}
   // Cleanup: eventos de actividad más viejos de 90 días (mismo criterio que scent_profiles)
   try { await db.execute('DELETE FROM activity_events WHERE created_at < DATE_SUB(NOW(), INTERVAL 90 DAY)'); } catch(e) {}
 
