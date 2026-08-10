@@ -7535,11 +7535,32 @@ async function start() {
     resolve();
   }));
 
+  // Warm up DB connection pool before accepting traffic — with retries.
+  // A coordinated restart of the app + DB services (e.g. redeploying both
+  // at once) can easily have the DB still booting when this first query
+  // fires; without a retry here, a single ETIMEDOUT crashed the whole
+  // process via process.exit(1), which just crash-looped forever against a
+  // DB that hadn't finished starting yet.
+  const MAX_DB_RETRIES = 10;
+  const DB_RETRY_DELAY_MS = 4000;
+  let dbConnected = false;
+  for (let attempt = 1; attempt <= MAX_DB_RETRIES; attempt++) {
+    try {
+      await db.execute('SELECT 1');
+      dbConnected = true;
+      break;
+    } catch(err) {
+      console.error(`⚠️  DB connection attempt ${attempt}/${MAX_DB_RETRIES} failed: ${err.message}`);
+      if (attempt < MAX_DB_RETRIES) await new Promise(r => setTimeout(r, DB_RETRY_DELAY_MS));
+    }
+  }
+  if (!dbConnected) {
+    console.error('❌ DB unreachable after ' + MAX_DB_RETRIES + ' attempts — exiting.');
+    process.exit(1);
+  }
+  console.log('✅ DB connection established');
+
   try {
-    // Warm up DB connection pool before accepting traffic
-    // Prevents cold-start 503s on first user request
-    await db.execute('SELECT 1');
-    console.log('✅ DB connection established');
     await initDB();
     await migrateOrders();
     await migrateConsultCounts();
