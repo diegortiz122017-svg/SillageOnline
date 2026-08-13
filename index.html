@@ -5344,8 +5344,8 @@ function openBundleDetail(b){
   var body = document.getElementById('bundleDetailBody');
   body.innerHTML = (b.items||[]).map(function(it){
     var prod = (P||[]).find(function(p){ return p.id === it.productId || p.id === +it.productId; });
-    var img = prod && prod.image ? '<img class="bundle-prod-img" src="'+cdnImg(prod.image,80)+'" loading="lazy"/>' :
-      '<div class="bundle-prod-img" style="display:flex;align-items:center;justify-content:center;font-size:1.2rem">🌸</div>';
+    var img = prod && prod.photos && prod.photos.length ? '<img class="bundle-prod-img" src="'+cdnImg(prod.photos[0],80)+'" loading="lazy"/>' :
+      '<div class="bundle-prod-img" style="display:flex;align-items:center;justify-content:center">'+(prod?svg(prod.c,prod.s,'sm'):'🌸')+'</div>';
     var brand = prod ? esc(prod.brand) : '';
     var name  = prod ? esc(prod.name)  : esc(it.name||'');
     var size  = it.size ? '<div class="bundle-prod-size">'+esc(it.size)+'</div>' : '';
