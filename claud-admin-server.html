@@ -961,6 +961,17 @@ tr:hover td{background:rgba(255,255,255,0.02)}
           </div>
         </div>
 
+        <!-- Nudge de Nez — experimento A/B (rama conversion-experiments) -->
+        <div class="act-wrap" style="margin-bottom:1.5rem">
+          <div class="act-title">Experimento: Nudge de Nez</div>
+          <div style="font-size:0.6rem;color:var(--muted);margin:0.4rem 0 0.8rem;line-height:1.5">
+            Compara la cohorte que ve el aviso proactivo de Nez contra el grupo de control (nunca lo ve) —
+            50/50 por sesión. Lo que importa es la diferencia en "Agregaron carrito" e "Iniciaron checkout"
+            entre ambas filas, no los clics al aviso en sí.
+          </div>
+          <div id="nudgeExpTable"><div style="color:var(--muted);font-size:0.7rem">Cargando…</div></div>
+        </div>
+
         <!-- Session/IP activity search -->
         <div class="act-wrap" style="margin-bottom:1.5rem">
           <div class="act-title">Buscar actividad por sesión o IP</div>
@@ -2252,7 +2263,7 @@ function navTo(page){
   }
   if(page==='pricing'){  renderPricing(); loadShippingConfig(); setTimeout(initSaleEmailUI, 800); loadNotifEmails(); }
   if(page==='orders'){   renderOrders(); fetchAllData(); }
-  if(page==='trafico'){  if(sessionToken) loadAnalytics(); loadTrafficByIp(); }
+  if(page==='trafico'){  if(sessionToken) loadAnalytics(); loadTrafficByIp(); loadNudgeExperiment(); }
   if(page==='catalogo'){ loadCatalogue(); }
   if(page==='bundles'){
     switchToPage('catalogo');
@@ -2981,6 +2992,57 @@ function loadAnalytics(){
 // bot/farm (varias sesiones o varios UA desde una sola IP, o pageviews sin
 // ninguna interacción real) se vean a simple vista sin tener que investigar
 // IP por IP como se hizo manualmente antes.
+// Nudge de Nez — comparación de cohortes A/B (rama conversion-experiments)
+function loadNudgeExperiment(){
+  if(!sessionToken) return;
+  var days = activeRange>0 ? activeRange : 90;
+  var tbl = document.getElementById('nudgeExpTable');
+  if(tbl) tbl.innerHTML = '<div style="color:var(--muted);font-size:0.7rem">Cargando…</div>';
+  adminFetch(API+'/admin/nudge-experiment?days='+days,{})
+    .then(function(r){ return r ? r.json() : null; })
+    .then(function(d){ if(d) renderNudgeExperiment(d); })
+    .catch(function(){ if(tbl) tbl.innerHTML = '<div style="color:#c05050;font-size:0.7rem">Error al cargar.</div>'; });
+}
+function renderNudgeExperiment(d){
+  var tbl = document.getElementById('nudgeExpTable');
+  if(!tbl) return;
+  var rows = d.cohorts || [];
+  if(!rows.length){ tbl.innerHTML = '<div style="color:var(--muted);font-size:0.7rem">Sin datos del experimento en este período.</div>'; return; }
+  var byGroup = {};
+  rows.forEach(function(r){ byGroup[r.cohort || 'desconocido'] = r; });
+  var order = ['nudge','control'].filter(function(g){ return byGroup[g]; })
+    .concat(Object.keys(byGroup).filter(function(g){ return g!=='nudge' && g!=='control'; }));
+  var pct = function(part, total){ return total ? Math.round((part/total)*100) : 0; };
+  var labels = {nudge:'Con nudge', control:'Control (sin nudge)'};
+  tbl.innerHTML = '<table style="width:100%;border-collapse:collapse;min-width:680px">'+
+    '<thead><tr style="text-align:left;color:#8a7f72;font-size:0.58rem;text-transform:uppercase;letter-spacing:0.06em">'+
+      '<th style="padding:0.3rem 0.6rem 0.3rem 0">Cohorte</th>'+
+      '<th style="padding:0.3rem 0.6rem">Sesiones</th>'+
+      '<th style="padding:0.3rem 0.6rem">Vieron producto</th>'+
+      '<th style="padding:0.3rem 0.6rem">Agregaron carrito</th>'+
+      '<th style="padding:0.3rem 0.6rem">Iniciaron checkout</th>'+
+      '<th style="padding:0.3rem 0.6rem">Abrieron Nez</th>'+
+      '<th style="padding:0.3rem 0.6rem">Nudge mostrado</th>'+
+      '<th style="padding:0.3rem 0.6rem">Nudge clic</th>'+
+      '<th style="padding:0.3rem 0 0.3rem 0.6rem">Nudge cerrado</th>'+
+    '</tr></thead><tbody>'+
+    order.map(function(g){
+      var r = byGroup[g];
+      return '<tr style="border-top:1px solid rgba(184,149,90,0.08)">'+
+        '<td style="padding:0.4rem 0.6rem 0.4rem 0">'+esc(labels[g]||g)+'</td>'+
+        '<td style="padding:0.4rem 0.6rem">'+fmtN(r.sessions)+'</td>'+
+        '<td style="padding:0.4rem 0.6rem;color:var(--muted)">'+fmtN(r.viewedProduct)+' ('+pct(r.viewedProduct,r.sessions)+'%)</td>'+
+        '<td style="padding:0.4rem 0.6rem;color:var(--gold)">'+fmtN(r.addedToCart)+' ('+pct(r.addedToCart,r.sessions)+'%)</td>'+
+        '<td style="padding:0.4rem 0.6rem;color:var(--gold)">'+fmtN(r.startedCheckout)+' ('+pct(r.startedCheckout,r.sessions)+'%)</td>'+
+        '<td style="padding:0.4rem 0.6rem;color:var(--muted)">'+fmtN(r.nezOpened)+'</td>'+
+        '<td style="padding:0.4rem 0.6rem;color:var(--muted)">'+fmtN(r.nudgeShown)+'</td>'+
+        '<td style="padding:0.4rem 0.6rem;color:var(--muted)">'+fmtN(r.nudgeClicked)+'</td>'+
+        '<td style="padding:0.4rem 0 0.4rem 0.6rem;color:var(--muted)">'+fmtN(r.nudgeDismissed)+'</td>'+
+      '</tr>';
+    }).join('')+
+    '</tbody></table>';
+}
+
 var _trIpRows = [];
 var _trIpDays = null;
 var _trIpFilterText = '';

@@ -3281,7 +3281,11 @@ setInterval(() => {
 // stored in our own DB, tied to the same anonymous sessionId already used for
 // Nez/carrito. Rate limited so this new public endpoint can't itself become an
 // abuse/log-flooding vector.
-const ACTIVITY_EVENT_TYPES = new Set(['pageview', 'nez_open', 'nez_message', 'product_view', 'cart_add', 'checkout_start']);
+const ACTIVITY_EVENT_TYPES = new Set([
+  'pageview', 'nez_open', 'nez_message', 'product_view', 'cart_add', 'checkout_start',
+  // Experimento de nudge de Nez (rama conversion-experiments) — etapas + cohorte A/B
+  'cohort_assigned', 'nez_nudge_shown', 'nez_nudge_clicked', 'nez_nudge_dismissed',
+]);
 const trackLimiter = rateLimit(60, 10 * 60 * 1000); // 60 eventos / 10min / IP — de sobra para navegar de verdad
 
 app.post('/api/track', trackLimiter, async (req, res) => {
@@ -3372,6 +3376,39 @@ app.get('/api/admin/traffic-by-ip', requireAdmin, async (req, res) => {
       LIMIT 100
     `, [days]);
     res.json({ days, ips: rows });
+  } catch(e) { res.status(500).json({ error: 'Query failed' }); }
+});
+
+// GET /api/admin/nudge-experiment?days=N — compara el embudo de conversión
+// entre la cohorte que ve el nudge de Nez y el grupo de control (rama
+// conversion-experiments). Cada sesión manda un evento cohort_assigned una
+// vez por carga de página; se agrupa por session_id para no contar de más
+// si navegó entre tienda/index varias veces con el mismo grupo.
+app.get('/api/admin/nudge-experiment', requireAdmin, async (req, res) => {
+  let days = parseInt(req.query.days) || 7;
+  days = Math.min(Math.max(days, 1), 90);
+  try {
+    const [rows] = await db.query(`
+      SELECT
+        cohorts.grp AS cohort,
+        COUNT(DISTINCT cohorts.session_id)                                            AS sessions,
+        COUNT(DISTINCT CASE WHEN ae.event_type='product_view'      THEN ae.session_id END) AS viewedProduct,
+        COUNT(DISTINCT CASE WHEN ae.event_type='cart_add'          THEN ae.session_id END) AS addedToCart,
+        COUNT(DISTINCT CASE WHEN ae.event_type='checkout_start'    THEN ae.session_id END) AS startedCheckout,
+        COUNT(DISTINCT CASE WHEN ae.event_type='nez_open'          THEN ae.session_id END) AS nezOpened,
+        COUNT(DISTINCT CASE WHEN ae.event_type='nez_nudge_shown'     THEN ae.session_id END) AS nudgeShown,
+        COUNT(DISTINCT CASE WHEN ae.event_type='nez_nudge_clicked'   THEN ae.session_id END) AS nudgeClicked,
+        COUNT(DISTINCT CASE WHEN ae.event_type='nez_nudge_dismissed' THEN ae.session_id END) AS nudgeDismissed
+      FROM (
+        SELECT DISTINCT session_id, JSON_UNQUOTE(JSON_EXTRACT(meta, '$.group')) AS grp
+        FROM activity_events
+        WHERE event_type='cohort_assigned' AND session_id IS NOT NULL
+          AND created_at >= DATE_SUB(NOW(), INTERVAL ? DAY)
+      ) cohorts
+      LEFT JOIN activity_events ae ON ae.session_id = cohorts.session_id
+      GROUP BY cohorts.grp
+    `, [days]);
+    res.json({ days, cohorts: rows });
   } catch(e) { res.status(500).json({ error: 'Query failed' }); }
 });
 

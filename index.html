@@ -3884,21 +3884,59 @@ function buildGrid(){
 buildGrid();
 // pills handled by buildGrid()
 
-// ── Proactive Nez nudge — mismo patrón visual que el toast de "nuevo
-// producto", pero para el visitante que lleva un rato en el sitio sin
-// haber abierto a Nez. Corre una sola vez por carga de página (a
-// diferencia de buildGrid(), que se re-ejecuta con cada filtro).
-(function(){
-  var NUDGE_DELAY_MS = 25000;
-  var shownKey = 'sillage_nez_nudge_shown';
-  try { if(sessionStorage.getItem(shownKey)) return; } catch(e){ return; }
-  setTimeout(function(){
+// ── Proactive Nez nudge — etapas + cohorte A/B ──────────────────────────
+// Etapa 1 (navegando pasivo, sin ver ningún producto): nudge genérico a los
+// ~35s. Etapa 2 (vio 1+ producto, sin agregar al carrito — señal más fuerte
+// de interés estancado): nudge más rápido (~18s desde la última vista) con
+// copy que ofrece ayuda a elegir. Se cancela solo si agrega al carrito
+// (_nezNudge.onCartAdd, llamado desde addToCart/addToCartWithOptions) — si
+// abre a Nez por otra vía, el chequeo de _somOpen/_somMessages en fire()
+// ya lo cubre sin necesidad de cancelar explícitamente.
+// Cohorte A/B 50/50 por sesión (sessionStorage, no localStorage — cada
+// visita nueva puede caer en cualquier grupo): la mitad nunca ve el nudge,
+// para poder comparar tasas de conversión entre ambos grupos en Tráfico.
+var _nezNudge = (function(){
+  var STAGE1_DELAY_MS = 35000;
+  var STAGE2_DELAY_MS = 18000;
+  var AUTO_HIDE_MS    = 8000;
+  var shownKey  = 'sillage_nez_nudge_shown';
+  var cohortKey = 'sillage_nudge_cohort';
+  var timer = null, stage = 1, active = false;
+
+  var cohort;
+  try {
+    cohort = sessionStorage.getItem(cohortKey);
+    if(!cohort){
+      cohort = Math.random() < 0.5 ? 'nudge' : 'control';
+      sessionStorage.setItem(cohortKey, cohort);
+    }
+  } catch(e){ cohort = 'control'; }
+  trackEvent('cohort_assigned', {group: cohort});
+
+  function clearTimer(){ if(timer){ clearTimeout(timer); timer = null; } }
+
+  function schedule(delay, nextStage){
+    if(cohort !== 'nudge') return;
+    try { if(sessionStorage.getItem(shownKey)) return; } catch(e){ return; }
+    clearTimer();
+    stage = nextStage;
+    active = true;
+    timer = setTimeout(fire, delay);
+  }
+
+  function fire(){
     try { if(sessionStorage.getItem(shownKey)) return; } catch(e){}
-    // No molestar si ya abrió/usó Nez, o si el toast de producto nuevo sigue visible
     if(_somOpen || (_somMessages && _somMessages.length)) return;
     if(document.getElementById('newArrivalToast')) return;
+    showToast(stage);
+  }
+
+  function showToast(forStage){
     var existing = document.getElementById('nezNudgeToast');
     if(existing) existing.remove();
+    var copy = forStage === 2
+      ? '¿Querés que te ayude a elegir la fragancia perfecta?'
+      : '¿Buscás algo en particular? Preguntale a Nez';
     var t = document.createElement('div');
     t.id = 'nezNudgeToast';
     t.style.cssText = 'position:fixed;bottom:80px;left:50%;transform:translateX(-50%);'+
@@ -3907,26 +3945,50 @@ buildGrid();
       'box-shadow:0 4px 20px rgba(0,0,0,0.4);animation:fadeUp 0.4s ease;max-width:90vw';
     t.innerHTML =
       '<span style="font-size:0.52rem;letter-spacing:0.2em;text-transform:uppercase;color:#b8955a">Nez</span>'+
-      '<span style="font-size:0.72rem;color:var(--cream)">¿Buscás algo en particular? Preguntale a Nez</span>'+
+      '<span style="font-size:0.72rem;color:var(--cream)">'+esc(copy)+'</span>'+
       '<span style="font-size:0.65rem;color:var(--gold)">→</span>'+
-      '<button onclick="event.stopPropagation();dismissNezNudgeToast(this)" '+
+      '<button onclick="event.stopPropagation();_nezNudge.dismiss()" '+
         'style="background:none;border:none;color:var(--muted);cursor:pointer;font-size:0.8rem;padding:0;margin-left:0.3rem">✕</button>';
     t.onclick = function(){
       try{ sessionStorage.setItem(shownKey,'1'); }catch(e){}
+      trackEvent('nez_nudge_clicked', {stage: forStage});
       t.remove();
       toggleSommelier();
     };
     document.body.appendChild(t);
     try{ sessionStorage.setItem(shownKey,'1'); }catch(e){}
+    trackEvent('nez_nudge_shown', {stage: forStage});
     setTimeout(function(){
-      if(t.parentNode){ t.style.opacity='0'; t.style.transition='opacity 0.5s'; setTimeout(function(){ t.remove(); },500); }
-    }, 8000);
-  }, NUDGE_DELAY_MS);
+      if(t.parentNode){
+        t.style.opacity='0'; t.style.transition='opacity 0.5s';
+        setTimeout(function(){ t.remove(); },500);
+      }
+    }, AUTO_HIDE_MS);
+  }
+
+  var api = {
+    onProductView: function(){
+      if(!active || stage < 2) schedule(STAGE2_DELAY_MS, 2);
+    },
+    onCartAdd: function(){
+      clearTimer();
+      active = false;
+      try{ sessionStorage.setItem(shownKey,'1'); }catch(e){} // etapa 3: ya no nudgear esta sesión
+    },
+    dismiss: function(){
+      var t = document.getElementById('nezNudgeToast');
+      if(t) t.remove();
+      try{ sessionStorage.setItem(shownKey,'1'); }catch(e){}
+      trackEvent('nez_nudge_dismissed', {stage: stage});
+    },
+  };
+
+  // Etapa 1 por defecto al cargar la página — si ve un producto antes de que
+  // dispare, onProductView() la reemplaza por la etapa 2 (más rápida).
+  schedule(STAGE1_DELAY_MS, 1);
+
+  return api;
 })();
-function dismissNezNudgeToast(btn){
-  var t = document.getElementById('nezNudgeToast');
-  if(t) t.remove();
-}
 
 // ════════════════════════════════════════════
 // FILTERS
@@ -3974,6 +4036,7 @@ function openDetail(pid){
   var p=P.find(function(x){return x.id===pid;});if(!p)return;
   trackEvent('product_view', {id:pid});
   if(typeof fbq==='function') fbq('track','ViewContent',{content_ids:[String(pid)],content_type:'product',value:effectivePrice(p),currency:'USD'});
+  if(typeof _nezNudge!=='undefined') _nezNudge.onProductView();
   _detailOpenPid=pid;
   curSlide=0;
   document.getElementById('bcBrand').textContent=p.brand;
@@ -4646,6 +4709,7 @@ function addToCart(pid){
   renderCart();saveCart();
   trackEvent('cart_add', {id:pid});
   if(typeof fbq==='function') fbq('track','AddToCart',{content_ids:[String(pid)],content_type:'product',value:effectivePrice(p),currency:'USD'});
+  if(typeof _nezNudge!=='undefined') _nezNudge.onCartAdd();
   _reinforceProfileIfRecommended(pid);
 }
 
@@ -4669,6 +4733,7 @@ function addToCartWithOptions(pid, label, price, size, type){
   saveCart();
   trackEvent('cart_add', {id:pid,type:type});
   if(typeof fbq==='function') fbq('track','AddToCart',{content_ids:[String(pid)],content_type:'product',value:parseFloat(price)||0,currency:'USD'});
+  if(typeof _nezNudge!=='undefined') _nezNudge.onCartAdd();
   _reinforceProfileIfRecommended(pid);
 }
 function removeFromCart(pid){cart=cart.filter(function(i){return i.p.id!==pid;});renderCart();saveCart();}
