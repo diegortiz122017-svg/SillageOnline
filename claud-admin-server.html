@@ -1949,21 +1949,30 @@ function esc(str){
 // venga de ahí (page, meta, sessionId, ip) se escapa antes de insertarlo.
 var ACT_EVENT_LABELS = {
   pageview:'Cargó página', nez_open:'Abrió a Nez', nez_message:'Escribió a Nez',
-  product_view:'Vio producto', cart_add:'Agregó al carrito', checkout_start:'Inició checkout'
+  product_view:'Vio producto', cart_add:'Agregó al carrito', checkout_start:'Inició checkout',
+  cohort_assigned:'Asignado a grupo A/B', nez_nudge_shown:'Vio aviso de Nez',
+  nez_nudge_clicked:'Clic en aviso de Nez', nez_nudge_dismissed:'Cerró aviso de Nez'
 };
 var ACT_TYPE_LABELS = { decant:'decant', botella:'botella completa' };
+var ACT_GROUP_LABELS = { nudge:'con aviso', control:'sin aviso (control)' };
 // product_view/cart_add meta llega como {"id":34[,"type":"decant"]} — resuelve
 // el id contra el catálogo para mostrar marca + nombre en vez del JSON crudo.
+// cohort_assigned/nez_nudge_* (experimento de A/B del aviso de Nez) llegan como
+// {"group":"nudge"|"control"} o {"stage":1|2} — también se traducen aquí.
 function _actMetaLabel(eventType, metaStr){
   if(!metaStr) return '';
-  if(eventType!=='product_view' && eventType!=='cart_add') return metaStr;
   var meta;
   try{ meta = JSON.parse(metaStr); }catch(e){ return metaStr; }
-  if(!meta || meta.id==null) return metaStr;
-  var prod = (catalogFragrances||[]).find(function(p){ return p.id===meta.id || String(p.id)===String(meta.id); });
-  var name = prod ? (prod.brand+' — '+prod.name) : ('Producto #'+meta.id);
-  var type = meta.type ? ' ('+(ACT_TYPE_LABELS[meta.type]||meta.type)+')' : '';
-  return name+type;
+  if(!meta) return metaStr;
+  if((eventType==='product_view' || eventType==='cart_add') && meta.id!=null){
+    var prod = (catalogFragrances||[]).find(function(p){ return p.id===meta.id || String(p.id)===String(meta.id); });
+    var name = prod ? (prod.brand+' — '+prod.name) : ('Producto #'+meta.id);
+    var type = meta.type ? ' ('+(ACT_TYPE_LABELS[meta.type]||meta.type)+')' : '';
+    return name+type;
+  }
+  if(eventType==='cohort_assigned' && meta.group!=null) return ACT_GROUP_LABELS[meta.group]||meta.group;
+  if(eventType.indexOf('nez_nudge_')===0 && meta.stage!=null) return 'etapa '+meta.stage;
+  return metaStr;
 }
 function searchActivity(){
   var input = document.getElementById('actSearchInput');
