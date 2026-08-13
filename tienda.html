@@ -2186,6 +2186,12 @@ footer{background:var(--dark);padding:3.5rem 4rem;text-align:center;border-top:1
       <input class="search-input" type="text" id="searchBox" placeholder="Buscar por nombre, marca o nota..."/>
     </div>
   </div>
+  <div id="bundles-section" style="display:none">
+    <div style="max-width:1200px;margin:0 auto">
+      <div class="coll-section-title">Bundles</div>
+      <div class="bundles-grid" id="homeBundlesGrid"></div>
+    </div>
+  </div>
   <p class="results-info">Mostrando <span id="resultCount">0</span> fragancias</p>
   <div class="product-grid" id="productGrid">
     <div class="empty-state" id="emptyState"><h3>No se encontraron fragancias</h3><p>Intenta ajustar los filtros</p></div>
@@ -3536,13 +3542,17 @@ function buildGrid(){
       t.onclick = function(){
         openDetail(newest.id);
         t.remove();
-        try{ localStorage.setItem(seenKey,'1'); }catch(e){}
       };
       document.body.appendChild(t);
+      // Marcar como visto apenas se muestra (no al cerrar) — si el visitante
+      // navega a otra página de la tienda (ej. de index.html a tienda.html)
+      // antes de que pase el auto-dismiss, la página nueva ya ve el flag y no
+      // lo vuelve a mostrar. Antes se marcaba solo al hacer clic o al cumplirse
+      // los 8s, así que navegar rápido entre páginas lo disparaba dos veces.
+      try{ localStorage.setItem(seenKey,'1'); }catch(e){}
       // Auto-dismiss after 8 seconds
       setTimeout(function(){
         if(t.parentNode){ t.style.opacity='0'; t.style.transition='opacity 0.5s'; setTimeout(function(){ t.remove(); },500); }
-        try{ localStorage.setItem(seenKey,'1'); }catch(e){}
       }, 8000);
     }, 3000);
   })();
@@ -5241,17 +5251,8 @@ function openBundleProdDetail(pid){
   }, 500);
 }
 
-function renderCollBundles(bundles){
-  var collBundlesGrid  = document.getElementById('collBundlesGrid');
-  var collBundlesTitle = document.getElementById('collBundlesTitle');
-  if(!collBundlesGrid) return;
-  if(!bundles || !bundles.length){
-    if(collBundlesTitle) collBundlesTitle.style.display='none';
-    collBundlesGrid.innerHTML='';
-    return;
-  }
-  if(collBundlesTitle) collBundlesTitle.style.display='block';
-  collBundlesGrid.innerHTML = bundles.map(function(b){
+function _bundleCardsHtml(bundles){
+  return bundles.map(function(b){
     var saving = b.orig_price && parseFloat(b.orig_price) > parseFloat(b.price)
       ? parseFloat(b.orig_price) - parseFloat(b.price) : 0;
     var items = (b.items||[]).map(function(it){
@@ -5272,9 +5273,10 @@ function renderCollBundles(bundles){
       '</div>'+
     '</div>';
   }).join('');
-
+}
+function _wireBundleGridClicks(gridEl){
   // Event delegation — one listener replaces all card/button listeners
-  collBundlesGrid.onclick = function(e){
+  gridEl.onclick = function(e){
     var addBtn = e.target.closest('.bsc-add');
     if(addBtn){
       e.stopPropagation();
@@ -5290,6 +5292,37 @@ function renderCollBundles(bundles){
       if(found) openBundleDetail(found);
     }
   };
+}
+function renderCollBundles(bundles){
+  var collBundlesGrid  = document.getElementById('collBundlesGrid');
+  var collBundlesTitle = document.getElementById('collBundlesTitle');
+  if(collBundlesGrid){
+    if(!bundles || !bundles.length){
+      if(collBundlesTitle) collBundlesTitle.style.display='none';
+      collBundlesGrid.innerHTML='';
+    } else {
+      if(collBundlesTitle) collBundlesTitle.style.display='block';
+      collBundlesGrid.innerHTML = _bundleCardsHtml(bundles);
+      _wireBundleGridClicks(collBundlesGrid);
+    }
+  }
+  renderHomeBundles(bundles);
+}
+// Bundles directamente en la página de Tienda, arriba de la grilla de
+// productos — vivía antes solo dentro de la ventana de "Colecciones",
+// que requiere un clic extra para verlos.
+function renderHomeBundles(bundles){
+  var section = document.getElementById('bundles-section');
+  var grid = document.getElementById('homeBundlesGrid');
+  if(!section || !grid) return;
+  if(!bundles || !bundles.length){
+    section.style.display='none';
+    grid.innerHTML='';
+    return;
+  }
+  section.style.display='block';
+  grid.innerHTML = _bundleCardsHtml(bundles);
+  _wireBundleGridClicks(grid);
 }
 
 var _bundlesLoaded = false;
