@@ -3552,7 +3552,7 @@ function buildGrid(){
       t.style.cssText = 'position:fixed;bottom:80px;left:50%;transform:translateX(-50%);'+
         'background:#1a1714;border:1px solid rgba(184,149,90,0.3);padding:0.8rem 1.2rem;'+
         'display:flex;align-items:center;gap:0.8rem;z-index:7000;cursor:pointer;'+
-        'box-shadow:0 4px 20px rgba(0,0,0,0.4);animation:fadeUp 0.4s ease;max-width:90vw';
+        'box-shadow:0 4px 20px rgba(0,0,0,0.4);animation:fadeUp 0.4s ease;width:min(90vw,420px)';
       t.innerHTML =
         '<span style="font-size:0.52rem;letter-spacing:0.2em;text-transform:uppercase;color:#b8955a">Nuevo</span>'+
         '<span style="font-size:0.72rem;color:var(--cream)">'+esc(newest.brand)+' '+esc(newest.name)+'</span>'+
@@ -3792,7 +3792,7 @@ var _nezNudge = (function(){
     t.style.cssText = 'position:fixed;bottom:80px;left:50%;transform:translateX(-50%);'+
       'background:#1a1714;border:1px solid rgba(184,149,90,0.3);padding:0.8rem 1.2rem;'+
       'display:flex;align-items:center;gap:0.8rem;z-index:7000;cursor:pointer;'+
-      'box-shadow:0 4px 20px rgba(0,0,0,0.4);animation:fadeUp 0.4s ease;max-width:90vw';
+      'box-shadow:0 4px 20px rgba(0,0,0,0.4);animation:fadeUp 0.4s ease;width:min(90vw,420px)';
     t.innerHTML =
       '<span style="font-size:0.52rem;letter-spacing:0.2em;text-transform:uppercase;color:#b8955a">Nez</span>'+
       '<span style="font-size:0.72rem;color:var(--cream)">'+esc(copy)+'</span>'+
