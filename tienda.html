@@ -1484,9 +1484,21 @@ footer{background:var(--dark);padding:3.5rem 4rem;text-align:center;border-top:1
 }
 
 /* ── BUNDLES SECTION ── */
-#bundles-section{padding:5rem var(--side);background:var(--bg);border-top:1px solid var(--border)}
+#bundles-section{padding:6rem 4rem 7rem;background:var(--warm-white);color:var(--charcoal);border-top:1px solid rgba(184,149,90,0.12)}
+.bh-header{max-width:600px;margin:0 auto 3rem;text-align:center}
+.bh-eyebrow{display:block;font-size:0.6rem;letter-spacing:0.35em;text-transform:uppercase;color:var(--gold);margin-bottom:0.9rem}
+.bh-title{font-family:'Cormorant Garamond',serif;font-size:clamp(2.2rem,4vw,3.2rem);font-weight:300;color:var(--charcoal);line-height:1.1;margin-bottom:0.8rem}
+.bh-title em{font-style:italic;color:var(--gold)}
+.bh-sub{font-size:0.76rem;color:var(--muted);line-height:1.8}
+@media(max-width:768px){#bundles-section{padding:4rem 1.5rem 5rem}}
 .bundles-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:1.2rem;margin-top:2rem;max-width:1200px;margin-left:auto;margin-right:auto}
 .bundle-store-card{background:rgba(184,149,90,0.04);border:1px solid rgba(184,149,90,0.2);padding:1.8rem;cursor:pointer;transition:all 0.3s;position:relative}
+#bundles-section .bundle-store-card{background:#fff}
+#bundles-section .bundle-store-card:hover{background:var(--gold-pale)}
+#bundles-section .bsc-name{color:var(--charcoal)}
+#bundles-section .bsc-desc{color:var(--muted)}
+#bundles-section .bsc-item{color:var(--charcoal);opacity:0.72}
+#bundles-section .bsc-orig{color:var(--muted)}
 .bundle-modal-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,0.75);z-index:650;align-items:center;justify-content:center}
 .bundle-modal-overlay.open{display:flex}
 .bundle-modal{background:var(--dark);border:1px solid var(--border);max-width:520px;width:90%;max-height:85vh;overflow-y:auto;position:relative}
@@ -2205,10 +2217,12 @@ footer{background:var(--dark);padding:3.5rem 4rem;text-align:center;border-top:1
 </section>
 
 <div id="bundles-section" style="display:none">
-  <div style="max-width:1200px;margin:0 auto">
-    <div class="coll-section-title">Bundles</div>
-    <div class="bundles-grid" id="homeBundlesGrid"></div>
+  <div class="bh-header">
+    <span class="bh-eyebrow">Bundles</span>
+    <h2 class="bh-title">Combina y <em>ahorra</em></h2>
+    <p class="bh-sub">Selecciones curadas en formato descubrimiento, pensadas para explorar más fragancias por menos.</p>
   </div>
+  <div class="bundles-grid" id="homeBundlesGrid"></div>
 </div>
 
 <!-- Bundle Detail Modal -->
