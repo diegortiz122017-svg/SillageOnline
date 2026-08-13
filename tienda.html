@@ -2186,12 +2186,6 @@ footer{background:var(--dark);padding:3.5rem 4rem;text-align:center;border-top:1
       <input class="search-input" type="text" id="searchBox" placeholder="Buscar por nombre, marca o nota..."/>
     </div>
   </div>
-  <div id="bundles-section" style="display:none">
-    <div style="max-width:1200px;margin:0 auto">
-      <div class="coll-section-title">Bundles</div>
-      <div class="bundles-grid" id="homeBundlesGrid"></div>
-    </div>
-  </div>
   <p class="results-info">Mostrando <span id="resultCount">0</span> fragancias</p>
   <div class="product-grid" id="productGrid">
     <div class="empty-state" id="emptyState"><h3>No se encontraron fragancias</h3><p>Intenta ajustar los filtros</p></div>
@@ -2209,6 +2203,13 @@ footer{background:var(--dark);padding:3.5rem 4rem;text-align:center;border-top:1
     <!-- Populated by buildTiendaCollections() -->
   </div>
 </section>
+
+<div id="bundles-section" style="display:none">
+  <div style="max-width:1200px;margin:0 auto">
+    <div class="coll-section-title">Bundles</div>
+    <div class="bundles-grid" id="homeBundlesGrid"></div>
+  </div>
+</div>
 
 <!-- Bundle Detail Modal -->
 <div class="bundle-modal-overlay" id="bundleDetailOverlay" onclick="if(event.target===this)closeBundleDetail()">
