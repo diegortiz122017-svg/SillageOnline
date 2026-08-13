@@ -1951,6 +1951,20 @@ var ACT_EVENT_LABELS = {
   pageview:'Cargó página', nez_open:'Abrió a Nez', nez_message:'Escribió a Nez',
   product_view:'Vio producto', cart_add:'Agregó al carrito', checkout_start:'Inició checkout'
 };
+var ACT_TYPE_LABELS = { decant:'decant', botella:'botella completa' };
+// product_view/cart_add meta llega como {"id":34[,"type":"decant"]} — resuelve
+// el id contra el catálogo para mostrar marca + nombre en vez del JSON crudo.
+function _actMetaLabel(eventType, metaStr){
+  if(!metaStr) return '';
+  if(eventType!=='product_view' && eventType!=='cart_add') return metaStr;
+  var meta;
+  try{ meta = JSON.parse(metaStr); }catch(e){ return metaStr; }
+  if(!meta || meta.id==null) return metaStr;
+  var prod = (catalogFragrances||[]).find(function(p){ return p.id===meta.id || String(p.id)===String(meta.id); });
+  var name = prod ? (prod.brand+' — '+prod.name) : ('Producto #'+meta.id);
+  var type = meta.type ? ' ('+(ACT_TYPE_LABELS[meta.type]||meta.type)+')' : '';
+  return name+type;
+}
 function searchActivity(){
   var input = document.getElementById('actSearchInput');
   var resultsEl = document.getElementById('actSearchResults');
@@ -1971,9 +1985,10 @@ function searchActivity(){
         d.events.map(function(e){
           var t = e.createdAt ? new Date(e.createdAt).toLocaleString('es-SV') : '';
           var label = ACT_EVENT_LABELS[e.eventType] || e.eventType;
+          var metaLabel = _actMetaLabel(e.eventType, e.meta);
           return '<tr style="border-top:1px solid rgba(184,149,90,0.08)">'+
             '<td style="padding:0.35rem 0.5rem 0.35rem 0;white-space:nowrap">'+esc(t)+'</td>'+
-            '<td>'+esc(label)+(e.meta?' <span style="color:#8a7f72">'+esc(e.meta)+'</span>':'')+'</td>'+
+            '<td>'+esc(label)+(metaLabel?' <span style="color:#8a7f72">— '+esc(metaLabel)+'</span>':'')+'</td>'+
             '<td style="color:#8a7f72">'+esc(e.page)+'</td>'+
             '<td style="color:#8a7f72;font-size:0.6rem">'+esc(isSession ? e.ip : e.sessionId)+'</td>'+
           '</tr>';
