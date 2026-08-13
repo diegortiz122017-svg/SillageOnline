@@ -5980,9 +5980,19 @@ Responde en el idioma del cliente.`
       const scored = catalogue
         .filter(p => !excludeIds.has(Number(p.id)))
         .filter(p => {
-          // Hard brand filter — if brand specified, only show that brand's products
-          if (brandFilter && !p.brand.toLowerCase().includes(brandFilter) && !brandFilter.includes(p.brand.toLowerCase())) return false;
-          return true;
+          // Brand filter — el modelo a veces manda el NOMBRE del producto/línea
+          // en args.brand en vez de en notes (ej. "Minérale" suena a nombre de
+          // marca aunque sea el producto de Maison Alhambra) — si eso pasara y
+          // el filtro solo comparara contra p.brand, un producto real quedaría
+          // excluido de TODO el resultado. Por eso también se acepta un match
+          // contra p.name (con acentos normalizados) antes de descartar.
+          if (!brandFilter) return true;
+          const pBrand = p.brand.toLowerCase();
+          const brandMatches = pBrand.includes(brandFilter) || brandFilter.includes(pBrand);
+          const nameNormBF = _stripAccents(p.name.toLowerCase());
+          const bfNorm = _stripAccents(brandFilter);
+          const nameMatches = nameNormBF.includes(bfNorm) || bfNorm.includes(nameNormBF);
+          return brandMatches || nameMatches;
         })
         .filter(p => {
           // Hard-exclude wrong gender BEFORE scoring — a penalty-based approach
