@@ -65,6 +65,15 @@ function _sha256Lower(str) {
   return crypto.createHash('sha256').update(String(str).trim().toLowerCase()).digest('hex');
 }
 
+// Strips accents (Minérale → Minerale) before the [^a-z0-9] cleanup used for
+// name-matching in search_catalogue — without this, /[^a-z0-9 ]/ deletes
+// accented letters outright (é → nothing) instead of normalizing them, so a
+// customer typing the unaccented spelling (the overwhelmingly common case in
+// chat) never matches a catalog name that has one.
+function _stripAccents(str) {
+  return String(str).normalize('NFD').replace(/[̀-ͯ]/g, '');
+}
+
 // Sends a server-side Purchase event to Meta's Conversions API. Mirrors the
 // same fbq('track', eventName, ...) calls fired client-side in tienda.html /
 // index.html — eventId must match the client-side eventID for the same order
@@ -5996,8 +6005,8 @@ Responde en el idioma del cliente.`
 
           // Direct name/brand match — if model passes product name as note (e.g. "santal 33", "sauvage")
           expandedNoteTerms.forEach(nt => {
-            const ntNorm = nt.replace(/[^a-z0-9]/g, '');
-            const nameNorm = pFullName.replace(/[^a-z0-9 ]/g, '');
+            const ntNorm = _stripAccents(nt).replace(/[^a-z0-9]/g, '');
+            const nameNorm = _stripAccents(pFullName).replace(/[^a-z0-9 ]/g, '');
             if(nameNorm.includes(ntNorm) || ntNorm.includes(nameNorm.split(' ').find(w => w.length > 4)||'')) score += 30;
           });
 
@@ -6023,8 +6032,8 @@ Responde en el idioma del cliente.`
           // Hard penalty: if specific notes requested and product has NONE, bury it
           // But skip penalty if the product matched by NAME (name match was the intent)
           const hadNameMatch = expandedNoteTerms.some(nt => {
-            const ntNorm = nt.replace(/[^a-z0-9]/g, '');
-            const nameNorm = (p.brand+' '+p.name).toLowerCase().replace(/[^a-z0-9 ]/g, '');
+            const ntNorm = _stripAccents(nt).replace(/[^a-z0-9]/g, '');
+            const nameNorm = _stripAccents((p.brand+' '+p.name).toLowerCase()).replace(/[^a-z0-9 ]/g, '');
             return nameNorm.includes(ntNorm) || ntNorm.includes(nameNorm.split(' ').find(w => w.length > 4)||'');
           });
           if (expandedNoteTerms.length > 0 && noteMatchCount === 0 && !hadNameMatch) score -= 50;
