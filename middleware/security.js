@@ -120,6 +120,15 @@ function getIp(req) {
   return req.socket.remoteAddress;
 }
 
+// Cloudflare adds CF-IPCountry to every request at the edge (ISO 3166-1 alpha-2,
+// e.g. "SV"), based on the same connecting IP — no external geolocation API,
+// no added latency. "XX" = Cloudflare couldn't determine it, "T1" = Tor exit node.
+function getCountry(req) {
+  const cc = req.headers['cf-ipcountry'];
+  if (!cc || cc === 'XX' || cc === 'T1') return null;
+  return cc.toUpperCase();
+}
+
 // Customer auth limiter — keyed by EMAIL not IP.
 const _customerRlStore = new Map();
 function customerAuthLimiter(req, res, next) {
@@ -148,4 +157,5 @@ module.exports = {
   customerAuthLimiter,
   bodyLimit,
   getIp,
+  getCountry,
 };

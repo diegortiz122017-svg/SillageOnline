@@ -3003,6 +3003,12 @@ function loadTrafficByIp(){
 // Limited investigado antes) es la combinación: una IP generando varias
 // sesiones con varios user-agents SIN que ninguna de esas sesiones haya
 // interactuado de verdad (ni vio producto, ni carrito, ni Nez, ni checkout).
+// ISO 3166-1 alpha-2 -> flag emoji (regional indicator symbols)
+function _flagEmoji(cc){
+  if(!cc || cc.length!==2) return '';
+  var A = 0x1F1E6;
+  return String.fromCodePoint(A+(cc.charCodeAt(0)-65)) + String.fromCodePoint(A+(cc.charCodeAt(1)-65));
+}
 function _trIpIsSuspicious(row){
   var noRealInteraction = !row.productViewSessions && !row.cartAddSessions && !row.nezOpenSessions && !row.checkoutSessions;
   return row.sessionCount>=4 && row.uaCount>=2 && noRealInteraction;
@@ -3030,7 +3036,7 @@ function _trIpRenderTable(){
   var col = _trIpSort.col, dir = _trIpSort.dir === 'asc' ? 1 : -1;
   rows.sort(function(a,b){
     var av = a[col], bv = b[col];
-    if(col === 'ip'){ av = av||''; bv = bv||''; return av.localeCompare(bv) * dir; }
+    if(col === 'ip' || col === 'country'){ av = av||''; bv = bv||''; return av.localeCompare(bv) * dir; }
     if(col === 'firstSeen' || col === 'lastSeen'){ av = new Date(av).getTime()||0; bv = new Date(bv).getTime()||0; return (av-bv) * dir; }
     return ((av||0) - (bv||0)) * dir;
   });
@@ -3040,7 +3046,7 @@ function _trIpRenderTable(){
   if(!rows.length){ tbl.innerHTML = '<div style="color:var(--muted);font-size:0.7rem">Ninguna IP coincide con el filtro.</div>'; return; }
 
   var cols = [
-    {key:'ip',label:'IP'}, {key:'sessionCount',label:'Sesiones'}, {key:'uaCount',label:'User-Agents'},
+    {key:'ip',label:'IP'}, {key:'country',label:'País'}, {key:'sessionCount',label:'Sesiones'}, {key:'uaCount',label:'User-Agents'},
     {key:'productViewSessions',label:'Vieron producto'}, {key:'cartAddSessions',label:'Carrito'},
     {key:'nezOpenSessions',label:'Nez'}, {key:'firstSeen',label:'Primera vez'}, {key:'lastSeen',label:'Última vez'},
   ];
@@ -3060,6 +3066,7 @@ function _trIpRenderTable(){
       var ipStyle = suspicious ? 'color:#c05050' : '';
       return '<tr style="'+rowStyle+'">'+
         '<td style="padding:0.4rem 0.6rem 0.4rem 0;font-family:monospace;font-size:0.66rem;'+ipStyle+'" title="'+(suspicious?'Patrón sospechoso':'')+'">'+esc(row.ip)+(suspicious?' ⚠':'')+'</td>'+
+        '<td style="padding:0.4rem 0.6rem;white-space:nowrap" title="'+esc(row.country||'')+'">'+_flagEmoji(row.country)+' '+esc(row.country||'—')+'</td>'+
         '<td style="padding:0.4rem 0.6rem">'+fmtN(row.sessionCount)+'</td>'+
         '<td style="padding:0.4rem 0.6rem'+(row.uaCount>=2?';color:#c05050':'')+'">'+fmtN(row.uaCount)+'</td>'+
         '<td style="padding:0.4rem 0.6rem;color:var(--muted)">'+fmtN(row.productViewSessions)+'</td>'+

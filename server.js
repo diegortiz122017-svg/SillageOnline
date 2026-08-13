@@ -44,7 +44,7 @@ async function logActivity(msg) {
   }
 }
 const { requireAdmin, requireCustomer, optionalCustomer, createSession, validateSession, destroySession } = auth;
-const { authLimiter, customerAuthLimiter, getIp } = security;
+const { authLimiter, customerAuthLimiter, getIp, getCountry } = security;
 const { ADMIN_USER, ADMIN_PASS, PORT, BASE_URL, OPENAI_API_KEY, WOMPI_CLIENT_ID, WOMPI_CLIENT_SECRET, WOMPI_PUBLIC_KEY, PAYPAL_CLIENT_ID, PAYPAL_CLIENT_SECRET, PAYPAL_API_BASE, EMAIL_HOLA, EMAIL_PEDIDOS, SESSION_TTL_CUSTOMER, SESSION_TTL_ADMIN, RESEND_API_KEY, NODE_ENV, IS_PROD, ANON_SESSION_TTL, ANON_WS_LIMIT, ANON_SOMMELIER_MAX, REG_SOMMELIER_LIMIT, ANON_SOMMELIER_LIMIT, CACHE_TTL_TOOL, CACHE_TTL_REPLY } = cfg;
 
 // ── BTCPay Server ─────────────────────────────────────
@@ -276,6 +276,7 @@ async function initDB() {
       page        VARCHAR(255) DEFAULT NULL,
       meta        VARCHAR(255) DEFAULT NULL,
       ip          VARCHAR(100) DEFAULT NULL,
+      country     VARCHAR(2)   DEFAULT NULL,
       user_agent  VARCHAR(255) DEFAULT NULL,
       created_at  DATETIME NOT NULL,
       INDEX idx_session (session_id),
@@ -289,6 +290,8 @@ async function initDB() {
   // grows (90-day retention still means real volume). Added after the table
   // already existed in production, so it needs its own migration statement.
   try { await db.execute('ALTER TABLE activity_events ADD INDEX idx_ip_created (ip, created_at)'); } catch(e) {}
+  // Same reason — table already existed in production before this column was added.
+  try { await db.execute('ALTER TABLE activity_events ADD COLUMN country VARCHAR(2) DEFAULT NULL'); } catch(e) {}
   // Cleanup: eventos de actividad más viejos de 90 días (mismo criterio que scent_profiles)
   try { await db.execute('DELETE FROM activity_events WHERE created_at < DATE_SUB(NOW(), INTERVAL 90 DAY)'); } catch(e) {}
 
@@ -3296,8 +3299,8 @@ app.post('/api/track', trackLimiter, async (req, res) => {
 
   try {
     await db.execute(
-      `INSERT INTO activity_events (session_id, customer_id, event_type, page, meta, ip, user_agent, created_at)
-       VALUES (?,?,?,?,?,?,?,?)`,
+      `INSERT INTO activity_events (session_id, customer_id, event_type, page, meta, ip, country, user_agent, created_at)
+       VALUES (?,?,?,?,?,?,?,?,?)`,
       [
         sessionId ? String(sessionId).slice(0, 100) : null,
         customerId,
@@ -3305,6 +3308,7 @@ app.post('/api/track', trackLimiter, async (req, res) => {
         page ? String(page).slice(0, 255) : null,
         metaStr,
         getIp(req),
+        getCountry(req),
         String(req.headers['user-agent'] || '').slice(0, 255) || null,
         new Date(),
       ]
@@ -3349,6 +3353,7 @@ app.get('/api/admin/traffic-by-ip', requireAdmin, async (req, res) => {
     const [rows] = await db.query(`
       SELECT
         ip,
+        MAX(country) AS country,
         COUNT(DISTINCT session_id)                                                AS sessionCount,
         COUNT(DISTINCT user_agent)                                                AS uaCount,
         COUNT(*)                                                                  AS events,
