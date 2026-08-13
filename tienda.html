@@ -2812,6 +2812,11 @@ function loadViaREST() {
       }, 700);
       window.history.replaceState(null, '', '/tienda');
     }
+    // Open Nez from a shared /nez link
+    if(window.location.pathname === '/nez'){
+      setTimeout(function(){ openSommelierModal(); }, 400);
+      window.history.replaceState(null, '', '/tienda');
+    }
   }).catch(function() {
     setConn('offline', 'Sin conexión');
     buildGrid();

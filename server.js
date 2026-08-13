@@ -1699,6 +1699,18 @@ app.get('/bundle/:slug', (req, res) => {
   if (fs.existsSync(index))  return res.sendFile(index);
   res.redirect('/');
 });
+
+// Shareable link that opens Nez directly — no share button needed, just
+// send /nez. Serves tienda.html (same rationale as /fragancia and /bundle
+// above), whose client JS detects the /nez path and opens the modal.
+app.get('/nez', (req, res) => {
+  const fs     = require('fs');
+  const tienda = path.join(__dirname, 'tienda.html');
+  const index  = path.join(__dirname, 'index.html');
+  if (fs.existsSync(tienda)) return res.sendFile(tienda);
+  if (fs.existsSync(index))  return res.sendFile(index);
+  res.redirect('/');
+});
 app.get('/privacidad', (req, res) => {
   const fs = require('fs');
   const file = path.join(__dirname, 'privacidad.html');
