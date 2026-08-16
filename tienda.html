@@ -5848,11 +5848,30 @@ function renderPaypalButtons(){
 }
 
 // ── PayWay (tarjeta, Banco Cuscatlán) ─────────────────────
+// Vista previa interna — visitar ?payway_preview=1 una vez guarda la bandera
+// en localStorage de ESE navegador; ?payway_preview=0 la quita. El servidor
+// puede quedar prendido (PAYWAY_ENABLED=true) para seguir probando, mientras
+// el botón sigue mostrando "Próximamente" para cualquiera sin la bandera.
+(function(){
+  var params = new URLSearchParams(window.location.search);
+  if(!params.has('payway_preview')) return;
+  try{
+    if(params.get('payway_preview')==='0') localStorage.removeItem('sillage_payway_preview');
+    else localStorage.setItem('sillage_payway_preview','1');
+  }catch(e){}
+  params.delete('payway_preview');
+  var qs = params.toString();
+  window.history.replaceState({}, '', window.location.pathname + (qs?'?'+qs:''));
+})();
+
 // Habilita el pay-method (disabled por defecto en el HTML) solo si el
-// servidor confirma que está configurado — así el botón "Próximamente"
-// nunca queda visible como pagable hasta que de verdad lo esté.
+// servidor confirma que está configurado Y este navegador tiene la vista
+// previa activada — así el botón "Próximamente" nunca queda visible como
+// pagable para visitantes normales hasta que se decida activarlo de verdad.
 fetch(API+'/payway/config').then(function(r){return r.json();}).then(function(cfg){
-  if(!cfg || !cfg.enabled) return;
+  var previewOk = false;
+  try{ previewOk = localStorage.getItem('sillage_payway_preview')==='1'; }catch(e){}
+  if(!cfg || !cfg.enabled || !previewOk) return;
   var btn = document.getElementById('pmPayway');
   var sub = document.getElementById('pmPaywaySub');
   var info = document.getElementById('pmInfoPaywayText');
