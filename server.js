@@ -4290,8 +4290,18 @@ app.post('/api/orders', orderLimiter, async (req, res) => {
     }
     const BASE       = BASE_URL || 'https://sillage-sv.com';
     const amountStr  = parseFloat(order.total).toFixed(2);
-    const callbackUrl = `${BASE}/api/payway/callback?orderId=${encodeURIComponent(order.id)}`;
-    const deniedUrl   = `${BASE}/api/payway/callback-denied?orderId=${encodeURIComponent(order.id)}`;
+    // URLs deliberadamente CORTAS (/pw/<id> en vez de
+    // /api/payway/callback?orderId=<id>): estos dos valores viajan
+    // encriptados, y el ciphertext en base64 crece con la longitud del texto
+    // plano — la URL larga daba 108 caracteres contra 64 de la corta. En las
+    // primeras pruebas en vivo el `amount` (24 chars encriptados) sí lo
+    // procesaba PayWay, pero el callback largo nunca disparó la redirección
+    // ni llegó a nuestro servidor, lo que apunta a que ese campo se trunca
+    // (p. ej. un varchar(100)) y su desencriptado del lado de PayWay queda
+    // corrupto. Sin query params, además, no dependemos de cómo parseen la
+    // query string.
+    const callbackUrl = `${BASE}/pw/${order.id}`;
+    const deniedUrl   = `${BASE}/pwd/${order.id}`;
     return res.json({
       ok: true,
       order,
@@ -4617,7 +4627,7 @@ app.get('/api/payway/status', async (req, res) => {
 // como que los parámetros vengan pegados a la URL en vez de en el body.
 async function handlePaywayCallback(req, res) {
   const BASE = BASE_URL || 'https://sillage-sv.com';
-  const orderId = String(req.query.orderId || '').slice(0, 80);
+  const orderId = String(req.params.orderId || req.query.orderId || '').slice(0, 80);
   const fallback = () => res.redirect(`${BASE}/?payway_order=${encodeURIComponent(orderId)}`);
   if (!orderId) return res.redirect(`${BASE}/`);
 
@@ -4696,7 +4706,7 @@ app.post('/api/payway/callback', paywayCallbackLimiter, express.urlencoded({ ext
 // refresque el formulario, según su documentación. Igual que arriba, acepta
 // GET y POST, y junta req.query con req.body.
 async function handlePaywayCallbackDenied(req, res) {
-  const orderId = String(req.query.orderId || '').slice(0, 80);
+  const orderId = String(req.params.orderId || req.query.orderId || '').slice(0, 80);
   const params = Object.assign({}, req.query, req.body);
   const { pwoReturnCodeTrx, pwoReturnMessageTrx } = params;
   if (orderId) {
@@ -4707,6 +4717,23 @@ async function handlePaywayCallbackDenied(req, res) {
 }
 app.get('/api/payway/callback-denied', paywayCallbackLimiter, handlePaywayCallbackDenied);
 app.post('/api/payway/callback-denied', paywayCallbackLimiter, express.urlencoded({ extended: false }), handlePaywayCallbackDenied);
+
+// Rutas CORTAS — son las que realmente se mandan encriptadas a PayWay (ver
+// comentario en el branch 'payway' de POST /api/orders). Las largas de arriba
+// se mantienen para pedidos que ya estaban en vuelo con el formato anterior.
+app.get('/pw/:orderId', paywayCallbackLimiter, handlePaywayCallback);
+app.post('/pw/:orderId', paywayCallbackLimiter, express.urlencoded({ extended: false }), handlePaywayCallback);
+app.get('/pwd/:orderId', paywayCallbackLimiter, handlePaywayCallbackDenied);
+app.post('/pwd/:orderId', paywayCallbackLimiter, express.urlencoded({ extended: false }), handlePaywayCallbackDenied);
+
+// Red de seguridad de diagnóstico: si PayWay llama una URL parecida pero que
+// no coincide con ninguna ruta de arriba, hoy se iría como un 404 mudo y no
+// tendríamos forma de saberlo. Esto lo deja registrado con método, ruta,
+// query y body para poder identificar el formato real que usan.
+app.all(['/api/payway/*', '/pw', '/pw/*', '/pwd', '/pwd/*'], express.urlencoded({ extended: false }), (req, res) => {
+  console.warn(`PayWay ruta no reconocida — ${req.method} ${req.originalUrl} — query: ${JSON.stringify(req.query)} — body: ${JSON.stringify(req.body)}`);
+  res.redirect((BASE_URL || 'https://sillage-sv.com') + '/');
+});
 
 // ═══════════════════════════════════════════════════════
 //  PAYPAL INTEGRATION
