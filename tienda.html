@@ -626,6 +626,15 @@ nav a:hover{color:var(--gold)}
 .m-btn-p:hover{background:var(--gold-light)}
 .m-btn-s{padding:0.9rem 1.2rem;background:transparent;border:1px solid var(--border);color:var(--muted);font-family:'Jost',sans-serif;font-size:0.65rem;letter-spacing:0.12em;text-transform:uppercase;cursor:pointer;transition:all 0.25s}
 .m-btn-s:hover{border-color:var(--gold);color:var(--gold)}
+.m-alt-pay-slot{flex:1}
+/* Reviste el botón de PayWay (vive en nuestro DOM, no en su iframe — el
+   formulario de tarjeta sí está aislado, este botón no) para que combine con
+   el resto del checkout en vez de la cajita blanca/verde de fábrica. */
+#paywayBtnContainer .pwo-container{width:100%;margin:0;padding:0;background:transparent;box-shadow:none;border:none;border-radius:0;text-align:center}
+#paywayBtnContainer .pwo-container .logo{width:110px;opacity:0.55;margin:0 auto 0.6rem;display:block}
+#paywayBtnContainer .pwo-container .pwo-link{display:block;margin:0;padding:0.9rem;background:var(--gold);border:none;border-radius:0;box-shadow:none;text-decoration:none;transition:background 0.3s}
+#paywayBtnContainer .pwo-container .pwo-link:hover{background:var(--gold-light);border:none;box-shadow:none}
+#paywayBtnContainer .pwo-container .pwo-link span{color:var(--dark);font-family:'Jost',sans-serif;font-weight:500;font-size:0.68rem;letter-spacing:0.22em;text-transform:uppercase}
 .tracker-wrap{margin-bottom:1.5rem}
 .tracker-lbl{font-size:0.58rem;letter-spacing:0.22em;text-transform:uppercase;color:var(--gold);margin-bottom:1rem}
 .tracker{display:flex;align-items:flex-start}
@@ -2461,9 +2470,12 @@ footer{background:var(--dark);padding:3.5rem 4rem;text-align:center;border-top:1
         <div class="m-summary"><div class="ms-title">Resumen del Pedido</div><div id="mSummaryItems"></div><div class="ms-div"></div><div class="ms-total"><span class="ms-total-lbl">Total</span><span class="ms-total-val" id="mSummaryTotal"></span></div></div>
         <div class="m-summary wb"><div class="ms-title">Enviando a</div><p style="font-size:0.75rem;color:var(--charcoal);line-height:1.7" id="mDelivery"></p></div>
         <div class="m-summary wb"><div class="ms-title">Método de Pago</div><p style="font-size:0.75rem;color:var(--charcoal)" id="mPayment"></p></div>
-        <div class="m-actions"><button class="m-btn-s" id="s3back">&#8592; Atrás</button><button class="m-btn-p" id="s3place">Realizar Pedido</button></div>
-        <div id="paypalButtonContainer" style="display:none;margin-top:0.8rem"></div>
-        <div id="paywayBtnContainer" style="display:none;margin-top:0.8rem"></div>
+        <div class="m-actions">
+          <button class="m-btn-s" id="s3back">&#8592; Atrás</button>
+          <button class="m-btn-p" id="s3place">Realizar Pedido</button>
+          <div id="paypalButtonContainer" class="m-alt-pay-slot" style="display:none"></div>
+          <div id="paywayBtnContainer" class="m-alt-pay-slot" style="display:none"></div>
+        </div>
       </div>
       <div class="m-section" id="ms4">
         <div class="success-wrap">
