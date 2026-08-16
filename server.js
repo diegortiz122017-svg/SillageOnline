@@ -214,6 +214,8 @@ async function initDB() {
       INDEX idx_sequence (sequence_step, created_at)
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
   `);
+  // Nombre opcional agregado después de que el modal ya estaba en producción.
+  try { await db.execute('ALTER TABLE email_leads ADD COLUMN name VARCHAR(120) DEFAULT NULL'); } catch(e) {}
 
   await db.execute(`
     CREATE TABLE IF NOT EXISTS inventory (
@@ -1077,9 +1079,10 @@ function buildLeadUnsubscribeFooter(token) {
     </div>`;
 }
 
-async function sendLeadWelcomeEmail(email, code, unsubToken) {
+async function sendLeadWelcomeEmail(email, code, unsubToken, name) {
+  const greeting = name ? `Hola ${escHtml(name)}, tu cupón ya es tuyo` : 'Tu cupón ya es tuyo';
   const html = emailTemplate(`
-    <h2 style="font-family:Georgia,serif;font-size:24px;font-weight:300;color:#1a1714;margin:0 0 8px">Tu cupón ya es tuyo</h2>
+    <h2 style="font-family:Georgia,serif;font-size:24px;font-weight:300;color:#1a1714;margin:0 0 8px">${greeting}</h2>
     <p style="font-size:13px;color:#8a7f72;margin:0 0 24px">10% de descuento en tu primera fragancia — sin apuro, para cuando quieras usarlo.</p>
     <div style="background:#faf8f4;border:1px dashed #d4b878;padding:16px;margin-bottom:24px;text-align:center">
       <span style="font-family:Georgia,serif;font-size:22px;letter-spacing:2px;color:#b8955a">${escHtml(code)}</span>
@@ -3476,6 +3479,7 @@ const leadCaptureLimiter = rateLimit(5, 60 * 60 * 1000); // 5 intentos/hora/IP
 // si el correo ya está registrado, devuelve el mismo código en vez de generar otro.
 app.post('/api/leads/capture', leadCaptureLimiter, async (req, res) => {
   const email = String(req.body.email || '').toLowerCase().trim();
+  const name  = String(req.body.name || '').trim().slice(0, 120) || null;
   const emailRe = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/;
   if (!email || !emailRe.test(email)) return res.status(400).json({ error: 'Correo electrónico inválido.' });
 
@@ -3501,12 +3505,12 @@ app.post('/api/leads/capture', leadCaptureLimiter, async (req, res) => {
 
     const unsubToken = crypto.randomBytes(24).toString('hex');
     await db.execute(
-      `INSERT INTO email_leads (email, promo_code, sequence_step, unsubscribed, unsubscribe_token, ip, created_at, updated_at)
-       VALUES (?,?,'welcome',0,?,?,?,?)`,
-      [email, code, unsubToken, getIp(req), now, now]
+      `INSERT INTO email_leads (email, name, promo_code, sequence_step, unsubscribed, unsubscribe_token, ip, created_at, updated_at)
+       VALUES (?,?,?,'welcome',0,?,?,?,?)`,
+      [email, name, code, unsubToken, getIp(req), now, now]
     );
 
-    sendLeadWelcomeEmail(email, code, unsubToken).catch(e => console.error('sendLeadWelcomeEmail error:', e.message));
+    sendLeadWelcomeEmail(email, code, unsubToken, name).catch(e => console.error('sendLeadWelcomeEmail error:', e.message));
     res.json({ ok: true, code });
   } catch(e) {
     console.error('leads/capture error:', e.message);

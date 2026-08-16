@@ -1210,6 +1210,7 @@ tr:hover td{background:rgba(255,255,255,0.02)}
         <div class="tbl-wrap" style="overflow-x:auto">
           <table id="leadsTable" style="min-width:640px">
             <thead><tr>
+              <th>Nombre</th>
               <th>Correo</th>
               <th>Cupón</th>
               <th>Estado</th>
@@ -1217,7 +1218,7 @@ tr:hover td{background:rgba(255,255,255,0.02)}
               <th>Convertido</th>
             </tr></thead>
             <tbody id="leadsBody">
-              <tr><td colspan="5" style="text-align:center;padding:2rem;color:var(--muted)">Cargando leads...</td></tr>
+              <tr><td colspan="6" style="text-align:center;padding:2rem;color:var(--muted)">Cargando leads...</td></tr>
             </tbody>
           </table>
         </div>
@@ -3666,7 +3667,7 @@ var LEAD_STEP_LABELS = {
 };
 function loadLeads(){
   var tbody=document.getElementById('leadsBody');
-  tbody.innerHTML='<tr><td colspan="5" style="text-align:center;padding:2rem;color:var(--muted);font-size:0.72rem">Cargando leads...</td></tr>';
+  tbody.innerHTML='<tr><td colspan="6" style="text-align:center;padding:2rem;color:var(--muted);font-size:0.72rem">Cargando leads...</td></tr>';
   adminFetch(API+'/admin/leads',{}).then(function(r){return r?r.json():null;}).then(function(d){
     var leads=(d&&d.leads)||[];
     document.getElementById('leadsTotal').textContent=fmtN(leads.length);
@@ -3674,13 +3675,14 @@ function loadLeads(){
     document.getElementById('leadsConverted').textContent=fmtN(converted);
     document.getElementById('leadsRate').textContent=leads.length?Math.round(converted/leads.length*100)+'%':'—';
     if(!leads.length){
-      tbody.innerHTML='<tr><td colspan="5" style="text-align:center;padding:2rem;color:var(--muted);font-size:0.72rem">Sin leads todavía.</td></tr>';
+      tbody.innerHTML='<tr><td colspan="6" style="text-align:center;padding:2rem;color:var(--muted);font-size:0.72rem">Sin leads todavía.</td></tr>';
       return;
     }
     tbody.innerHTML=leads.map(function(l){
       var estado=LEAD_STEP_LABELS[l.sequence_step]||l.sequence_step;
       var estadoColor=l.sequence_step==='converted'?'#5fb87a':(l.unsubscribed?'var(--muted)':'inherit');
       return '<tr>'+
+        '<td>'+(l.name?esc(l.name):'<span style="color:var(--muted)">—</span>')+'</td>'+
         '<td>'+esc(l.email)+(l.unsubscribed?' <span style="color:var(--muted);font-size:0.58rem">(baja)</span>':'')+'</td>'+
         '<td style="font-family:monospace;font-size:0.66rem">'+esc(l.promo_code)+'</td>'+
         '<td style="color:'+estadoColor+'">'+estado+'</td>'+
@@ -3688,7 +3690,7 @@ function loadLeads(){
         '<td style="white-space:nowrap;color:var(--muted)">'+(l.converted_at?esc(fmtActTime(l.converted_at)):'—')+'</td>'+
       '</tr>';
     }).join('');
-  }).catch(function(){ tbody.innerHTML='<tr><td colspan="5" style="text-align:center;padding:2rem;color:#d9534f">Error al cargar.</td></tr>'; });
+  }).catch(function(){ tbody.innerHTML='<tr><td colspan="6" style="text-align:center;padding:2rem;color:#d9534f">Error al cargar.</td></tr>'; });
 }
 function sendLeadCampaign(){
   var err=document.getElementById('leadCampaignErr');
