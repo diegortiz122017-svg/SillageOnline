@@ -4030,8 +4030,8 @@ function openDetail(pid){
   document.getElementById('bcBrand').textContent=p.brand;
   document.getElementById('bcName').textContent=p.name;
   var slidesEl=document.getElementById('slides');slidesEl.innerHTML='';
-  var bgs=['background:linear-gradient(135deg,#f2ede4,#e8e0d4)','background:linear-gradient(160deg,'+p.c[2]+' 0%,#1a1410 100%)','background:linear-gradient(135deg,#faf7f2,#f0e8dc)','background:linear-gradient(135deg,'+p.c[0]+','+p.c[1]+')'];
-  var overlays=['','<div style="position:absolute;bottom:1.5rem;left:1.5rem;right:1.5rem"><p style=\'font-family:Cormorant Garamond,serif;font-size:1.4rem;font-weight:300;color:rgba(245,240,232,0.88);font-style:italic\'>"'+p.tagline+'"</p></div>','<div style="position:absolute;top:1.2rem;left:1.2rem;padding:0.4rem 0.9rem;border:1px solid rgba(184,149,90,0.4);background:rgba(255,255,255,0.75)"><p style=\'font-size:0.52rem;letter-spacing:0.22em;text-transform:uppercase;color:#b8955a\'>'+p.conc+'</p></div>','<div style="position:absolute;bottom:1.5rem;right:1.5rem;font-family:Cormorant Garamond,serif;font-size:2.8rem;font-weight:300;color:rgba(255,255,255,0.12)">'+p.name.split(' ').pop()+'</div>'];
+  var bgs=['background:linear-gradient(135deg,#f2ede4,#e8e0d4)'];
+  var overlays=['','<div style="position:absolute;bottom:1.5rem;left:1.5rem;right:1.5rem"><p style=\'font-family:Cormorant Garamond,serif;font-size:1.4rem;font-weight:300;color:#6b5843;font-style:italic\'>"'+p.tagline+'"</p></div>','<div style="position:absolute;top:1.2rem;left:1.2rem;padding:0.4rem 0.9rem;border:1px solid rgba(184,149,90,0.4);background:rgba(255,255,255,0.75)"><p style=\'font-size:0.52rem;letter-spacing:0.22em;text-transform:uppercase;color:#b8955a\'>'+p.conc+'</p></div>','<div style="position:absolute;bottom:1.5rem;right:1.5rem;font-family:Cormorant Garamond,serif;font-size:2.8rem;font-weight:300;color:rgba(20,15,10,0.08)">'+p.name.split(' ').pop()+'</div>'];
   // Un slide por foto real (mínimo 1) — los captions siguen rotando por índice,
   // así que con menos de 4 fotos igual se ven variados en vez de repetir siempre el mismo.
   slideCount = (p.photos && p.photos.length) ? p.photos.length : 1;
