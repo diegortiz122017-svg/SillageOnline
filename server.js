@@ -4628,7 +4628,10 @@ app.get('/api/payway/status', async (req, res) => {
 async function handlePaywayCallback(req, res) {
   const BASE = BASE_URL || 'https://sillage-sv.com';
   const orderId = String(req.params.orderId || req.query.orderId || '').slice(0, 80);
-  const fallback = () => res.redirect(`${BASE}/?payway_order=${encodeURIComponent(orderId)}`);
+  // res.headersSent guard: fallback() puede llamarse una vez para responder
+  // al navegador, y de nuevo desde el catch si algo revienta DESPUÉS de esa
+  // respuesta (ya en el trabajo de fondo) — ahí no debe intentar redirigir otra vez.
+  const fallback = () => { if (!res.headersSent) res.redirect(`${BASE}/?payway_order=${encodeURIComponent(orderId)}`); };
   if (!orderId) return res.redirect(`${BASE}/`);
 
   try {
@@ -4656,6 +4659,13 @@ async function handlePaywayCallback(req, res) {
       `UPDATE orders SET status='Procesando', payment_status='Pagado', payment_method='payway', updated_at=? WHERE id=?`,
       [now, orderId]
     );
+
+    // El pedido ya quedó marcado Pagado — respondemos YA en vez de esperar a
+    // que salgan los correos (y la nota de Nez, que llama a OpenAI) antes de
+    // devolver el navegador al sitio. Todo lo de abajo sigue en segundo
+    // plano; el polling en /api/payway/status ya encuentra el pedido pagado.
+    fallback();
+
     await logActivity(
       `PayWay callback pedido ${orderId} — auth ${escHtml(pwoAuthorizationNumber)} ref ${escHtml(pwoReferenceNumber)}` +
       (pwoCustomerCCBrand ? ` — ${escHtml(pwoCustomerCCBrand)} ****${escHtml(pwoCustomerCCLastD||'')}` : '')
@@ -4692,10 +4702,9 @@ async function handlePaywayCallback(req, res) {
     }
 
     console.log(`PayWay order confirmed: ${orderId} — auth ${pwoAuthorizationNumber}`);
-    return fallback();
   } catch(e) {
     console.error('PayWay callback error:', e.message);
-    return fallback();
+    fallback();
   }
 }
 app.get('/api/payway/callback', paywayCallbackLimiter, handlePaywayCallback);
