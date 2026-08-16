@@ -4654,15 +4654,23 @@ app.post('/api/payway/callback', paywayCallbackLimiter, express.urlencoded({ ext
 
     const fullOrder = { ...o, id: o.id, status: 'Procesando', paymentStatus: 'Pagado', paymentMethod: 'payway', payment_method: 'payway', items };
     broadcastAdmin('new_order', fullOrder);
+    // PAYWAY_MODE=test apunta al sandbox de PayWay (test.payway.sv) — nunca es
+    // dinero real, así que nunca debe emitir un DTE real a Hacienda ni reportar
+    // una compra real a Meta, aunque DTE_ENABLED esté en producción para el
+    // resto del sitio. Solo se activa con PAYWAY_MODE=prod (credenciales reales).
     let paywayDte = null;
-    try { paywayDte = await emitDteForOrder(orderId); } catch(e) { console.error('PayWay DTE error:', e.message); }
+    if (cfg.PAYWAY_MODE === 'prod') {
+      try { paywayDte = await emitDteForOrder(orderId); } catch(e) { console.error('PayWay DTE error:', e.message); }
+    }
     try { await sendOrderConfirmation(fullOrder, paywayDte); } catch(e) { console.error('PayWay confirmation email error:', e.message); }
     try { await notifyAdmins(fullOrder); } catch(e) {}
-    sendMetaCAPIEvent('Purchase', {
-      email: o.email, value: parseFloat(o.total) || 0,
-      contentIds: items.map(i => String(i.productId)),
-      eventId: 'order_' + orderId,
-    });
+    if (cfg.PAYWAY_MODE === 'prod') {
+      sendMetaCAPIEvent('Purchase', {
+        email: o.email, value: parseFloat(o.total) || 0,
+        contentIds: items.map(i => String(i.productId)),
+        eventId: 'order_' + orderId,
+      });
+    }
 
     console.log(`PayWay order confirmed: ${orderId} — auth ${pwoAuthorizationNumber}`);
     return fallback();
