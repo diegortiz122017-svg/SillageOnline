@@ -114,6 +114,16 @@ function requireCustomer(req, res, next) {
   }
   req.customerSession = session;
   req.customer = session; // backwards compat — routes use req.customer.user.id
+  // Refresh last_login from real activity, not just explicit password logins —
+  // throttled to once per 30min per customer (WHERE clause, no extra read) so
+  // it doesn't add a write to every authenticated request. Fire-and-forget:
+  // never block the response on it.
+  if (session.user && session.user.id) {
+    db.execute(
+      `UPDATE customers SET last_login=NOW() WHERE id=? AND (last_login IS NULL OR last_login < DATE_SUB(NOW(), INTERVAL 30 MINUTE))`,
+      [session.user.id]
+    ).catch(() => {});
+  }
   next();
 }
 
