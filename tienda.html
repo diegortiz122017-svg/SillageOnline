@@ -5905,11 +5905,37 @@ function loadPaywayJs(jsUrl){
   return _paywayJsLoading;
 }
 // init trae token/montos ya encriptados por el servidor — nunca se genera acá.
+// El modal de checkout usa transform (para la animación de apertura) en
+// .modal-box, y #paywayBtnContainer vive adentro — por regla del spec de CSS,
+// un transform en un ancestro crea un "containing block" nuevo para los
+// descendientes position:fixed, así que el overlay de PayWay (que debería
+// cubrir toda la pantalla) queda encerrado en los ~540px del modal en vez de
+// la pantalla completa. Se siente como que hace falta un segundo clic porque
+// el primero sí abre el formulario, solo que aplastado o fuera de vista.
+//
+// Lo movemos a <body> parcheando putFrame (el método que PayWay usa para
+// crear el overlay) — a propósito ANTES de que openWindow() someta el
+// formulario que apunta al iframe, no después con un MutationObserver: mover
+// un iframe (o su contenedor) en el DOM después de que ya empezó a navegar
+// reinicia esa navegación en la mayoría de navegadores, así que hacerlo tarde
+// rompería el formulario en vez de arreglar el encuadre.
+function _pwoPatchPutFrame(){
+  if(typeof PayWayOneBtn==='undefined' || PayWayOneBtn.prototype._pwoRelocatePatched) return;
+  var origPutFrame = PayWayOneBtn.prototype.putFrame;
+  PayWayOneBtn.prototype.putFrame = function(){
+    origPutFrame.apply(this, arguments);
+    var overlay = document.getElementById(this.frameOverlayId);
+    if(overlay) document.body.appendChild(overlay);
+  };
+  PayWayOneBtn.prototype._pwoRelocatePatched = true;
+}
+
 function renderPaywayButton(init){
   var container=document.getElementById('paywayBtnContainer');
   if(!container) return;
   container.innerHTML=''; // limpiar botón previo — cada pedido trae un monto encriptado nuevo
   loadPaywayJs(init.jsUrl).then(function(){
+    _pwoPatchPutFrame();
     PayWayOneButton.init({
       container:      'paywayBtnContainer',
       token:          init.token,
