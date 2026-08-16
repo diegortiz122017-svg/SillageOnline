@@ -5324,7 +5324,16 @@ document.getElementById('s2next').addEventListener('click',function(){if(v2()){f
 document.getElementById('s3back').addEventListener('click',function(){goStep(2);});
 document.getElementById('s3place').addEventListener('click',placeOrder);
 
+var _placingOrder = false;
 function placeOrder(){
+  // Guard against double-clicks creating two orders: the button used to only
+  // get disabled inside _doPlaceOrder(), which runs after this async shipping
+  // fetch resolves — a fast second click landed before that, slipping through
+  // and firing a second POST /api/orders for the same cart.
+  if(_placingOrder) return;
+  _placingOrder = true;
+  var placeBtn = document.getElementById('s3place');
+  if(placeBtn){ placeBtn.textContent='Procesando...'; placeBtn.disabled=true; }
   // Always fetch current shipping settings before calculating total
   // to avoid mismatch if admin changed them since page load
   fetch(API+'/settings/shipping')
@@ -5446,7 +5455,8 @@ function _doPlaceOrder(){
       toast('Error', err.message || 'No se pudo conectar con el servidor. Intenta de nuevo.','');
       placeBtn.textContent='Realizar Pedido';
       placeBtn.disabled=false;
-    });
+    })
+    .finally(function(){ _placingOrder = false; });
 }
 
 // Pantalla de \u00e9xito compartida \u2014 usada por el flujo normal (/api/orders) y por
