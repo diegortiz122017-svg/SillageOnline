@@ -1080,7 +1080,7 @@ function buildLeadUnsubscribeFooter(token) {
 async function sendLeadWelcomeEmail(email, code, unsubToken) {
   const html = emailTemplate(`
     <h2 style="font-family:Georgia,serif;font-size:24px;font-weight:300;color:#1a1714;margin:0 0 8px">Tu cupón ya es tuyo</h2>
-    <p style="font-size:13px;color:#8a7f72;margin:0 0 24px">Un 10% para tu primera fragancia — sin apuro, para cuando quieras usarlo.</p>
+    <p style="font-size:13px;color:#8a7f72;margin:0 0 24px">10% de descuento en tu primera fragancia — sin apuro, para cuando quieras usarlo.</p>
     <div style="background:#faf8f4;border:1px dashed #d4b878;padding:16px;margin-bottom:24px;text-align:center">
       <span style="font-family:Georgia,serif;font-size:22px;letter-spacing:2px;color:#b8955a">${escHtml(code)}</span>
     </div>
@@ -1088,7 +1088,7 @@ async function sendLeadWelcomeEmail(email, code, unsubToken) {
     ${buildLeadUnsubscribeFooter(unsubToken)}`);
   await sendEmail({
     to: email,
-    subject: `Tu cupón de 10% — Sillage Parfumerie`,
+    subject: `Tu cupón de 10% de descuento — Sillage Parfumerie`,
     from: `Sillage Parfumerie <${EMAIL_HOLA}>`,
     html
   });
@@ -1096,7 +1096,7 @@ async function sendLeadWelcomeEmail(email, code, unsubToken) {
 
 async function sendLeadReminderEmail(email, code, unsubToken) {
   const html = emailTemplate(`
-    <h2 style="font-family:Georgia,serif;font-size:24px;font-weight:300;color:#1a1714;margin:0 0 8px">Tu 10% sigue esperando</h2>
+    <h2 style="font-family:Georgia,serif;font-size:24px;font-weight:300;color:#1a1714;margin:0 0 8px">Tu 10% de descuento sigue esperando</h2>
     <p style="font-size:13px;color:#8a7f72;margin:0 0 24px">Por si se te pasó — tu cupón de bienvenida todavía está activo.</p>
     <div style="background:#faf8f4;border:1px dashed #d4b878;padding:16px;margin-bottom:24px;text-align:center">
       <span style="font-family:Georgia,serif;font-size:22px;letter-spacing:2px;color:#b8955a">${escHtml(code)}</span>
@@ -1105,7 +1105,7 @@ async function sendLeadReminderEmail(email, code, unsubToken) {
     ${buildLeadUnsubscribeFooter(unsubToken)}`);
   await sendEmail({
     to: email,
-    subject: `Tu cupón de 10% sigue activo — Sillage Parfumerie`,
+    subject: `Tu cupón de 10% de descuento sigue activo — Sillage Parfumerie`,
     from: `Sillage Parfumerie <${EMAIL_HOLA}>`,
     html
   });
@@ -1114,7 +1114,7 @@ async function sendLeadReminderEmail(email, code, unsubToken) {
 async function sendLeadLastChanceEmail(email, code, unsubToken) {
   const html = emailTemplate(`
     <h2 style="font-family:Georgia,serif;font-size:24px;font-weight:300;color:#1a1714;margin:0 0 8px">Tu cupón vence pronto</h2>
-    <p style="font-size:13px;color:#8a7f72;margin:0 0 24px">Tu 10% de bienvenida vence en los próximos días.</p>
+    <p style="font-size:13px;color:#8a7f72;margin:0 0 24px">Tu 10% de descuento de bienvenida vence en los próximos días.</p>
     <div style="background:#faf8f4;border:1px dashed #d4b878;padding:16px;margin-bottom:24px;text-align:center">
       <span style="font-family:Georgia,serif;font-size:22px;letter-spacing:2px;color:#b8955a">${escHtml(code)}</span>
     </div>
