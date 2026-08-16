@@ -1596,6 +1596,23 @@ footer{background:var(--dark);padding:3.5rem 4rem;text-align:center;border-top:1
 .bsc-add:hover{background:var(--gold-light)}
 @media(max-width:600px){.bundles-grid{grid-template-columns:1fr}}
 
+/* ── LEAD CAPTURE MODAL (10% a cambio del correo) ── */
+.lead-modal-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,0.6);z-index:8000;align-items:center;justify-content:center;padding:1.5rem}
+.lead-modal-overlay.open{display:flex}
+.lead-modal{width:100%;max-width:340px;background:var(--dark);border:1px solid rgba(184,149,90,0.3);padding:2rem 1.6rem 1.8rem;position:relative;box-shadow:0 20px 60px rgba(0,0,0,0.5)}
+.lead-modal-close{position:absolute;top:0.9rem;right:0.9rem;background:none;border:none;color:var(--muted);font-size:1.1rem;cursor:pointer;line-height:1}
+.lead-modal-eyebrow{display:block;font-size:0.55rem;letter-spacing:0.3em;text-transform:uppercase;color:var(--gold);margin-bottom:0.9rem}
+.lead-modal-title{font-family:'Cormorant Garamond',serif;font-weight:300;font-size:1.7rem;color:var(--cream);line-height:1.15;margin:0 0 0.7rem}
+.lead-modal-sub{font-size:0.72rem;color:var(--muted);line-height:1.7;margin:0 0 1.4rem}
+.lead-modal-input{width:100%;box-sizing:border-box;background:transparent;border:1px solid rgba(184,149,90,0.35);color:var(--cream);font-family:'Jost',sans-serif;font-size:0.75rem;padding:0.75rem 0.9rem;outline:none;margin-bottom:0.8rem}
+.lead-modal-btn{width:100%;background:var(--gold);border:none;color:var(--dark);font-family:'Jost',sans-serif;font-weight:500;font-size:0.6rem;letter-spacing:0.18em;text-transform:uppercase;padding:0.85rem;cursor:pointer;transition:background 0.25s}
+.lead-modal-btn:hover{background:var(--gold-light)}
+.lead-modal-btn:disabled{opacity:0.6;cursor:default}
+.lead-modal-fine{font-size:0.56rem;color:var(--muted);opacity:0.75;line-height:1.6;margin:0.9rem 0 0}
+.lead-modal-code-box{border:1px dashed rgba(184,149,90,0.5);padding:0.9rem;margin-bottom:1rem;text-align:center}
+.lead-modal-code{font-family:'Cormorant Garamond',serif;font-size:1.4rem;letter-spacing:0.06em;color:var(--gold)}
+.lead-modal-err{color:#d9534f;font-size:0.65rem;min-height:1rem;margin-top:-0.3rem;margin-bottom:0.5rem}
+
 
 
 
@@ -2376,6 +2393,29 @@ footer{background:var(--dark);padding:3.5rem 4rem;text-align:center;border-top:1
   <p class="f-copy">&copy; 2026 Sillage Parfumerie. Todos los derechos reservados.</p>
   <p class="f-copy" style="opacity:0.6;margin-top:0.3rem">Sillage, Sociedad por Acciones Simplificada de Capital Variable — NIT 0823-050526-101-6 — El Salvador</p>
 </footer>
+
+<!-- Lead capture modal — 10% a cambio del correo, primera visita -->
+<div class="lead-modal-overlay" id="leadModalOverlay" onclick="if(event.target===this)_leadCapture.dismiss()">
+  <div class="lead-modal">
+    <button class="lead-modal-close" onclick="_leadCapture.dismiss()" aria-label="Cerrar">&#10005;</button>
+    <div id="leadModalForm">
+      <span class="lead-modal-eyebrow">Bienvenida</span>
+      <h2 class="lead-modal-title">Un 10% para tu primera fragancia</h2>
+      <p class="lead-modal-sub">Dejanos tu correo y te compartimos un cupón único — sin apuro, para cuando quieras usarlo.</p>
+      <input type="email" id="leadModalEmail" class="lead-modal-input" placeholder="tu@correo.com" onkeydown="if(event.key==='Enter')_leadCapture.submit()"/>
+      <div class="lead-modal-err" id="leadModalErr"></div>
+      <button class="lead-modal-btn" id="leadModalSubmitBtn" onclick="_leadCapture.submit()">Quiero mi 10%</button>
+      <p class="lead-modal-fine">Un correo, un cupón. Podés darte de baja cuando quieras.</p>
+    </div>
+    <div id="leadModalSuccess" style="display:none;text-align:center">
+      <span class="lead-modal-eyebrow">Gracias</span>
+      <h2 class="lead-modal-title">Tu cupón ya es tuyo</h2>
+      <div class="lead-modal-code-box"><span class="lead-modal-code" id="leadModalCode"></span></div>
+      <p class="lead-modal-sub">Te lo enviamos también por correo, por si lo necesitás después.</p>
+      <button class="lead-modal-btn" onclick="_leadCapture.close()">Explorar la colección</button>
+    </div>
+  </div>
+</div>
 
 <!-- DETAIL, CART, CHECKOUT (same structure as before) -->
 <div class="overlay" id="detailOverlay">
@@ -3684,7 +3724,11 @@ function buildGrid(){
   }
 
   // ── Main toast for newest product if user hasn't seen it ──
+  // Primera visita: el modal de bienvenida (10% por correo) ocupa este lugar
+  // en su lugar — este toast solo entra en juego una vez que ya se le ofreció
+  // el cupón (o ya lo cerró/usó), para no competir con él.
   (function(){
+    try { if(!localStorage.getItem('sillage_lead_seen')) return; } catch(e){ return; }
     var newest = newArrivals.sort(function(a,b){ return new Date(b.arrivedAt)-new Date(a.arrivedAt); })[0];
     if(!newest) return;
     var seenKey = 'sillage_seen_new_'+newest.id;
@@ -3988,6 +4032,75 @@ var _nezNudge = (function(){
   schedule(STAGE1_DELAY_MS, 1);
 
   return api;
+})();
+
+// ── Lead capture modal — 10% a cambio del correo, primera visita ────────
+// Reemplaza al toast de "nuevo producto" para visitantes nuevos (ese toast
+// se auto-desactiva hasta que este modal ya se mostró — ver su propio guard
+// más arriba). Se marca como visto apenas se muestra (mismo criterio que el
+// fix del toast duplicado), no al enviar o cerrar.
+var _leadCapture = (function(){
+  var TRIGGER_DELAY_MS = 17000;
+  var shownKey = 'sillage_lead_seen';
+
+  function eligible(){
+    try { if(localStorage.getItem(shownKey)) return false; } catch(e){ return false; }
+    if(typeof customerToken !== 'undefined' && customerToken) return false;
+    return true;
+  }
+
+  function fire(){
+    if(!eligible()) return;
+    if(typeof _somOpen !== 'undefined' && _somOpen) return;
+    if(document.getElementById('nezNudgeToast') || document.getElementById('newArrivalToast')) return;
+    show();
+  }
+
+  function show(){
+    var ov = document.getElementById('leadModalOverlay');
+    if(!ov) return;
+    ov.classList.add('open');
+    try{ localStorage.setItem(shownKey,'1'); }catch(e){}
+    trackEvent('lead_modal_shown');
+  }
+
+  function dismiss(){
+    var ov = document.getElementById('leadModalOverlay');
+    if(ov) ov.classList.remove('open');
+    trackEvent('lead_modal_dismissed');
+  }
+
+  function close(){
+    var ov = document.getElementById('leadModalOverlay');
+    if(ov) ov.classList.remove('open');
+  }
+
+  function submit(){
+    var input = document.getElementById('leadModalEmail');
+    var err   = document.getElementById('leadModalErr');
+    var btn   = document.getElementById('leadModalSubmitBtn');
+    var email = (input.value||'').trim();
+    var emailRe = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/;
+    err.textContent = '';
+    if(!email || !emailRe.test(email)){ err.textContent = 'Ingresá un correo válido.'; return; }
+    btn.disabled = true;
+    fetch(API+'/leads/capture', {
+      method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify({email: email})
+    }).then(function(r){ return r.json(); }).then(function(d){
+      btn.disabled = false;
+      if(!d || d.error){ err.textContent = (d && d.error) || 'No se pudo procesar. Intenta de nuevo.'; return; }
+      document.getElementById('leadModalCode').textContent = d.code;
+      document.getElementById('leadModalForm').style.display = 'none';
+      document.getElementById('leadModalSuccess').style.display = 'block';
+      trackEvent('lead_captured');
+    }).catch(function(){
+      btn.disabled = false;
+      err.textContent = 'Error de conexión. Intenta de nuevo.';
+    });
+  }
+
+  setTimeout(fire, TRIGGER_DELAY_MS);
+  return { dismiss: dismiss, close: close, submit: submit };
 })();
 
 // ════════════════════════════════════════════

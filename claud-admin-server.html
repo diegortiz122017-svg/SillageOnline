@@ -792,6 +792,7 @@ tr:hover td{background:rgba(255,255,255,0.02)}
         <button class="nav-btn" data-page="cod"><span class="nav-icon">🛡️</span>COD</button>
         <div class="sb-section">Clientes</div>
         <button class="nav-btn" data-page="clientes"><span class="nav-icon">👤</span>Clientes</button>
+        <button class="nav-btn" data-page="leads"><span class="nav-icon">✨</span>Leads</button>
         <button class="nav-btn" data-page="promos"><span class="nav-icon">🏷️</span>Descuentos</button>
         <button class="nav-btn" data-page="emails"><span class="nav-icon">✉️</span>Emails</button>
         <div class="sb-section">Fiscal</div>
@@ -1166,6 +1167,56 @@ tr:hover td{background:rgba(255,255,255,0.02)}
             </tr></thead>
             <tbody id="clientesBody">
               <tr><td colspan="8" style="text-align:center;padding:2rem;color:var(--muted)">Cargando clientes...</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+      <!-- LEADS (modal de bienvenida — 10% a cambio del correo) -->
+      <div class="page" id="page-leads">
+        <div class="page-title">Leads</div>
+        <div class="page-sub">Correos capturados por el modal de bienvenida — secuencia automática + campañas manuales</div>
+        <div class="stats-row" style="margin-bottom:1.5rem">
+          <div class="stat-card"><div class="stat-val c-gold" id="leadsTotal">—</div><div class="stat-label">Total Leads</div></div>
+          <div class="stat-card"><div class="stat-val c-ok" id="leadsConverted">—</div><div class="stat-label">Convertidos</div></div>
+          <div class="stat-card"><div class="stat-val" id="leadsRate">—</div><div class="stat-label">Tasa de Conversión</div></div>
+        </div>
+
+        <div style="background:rgba(255,255,255,0.03);border:1px solid var(--border-light);padding:1.2rem;margin-bottom:1.5rem">
+          <div style="font-size:0.6rem;letter-spacing:0.2em;text-transform:uppercase;color:var(--gold);margin-bottom:1rem">Campaña Manual</div>
+          <div style="display:flex;flex-direction:column;gap:0.8rem;max-width:600px">
+            <div>
+              <label class="dte-lbl">Enviar a</label>
+              <select id="leadCampaignFilter" class="dte-inp" style="width:100%">
+                <option value="all">Todos los no convertidos</option>
+                <option value="welcome">Solo etapa: Bienvenida</option>
+                <option value="reminder_5d">Solo etapa: Recordatorio</option>
+                <option value="last_chance_30d">Solo etapa: Último aviso</option>
+              </select>
+            </div>
+            <div>
+              <label class="dte-lbl">Asunto</label>
+              <input id="leadCampaignSubject" class="dte-inp" style="width:100%" placeholder="Asunto del correo"/>
+            </div>
+            <div>
+              <label class="dte-lbl">Mensaje</label>
+              <textarea id="leadCampaignMessage" rows="6" style="width:100%;box-sizing:border-box;background:var(--card);border:1px solid var(--border-light);color:var(--cream);font-family:'Jost',sans-serif;font-size:0.75rem;padding:0.6rem 0.8rem;outline:none;resize:vertical" placeholder="Escribe el mensaje... (separa párrafos con una línea en blanco)"></textarea>
+            </div>
+            <div id="leadCampaignErr" style="color:#d9534f;font-size:0.68rem"></div>
+            <div><button class="save-btn" style="width:fit-content" onclick="sendLeadCampaign()">Enviar Campaña</button></div>
+          </div>
+        </div>
+
+        <div class="tbl-wrap" style="overflow-x:auto">
+          <table id="leadsTable" style="min-width:640px">
+            <thead><tr>
+              <th>Correo</th>
+              <th>Cupón</th>
+              <th>Estado</th>
+              <th>Registrado</th>
+              <th>Convertido</th>
+            </tr></thead>
+            <tbody id="leadsBody">
+              <tr><td colspan="5" style="text-align:center;padding:2rem;color:var(--muted)">Cargando leads...</td></tr>
             </tbody>
           </table>
         </div>
@@ -1612,6 +1663,7 @@ tr:hover td{background:rgba(255,255,255,0.02)}
       <button class="mob-drawer-item" data-page="decants" onclick="navToFromDrawer('decants')"><span class="mob-icon">🧪</span>Decants</button>
       <button class="mob-drawer-item" data-page="cod" onclick="navToFromDrawer('cod')"><span class="mob-icon">🛡️</span>COD</button>
       <button class="mob-drawer-item" data-page="clientes" onclick="navToFromDrawer('clientes')"><span class="mob-icon">👤</span>Clientes</button>
+      <button class="mob-drawer-item" data-page="leads" onclick="navToFromDrawer('leads')"><span class="mob-icon">✨</span>Leads</button>
       <button class="mob-drawer-item" data-page="emails" onclick="navToFromDrawer('emails')"><span class="mob-icon">✉️</span>Emails</button>
       <button class="mob-drawer-item" data-page="dte" onclick="navToFromDrawer('dte')"><span class="mob-icon">📄</span>DTE</button>
     </div>
@@ -1951,7 +2003,9 @@ var ACT_EVENT_LABELS = {
   pageview:'Cargó página', nez_open:'Abrió a Nez', nez_message:'Escribió a Nez',
   product_view:'Vio producto', cart_add:'Agregó al carrito', checkout_start:'Inició checkout',
   cohort_assigned:'Asignado a grupo A/B', nez_nudge_shown:'Vio aviso de Nez',
-  nez_nudge_clicked:'Clic en aviso de Nez', nez_nudge_dismissed:'Cerró aviso de Nez'
+  nez_nudge_clicked:'Clic en aviso de Nez', nez_nudge_dismissed:'Cerró aviso de Nez',
+  lead_modal_shown:'Vio modal de bienvenida', lead_modal_dismissed:'Cerró modal de bienvenida',
+  lead_captured:'Dejó su correo (10%)'
 };
 var ACT_TYPE_LABELS = { decant:'decant', botella:'botella completa' };
 var ACT_GROUP_LABELS = { nudge:'con aviso', control:'sin aviso (control)' };
@@ -2306,6 +2360,7 @@ function navTo(page){
   if(page==='decants'){     renderDecantInventory(); loadDecantsEnabled(); }
   if(page==='cod'){         renderCODPage(); }
   if(page==='clientes')  loadClientes();
+  if(page==='leads')     loadLeads();
   if(page==='dte')       renderDtePage();
   if(page==='promos'){    loadPromoCodes(); renderPricing(); setTimeout(initSaleEmailUI, 800); }
   if(page==='emails')    loadSentEmails();
@@ -3597,6 +3652,52 @@ function sendManualEmail(){
     }).catch(function(e){ err.textContent='Error: '+e.message; });
 }
 
+var LEAD_STEP_LABELS = {
+  welcome:'Bienvenida enviada', reminder_5d:'Recordatorio enviado',
+  last_chance_30d:'Último aviso enviado', converted:'Convertido'
+};
+function loadLeads(){
+  var tbody=document.getElementById('leadsBody');
+  tbody.innerHTML='<tr><td colspan="5" style="text-align:center;padding:2rem;color:var(--muted);font-size:0.72rem">Cargando leads...</td></tr>';
+  adminFetch(API+'/admin/leads',{}).then(function(r){return r?r.json():null;}).then(function(d){
+    var leads=(d&&d.leads)||[];
+    document.getElementById('leadsTotal').textContent=fmtN(leads.length);
+    var converted=leads.filter(function(l){return l.sequence_step==='converted';}).length;
+    document.getElementById('leadsConverted').textContent=fmtN(converted);
+    document.getElementById('leadsRate').textContent=leads.length?Math.round(converted/leads.length*100)+'%':'—';
+    if(!leads.length){
+      tbody.innerHTML='<tr><td colspan="5" style="text-align:center;padding:2rem;color:var(--muted);font-size:0.72rem">Sin leads todavía.</td></tr>';
+      return;
+    }
+    tbody.innerHTML=leads.map(function(l){
+      var estado=LEAD_STEP_LABELS[l.sequence_step]||l.sequence_step;
+      var estadoColor=l.sequence_step==='converted'?'#5fb87a':(l.unsubscribed?'var(--muted)':'inherit');
+      return '<tr>'+
+        '<td>'+esc(l.email)+(l.unsubscribed?' <span style="color:var(--muted);font-size:0.58rem">(baja)</span>':'')+'</td>'+
+        '<td style="font-family:monospace;font-size:0.66rem">'+esc(l.promo_code)+'</td>'+
+        '<td style="color:'+estadoColor+'">'+estado+'</td>'+
+        '<td style="white-space:nowrap;color:var(--muted)">'+esc(fmtActTime(l.created_at))+'</td>'+
+        '<td style="white-space:nowrap;color:var(--muted)">'+(l.converted_at?esc(fmtActTime(l.converted_at)):'—')+'</td>'+
+      '</tr>';
+    }).join('');
+  }).catch(function(){ tbody.innerHTML='<tr><td colspan="5" style="text-align:center;padding:2rem;color:#d9534f">Error al cargar.</td></tr>'; });
+}
+function sendLeadCampaign(){
+  var err=document.getElementById('leadCampaignErr');
+  err.textContent='';
+  var filter=document.getElementById('leadCampaignFilter').value;
+  var subject=document.getElementById('leadCampaignSubject').value.trim();
+  var message=document.getElementById('leadCampaignMessage').value.trim();
+  if(!subject||!message){ err.textContent='Completa asunto y mensaje.'; return; }
+  adminFetch(API+'/admin/leads/campaign',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({filter:filter,subject:subject,message:message})})
+    .then(function(r){return r?r.json():null;}).then(function(d){
+      if(!d){ err.textContent='Sin respuesta.'; return; }
+      if(d.error){ err.textContent=d.error; return; }
+      document.getElementById('leadCampaignSubject').value='';
+      document.getElementById('leadCampaignMessage').value='';
+      toast('Campaña enviada', d.sent+' correos', 'ok');
+    }).catch(function(e){ err.textContent='Error: '+e.message; });
+}
 function loadPromoCodes(){
   var tbody=document.getElementById('promoBody');
   tbody.innerHTML='<tr><td colspan="8" style="text-align:center;padding:2rem;color:var(--muted);font-size:0.72rem">Cargando...</td></tr>';

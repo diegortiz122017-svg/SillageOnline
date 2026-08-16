@@ -58,6 +58,7 @@ footer{text-align:center;padding:2rem;font-size:0.6rem;letter-spacing:0.1em;colo
     <li><strong>Sesión anónima:</strong> un identificador temporal (sessionId) almacenado en tu navegador para mantener tu carrito, perfil olfativo de sesión, y límites de uso de Nez. No está vinculado a tu identidad a menos que crees una cuenta</li>
     <li><strong>Actividad de navegación:</strong> registramos internamente eventos como páginas visitadas, apertura del chat de Nez, productos vistos, productos agregados al carrito e inicio de compra — vinculados a tu sessionId o cuenta. Junto con estos eventos guardamos tu dirección IP y el user-agent de tu navegador, principalmente para detectar tráfico automatizado/abusivo y entender el uso general de la tienda. No se usa para publicidad ni se comparte con redes de anuncios</li>
     <li><strong>Datos de checkout:</strong> cuando inicias el proceso de compra y proporcionas tu correo, lo guardamos temporalmente para enviarte un recordatorio si no completas tu pedido (ver sección 4)</li>
+    <li><strong>Correo de bienvenida:</strong> si dejas tu correo en el modal de bienvenida para recibir un cupón de descuento, lo guardamos junto con el código generado para vos — no hace falta crear una cuenta (ver sección 4)</li>
     <li><strong>Preferencias de comunicación:</strong> si deseas recibir emails de marketing y/o seguimiento (solo usuarios registrados)</li>
   </ul>
   <p><strong>No almacenamos datos de tarjeta de crédito.</strong> Los pagos son procesados de forma segura por Wompi y BTCPay.</p>
@@ -78,13 +79,14 @@ footer{text-align:center;padding:2rem;font-size:0.6rem;letter-spacing:0.1em;colo
   <ul>
     <li><strong>Transaccionales</strong> (no opcionales): confirmación de pedido, notificación de envío, confirmación de entrega, expiración de pago Bitcoin. Estos se envían siempre porque son parte del servicio que contrataste</li>
     <li><strong>Recordatorio de carrito</strong> (cancelable): un único email si no completaste tu compra. Incluye enlace de cancelación en el pie del correo</li>
+    <li><strong>Cupón de bienvenida</strong> (cancelable): si dejas tu correo en el modal de bienvenida, te enviamos un cupón único de 10% para tu primera compra, un recordatorio si no lo usas en unos días, y un último aviso antes de que venza. No requiere cuenta — cada correo incluye su propio enlace de baja</li>
     <li><strong>Seguimiento post-entrega</strong> (cancelable): recomendaciones de Nez basadas en tu compra, aproximadamente 14 días después de la entrega. Solo usuarios registrados</li>
     <li><strong>Marketing</strong> (cancelable): novedades del catálogo, ofertas. Solo usuarios registrados con esta preferencia activa</li>
   </ul>
   <p>Todo email no transaccional incluye un enlace para <strong>cancelar o gestionar tus preferencias</strong> con un solo clic. También puedes escribirnos a <a href="mailto:hola@sillage-sv.com">hola@sillage-sv.com</a>.</p>
 
   <h2>5. Códigos de descuento</h2>
-  <p>Si utilizas un código promocional, registramos su uso para validar que no exceda los límites configurados. No se almacena información adicional asociada al código más allá del conteo de usos.</p>
+  <p>Si utilizas un código promocional, registramos su uso para validar que no exceda los límites configurados. La excepción es el cupón del modal de bienvenida (sección 4): ese código sí queda asociado al correo que lo generó, para poder enviarlo y darle seguimiento.</p>
 
   <h2>6. Compartir información con terceros</h2>
   <p>No vendemos ni alquilamos tus datos personales. Compartimos información únicamente con los siguientes proveedores de servicio:</p>
@@ -106,6 +108,7 @@ footer{text-align:center;padding:2rem;font-size:0.6rem;letter-spacing:0.1em;colo
     <li>Sesiones anónimas: el sessionId persiste en tu navegador hasta que lo borres. Los datos asociados en servidor expiran a los 90 días de inactividad</li>
     <li>Actividad de navegación (analítica interna): se elimina automáticamente a los 90 días</li>
     <li>Carritos abandonados: el registro se elimina una vez enviado el recordatorio o completado el pedido</li>
+    <li>Leads del modal de bienvenida: se conservan mientras no te des de baja, para no volver a ofrecerte el mismo cupón ni reenviarte correos que ya rechazaste</li>
     <li>Tokens de revocación de sesión: hasta el vencimiento natural del token</li>
   </ul>
 
@@ -137,6 +140,7 @@ footer{text-align:center;padding:2rem;font-size:0.6rem;letter-spacing:0.1em;colo
     <li>Recordar tu carrito de compras</li>
     <li>Guardar tu perfil olfativo local para una experiencia más fluida con Nez</li>
     <li>Recordar si ya viste el aviso de privacidad</li>
+    <li>Recordar si ya te mostramos el modal de bienvenida (cupón), para no repetirlo</li>
   </ul>
   <p>La actividad de navegación que registramos internamente (sección 2) vive en nuestros propios servidores, nunca se comparte con redes publicitarias, y no depende de cookies — usa el mismo sessionId de localStorage.</p>
   <p>Usamos el Pixel de Meta (Facebook/Instagram) para medir el rendimiento de nuestros anuncios y mostrarte publicidad relevante en esas plataformas — ver sección 6 para el detalle de qué le compartimos. Algunos proveedores externos con los que interactúas directamente también pueden usar sus propias cookies, bajo sus propias políticas de privacidad — no las controlamos nosotros:</p>

@@ -196,6 +196,25 @@ async function initDB() {
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
   `);
 
+  // Leads capturados por el modal de bienvenida (10% a cambio del correo) —
+  // sequence_step avanza welcome -> reminder_5d -> last_chance_30d -> converted,
+  // manejado por el motor de secuencia (setInterval más abajo).
+  await db.execute(`
+    CREATE TABLE IF NOT EXISTS email_leads (
+      id                 INT AUTO_INCREMENT PRIMARY KEY,
+      email              VARCHAR(255) NOT NULL UNIQUE,
+      promo_code         VARCHAR(30)  NOT NULL,
+      sequence_step      VARCHAR(20)  NOT NULL DEFAULT 'welcome',
+      converted_at       DATETIME     DEFAULT NULL,
+      unsubscribed       TINYINT(1)   DEFAULT 0,
+      unsubscribe_token  VARCHAR(64)  NOT NULL,
+      ip                 VARCHAR(100) DEFAULT NULL,
+      created_at         DATETIME NOT NULL,
+      updated_at         DATETIME NOT NULL,
+      INDEX idx_sequence (sequence_step, created_at)
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
+  `);
+
   await db.execute(`
     CREATE TABLE IF NOT EXISTS inventory (
       product_id   INT PRIMARY KEY,
@@ -1038,6 +1057,72 @@ async function sendWelcomeEmail(customer) {
   await sendEmail({
     to: customer.email,
     subject: `Bienvenido a Sillage Parfumerie`,
+    from: `Sillage Parfumerie <${EMAIL_HOLA}>`,
+    html
+  });
+}
+
+// ── Lead capture (modal de bienvenida — 10% a cambio del correo) ─────────
+function buildLeadUnsubscribeFooter(token) {
+  const BASE = process.env.BASE_URL || 'https://sillage-sv.com';
+  const url  = `${BASE}/api/leads/unsubscribe?token=${token}`;
+  return `
+    <div style="margin-top:32px;padding-top:16px;border-top:1px solid #e8d8b8;text-align:center">
+      <p style="font-size:10px;color:#b0a898;letter-spacing:0.05em;margin:0 0 6px">
+        Recibiste este correo porque dejaste tu email en sillage-sv.com para recibir un cupón.
+      </p>
+      <a href="${url}" style="font-size:10px;color:#b8955a;letter-spacing:1px;text-transform:uppercase;text-decoration:none">
+        Darme de baja
+      </a>
+    </div>`;
+}
+
+async function sendLeadWelcomeEmail(email, code, unsubToken) {
+  const html = emailTemplate(`
+    <h2 style="font-family:Georgia,serif;font-size:24px;font-weight:300;color:#1a1714;margin:0 0 8px">Tu cupón ya es tuyo</h2>
+    <p style="font-size:13px;color:#8a7f72;margin:0 0 24px">Un 10% para tu primera fragancia — sin apuro, para cuando quieras usarlo.</p>
+    <div style="background:#faf8f4;border:1px dashed #d4b878;padding:16px;margin-bottom:24px;text-align:center">
+      <span style="font-family:Georgia,serif;font-size:22px;letter-spacing:2px;color:#b8955a">${escHtml(code)}</span>
+    </div>
+    <p style="font-size:12px;color:#8a7f72;line-height:1.8">Válido por 30 días en tu primera compra en sillage-sv.com.</p>
+    ${buildLeadUnsubscribeFooter(unsubToken)}`);
+  await sendEmail({
+    to: email,
+    subject: `Tu cupón de 10% — Sillage Parfumerie`,
+    from: `Sillage Parfumerie <${EMAIL_HOLA}>`,
+    html
+  });
+}
+
+async function sendLeadReminderEmail(email, code, unsubToken) {
+  const html = emailTemplate(`
+    <h2 style="font-family:Georgia,serif;font-size:24px;font-weight:300;color:#1a1714;margin:0 0 8px">Tu 10% sigue esperando</h2>
+    <p style="font-size:13px;color:#8a7f72;margin:0 0 24px">Por si se te pasó — tu cupón de bienvenida todavía está activo.</p>
+    <div style="background:#faf8f4;border:1px dashed #d4b878;padding:16px;margin-bottom:24px;text-align:center">
+      <span style="font-family:Georgia,serif;font-size:22px;letter-spacing:2px;color:#b8955a">${escHtml(code)}</span>
+    </div>
+    <p style="font-size:12px;color:#8a7f72;line-height:1.8">Válido en tu primera compra en sillage-sv.com.</p>
+    ${buildLeadUnsubscribeFooter(unsubToken)}`);
+  await sendEmail({
+    to: email,
+    subject: `Tu cupón de 10% sigue activo — Sillage Parfumerie`,
+    from: `Sillage Parfumerie <${EMAIL_HOLA}>`,
+    html
+  });
+}
+
+async function sendLeadLastChanceEmail(email, code, unsubToken) {
+  const html = emailTemplate(`
+    <h2 style="font-family:Georgia,serif;font-size:24px;font-weight:300;color:#1a1714;margin:0 0 8px">Tu cupón vence pronto</h2>
+    <p style="font-size:13px;color:#8a7f72;margin:0 0 24px">Tu 10% de bienvenida vence en los próximos días.</p>
+    <div style="background:#faf8f4;border:1px dashed #d4b878;padding:16px;margin-bottom:24px;text-align:center">
+      <span style="font-family:Georgia,serif;font-size:22px;letter-spacing:2px;color:#b8955a">${escHtml(code)}</span>
+    </div>
+    <p style="font-size:12px;color:#8a7f72;line-height:1.8">Después de esto no podemos garantizar que siga activo.</p>
+    ${buildLeadUnsubscribeFooter(unsubToken)}`);
+  await sendEmail({
+    to: email,
+    subject: `Tu cupón vence pronto — Sillage Parfumerie`,
     from: `Sillage Parfumerie <${EMAIL_HOLA}>`,
     html
   });
@@ -3285,6 +3370,8 @@ const ACTIVITY_EVENT_TYPES = new Set([
   'pageview', 'nez_open', 'nez_message', 'product_view', 'cart_add', 'checkout_start',
   // Experimento de nudge de Nez (rama conversion-experiments) — etapas + cohorte A/B
   'cohort_assigned', 'nez_nudge_shown', 'nez_nudge_clicked', 'nez_nudge_dismissed',
+  // Modal de bienvenida (10% a cambio del correo)
+  'lead_modal_shown', 'lead_modal_dismissed', 'lead_captured',
 ]);
 const trackLimiter = rateLimit(60, 10 * 60 * 1000); // 60 eventos / 10min / IP — de sobra para navegar de verdad
 
@@ -3379,6 +3466,114 @@ app.get('/api/admin/traffic-by-ip', requireAdmin, async (req, res) => {
   } catch(e) { res.status(500).json({ error: 'Query failed' }); }
 });
 
+// ── Lead capture (modal de bienvenida) ────────────────────────────────────
+function genLeadCode() {
+  return 'BIENVENIDA' + Math.random().toString(36).substr(2, 5).toUpperCase();
+}
+const leadCaptureLimiter = rateLimit(5, 60 * 60 * 1000); // 5 intentos/hora/IP
+
+// POST /api/leads/capture — correo a cambio de un cupón único de 10%. Idempotente:
+// si el correo ya está registrado, devuelve el mismo código en vez de generar otro.
+app.post('/api/leads/capture', leadCaptureLimiter, async (req, res) => {
+  const email = String(req.body.email || '').toLowerCase().trim();
+  const emailRe = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/;
+  if (!email || !emailRe.test(email)) return res.status(400).json({ error: 'Correo electrónico inválido.' });
+
+  try {
+    const [existing] = await db.execute('SELECT promo_code FROM email_leads WHERE email=?', [email]);
+    if (existing.length) return res.json({ ok: true, code: existing[0].promo_code });
+
+    const now     = new Date();
+    const expires = new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000);
+    let code, promoOk = false;
+    for (let i = 0; i < 5 && !promoOk; i++) {
+      code = genLeadCode();
+      try {
+        await db.execute(
+          `INSERT INTO promo_codes (code, type, value, active, max_uses, used_count, expires_at, created_at, updated_at)
+           VALUES (?, 'percent', 10, 1, 1, 0, ?, ?, ?)`,
+          [code, expires, now, now]
+        );
+        promoOk = true;
+      } catch(e) { if (e.code !== 'ER_DUP_ENTRY') throw e; }
+    }
+    if (!promoOk) return res.status(500).json({ error: 'No se pudo generar el cupón. Intenta de nuevo.' });
+
+    const unsubToken = crypto.randomBytes(24).toString('hex');
+    await db.execute(
+      `INSERT INTO email_leads (email, promo_code, sequence_step, unsubscribed, unsubscribe_token, ip, created_at, updated_at)
+       VALUES (?,?,'welcome',0,?,?,?,?)`,
+      [email, code, unsubToken, getIp(req), now, now]
+    );
+
+    sendLeadWelcomeEmail(email, code, unsubToken).catch(e => console.error('sendLeadWelcomeEmail error:', e.message));
+    res.json({ ok: true, code });
+  } catch(e) {
+    console.error('leads/capture error:', e.message);
+    res.status(500).json({ error: 'No se pudo procesar tu correo. Intenta de nuevo.' });
+  }
+});
+
+// GET /api/leads/unsubscribe?token=... — enlace de baja en los correos de secuencia.
+app.get('/api/leads/unsubscribe', async (req, res) => {
+  const token = String(req.query.token || '').slice(0, 64);
+  if (token) await db.execute('UPDATE email_leads SET unsubscribed=1, updated_at=? WHERE unsubscribe_token=?', [new Date(), token]).catch(() => {});
+  res.send(`<!DOCTYPE html><html lang="es"><head><meta charset="UTF-8"/><title>Sillage Parfumerie</title></head>
+<body style="margin:0;padding:0;background:#f5f0e8;font-family:Helvetica,Arial,sans-serif;display:flex;align-items:center;justify-content:center;min-height:100vh">
+  <div style="text-align:center;padding:2rem">
+    <h1 style="font-family:Georgia,serif;font-weight:300;color:#1a1714;font-size:22px">Listo, te dimos de baja</h1>
+    <p style="color:#8a7f72;font-size:13px">Ya no vas a recibir más correos sobre tu cupón de bienvenida.</p>
+    <a href="/" style="color:#b8955a;font-size:12px">Volver a la tienda</a>
+  </div>
+</body></html>`);
+});
+
+// GET /api/admin/leads?status=X — lista de leads capturados por el modal, para
+// la vista de admin y para armar campañas manuales dirigidas.
+app.get('/api/admin/leads', requireAdmin, async (req, res) => {
+  const status = req.query.status ? String(req.query.status).slice(0, 20) : null;
+  try {
+    const [rows] = status
+      ? await db.execute('SELECT * FROM email_leads WHERE sequence_step=? ORDER BY created_at DESC LIMIT 500', [status])
+      : await db.execute('SELECT * FROM email_leads ORDER BY created_at DESC LIMIT 500');
+    res.json({ leads: rows });
+  } catch(e) { res.status(500).json({ error: 'Query failed' }); }
+});
+
+// POST /api/admin/leads/campaign — envía un correo puntual a un grupo de leads.
+// filter: 'all' | 'welcome' | 'reminder_5d' | 'last_chance_30d' (nunca a 'converted').
+app.post('/api/admin/leads/campaign', requireAdmin, async (req, res) => {
+  const subject = String(req.body.subject || '').trim().slice(0, 200);
+  const message = String(req.body.message || '').trim().slice(0, 5000);
+  const filter  = String(req.body.filter || 'all').slice(0, 20);
+  if (!subject || !message) return res.status(400).json({ error: 'Asunto y mensaje son requeridos.' });
+
+  try {
+    const where = filter === 'all'
+      ? "unsubscribed=0 AND sequence_step != 'converted'"
+      : 'unsubscribed=0 AND sequence_step=?';
+    const [leads] = filter === 'all'
+      ? await db.execute(`SELECT * FROM email_leads WHERE ${where}`)
+      : await db.execute(`SELECT * FROM email_leads WHERE ${where}`, [filter]);
+
+    let sent = 0;
+    for (const lead of leads) {
+      const html = emailTemplate(`
+        <div style="font-size:13px;color:#2a231c;line-height:1.8">${bodyToHtml(message, false)}</div>
+        ${buildLeadUnsubscribeFooter(lead.unsubscribe_token)}`);
+      try {
+        await sendEmail({ to: lead.email, subject, html });
+        sent++;
+      } catch(e) { console.error('lead campaign send failed:', lead.email, e.message); }
+    }
+    await logActivity(`Campaña a leads enviada: "${subject}" → ${sent} correos (filtro: ${filter})`);
+    res.json({ ok: true, sent });
+  } catch(e) {
+    console.error('leads/campaign error:', e.message);
+    res.status(500).json({ error: 'No se pudo enviar la campaña.' });
+  }
+});
+
 // GET /api/admin/nudge-experiment?days=N — compara el embudo de conversión
 // entre la cohorte que ve el nudge de Nez y el grupo de control (rama
 // conversion-experiments). Cada sesión manda un evento cohort_assigned una
@@ -3421,6 +3616,47 @@ setInterval(async () => {
       console.log(`BTCPay cleanup: removed ${r.affectedRows} expired pending order(s)`);
   } catch(e) { /* ignore */ }
 }, 30 * 60 * 1000);
+
+// ── Lead sequence engine ──────────────────────────────
+// Corre cada hora: marca convertidos a los leads con un pedido real usando su
+// cupón (cualquier método de pago — COD/PayPal/BTCPay todos escriben
+// orders.promo_code al crear el pedido, así que no hace falta tocar cada uno
+// de esos flujos por separado), y avanza la secuencia de quienes no convirtieron.
+async function runLeadSequence() {
+  try {
+    await db.execute(`
+      UPDATE email_leads el
+      JOIN orders o ON o.promo_code = el.promo_code
+      SET el.sequence_step='converted', el.converted_at=NOW(), el.updated_at=NOW()
+      WHERE el.sequence_step != 'converted'
+    `);
+
+    const [dueReminder] = await db.execute(`
+      SELECT * FROM email_leads
+      WHERE sequence_step='welcome' AND unsubscribed=0 AND created_at <= DATE_SUB(NOW(), INTERVAL 5 DAY)
+      LIMIT 50
+    `);
+    for (const lead of dueReminder) {
+      try {
+        await sendLeadReminderEmail(lead.email, lead.promo_code, lead.unsubscribe_token);
+        await db.execute("UPDATE email_leads SET sequence_step='reminder_5d', updated_at=? WHERE id=?", [new Date(), lead.id]);
+      } catch(e) { console.error('lead reminder email failed:', lead.email, e.message); }
+    }
+
+    const [dueLastChance] = await db.execute(`
+      SELECT * FROM email_leads
+      WHERE sequence_step='reminder_5d' AND unsubscribed=0 AND created_at <= DATE_SUB(NOW(), INTERVAL 30 DAY)
+      LIMIT 50
+    `);
+    for (const lead of dueLastChance) {
+      try {
+        await sendLeadLastChanceEmail(lead.email, lead.promo_code, lead.unsubscribe_token);
+        await db.execute("UPDATE email_leads SET sequence_step='last_chance_30d', updated_at=? WHERE id=?", [new Date(), lead.id]);
+      } catch(e) { console.error('lead last-chance email failed:', lead.email, e.message); }
+    }
+  } catch(e) { console.error('runLeadSequence error:', e.message); }
+}
+setInterval(runLeadSequence, 60 * 60 * 1000);
 
 app.get('/api/catalogue', async (req, res) => res.json(await getCatalogue()));
 
