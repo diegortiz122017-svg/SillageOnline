@@ -4607,23 +4607,32 @@ app.get('/api/payway/status', async (req, res) => {
 // BTCPay (deducir inventario, DTE, emails, evento de compra a Meta, avisar
 // admin). Redirige de vuelta a la tienda al terminar, ya que quien "llama"
 // esta URL es el navegador del cliente, no un servidor.
-app.post('/api/payway/callback', paywayCallbackLimiter, express.urlencoded({ extended: false }), async (req, res) => {
+//
+// La documentación de PayWay dice que esto llega por POST, pero la primera
+// prueba en vivo (4 pedidos de prueba, incluyendo uno confirmado como
+// "aprobado" dentro del modal de PayWay) se quedó siempre en Pendiente — el
+// callback nunca actualizó el pedido. Sin logs de PayWay para confirmar la
+// causa exacta, esto ahora acepta GET además de POST, y junta req.query con
+// req.body al leer los campos pwo* — cubre tanto un redirect final por GET
+// como que los parámetros vengan pegados a la URL en vez de en el body.
+async function handlePaywayCallback(req, res) {
   const BASE = BASE_URL || 'https://sillage-sv.com';
   const orderId = String(req.query.orderId || '').slice(0, 80);
   const fallback = () => res.redirect(`${BASE}/?payway_order=${encodeURIComponent(orderId)}`);
   if (!orderId) return res.redirect(`${BASE}/`);
 
   try {
+    const params = Object.assign({}, req.query, req.body);
     const {
       pwoAuthorizationNumber, pwoReferenceNumber, pwoPayWayNumber,
       pwoCustomerCCHolder, pwoCustomerCCLastD, pwoCustomerCCBrand,
-    } = req.body || {};
+    } = params;
 
     // Sanidad mínima — sin firma que verificar, al menos exigimos que los
     // campos esperados de una aprobación real vengan presentes y con forma
     // razonable (ver nota de seguridad arriba de esta sección).
     if (!pwoAuthorizationNumber || !pwoReferenceNumber) {
-      console.warn(`PayWay callback: faltan campos de autorización para pedido ${orderId} — payload:`, JSON.stringify(req.body));
+      console.warn(`PayWay callback: faltan campos de autorización para pedido ${orderId} — method ${req.method} — query:`, JSON.stringify(req.query), '— body:', JSON.stringify(req.body));
       return fallback();
     }
 
@@ -4678,20 +4687,26 @@ app.post('/api/payway/callback', paywayCallbackLimiter, express.urlencoded({ ext
     console.error('PayWay callback error:', e.message);
     return fallback();
   }
-});
+}
+app.get('/api/payway/callback', paywayCallbackLimiter, handlePaywayCallback);
+app.post('/api/payway/callback', paywayCallbackLimiter, express.urlencoded({ extended: false }), handlePaywayCallback);
 
 // Callback para transacciones DENEGADAS — solo limpieza/registro, no crea ni
 // confirma nada. reloadPage:true (JSON) le indica al modal de PayWay que
-// refresque el formulario, según su documentación.
-app.post('/api/payway/callback-denied', paywayCallbackLimiter, express.urlencoded({ extended: false }), async (req, res) => {
+// refresque el formulario, según su documentación. Igual que arriba, acepta
+// GET y POST, y junta req.query con req.body.
+async function handlePaywayCallbackDenied(req, res) {
   const orderId = String(req.query.orderId || '').slice(0, 80);
-  const { pwoReturnCodeTrx, pwoReturnMessageTrx } = req.body || {};
+  const params = Object.assign({}, req.query, req.body);
+  const { pwoReturnCodeTrx, pwoReturnMessageTrx } = params;
   if (orderId) {
     console.log(`PayWay denied — pedido ${orderId} — código ${pwoReturnCodeTrx || '?'}: ${pwoReturnMessageTrx || ''}`);
     await logActivity(`Pago PayWay denegado — pedido ${escHtml(orderId)} — ${escHtml(pwoReturnMessageTrx || pwoReturnCodeTrx || 'sin detalle')}`).catch(() => {});
   }
   res.json({ reloadPage: true });
-});
+}
+app.get('/api/payway/callback-denied', paywayCallbackLimiter, handlePaywayCallbackDenied);
+app.post('/api/payway/callback-denied', paywayCallbackLimiter, express.urlencoded({ extended: false }), handlePaywayCallbackDenied);
 
 // ═══════════════════════════════════════════════════════
 //  PAYPAL INTEGRATION
