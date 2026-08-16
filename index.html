@@ -6138,6 +6138,16 @@ function renderPaywayButton(init){
       responseCallbackForDenied: init.responseCallbackForDenied,
       label: 'Pagar con Tarjeta',
     });
+    // Auto-disparamos el botón de PayWay apenas se renderiza — para el cliente
+    // "Realizar Pedido" y "Pagar con Tarjeta" son dos botones distintos en el
+    // mismo lugar (uno nuestro que crea la orden, uno de PayWay que abre el
+    // formulario), y sentirse obligado a hacer un segundo clic ahí mismo es
+    // justo lo que invita al doble clic apurado que generaba pedidos
+    // duplicados. No es un popup (PayWay somete un <form> a un iframe en la
+    // misma página, no window.open), así que no hay bloqueador de por medio.
+    // El botón sigue visible por si lo cierran y quieren reabrirlo.
+    var pwoBtn = container.querySelector('a');
+    if(pwoBtn) pwoBtn.click();
   }).catch(function(e){
     console.error(e);
     container.innerHTML='<p style="font-size:0.7rem;color:var(--error)">No se pudo cargar el pago con tarjeta. Intenta recargar la página.</p>';
