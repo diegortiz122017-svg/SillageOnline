@@ -2418,11 +2418,11 @@ footer{background:var(--dark);padding:3.5rem 4rem;text-align:center;border-top:1
       <div class="m-section" id="ms2">
         <p class="f-label-top">Selecciona tu método de pago</p>
         <div class="pay-methods">
-          <button class="pay-method disabled" id="pmWompi" disabled title="Próximamente"><span class="pm-icon">&#128179;</span><div><span class="pm-name">Tarjeta de Crédito / Débito</span><span class="pm-sub">Próximamente</span></div></button>
+          <button class="pay-method disabled" id="pmPayway" disabled title="Próximamente"><span class="pm-icon">&#128179;</span><div><span class="pm-name">Tarjeta de Crédito / Débito</span><span class="pm-sub" id="pmPaywaySub">Próximamente</span></div></button>
           <button class="pay-method" id="pmBtcpay" onclick="selectPayMethod('btcpay')"><span class="pm-icon">&#9889;</span><div><span class="pm-name">Bitcoin / Lightning</span><span class="pm-sub">Paga con cualquier wallet BTC</span></div></button>
           <button class="pay-method active" id="pmCod" onclick="selectPayMethod('cod')"><span class="pm-icon">&#128181;</span><div><span class="pm-name">Pago contra Entrega</span><span class="pm-sub">Paga en efectivo al recibir</span></div></button>
         </div>
-        <div id="pmInfoWompi" class="pm-info" style="display:none"><p style="font-size:0.68rem;color:var(--muted);line-height:1.7">El pago con tarjeta estará disponible muy pronto.</p></div>
+        <div id="pmInfoPayway" class="pm-info" style="display:none"><p style="font-size:0.68rem;color:var(--muted);line-height:1.7" id="pmInfoPaywayText">El pago con tarjeta estará disponible muy pronto.</p></div>
         <div id="pmInfoBtcpay" class="pm-info" style="display:none"><p style="font-size:0.68rem;color:var(--muted);line-height:1.7">Serás redirigido a una página de pago segura donde podrás pagar con <strong style="color:var(--gold)">Bitcoin on-chain o Lightning Network</strong>.<br><span style="font-size:0.62rem">Compatible con Chivo Wallet, Phoenix, Muun, y cualquier wallet Bitcoin.</span></p></div>
         <div id="pmInfoCod" class="pm-info">
           <p style="font-size:0.68rem;color:var(--muted);line-height:1.7">Pagarás en efectivo cuando recibas tu pedido.</p>
@@ -2463,6 +2463,7 @@ footer{background:var(--dark);padding:3.5rem 4rem;text-align:center;border-top:1
         <div class="m-summary wb"><div class="ms-title">Método de Pago</div><p style="font-size:0.75rem;color:var(--charcoal)" id="mPayment"></p></div>
         <div class="m-actions"><button class="m-btn-s" id="s3back">&#8592; Atrás</button><button class="m-btn-p" id="s3place">Realizar Pedido</button></div>
         <div id="paypalButtonContainer" style="display:none;margin-top:0.8rem"></div>
+        <div id="paywayBtnContainer" style="display:none;margin-top:0.8rem"></div>
       </div>
       <div class="m-section" id="ms4">
         <div class="success-wrap">
@@ -5070,6 +5071,7 @@ function fillReview(){
   var pmLabels={
     'wompi':  'Tarjeta de Crédito / Débito — Wompi',
     'paypal': 'Tarjeta de Crédito / Débito — PayPal',
+    'payway': 'Tarjeta de Crédito / Débito',
     'btcpay': 'Bitcoin / Lightning Network',
     'cod':    'Pago contra Entrega'
   };
@@ -5079,12 +5081,15 @@ function fillReview(){
   // sigue sirviendo para BTC/COD.
   var placeBtnEl = document.getElementById('s3place');
   var ppContainer = document.getElementById('paypalButtonContainer');
+  var pwContainer = document.getElementById('paywayBtnContainer');
   if(selectedPayMethod==='paypal'){
     if(placeBtnEl) placeBtnEl.style.display='none';
     if(ppContainer){ ppContainer.style.display='block'; renderPaypalButtons(); }
+    if(pwContainer) pwContainer.style.display='none';
   } else {
     if(placeBtnEl) placeBtnEl.style.display='';
     if(ppContainer) ppContainer.style.display='none';
+    if(pwContainer) pwContainer.style.display='none';
   }
 }
 document.getElementById('s1next').addEventListener('click',function(){
@@ -5229,6 +5234,15 @@ function _doPlaceOrder(){
       if(selectedPayMethod==='btcpay'){
         // btcpay selected but no invoiceId returned — close modal and show error
         closeBTCPayModal();
+      }
+      if(selectedPayMethod==='payway'&&res.paywayInit){
+        placeBtn.textContent='Realizar Pedido';
+        placeBtn.disabled=false;
+        placeBtn.style.display='none';
+        var pwContainer=document.getElementById('paywayBtnContainer');
+        if(pwContainer) pwContainer.style.display='block';
+        renderPaywayButton(res.paywayInit);
+        return;
       }
       renderOrderSuccess(order, orderItems, total, email);
       placeBtn.textContent='Realizar Pedido';
@@ -5832,6 +5846,82 @@ function renderPaypalButtons(){
     container.innerHTML='<p style="font-size:0.7rem;color:var(--error)">No se pudo cargar PayPal. Intenta recargar la página.</p>';
   });
 }
+
+// ── PayWay (tarjeta, Banco Cuscatlán) ─────────────────────
+// Habilita el pay-method (disabled por defecto en el HTML) solo si el
+// servidor confirma que está configurado — así el botón "Próximamente"
+// nunca queda visible como pagable hasta que de verdad lo esté.
+fetch(API+'/payway/config').then(function(r){return r.json();}).then(function(cfg){
+  if(!cfg || !cfg.enabled) return;
+  var btn = document.getElementById('pmPayway');
+  var sub = document.getElementById('pmPaywaySub');
+  var info = document.getElementById('pmInfoPaywayText');
+  if(btn){ btn.disabled=false; btn.classList.remove('disabled'); btn.removeAttribute('title'); btn.onclick=function(){ selectPayMethod('payway'); }; }
+  if(sub) sub.textContent='Visa, Mastercard';
+  if(info) info.textContent='Se abrirá una ventana segura de PayWay para ingresar los datos de tu tarjeta.';
+}).catch(function(){});
+
+var _paywayJsLoading = null; // promise, evita cargar el script dos veces
+function loadPaywayJs(jsUrl){
+  if(window.PayWayOneButton) return Promise.resolve();
+  if(_paywayJsLoading) return _paywayJsLoading;
+  _paywayJsLoading = new Promise(function(resolve, reject){
+    var s=document.createElement('script');
+    s.src=jsUrl;
+    s.onload=resolve; s.onerror=function(){ _paywayJsLoading=null; reject(new Error('No se pudo cargar PayWay')); };
+    document.head.appendChild(s);
+  });
+  return _paywayJsLoading;
+}
+// init trae token/montos ya encriptados por el servidor — nunca se genera acá.
+function renderPaywayButton(init){
+  var container=document.getElementById('paywayBtnContainer');
+  if(!container) return;
+  container.innerHTML=''; // limpiar botón previo — cada pedido trae un monto encriptado nuevo
+  loadPaywayJs(init.jsUrl).then(function(){
+    PayWayOneButton.init({
+      container:      'paywayBtnContainer',
+      token:          init.token,
+      retailerOwner:  init.retailerOwner,
+      userOperation:  init.userOperation,
+      serviceProduct: init.serviceProduct,
+      userClient:     init.userClient,
+      clientIP:       init.clientIP,
+      amount:         init.amount,
+      responseCallback:          init.responseCallback,
+      responseCallbackForDenied: init.responseCallbackForDenied,
+      label: 'Pagar con Tarjeta',
+    });
+  }).catch(function(e){
+    console.error(e);
+    container.innerHTML='<p style="font-size:0.7rem;color:var(--error)">No se pudo cargar el pago con tarjeta. Intenta recargar la página.</p>';
+  });
+}
+
+// Vuelta desde el callback de PayWay (redirect POST del navegador, ya
+// procesado server-side) — mismo patrón que checkWompiRedirect.
+(function checkPaywayRedirect() {
+  var params = new URLSearchParams(window.location.search);
+  var orderId = params.get('payway_order');
+  if (!orderId) return;
+  window.history.replaceState({}, '', window.location.pathname);
+  var attempts = 0;
+  var interval = setInterval(function() {
+    attempts++;
+    fetch(API+'/payway/status?orderId=' + encodeURIComponent(orderId))
+      .then(function(r){ return r.json(); })
+      .then(function(d){
+        if (d.status === 'paid' && d.order) {
+          clearInterval(interval);
+          _wompiHandleSuccess(d.order); // genérico pese al nombre — arma la pantalla desde el objeto order, no del form
+        } else if (attempts >= 10) {
+          clearInterval(interval);
+          toast('Verificando tu pago', 'Si ya pagaste, tu pedido se confirmará en unos minutos — revisa tu correo.', '');
+        }
+      })
+      .catch(function(){ clearInterval(interval); });
+  }, 3000);
+})();
 
 function openWompiWidget(reference, amountCents, order, fallbackUrl) {
   if (!_wompiPublicKey) {

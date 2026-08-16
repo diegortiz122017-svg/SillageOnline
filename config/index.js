@@ -57,6 +57,21 @@ const PAYPAL_API_BASE = PAYPAL_MODE === 'live'
   ? 'https://api-m.paypal.com'
   : 'https://api-m.sandbox.paypal.com';
 
+// PayWay One (Banco Cuscatlán) — tarjeta de crédito/débito vía botón/modal JS.
+// Master switch: mientras esté en false el código queda inerte aunque ya esté
+// desplegado — igual que DTE_ENABLED. Prender solo una vez estén las
+// credenciales configuradas (mismo patrón que el resto de pasarelas: nunca
+// se hardcodean, solo variables de entorno).
+const PAYWAY_ENABLED         = process.env.PAYWAY_ENABLED === 'true';
+const PAYWAY_TOKEN           = process.env.PAYWAY_TOKEN           || null; // Token Autenticación
+const PAYWAY_RETAILER_OWNER  = process.env.PAYWAY_RETAILER_OWNER  || null; // ID Comercio
+const PAYWAY_USER_OPERATION  = process.env.PAYWAY_USER_OPERATION  || null; // Usuario Operación
+const PAYWAY_ENCRYPTION_KEY  = process.env.PAYWAY_ENCRYPTION_KEY  || null; // Token Encriptación (nunca exponer al cliente)
+// 'test' o 'prod' — cambia el dominio de los scripts/servicios de PayWay.
+const PAYWAY_MODE   = process.env.PAYWAY_MODE === 'prod' ? 'prod' : 'test';
+const PAYWAY_DOMAIN = PAYWAY_MODE === 'prod' ? 'www.payway.sv' : 'test.payway.sv';
+const PAYWAY_JS_URL = `https://${PAYWAY_DOMAIN}/web-payway-sv/resources/js/paywayOneButton.js`;
+
 // ─── AI ───────────────────────────────────────────────────────────────────────
 const OPENAI_API_KEY = process.env.OPENAI_API_KEY || null;
 
@@ -158,6 +173,8 @@ module.exports = {
   RESEND_API_KEY, FROM_EMAIL, EMAIL_HOLA, EMAIL_PEDIDOS, ADMIN_NOTIFY_EMAIL,
   WOMPI_CLIENT_ID, WOMPI_CLIENT_SECRET, WOMPI_PUBLIC_KEY,
   PAYPAL_CLIENT_ID, PAYPAL_CLIENT_SECRET, PAYPAL_MODE, PAYPAL_API_BASE,
+  PAYWAY_ENABLED, PAYWAY_TOKEN, PAYWAY_RETAILER_OWNER, PAYWAY_USER_OPERATION,
+  PAYWAY_ENCRYPTION_KEY, PAYWAY_MODE, PAYWAY_DOMAIN, PAYWAY_JS_URL,
   OPENAI_API_KEY,
   ADMIN_USER, ADMIN_PASS,
   DTE_ENABLED, DTE_AMBIENTE, DTE_MH_BASE,
