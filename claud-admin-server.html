@@ -146,6 +146,7 @@ tr:hover td{background:rgba(255,255,255,0.02)}
 .pay-ok{background:rgba(90,154,106,0.2);color:var(--success);border:1px solid rgba(90,154,106,0.3)}
 .pay-pend{background:rgba(212,144,26,0.15);color:var(--warn);border:1px solid rgba(212,144,26,0.25)}
 .pay-err{background:rgba(192,80,74,0.15);color:var(--error);border:1px solid rgba(192,80,74,0.25)}
+.pay-aband{background:rgba(150,150,150,0.12);color:#999;border:1px solid rgba(150,150,150,0.25)}
 .export-btn{display:inline-block;padding:0.6rem 1.4rem;border:1px solid var(--border);color:var(--muted);font-family:'Jost',sans-serif;font-size:0.62rem;letter-spacing:0.15em;text-transform:uppercase;text-decoration:none;transition:all 0.25s;white-space:nowrap;align-self:flex-start}
 .export-btn:hover{border-color:var(--gold);color:var(--gold)}
 
@@ -1551,7 +1552,10 @@ tr:hover td{background:rgba(255,255,255,0.02)}
             <div class="page-title">Pedidos</div>
             <div class="page-sub" style="margin-bottom:0">Pedidos en tiempo real — aparecen al instante cuando se realizan</div>
           </div>
-          <button class="export-btn" id="exportBtn" onclick="exportOrders()">&#128196; Exportar CSV</button>
+          <div style="display:flex;gap:0.5rem">
+            <button class="export-btn" id="abandonedBtn" onclick="filterOrders('abandoned')" title="Pagos con tarjeta/online iniciados y nunca completados">&#128172; Abandonados (<span id="abandonedCount">0</span>)</button>
+            <button class="export-btn" id="exportBtn" onclick="exportOrders()">&#128196; Exportar CSV</button>
+          </div>
         </div>
         <div style="margin-bottom:1.2rem">
           <input id="orderSearchInput" type="text" placeholder="Buscar por # de orden, cliente o email..."
@@ -3422,7 +3426,11 @@ document.getElementById('savePriceBtn').addEventListener('click',function(){
 });
 
 // ── ORDERS ────────────────────────────────────────
-function renderOrders(){ renderOrdersList(orders, null); }
+function renderOrders(){
+  renderOrdersList(orders.filter(function(o){return o.paymentStatus!=='Abandonado';}), null);
+  var cEl=document.getElementById('abandonedCount');
+  if(cEl) cEl.textContent=orders.filter(function(o){return o.paymentStatus==='Abandonado';}).length;
+}
 
 // Event delegation for status selects and tracking inputs
 // Status/tracking handled by unified document listener below
@@ -3469,7 +3477,7 @@ function renderOrdersList(list, banner){
         '</select>'+
         '<input class="tracking-input" id="trk-'+o.id+'" placeholder="N° seguimiento" value="'+(o.tracking_number||'')+'" data-oid="'+o.id+'" title="Número de seguimiento — se incluye en el email de envío"/>'+
         '<span class="sc '+scls+'">'+o.status+'</span>'+
-        '<span class="pay-chip pay-'+(o.paymentStatus==='Pagado'?'ok':o.paymentStatus==='Fallido'?'err':'pend')+'">'+pmLabel+'</span>'+
+        '<span class="pay-chip pay-'+(o.paymentStatus==='Pagado'?'ok':o.paymentStatus==='Fallido'?'err':o.paymentStatus==='Abandonado'?'aband':'pend')+'">'+pmLabel+(o.paymentStatus==='Abandonado'?' · Abandonado':'')+'</span>'+
         (o.paymentStatus!=='Pagado'?
           '<button onclick="confirmOrderPayment(\''+o.id+'\')" title="Marcar el pago como recibido — emite el DTE" style="background:rgba(95,184,122,0.12);border:1px solid rgba(95,184,122,0.35);color:#5fb87a;font-family:\'Jost\',sans-serif;font-size:0.55rem;letter-spacing:0.1em;text-transform:uppercase;padding:0.25rem 0.6rem;cursor:pointer">✓ Confirmar pago</button>'
           :'')+
@@ -4853,8 +4861,12 @@ function filterOrders(type){
                o.status==='Empaquetado'||o.status==='Packaged'||
                o.status==='Pendiente de Pago';
       })
-    : orders;
-  renderOrdersList(filtered, type === 'pending' ? 'Mostrando solo pedidos pendientes' : null);
+    : type === 'abandoned'
+    ? orders.filter(function(o){ return o.paymentStatus==='Abandonado'; })
+    : orders.filter(function(o){ return o.paymentStatus!=='Abandonado'; });
+  renderOrdersList(filtered, type === 'pending' ? 'Mostrando solo pedidos pendientes'
+    : type === 'abandoned' ? 'Pagos con tarjeta/online iniciados y nunca completados — datos de contacto disponibles para seguimiento manual'
+    : null);
 }
 
 function filterInventory(type){

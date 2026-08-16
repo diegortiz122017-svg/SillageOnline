@@ -3658,6 +3658,27 @@ async function runLeadSequence() {
 }
 setInterval(runLeadSequence, 60 * 60 * 1000);
 
+// ── Abandoned online-payment orders ──────────────────────
+// El checkout inserta la orden como 'Pendiente' antes de que el cliente llegue
+// al paso de pago (necesitamos el order.id para las URLs de callback). Si nunca
+// vuelve, la orden queda 'Pendiente' para siempre mezclada con pedidos reales.
+// Este barrido las pasa a 'Abandonado' tras 1 hora sin confirmación — no se
+// borran (el nombre/correo/dirección sirven para seguimiento manual), solo se
+// sacan del estado que implica "pedido activo esperando ser despachado".
+const ONLINE_PAYMENT_METHODS = ['payway', 'wompi', 'btcpay', 'paypal'];
+async function sweepAbandonedOrders() {
+  try {
+    await db.execute(
+      `UPDATE orders SET payment_status='Abandonado', updated_at=NOW()
+       WHERE payment_status='Pendiente' AND payment_method IN (?)
+       AND created_at < DATE_SUB(NOW(), INTERVAL 1 HOUR)`,
+      [ONLINE_PAYMENT_METHODS]
+    );
+  } catch (e) { console.error('sweepAbandonedOrders error:', e.message); }
+}
+setInterval(sweepAbandonedOrders, 15 * 60 * 1000);
+sweepAbandonedOrders();
+
 app.get('/api/catalogue', async (req, res) => res.json(await getCatalogue()));
 
 // ════════════════════════════════════════════════════════════════════════════
