@@ -3993,6 +3993,8 @@ var _nezNudge = (function(){
     try { if(sessionStorage.getItem(shownKey)) return; } catch(e){}
     if(_somOpen || (_somMessages && _somMessages.length)) return;
     if(document.getElementById('newArrivalToast')) return;
+    var leadModal = document.getElementById('leadModalOverlay');
+    if(leadModal && leadModal.classList.contains('open')) { clearTimer(); active = false; schedule(4000, stage); return; }
     showToast(stage);
   }
 
