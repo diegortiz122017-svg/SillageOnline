@@ -25,12 +25,12 @@ function cors(req, res, next) {
 function securityHeaders(req, res, next) {
   res.setHeader('Content-Security-Policy',
     "default-src 'self'; " +
-    "script-src 'self' 'unsafe-inline' https://fonts.googleapis.com https://cdnjs.cloudflare.com https://static.cloudflareinsights.com https://checkout.wompi.sv https://teyko.app; " +
+    "script-src 'self' 'unsafe-inline' https://fonts.googleapis.com https://cdnjs.cloudflare.com https://static.cloudflareinsights.com https://checkout.wompi.sv https://teyko.app https://test.payway.sv https://www.payway.sv; " +
     "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com https://fonts.gstatic.com; " +
     "font-src 'self' https://fonts.gstatic.com; " +
-    "img-src 'self' data: https://res.cloudinary.com https://btcpay.davidcoen.it; " +
-    "frame-src https://checkout.wompi.sv; " +
-    "connect-src 'self' wss://sillage-sv.com wss: https://api.wompi.sv https://id.wompi.sv https://checkout.wompi.sv https://cloudflareinsights.com https://api.openai.com https://api.teyko.app wss://api.teyko.app ; " +
+    "img-src 'self' data: https://res.cloudinary.com https://btcpay.davidcoen.it https://test.payway.sv https://www.payway.sv; " +
+    "frame-src https://checkout.wompi.sv https://test.payway.sv https://www.payway.sv; " +
+    "connect-src 'self' wss://sillage-sv.com wss: https://api.wompi.sv https://id.wompi.sv https://checkout.wompi.sv https://cloudflareinsights.com https://api.openai.com https://api.teyko.app wss://api.teyko.app https://test.payway.sv https://www.payway.sv; " +
     "frame-ancestors 'none'; " +
     "base-uri 'self'; " +
     "form-action 'self' https://checkout.wompi.sv; " +
