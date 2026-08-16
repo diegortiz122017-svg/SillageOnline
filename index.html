@@ -4179,6 +4179,9 @@ function openDetail(pid){
   curSlide=0;
   document.getElementById('bcBrand').textContent=p.brand;
   document.getElementById('bcName').textContent=p.name;
+  document.getElementById('backBtn').textContent = _detailFromBundle
+    ? '← Volver al bundle "'+_detailFromBundle.name+'"'
+    : '← Volver a la Colección';
   var slidesEl=document.getElementById('slides');slidesEl.innerHTML='';
   var bgs=['background:linear-gradient(135deg,#f2ede4,#e8e0d4)'];
   var overlays=['','<div style="position:absolute;bottom:1.5rem;left:1.5rem;right:1.5rem"><p style=\'font-family:Cormorant Garamond,serif;font-size:1.4rem;font-weight:300;color:#6b5843;font-style:italic\'>"'+p.tagline+'"</p></div>','<div style="position:absolute;top:1.2rem;left:1.2rem;padding:0.4rem 0.9rem;border:1px solid rgba(184,149,90,0.4);background:rgba(255,255,255,0.75)"><p style=\'font-size:0.52rem;letter-spacing:0.22em;text-transform:uppercase;color:#b8955a\'>'+p.conc+'</p></div>','<div style="position:absolute;bottom:1.5rem;right:1.5rem;font-family:Cormorant Garamond,serif;font-size:2.8rem;font-weight:300;color:rgba(20,15,10,0.08)">'+p.name.split(' ').pop()+'</div>'];
@@ -4494,6 +4497,14 @@ function closeDetail(){
   document.getElementById('detailOverlay').classList.remove('open');
   document.body.style.overflow='';
   _detailOpenPid=null;
+  // Si este detalle se abrió desde un bundle, "volver" regresa al bundle en
+  // vez de perderlo — sea cual sea el botón/tecla usado para cerrar.
+  if(_detailFromBundle){
+    var b = _detailFromBundle;
+    _detailFromBundle = null;
+    openBundleDetail(b);
+    return;
+  }
   // Restore base URL
   if(window.history.state && window.history.state.producto){
     window.history.pushState({}, '', '/');
@@ -5571,7 +5582,38 @@ var currentCustomer = null;
 
 
 // ── Bundles ──────────────────────────────────────────
+// _lastBundleViewed: el bundle que se está mostrando (o el último visto), para
+// poder reabrirlo con un clic si el cliente lo cierra o entra a ver el detalle
+// de uno de sus productos y luego no sabe cómo volver.
+// _detailFromBundle: cuál bundle originó el detalle de producto actualmente
+// abierto (si alguno) — controla a dónde regresa el botón "Volver".
+var _lastBundleViewed = null;
+var _detailFromBundle = null;
+
+function showBundleReturnChip(b){
+  if(!b) return;
+  hideBundleReturnChip();
+  var chip = document.createElement('div');
+  chip.id = 'bundleReturnChip';
+  chip.style.cssText = 'position:fixed;bottom:1.5rem;left:1.5rem;z-index:900;'+
+    'background:#1a1714;border:1px solid rgba(184,149,90,0.3);padding:0.7rem 1rem;'+
+    'display:flex;align-items:center;gap:0.7rem;cursor:pointer;'+
+    'box-shadow:0 4px 20px rgba(0,0,0,0.4);animation:fadeUp 0.4s ease;max-width:min(90vw,320px)';
+  chip.innerHTML =
+    '<span style="font-size:0.7rem;color:var(--cream);line-height:1.4">↩ Volver al bundle <b style="color:var(--gold)">'+esc(b.name)+'</b></span>'+
+    '<button onclick="event.stopPropagation();hideBundleReturnChip()" '+
+      'style="background:none;border:none;color:var(--muted);cursor:pointer;font-size:0.8rem;padding:0;flex-shrink:0">✕</button>';
+  chip.onclick = function(){ hideBundleReturnChip(); openBundleDetail(b); };
+  document.body.appendChild(chip);
+}
+function hideBundleReturnChip(){
+  var c = document.getElementById('bundleReturnChip');
+  if(c) c.remove();
+}
+
 function openBundleDetail(b){
+  _lastBundleViewed = b;
+  hideBundleReturnChip();
   document.getElementById('bundleDetailName').textContent = b.name;
   document.getElementById('bundleDetailDesc').textContent = b.description || '';
   document.getElementById('bundleDetailPrice').textContent = '$'+parseFloat(b.price).toFixed(2);
@@ -5599,7 +5641,7 @@ function openBundleDetail(b){
     '</div>';
   }).join('');
 
-  document.getElementById('bundleDetailAddBtn').onclick = function(){ addBundleToCart(b.id, b); closeBundleDetail(); };
+  document.getElementById('bundleDetailAddBtn').onclick = function(){ _lastBundleViewed = null; addBundleToCart(b.id, b); closeBundleDetail(); };
 
   // Share button
   var shareBtn = document.getElementById('bundleShareBtn');
@@ -5631,12 +5673,17 @@ function closeBundleDetail(){
   if(window.history.state && window.history.state.bundle){
     window.history.pushState({}, '', '/');
   }
+  // Cerrado sin agregar al carrito ni entrar a un producto — deja un chip para
+  // volver con un clic en vez de perder el bundle por completo.
+  if(_lastBundleViewed) showBundleReturnChip(_lastBundleViewed);
 }
 
 function openBundleProdDetail(pid){
   var bundleOverlay = document.getElementById('bundleDetailOverlay');
   var collOverlay   = document.getElementById('collOverlay');
   var detailOverlay = document.getElementById('detailOverlay');
+
+  _detailFromBundle = _lastBundleViewed;
 
   // Pre-load the detail content while modals are still visible
   openDetail(pid);
