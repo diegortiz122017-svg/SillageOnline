@@ -3603,6 +3603,9 @@ function buildGrid(){
   // Primera visita: el modal de bienvenida (10% por correo) ocupa este lugar
   // en su lugar — este toast solo entra en juego una vez que ya se le ofreció
   // el cupón (o ya lo cerró/usó), para no competir con él.
+  // Además comparte con el nudge de Nez un tope de "un toast proactivo por
+  // visita" (ver _proactiveToastTaken/_markProactiveToastShown, top-level más
+  // abajo) — antes ambos podían dispararse en la misma sesión y se sentía spam.
   (function(){
     try { if(!localStorage.getItem('sillage_lead_seen')) return; } catch(e){ return; }
     var newest = newArrivals.sort(function(a,b){ return new Date(b.arrivedAt)-new Date(a.arrivedAt); })[0];
@@ -3610,6 +3613,7 @@ function buildGrid(){
     var seenKey = 'sillage_seen_new_'+newest.id;
     try { if(localStorage.getItem(seenKey)) return; } catch(e){ return; }
     setTimeout(function(){
+      if(_proactiveToastTaken()) return;
       var existing = document.getElementById('newArrivalToast');
       if(existing) existing.remove();
       var t = document.createElement('div');
@@ -3635,6 +3639,7 @@ function buildGrid(){
       // lo vuelve a mostrar. Antes se marcaba solo al hacer clic o al cumplirse
       // los 8s, así que navegar rápido entre páginas lo disparaba dos veces.
       try{ localStorage.setItem(seenKey,'1'); }catch(e){}
+      _markProactiveToastShown();
       // Auto-dismiss after 8 seconds
       setTimeout(function(){
         if(t.parentNode){ t.style.opacity='0'; t.style.transition='opacity 0.5s'; setTimeout(function(){ t.remove(); },500); }
@@ -3810,6 +3815,17 @@ buildGrid();
 // Cohorte A/B 50/50 por sesión (sessionStorage, no localStorage — cada
 // visita nueva puede caer en cualquier grupo): la mitad nunca ve el nudge,
 // para poder comparar tasas de conversión entre ambos grupos en Tráfico.
+// Tope compartido entre el toast de "recién llegado" (dentro de buildGrid())
+// y el nudge de Nez de aquí abajo — como máximo uno de los dos aparece por
+// visita (sessionStorage, no localStorage: se resetea en cada sesión nueva,
+// igual que el cohorte de Nez).
+function _proactiveToastTaken(){
+  try{ return !!sessionStorage.getItem('sillage_proactive_toast_shown'); }catch(e){ return false; }
+}
+function _markProactiveToastShown(){
+  try{ sessionStorage.setItem('sillage_proactive_toast_shown','1'); }catch(e){}
+}
+
 var _nezNudge = (function(){
   var STAGE1_DELAY_MS = 35000;
   var STAGE2_DELAY_MS = 18000;
@@ -3843,6 +3859,7 @@ var _nezNudge = (function(){
     try { if(sessionStorage.getItem(shownKey)) return; } catch(e){}
     if(_somOpen || (_somMessages && _somMessages.length)) return;
     if(document.getElementById('newArrivalToast')) return;
+    if(_proactiveToastTaken()) return;
     var leadModal = document.getElementById('leadModalOverlay');
     if(leadModal && leadModal.classList.contains('open')) { clearTimer(); active = false; schedule(4000, stage); return; }
     showToast(stage);
@@ -3874,6 +3891,7 @@ var _nezNudge = (function(){
     };
     document.body.appendChild(t);
     try{ sessionStorage.setItem(shownKey,'1'); }catch(e){}
+    _markProactiveToastShown();
     trackEvent('nez_nudge_shown', {stage: forStage});
     setTimeout(function(){
       if(t.parentNode){
@@ -5440,37 +5458,25 @@ var currentCustomer = null;
 
 // ── Bundles ──────────────────────────────────────────
 // _lastBundleViewed: el bundle que se está mostrando (o el último visto), para
-// poder reabrirlo con un clic si el cliente lo cierra o entra a ver el detalle
-// de uno de sus productos y luego no sabe cómo volver.
+// poder reabrirlo si el cliente entra a ver el detalle de uno de sus productos
+// y luego no sabe cómo volver.
 // _detailFromBundle: cuál bundle originó el detalle de producto actualmente
 // abierto (si alguno) — controla a dónde regresa el botón "Volver".
 var _lastBundleViewed = null;
 var _detailFromBundle = null;
 
-function showBundleReturnChip(b){
-  if(!b) return;
-  hideBundleReturnChip();
-  var chip = document.createElement('div');
-  chip.id = 'bundleReturnChip';
-  chip.style.cssText = 'position:fixed;bottom:1.5rem;left:1.5rem;z-index:900;'+
-    'background:#1a1714;border:1px solid rgba(184,149,90,0.3);padding:0.7rem 1rem;'+
-    'display:flex;align-items:center;gap:0.7rem;cursor:pointer;'+
-    'box-shadow:0 4px 20px rgba(0,0,0,0.4);animation:fadeUp 0.4s ease;max-width:min(90vw,320px)';
-  chip.innerHTML =
-    '<span style="font-size:0.7rem;color:var(--cream);line-height:1.4">↩ Volver al bundle <b style="color:var(--gold)">'+esc(b.name)+'</b></span>'+
-    '<button onclick="event.stopPropagation();hideBundleReturnChip()" '+
-      'style="background:none;border:none;color:var(--muted);cursor:pointer;font-size:0.8rem;padding:0;flex-shrink:0">✕</button>';
-  chip.onclick = function(){ hideBundleReturnChip(); openBundleDetail(b); };
-  document.body.appendChild(chip);
-}
-function hideBundleReturnChip(){
-  var c = document.getElementById('bundleReturnChip');
-  if(c) c.remove();
+// Al abrir un bundle (típicamente por link compartido) dejamos la página de
+// fondo ya posicionada en la sección de Bundles de la tienda — invisible
+// mientras el modal está abierto, pero así, si lo cierran, ya están ahí en
+// vez de quedar en la parte de arriba de la tienda sin rastro del bundle.
+function scrollToBundlesSection(){
+  var section = document.getElementById('bundles-section');
+  if(section) section.scrollIntoView();
 }
 
 function openBundleDetail(b){
   _lastBundleViewed = b;
-  hideBundleReturnChip();
+  scrollToBundlesSection();
   document.getElementById('bundleDetailName').textContent = b.name;
   document.getElementById('bundleDetailDesc').textContent = b.description || '';
   document.getElementById('bundleDetailPrice').textContent = '$'+parseFloat(b.price).toFixed(2);
@@ -5498,7 +5504,7 @@ function openBundleDetail(b){
     '</div>';
   }).join('');
 
-  document.getElementById('bundleDetailAddBtn').onclick = function(){ _lastBundleViewed = null; addBundleToCart(b.id, b); closeBundleDetail(); };
+  document.getElementById('bundleDetailAddBtn').onclick = function(){ addBundleToCart(b.id, b); closeBundleDetail(); };
 
   // Share button
   var shareBtn = document.getElementById('bundleShareBtn');
@@ -5530,9 +5536,6 @@ function closeBundleDetail(){
   if(window.history.state && window.history.state.bundle){
     window.history.pushState({}, '', '/tienda');
   }
-  // Cerrado sin agregar al carrito ni entrar a un producto — deja un chip para
-  // volver con un clic en vez de perder el bundle por completo.
-  if(_lastBundleViewed) showBundleReturnChip(_lastBundleViewed);
 }
 
 function openBundleProdDetail(pid){
