@@ -4197,52 +4197,74 @@ app.post('/api/orders', orderLimiter, async (req, res) => {
     promoDiscount: promoResult && promoResult.ok ? promoResult.discount : 0,
   };
 
-  await db.execute(
-    `INSERT INTO orders (id,customer,email,phone,address,city,state_province,country,items,total,status,payment_status,payment_method,tracker_step,customer_id,customer_ip,promo_code,promo_discount,created_at,updated_at)
-     VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
-    [order.id, order.customer, order.email, order.phone, order.address,
-     order.city, order.state, order.country,
-     JSON.stringify(order.items), order.total,
-     order.status, order.paymentStatus, order.paymentMethod,
-     parseInt(order.trackerStep), customerId ? parseInt(customerId) : null,
-     req.codClientIp || null, order.promoCode, order.promoDiscount, n, n]
+  // ── Duplicate-submission guard ─────────────────────────────────────────
+  // Same email + payment method + total + items within a short window is
+  // almost certainly the same checkout fired twice (double-click, a second
+  // open tab, a retried request) rather than two genuine separate orders —
+  // this is what produced the "two orders, one paid, one orphaned forever"
+  // case: a fresh order.id got minted and inserted for each click. Reusing
+  // the existing pending order instead closes that regardless of what
+  // causes the duplicate call (the double-click itself is also fixed
+  // client-side now, but a second tab or a network retry isn't).
+  const itemsKey = JSON.stringify((rawItems || []).map(i => [i.productId, i.qty, i.size || '', i.bundleId || '']).sort());
+  const [dupeRows] = await db.execute(
+    `SELECT id, items FROM orders
+     WHERE email=? AND payment_method=? AND total=? AND payment_status='Pendiente'
+       AND created_at > DATE_SUB(NOW(), INTERVAL 20 SECOND)
+     ORDER BY created_at DESC LIMIT 1`,
+    [rawEmail, paymentMethod, order.total]
   );
-
-  if (promoResult && promoResult.ok) {
-    await db.execute('UPDATE promo_codes SET used_count = used_count + 1, updated_at=? WHERE id=?', [n, promoResult.id]).catch(() => {});
-  }
-
-  // Save shipping info to customer profile if logged in
-  if (customerId) {
-    const { address: addr, city, state, postcode, country, phone } = req.body;
+  const isDuplicate = dupeRows.length && itemsKey === JSON.stringify((JSON.parse(dupeRows[0].items) || []).map(i => [i.productId, i.qty, i.size || '', i.bundleId || '']).sort());
+  if (isDuplicate) {
+    order.id = dupeRows[0].id; // reuse — every branch below only needs order.id/total/items
+  } else {
     await db.execute(
-      `UPDATE customers SET
-        name     = ?,
-        phone    = COALESCE(?, phone),
-        address  = COALESCE(?, address),
-        city     = COALESCE(?, city),
-        state    = COALESCE(?, state),
-        postcode = COALESCE(?, postcode),
-        country  = COALESCE(?, country)
-       WHERE id = ?`,
-      [order.customer, phone||null, addr||null, city||null,
-       state||null, postcode||null, country||null, parseInt(customerId)]
+      `INSERT INTO orders (id,customer,email,phone,address,city,state_province,country,items,total,status,payment_status,payment_method,tracker_step,customer_id,customer_ip,promo_code,promo_discount,created_at,updated_at)
+       VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
+      [order.id, order.customer, order.email, order.phone, order.address,
+       order.city, order.state, order.country,
+       JSON.stringify(order.items), order.total,
+       order.status, order.paymentStatus, order.paymentMethod,
+       parseInt(order.trackerStep), customerId ? parseInt(customerId) : null,
+       req.codClientIp || null, order.promoCode, order.promoDiscount, n, n]
     );
-  }
 
-  // ── Inventory: only deduct immediately for COD ────────
-  // For Wompi/Chivo: deduct AFTER payment confirmed via webhook
-  // For COD: deduct unit stock now, but ml deduction waits until admin marks Procesando
-  if (paymentMethod === 'cod') {
-    await deductInventory(order.items);
-    // NOTE: deductBottleInventory intentionally NOT called here for COD
-    // It fires when admin moves order to Procesando (see PATCH /api/orders/:id)
-    // Reset registered user's daily consult limit on confirmed purchase
+    if (promoResult && promoResult.ok) {
+      await db.execute('UPDATE promo_codes SET used_count = used_count + 1, updated_at=? WHERE id=?', [n, promoResult.id]).catch(() => {});
+    }
+
+    // Save shipping info to customer profile if logged in
     if (customerId) {
+      const { address: addr, city, state, postcode, country, phone } = req.body;
       await db.execute(
-        'UPDATE consult_counts SET count=0, last_reset=? WHERE customer_id=?',
-        [new Date().toISOString().slice(0,10), customerId]
-      ).catch(() => {});
+        `UPDATE customers SET
+          name     = ?,
+          phone    = COALESCE(?, phone),
+          address  = COALESCE(?, address),
+          city     = COALESCE(?, city),
+          state    = COALESCE(?, state),
+          postcode = COALESCE(?, postcode),
+          country  = COALESCE(?, country)
+         WHERE id = ?`,
+        [order.customer, phone||null, addr||null, city||null,
+         state||null, postcode||null, country||null, parseInt(customerId)]
+      );
+    }
+
+    // ── Inventory: only deduct immediately for COD ────────
+    // For Wompi/Chivo: deduct AFTER payment confirmed via webhook
+    // For COD: deduct unit stock now, but ml deduction waits until admin marks Procesando
+    if (paymentMethod === 'cod') {
+      await deductInventory(order.items);
+      // NOTE: deductBottleInventory intentionally NOT called here for COD
+      // It fires when admin moves order to Procesando (see PATCH /api/orders/:id)
+      // Reset registered user's daily consult limit on confirmed purchase
+      if (customerId) {
+        await db.execute(
+          'UPDATE consult_counts SET count=0, last_reset=? WHERE customer_id=?',
+          [new Date().toISOString().slice(0,10), customerId]
+        ).catch(() => {});
+      }
     }
   }
 
@@ -4347,15 +4369,17 @@ app.post('/api/orders', orderLimiter, async (req, res) => {
   }
 
   // ── COD: insert order normally ────────────────────────────────────────────────
-  broadcastAdmin('new_order', order);
-  await logActivity(`Nuevo pedido ${escHtml(order.id)} de ${escHtml(order.customer)} — $${parseFloat(order.total||0).toFixed(2)}`);
-  try { await sendOrderConfirmation(order); } catch(e) {}
-  try { await notifyAdmins(order); } catch(e) {}
-  sendMetaCAPIEvent('Purchase', {
-    req, email: order.email, value: parseFloat(order.total) || 0,
-    contentIds: (order.items || []).map(i => String(i.productId)),
-    eventId: 'order_' + order.id,
-  });
+  if (!isDuplicate) {
+    broadcastAdmin('new_order', order);
+    await logActivity(`Nuevo pedido ${escHtml(order.id)} de ${escHtml(order.customer)} — $${parseFloat(order.total||0).toFixed(2)}`);
+    try { await sendOrderConfirmation(order); } catch(e) {}
+    try { await notifyAdmins(order); } catch(e) {}
+    sendMetaCAPIEvent('Purchase', {
+      req, email: order.email, value: parseFloat(order.total) || 0,
+      contentIds: (order.items || []).map(i => String(i.productId)),
+      eventId: 'order_' + order.id,
+    });
+  }
   res.json({ ok: true, order, wompiUrl: null, btcpayUrl: null, btcpayInvoiceId: null });
 });
 
