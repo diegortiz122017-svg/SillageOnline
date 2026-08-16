@@ -5899,28 +5899,36 @@ function renderPaywayButton(init){
 }
 
 // Vuelta desde el callback de PayWay (redirect POST del navegador, ya
-// procesado server-side) — mismo patrón que checkWompiRedirect.
+// procesado server-side) — mismo patrón que checkWompiRedirect. Para cuando
+// esta página cargó, el servidor ya marcó el pedido como Pagado (el callback
+// responde antes de mandar los correos, no después) — así que el primer
+// chequeo es inmediato, sin esperar los 3s del intervalo, que solo aplican
+// a los reintentos si por lo que sea el primero no lo encuentra todavía.
 (function checkPaywayRedirect() {
   var params = new URLSearchParams(window.location.search);
   var orderId = params.get('payway_order');
   if (!orderId) return;
   window.history.replaceState({}, '', window.location.pathname);
   var attempts = 0;
-  var interval = setInterval(function() {
+  var interval = null;
+  function check(){
     attempts++;
     fetch(API+'/payway/status?orderId=' + encodeURIComponent(orderId))
       .then(function(r){ return r.json(); })
       .then(function(d){
         if (d.status === 'paid' && d.order) {
-          clearInterval(interval);
+          if (interval) clearInterval(interval);
           _wompiHandleSuccess(d.order); // genérico pese al nombre — arma la pantalla desde el objeto order, no del form
         } else if (attempts >= 10) {
-          clearInterval(interval);
+          if (interval) clearInterval(interval);
           toast('Verificando tu pago', 'Si ya pagaste, tu pedido se confirmará en unos minutos — revisa tu correo.', '');
+        } else if (!interval) {
+          interval = setInterval(check, 3000);
         }
       })
-      .catch(function(){ clearInterval(interval); });
-  }, 3000);
+      .catch(function(){ if (interval) clearInterval(interval); });
+  }
+  check();
 })();
 
 function openWompiWidget(reference, amountCents, order, fallbackUrl) {
