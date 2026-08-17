@@ -4256,12 +4256,16 @@ app.post('/api/orders', orderLimiter, async (req, res) => {
       await db.execute('UPDATE promo_codes SET used_count = used_count + 1, updated_at=? WHERE id=?', [n, promoResult.id]).catch(() => {});
     }
 
-    // Save shipping info to customer profile if logged in
+    // Save shipping info to customer profile if logged in — NOT name: the
+    // checkout "customer" field is who receives THIS order (could be a gift,
+    // a placeholder while testing, anyone), not the account holder's
+    // identity. This used to overwrite `name` unconditionally on every
+    // order, silently renaming the account to whatever was typed at
+    // checkout.
     if (customerId) {
       const { address: addr, city, state, postcode, country, phone } = req.body;
       await db.execute(
         `UPDATE customers SET
-          name     = ?,
           phone    = COALESCE(?, phone),
           address  = COALESCE(?, address),
           city     = COALESCE(?, city),
@@ -4269,7 +4273,7 @@ app.post('/api/orders', orderLimiter, async (req, res) => {
           postcode = COALESCE(?, postcode),
           country  = COALESCE(?, country)
          WHERE id = ?`,
-        [order.customer, phone||null, addr||null, city||null,
+        [phone||null, addr||null, city||null,
          state||null, postcode||null, country||null, parseInt(customerId)]
       );
     }
