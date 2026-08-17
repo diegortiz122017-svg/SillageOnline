@@ -1147,7 +1147,7 @@ async function sendShippedEmail(order) {
   const trackingHtml = order.tracking_number
     ? `<div style="background:#faf8f4;border:1px solid #e8d8b8;padding:12px 16px;margin-bottom:24px">
         <span style="font-size:10px;letter-spacing:3px;text-transform:uppercase;color:#8a7f72">Número de Seguimiento</span><br/>
-        <span style="font-family:Georgia,serif;font-size:18px;color:#b8955a">${order.tracking_number}</span>
+        <span style="font-family:Georgia,serif;font-size:18px;color:#b8955a">${escHtml(order.tracking_number)}</span>
        </div>`
     : '';
   const html = emailTemplate(`
@@ -1584,8 +1584,10 @@ app.use(function(req, res, next) {
   // count against the budget (they'd exhaust it on a single visit).
   if (!req.path.startsWith('/api/')) return next();
   // Authenticated admin calls are exempt. The admin panel sends its session as
-  // x-session-token (NOT x-admin-token), so validate that and exempt admin role.
-  if (req.headers['x-admin-token']) return next();              // legacy
+  // x-session-token — that's the only thing that grants the exemption.
+  // (A legacy `x-admin-token` presence-only check used to also exempt callers
+  // here — removed: it never validated the header's value against anything,
+  // so any client could set that header to any string and bypass the limiter.)
   const _s = validateSession(req.headers['x-session-token']);
   if (_s && _s.role === 'admin') return next();
   return security.globalApiLimiter(req, res, next);
@@ -2146,12 +2148,12 @@ wss.on('connection', (ws, req) => {
 //  AUTH ROUTES
 // ═══════════════════════════════════════════════════════
 app.post('/api/auth/login', authLimiter, async (req, res) => {
-  // Use the LAST IP in x-forwarded-for (the one Cloudflare adds, attacker can't spoof it)
-  // or fall back to socket address. Never trust the first/arbitrary entry.
-  const forwarded = req.headers['x-forwarded-for'];
-  const ip = (forwarded
-    ? forwarded.split(',').map(s => s.trim()).filter(Boolean).pop()
-    : null) || req.socket.remoteAddress || 'unknown';
+  // Same IP-extraction helper used everywhere else (CF-Connecting-IP first,
+  // then the FIRST x-forwarded-for entry). This used to trust the LAST XFF
+  // entry instead, on reasoning ("the one Cloudflare adds") that directly
+  // contradicts getIp()'s own documented fix — behind Cloudflare, the real
+  // unspoofable client IP is CF-Connecting-IP, not any XFF position.
+  const ip = getIp(req) || 'unknown';
 
   if (!checkRateLimit(ip)) return res.status(429).json({ error: 'Demasiados intentos. Espera 15 minutos.' });
 
@@ -2190,8 +2192,12 @@ app.post('/api/auth/login', authLimiter, async (req, res) => {
   await logActivity('Admin inició sesión');
   res.json({ ok: true, token });
 });
-// Emergency lockout reset — requires correct password in body, no session needed
-app.post('/api/auth/clear-lockout', async (req, res) => {
+// Emergency lockout reset — requires correct password in body, no session needed.
+// Checks the admin password directly, so it needs the same throttling as the
+// real login route — it was previously unthrottled (only the bypassable
+// global API limiter applied), making it a cheaper password-guessing oracle
+// than the front door.
+app.post('/api/auth/clear-lockout', authLimiter, async (req, res) => {
   const { password } = req.body || {};
   if (!verifyAdminPassword(password, ADMIN_PASS)) {
     return res.status(401).json({ error: 'Credenciales incorrectas.' });
@@ -2251,7 +2257,7 @@ app.post('/api/customer/register', customerAuthLimiter, async (req, res) => {
 });
 
 app.post('/api/customer/login', customerAuthLimiter, async (req, res) => {
-  const ip = req.headers['x-forwarded-for'] || req.socket.remoteAddress || 'unknown';
+  const ip = getIp(req) || 'unknown';
   if (!checkRateLimit(ip)) return res.status(429).json({ error: 'Demasiados intentos. Espera 15 minutos.' });
   const { email, password } = req.body;
   if (!email || !password) return res.status(400).json({ error: 'Correo y contraseña requeridos.' });
@@ -2441,8 +2447,15 @@ app.get('/api/orders/:id/invoice', optionalCustomer, async (req, res) => {
   const orderId = req.params.id;
   let orderRow  = null;
 
-  // Admin access — unrestricted
-  const isAdmin = !!req.headers['x-admin-token'];
+  // Admin access — unrestricted, but only for a real validated admin session.
+  // (Previously checked only whether an `x-admin-token` header was present at
+  // all, never its value — any request with that header set to anything, e.g.
+  // `x-admin-token: x`, was treated as admin and could pull any customer's
+  // invoice by guessing/iterating order IDs. The admin panel doesn't even
+  // send this header — it authenticates with x-session-token like everything
+  // else — so this was dead legacy code that was also a live IDOR.)
+  const adminSession = validateSession(req.headers['x-session-token']);
+  const isAdmin = !!(adminSession && adminSession.role === 'admin');
   if (isAdmin) {
     try {
       const [rows] = await db.execute('SELECT * FROM orders WHERE id=?', [orderId]);
@@ -3469,9 +3482,18 @@ app.get('/api/admin/traffic-by-ip', requireAdmin, async (req, res) => {
   } catch(e) { res.status(500).json({ error: 'Query failed' }); }
 });
 
+// Sufijo aleatorio base36 con crypto.randomInt (CSPRNG) — reemplaza los
+// Math.random().toString(36) usados para IDs de pedido, referencias de pago y
+// códigos de cupón. Math.random() no es apto para nada security-adjacent: los
+// IDs de pedido viajan en URLs de callback de pago y se devuelven al cliente,
+// así que su componente aleatorio debería ser realmente impredecible.
+function secureRandomBase36(len) {
+  return crypto.randomInt(Math.pow(36, len)).toString(36).padStart(len, '0').toUpperCase();
+}
+
 // ── Lead capture (modal de bienvenida) ────────────────────────────────────
 function genLeadCode() {
-  return 'BIENVENIDA' + Math.random().toString(36).substr(2, 5).toUpperCase();
+  return 'BIENVENIDA' + secureRandomBase36(5);
 }
 const leadCaptureLimiter = rateLimit(5, 60 * 60 * 1000); // 5 intentos/hora/IP
 
@@ -3714,7 +3736,8 @@ async function validatePromoCode(rawCode, subtotal) {
 // Público — usado por el checkout mientras el cliente escribe el código.
 // El frontend (tienda.html applyPromo) manda `cartTotal` y espera {ok:true,...}
 // en éxito o {ok:false,error} en fallo — replicado exacto aquí.
-app.post('/api/promo/validate', async (req, res) => {
+const promoValidateLimiter = rateLimit(20, 10 * 60 * 1000); // 20 intentos/10min/IP — evita fuerza bruta de códigos cortos
+app.post('/api/promo/validate', promoValidateLimiter, async (req, res) => {
   const subtotal = Math.max(0, parseFloat(req.body.cartTotal ?? req.body.subtotal) || 0);
   const result = await validatePromoCode(req.body.code, subtotal).catch(() => ({ ok: false, error: 'Error al validar el código.' }));
   if (!result.ok) return res.json({ ok: false, error: result.error });
@@ -4179,7 +4202,7 @@ app.post('/api/orders', orderLimiter, async (req, res) => {
   const paymentStatus = 'Pendiente';
 
   const order = {
-    id:            'SLG-' + Date.now().toString(36).toUpperCase() + '-' + Math.random().toString(36).substr(2,4).toUpperCase(),
+    id:            'SLG-' + Date.now().toString(36).toUpperCase() + '-' + secureRandomBase36(4),
     customer:      String(req.body.customer   || '').slice(0, 200).replace(/[<>]/g, ''),
     email:         rawEmail.slice(0, 200),
     phone:         req.body.phone ? String(req.body.phone).slice(0, 30).replace(/[^0-9+\-\s()]/g, '') : null,
@@ -4421,7 +4444,7 @@ async function createWompiLink(order) {
   const token     = await getWompiToken();
   const amountCents = Math.round(parseFloat(order.total) * 100);
   // reference must be unique and <= 60 chars
-  const reference = `SLG-${Date.now().toString(36).toUpperCase()}-${Math.random().toString(36).substr(2,4).toUpperCase()}`;
+  const reference = `SLG-${Date.now().toString(36).toUpperCase()}-${secureRandomBase36(4)}`;
 
   const body = {
     idComercio:        reference,
@@ -4483,7 +4506,15 @@ app.post('/api/wompi/webhook', express.json(), async (req, res) => {
   const hashInput = `${tx.id || ''}${tx.estado || tx.status || ''}${tx.monto || tx.amount || ''}${WOMPI_CLIENT_SECRET}`;
   const expected  = crypto.createHash('sha256').update(hashInput).digest('hex');
 
-  if (receivedHash.toLowerCase() !== expected.toLowerCase()) {
+  // Timing-safe compare (same pattern as the session-token signature check in
+  // middleware/auth.js) — a plain !== leaks how many leading characters
+  // matched via response timing. receivedHash length isn't guaranteed (it's
+  // attacker-controlled input), so length-mismatch is rejected directly
+  // rather than passed to timingSafeEqual, which throws on unequal lengths.
+  const receivedBuf = Buffer.from(String(receivedHash).toLowerCase(), 'hex');
+  const expectedBuf = Buffer.from(expected.toLowerCase(), 'hex');
+  const signatureOk = receivedBuf.length === expectedBuf.length && crypto.timingSafeEqual(receivedBuf, expectedBuf);
+  if (!signatureOk) {
     console.warn('Wompi webhook: signature mismatch — rejected');
     return res.sendStatus(400);
   }
@@ -4952,7 +4983,7 @@ app.post('/api/paypal/create-order', orderLimiter, async (req, res) => {
   const customerSession = customerToken ? validateSession(customerToken) : null;
   const customerId      = (customerSession && customerSession.role === 'customer') ? customerSession.user.id : null;
 
-  const orderId = 'SLG-' + Date.now().toString(36).toUpperCase() + '-' + Math.random().toString(36).substr(2,4).toUpperCase();
+  const orderId = 'SLG-' + Date.now().toString(36).toUpperCase() + '-' + secureRandomBase36(4);
   const orderSnapshot = {
     id:            orderId,
     customer:      String(req.body.customer || '').slice(0, 200).replace(/[<>]/g, ''),
@@ -5967,11 +5998,18 @@ app.patch('/api/orders/:id', requireAdmin, async (req, res) => {
 
   // Confirmación de pago manual (admin) → emite el DTE (opción A, sin esperar webhook).
   // Útil cuando el webhook de Wompi/BTCPay no llega o para pruebas. Dedup-guarded.
+  // PayWay en modo test (sandbox, nunca dinero real) nunca debe emitir un DTE
+  // real — mismo gate que ya existe en el callback automático de PayWay
+  // (handlePaywayCallback), que aquí faltaba: confirmar manualmente el pago
+  // de una orden PayWay de prueba desde este botón sí llegaba a emitir un DTE.
   let manualPagoDte = null;
+  const isPaywayTest = existing[0].payment_method === 'payway' && cfg.PAYWAY_MODE !== 'prod';
   if (paymentStatus === 'Pagado' && prevPayment !== 'Pagado') {
     broadcastAdmin('order_update', { id: req.params.id, paymentStatus: 'Pagado' });
     await logActivity(`Pago confirmado manualmente para pedido ${escHtml(req.params.id)}`);
-    try { manualPagoDte = await emitDteForOrder(req.params.id); } catch(e) { console.error('DTE (pago manual) error:', e.message); }
+    if (!isPaywayTest) {
+      try { manualPagoDte = await emitDteForOrder(req.params.id); } catch(e) { console.error('DTE (pago manual) error:', e.message); }
+    }
   }
   const [updated] = await db.execute('SELECT * FROM orders WHERE id=?', [req.params.id]);
   const order = {
