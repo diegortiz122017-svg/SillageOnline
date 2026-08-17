@@ -1034,6 +1034,7 @@ tr:hover td{background:rgba(255,255,255,0.02)}
               <button onclick="initBottleInventory()" style="background:none;border:1px solid rgba(184,149,90,0.3);color:#8a7f72;font-family:'Jost',sans-serif;font-size:0.55rem;letter-spacing:0.12em;text-transform:uppercase;padding:0.45rem 0.8rem;cursor:pointer" title="Crear registros para todas las fragancias existentes">Inicializar Todo</button>
               <button onclick="purgeOrphanBottles()" style="background:none;border:1px solid rgba(192,80,80,0.3);color:#8a7f72;font-family:'Jost',sans-serif;font-size:0.55rem;letter-spacing:0.12em;text-transform:uppercase;padding:0.45rem 0.8rem;cursor:pointer" title="Eliminar registros de fragancias que ya no existen">Limpiar Huérfanos</button>
               <button onclick="backfillChords()" style="background:none;border:1px solid rgba(184,149,90,0.3);color:#8a7f72;font-family:'Jost',sans-serif;font-size:0.55rem;letter-spacing:0.12em;text-transform:uppercase;padding:0.45rem 0.8rem;cursor:pointer" title="Calcular acordes para productos que no los tienen">Recalcular Acordes</button>
+              <button onclick="migrateNoteIntensity()" style="background:none;border:1px solid rgba(184,149,90,0.3);color:#8a7f72;font-family:'Jost',sans-serif;font-size:0.55rem;letter-spacing:0.12em;text-transform:uppercase;padding:0.45rem 0.8rem;cursor:pointer" title="Recalcular las barras de intensidad Top/Corazón/Fondo de todos los productos">Recalcular Intensidad de Notas</button>
               <button class="add-btn-lg" onclick="openBottleModal(null)" style="font-size:0.58rem;padding:0.5rem 1rem">+ Registrar Botella</button>
             </div>
           </div>
@@ -5952,6 +5953,16 @@ function backfillChords(){
     .then(function(r){ return r?r.json():null; })
     .then(function(res){
       if(res&&res.ok) toast('Acordes actualizados', res.updated+' productos actualizados','ok');
+      else toast('Error','No se pudo completar','');
+    });
+}
+
+function migrateNoteIntensity(){
+  if(!confirm('¿Recalcular las barras Top/Corazón/Fondo de TODOS los productos con el modelo nuevo?\nEsto sobreescribe los valores actuales.')) return;
+  adminFetch(API+'/admin/migrate-note-intensity',{ method:'POST' })
+    .then(function(r){ return r?r.json():null; })
+    .then(function(res){
+      if(res&&res.ok) toast('Intensidad recalculada', res.updated+' productos actualizados','ok');
       else toast('Error','No se pudo completar','');
     });
 }

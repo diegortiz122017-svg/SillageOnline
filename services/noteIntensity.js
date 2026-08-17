@@ -218,45 +218,52 @@ function getSillageBase(sillage) {
 /**
  * Calculate all three intensity scores for a product.
  *
+ * Each tier blends two signals instead of nudging a shared anchor by a few
+ * points (the old model let the Sillage anchor dominate — ±15 points of
+ * ingredient nudge on top of a ~50-90 point anchor barely moved the needle,
+ * so top/mid/base always landed within a few points of each other for any
+ * one product, regardless of what was actually in each tier's note list).
+ *
  * Algorithm per tier:
- *   1. Get sillage base (midpoint of the tier)
- *   2. Apply concentration multiplier
- *   3. Score ingredients → normalize to -15..+15 nudge
- *   4. Add powerhouse bonus (+8 if present)
- *   5. Note count: fewer items = higher prominence (+5 if ≤2 notes, -3 if ≥6)
- *   6. Clamp to 5–98
+ *   1. Sillage anchor — product's overall Sillage rating × concentration
+ *   2. Ingredient score — this tier's own note list scored against its
+ *      weight table, scaled to 0-100
+ *   3. Blend anchor and ingredient score per tier's anchorWeight — Fondo
+ *      leans most on Sillage (base notes are what actually drive projection
+ *      and longevity), Top leans most on its own notes (a soft citrus
+ *      opening and a spiced, aldehydic opening shouldn't both read as
+ *      "strong" just because the fragrance is Sillage: Fuerte overall)
+ *   4. Powerhouse bonus (+8) and note-count adjustment (±5) nudge the blend
+ *   5. Clamp to 5–98
  */
 function calcIntensity(product) {
   const sillageBase = getSillageBase(product.sillage);
   const concMult    = getConcentrationMultiplier(product.conc);
+  const anchor       = Math.round(sillageBase * concMult);
 
-  function tierScore(notesStr, weightTable) {
+  function tierScore(notesStr, weightTable, anchorWeight) {
     const { score, count, hasPowerhouse } = scoreNotes(notesStr, weightTable);
 
-    // Anchored base: sillage midpoint × concentration
-    let base = Math.round(sillageBase * concMult);
+    // Ingredient score, scaled to 0-100. Ceiling of 35 raw points — a
+    // genuinely heavy, note-dense tier (e.g. oud + incense + labdanum)
+    // reaches the top of the range; a light one (e.g. bergamot + lemon)
+    // stays low, regardless of the product's overall Sillage.
+    const ingredientPct = Math.min(100, Math.round((score / 35) * 100));
 
-    // Ingredient nudge: normalize raw score to ±15 window
-    // Raw ceiling ~50 for very heavy ingredient lists
-    const nudge = score > 0 ? Math.round((score / 50) * 15) - 7 : 0;
+    let blended = Math.round(anchor * anchorWeight + ingredientPct * (1 - anchorWeight));
 
-    // Powerhouse bonus
-    const phBonus = hasPowerhouse ? 8 : 0;
+    if (hasPowerhouse)    blended += 8;
+    if (count <= 2)       blended += 5;
+    else if (count >= 6)  blended -= 4;
+    else if (count >= 4)  blended -= 2;
 
-    // Note count signal: sparse = more prominent, dense = shared space
-    let countAdj = 0;
-    if (count <= 2)      countAdj = +5;
-    else if (count >= 6) countAdj = -4;
-    else if (count >= 4) countAdj = -2;
-
-    const final = base + nudge + phBonus + countAdj;
-    return Math.min(98, Math.max(5, final));
+    return Math.min(98, Math.max(5, blended));
   }
 
   return {
-    top_intensity:  tierScore(product.top,  TOP_WEIGHTS),
-    mid_intensity:  tierScore(product.mid,  HEART_WEIGHTS),
-    base_intensity: tierScore(product.base, BASE_WEIGHTS),
+    top_intensity:  tierScore(product.top,  TOP_WEIGHTS,   0.35),
+    mid_intensity:  tierScore(product.mid,  HEART_WEIGHTS, 0.40),
+    base_intensity: tierScore(product.base, BASE_WEIGHTS,  0.60),
   };
 }
 
