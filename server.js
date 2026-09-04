@@ -336,6 +336,8 @@ async function initDB() {
   try { await db.execute('DELETE FROM scent_profiles WHERE last_used < DATE_SUB(NOW(), INTERVAL 90 DAY)'); } catch(e) {}
   // "Favoritos de Todos" homepage flag — independent of badge
   try { await db.execute('ALTER TABLE products ADD COLUMN home_favorite TINYINT(1) DEFAULT 0'); } catch(e) {}
+  // Zoom de la imagen en el modal de producto (1 = normal, >1 = acercar)
+  try { await db.execute('ALTER TABLE products ADD COLUMN image_zoom DECIMAL(4,2) DEFAULT 1.00'); } catch(e) {}
 
   await db.execute(`
     CREATE TABLE IF NOT EXISTS bundles (

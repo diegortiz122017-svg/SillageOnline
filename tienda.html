@@ -4040,7 +4040,7 @@ function openDetail(pid){
   for(var i=0;i<slideCount;i++){
     var sd=document.createElement('div');
     sd.className='slide'+(i===0?' active':'');sd.style.cssText=bgs[i%bgs.length];
-    sd.innerHTML='<div class="slide-bottle">'+(p.photos&&p.photos[i]?'<img src="'+esc(cdnImg(p.photos[i],800))+'" alt="'+esc(p.brand+' '+p.name)+'" style="max-height:100%;max-width:100%;object-fit:contain;"/>':svg(p.c,p.s,'lg'))+'</div>'+overlays[i%overlays.length];
+    sd.innerHTML='<div class="slide-bottle">'+(p.photos&&p.photos[i]?'<img src="'+esc(cdnImg(p.photos[i],800))+'" alt="'+esc(p.brand+' '+p.name)+'" style="max-height:100%;max-width:100%;object-fit:contain;transform:scale('+(p.imageZoom||1)+');"/>':svg(p.c,p.s,'lg'))+'</div>'+overlays[i%overlays.length];
     slidesEl.appendChild(sd);
   }
   var dotsEl=document.getElementById('dots');dotsEl.innerHTML='';
