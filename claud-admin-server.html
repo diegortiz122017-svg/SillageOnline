@@ -314,6 +314,10 @@ tr:hover td{background:rgba(255,255,255,0.02)}
 .frag-url-input{flex:1;min-width:180px;background:rgba(255,255,255,0.06);border:1px solid var(--border);color:var(--cream);font-family:'Jost',sans-serif;font-size:0.75rem;padding:0.5rem 0.8rem;outline:none}
 .frag-url-input:focus{border-color:var(--gold)}
 .frag-url-add{padding:0.5rem 1rem;background:transparent;border:1px solid var(--border);color:var(--muted);font-family:'Jost',sans-serif;font-size:0.6rem;letter-spacing:0.12em;text-transform:uppercase;cursor:pointer;transition:all 0.2s;white-space:nowrap}
+.frag-zoom-row{display:flex;gap:1rem;align-items:center;margin-bottom:1rem}
+.frag-zoom-row:last-child{margin-bottom:0}
+.frag-zoom-preview{width:70px;height:70px;flex-shrink:0;overflow:hidden;background:rgba(184,149,90,0.08);border:1px solid var(--border);display:flex;align-items:center;justify-content:center}
+.frag-zoom-preview img{max-width:100%;max-height:100%;object-fit:contain;transition:transform 0.15s}
 .frag-url-add:hover{border-color:var(--gold);color:var(--gold)}
 .frag-save{width:100%;padding:0.85rem;background:var(--gold);border:none;color:var(--dark);font-family:'Jost',sans-serif;font-size:0.68rem;letter-spacing:0.22em;text-transform:uppercase;cursor:pointer;font-weight:500;margin-top:1.2rem;transition:background 0.3s}
 .frag-save:hover{background:var(--gold-light)}
@@ -745,15 +749,9 @@ tr:hover td{background:rgba(255,255,255,0.02)}
       </div>
       <p style="font-size:0.58rem;color:var(--muted);margin-top:0.5rem">Sube tus fotos a un servicio como <strong>imgbb.com</strong> o <strong>cloudinary.com</strong> y pega la URL aquí.</p>
     </div>
-    <div class="frag-section">Zoom de imagen (modal de producto)</div>
-    <div class="frag-photos-area" style="display:flex;gap:1rem;align-items:center;flex-wrap:wrap">
-      <div style="width:110px;height:110px;flex-shrink:0;overflow:hidden;background:rgba(184,149,90,0.08);border:1px solid var(--border);display:flex;align-items:center;justify-content:center">
-        <img id="fImageZoomPreview" src="" style="display:none;max-width:100%;max-height:100%;object-fit:contain;transform:scale(1);transition:transform 0.15s"/>
-      </div>
-      <div style="flex:1;min-width:180px">
-        <input type="range" id="fImageZoom" min="1" max="2.5" step="0.05" value="1" style="width:100%" oninput="updateImageZoomPreview()"/>
-        <p style="font-size:0.65rem;color:var(--muted);margin-top:0.4rem">Acercamiento en el modal de producto: <strong id="fImageZoomLabel">100%</strong></p>
-      </div>
+    <div class="frag-section">Zoom por foto (modal de producto)</div>
+    <div class="frag-photos-area" id="fragZoomArea">
+      <p style="font-size:0.6rem;color:var(--muted)">Agrega fotos arriba para poder ajustar el zoom de cada una.</p>
     </div>
     <div class="frag-err" id="fragErr"></div>
     <button class="frag-save" onclick="saveFragrance()">Guardar Fragancia</button>
@@ -4668,6 +4666,7 @@ function pickSugg(id, val) {
 var catalogFragrances=[];
 var editingFragId=null;
 var fragPhotos=[];
+var fragPhotoZoom=[]; // zoom por foto, alineado por índice con fragPhotos (1=normal)
 
 function loadCatalogue(){
   adminFetch(API+'/catalogue',{})
@@ -4775,9 +4774,8 @@ function openFragModal(id){
   document.getElementById('fragPhotoUrl').value='';
   document.getElementById('fragErr').textContent='';
   fragPhotos=p&&p.photos?p.photos.slice():[];
+  fragPhotoZoom=p&&Array.isArray(p.photoZoom)?p.photoZoom.slice():[];
   renderFragPhotos();
-  document.getElementById('fImageZoom').value=p&&p.imageZoom?p.imageZoom:1;
-  updateImageZoomPreview();
   document.getElementById('fragModal').classList.add('open');
   document.body.style.overflow='hidden';
   setTimeout(function(){document.getElementById('fBrand').focus();},200);
@@ -4791,13 +4789,13 @@ document.getElementById('fragModal').addEventListener('click',function(e){if(e.t
 function addFragPhoto(){
   var url=document.getElementById('fragPhotoUrl').value.trim();
   if(!url)return;
-  if(fragPhotos.indexOf(url)===-1)fragPhotos.push(url);
+  if(fragPhotos.indexOf(url)===-1){fragPhotos.push(url);fragPhotoZoom.push(1);}
   document.getElementById('fragPhotoUrl').value='';
   renderFragPhotos();
 }
 document.getElementById('fragPhotoUrl').addEventListener('keydown',function(e){if(e.key==='Enter'){e.preventDefault();addFragPhoto();}});
 
-function removeFragPhoto(idx){fragPhotos.splice(idx,1);renderFragPhotos();}
+function removeFragPhoto(idx){fragPhotos.splice(idx,1);fragPhotoZoom.splice(idx,1);renderFragPhotos();}
 
 function renderFragPhotos(){
   var list=document.getElementById('fragPhotosList');
@@ -4808,21 +4806,32 @@ function renderFragPhotos(){
       '<div class="frag-photo-rm" onclick="removeFragPhoto('+i+')">&#10005;</div>'+
     '</div>';
   }).join('')+(fragPhotos.length<8?'<div class="cat-add-photo" onclick="document.getElementById(\'fragPhotoUrl\').focus()" title="Agregar foto">+</div>':'');
-  updateImageZoomPreview();
+  renderFragZoomArea();
 }
 
-function updateImageZoomPreview(){
-  var zoom=parseFloat(document.getElementById('fImageZoom').value)||1;
-  document.getElementById('fImageZoomLabel').textContent=Math.round(zoom*100)+'%';
-  var img=document.getElementById('fImageZoomPreview');
-  img.style.transform='scale('+zoom+')';
-  if(fragPhotos.length){
-    img.src=fragPhotos[0];
-    img.style.display='block';
-  } else {
-    img.removeAttribute('src');
-    img.style.display='none';
+function renderFragZoomArea(){
+  var area=document.getElementById('fragZoomArea');
+  if(!fragPhotos.length){
+    area.innerHTML='<p style="font-size:0.6rem;color:var(--muted)">Agrega fotos arriba para poder ajustar el zoom de cada una.</p>';
+    return;
   }
+  area.innerHTML=fragPhotos.map(function(url,i){
+    var zoom=fragPhotoZoom[i]!=null?fragPhotoZoom[i]:1;
+    return '<div class="frag-zoom-row">'+
+      '<div class="frag-zoom-preview"><img id="fZoomPreview'+i+'" src="'+esc(url)+'" style="transform:scale('+zoom+')"/></div>'+
+      '<div style="flex:1;min-width:180px">'+
+        '<input type="range" min="0.5" max="2.5" step="0.05" value="'+zoom+'" style="width:100%" oninput="setFragPhotoZoom('+i+',this.value)"/>'+
+        '<p style="font-size:0.65rem;color:var(--muted);margin-top:0.4rem">Foto '+(i+1)+': <strong id="fZoomLabel'+i+'">'+Math.round(zoom*100)+'%</strong></p>'+
+      '</div>'+
+    '</div>';
+  }).join('');
+}
+
+function setFragPhotoZoom(idx,value){
+  var zoom=parseFloat(value)||1;
+  fragPhotoZoom[idx]=zoom;
+  document.getElementById('fZoomPreview'+idx).style.transform='scale('+zoom+')';
+  document.getElementById('fZoomLabel'+idx).textContent=Math.round(zoom*100)+'%';
 }
 
 function saveFragrance(){
@@ -4846,7 +4855,7 @@ function saveFragrance(){
     desc:document.getElementById('fDesc').value,
     c:[document.getElementById('fC1').value,document.getElementById('fC2').value,document.getElementById('fC3').value],
     s:document.getElementById('fShape').value,photos:fragPhotos,
-    imageZoom:parseFloat(document.getElementById('fImageZoom').value)||1
+    photoZoom:fragPhotoZoom
   };
   var btn=document.querySelector('.frag-save');
   btn.textContent='Guardando...';btn.disabled=true;

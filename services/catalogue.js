@@ -47,7 +47,14 @@ function rowToProduct(r) {
     chords_override: r.chords_override ? (typeof r.chords_override === 'string' ? JSON.parse(r.chords_override) : r.chords_override) : null,
     sort_order:    r.sort_order,
     homeFavorite:  !!r.home_favorite,
-    imageZoom:     r.image_zoom != null ? parseFloat(r.image_zoom) : 1,
+    // Zoom por foto: array alineado por índice con `photos` (photoZoom[i] para photos[i]).
+    photoZoom:     (() => {
+      if (!r.image_zoom) return [];
+      try {
+        const parsed = typeof r.image_zoom === 'string' ? JSON.parse(r.image_zoom) : r.image_zoom;
+        return Array.isArray(parsed) ? parsed : [];
+      } catch { return []; }
+    })(),
   };
 }
 
@@ -87,7 +94,7 @@ function productToRow(p, now) {
     p.chords_override ? JSON.stringify(p.chords_override) : null,
     p.sort_order   != null ? p.sort_order : 0,
     p.homeFavorite ? 1 : 0,
-    p.imageZoom    != null ? parseFloat(p.imageZoom) : 1,
+    Array.isArray(p.photoZoom) && p.photoZoom.length ? JSON.stringify(p.photoZoom) : null,
     now,
   ];
 }
