@@ -1125,7 +1125,10 @@ tr:hover td{background:rgba(255,255,255,0.02)}
           <button class="auto-badge-btn" id="autoBadgeBtn" onclick="autoAssignBestsellers()">&#9733; Auto Bestsellers</button>
         </div>
         <div class="auto-badge-result" id="autoBadgeResult" style="display:none"></div>
-        <button class="add-frag-btn" onclick="openFragModal()">&#43; Agregar Fragancia</button>
+        <div style="display:flex;gap:0.8rem;flex-wrap:wrap;align-items:center">
+          <button class="add-frag-btn" style="margin-bottom:0" onclick="openFragModal()">&#43; Agregar Fragancia</button>
+          <button class="auto-badge-btn" style="margin-bottom:1.5rem" onclick="exportCatalogueReport()">&#8681; Descargar Catálogo (Excel/CSV)</button>
+        </div>
         <div class="cat-grid" id="catGrid"></div>
         </div><!-- end cat-tab-productos -->
 
@@ -4667,6 +4670,26 @@ var catalogFragrances=[];
 var editingFragId=null;
 var fragPhotos=[];
 var fragPhotoZoom=[]; // zoom por foto, alineado por índice con fragPhotos (1=normal)
+
+function exportCatalogueReport(){
+  adminFetch(API+'/admin/catalogue/export',{})
+    .then(function(r){
+      if(!r || !r.ok){ toast('Error','No se pudo generar el catálogo','err'); return; }
+      return r.blob();
+    })
+    .then(function(blob){
+      if(!blob) return;
+      var url=URL.createObjectURL(blob);
+      var a=document.createElement('a');
+      a.href=url;
+      a.download='sillage-catalogo.csv';
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+    })
+    .catch(function(){toast('Error','No se pudo generar el catálogo','err');});
+}
 
 function loadCatalogue(){
   adminFetch(API+'/catalogue',{})

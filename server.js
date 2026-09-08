@@ -5951,6 +5951,36 @@ app.post('/api/pricing', requireAdmin, async (req, res) => {
 app.get('/api/orders',   requireAdmin, async (req, res) => res.json(await getOrders()));
 app.get('/api/activity', requireAdmin, async (req, res) => res.json(await getActivity()));
 
+// GET /api/admin/catalogue/export — catálogo completo en CSV (abre bien en Excel).
+app.get('/api/admin/catalogue/export', requireAdmin, async (req, res) => {
+  const [catalogue, invMap, priceMap] = await Promise.all([getCatalogue(), getInventoryMap(), getPricingMap()]);
+  const esc = v => `"${String(v == null ? '' : v).replace(/"/g, '""')}"`;
+  const genderLbl = { M: 'Hombre', F: 'Mujer', U: 'Unisex' };
+  const header = [
+    'ID', 'Marca', 'Nombre', 'Género', 'Precio', 'Precio Decant 10ml', 'Precio Decant 5ml',
+    'Tamaño Decant (ml)', 'Tamaño', 'Badge', 'Lujo', 'Familia Olfativa',
+    'Notas Salida', 'Notas Corazón', 'Notas Fondo', 'Concentración', 'Temporada', 'Estela',
+    'Duración', 'Favorito Home', 'Stock', 'Bajo Stock', 'Agotado', 'Precio Oferta', 'En Oferta',
+  ];
+  const lines = [header.join(',')];
+  catalogue.forEach(p => {
+    const inv = invMap[p.id] || {};
+    const pr  = priceMap[p.id] || {};
+    lines.push([
+      p.id, p.brand, p.name, genderLbl[p.g] || p.g, p.price,
+      p.decantPrice != null ? p.decantPrice : '', p.decantPrice5 != null ? p.decantPrice5 : '',
+      p.decantSizeMl != null ? p.decantSizeMl : '', p.size, p.badge || '', p.luxury ? 'Sí' : 'No',
+      p.family || '', p.top || '', p.mid || '', p.base || '', p.conc || '', p.season || '',
+      p.sillage || '', p.long || '', p.homeFavorite ? 'Sí' : 'No',
+      inv.stock != null ? inv.stock : '', inv.lowStock ? 'Sí' : 'No', inv.outOfStock ? 'Sí' : 'No',
+      pr.salePrice != null ? pr.salePrice : '', pr.onSale ? 'Sí' : 'No',
+    ].map(esc).join(','));
+  });
+  res.setHeader('Content-Type', 'text/csv; charset=utf-8');
+  res.setHeader('Content-Disposition', 'attachment; filename="sillage-catalogo.csv"');
+  res.send('﻿' + lines.join('\n')); // BOM — para que Excel abra bien los acentos
+});
+
 app.get('/api/orders/export', requireAdmin, async (req, res) => {
   const [rows] = await db.query('SELECT id,customer,email,phone,address,city,state_province,country,items,total,status,payment_status,payment_method,tracker_step,customer_id,created_at,updated_at FROM orders ORDER BY created_at DESC');
   const lines = ['ID,Cliente,Email,Dirección,Total,Estado,Pago,Fecha'];
