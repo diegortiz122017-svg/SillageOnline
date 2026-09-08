@@ -2323,7 +2323,7 @@ footer{background:var(--dark);padding:3.5rem 4rem;text-align:center;border-top:1
       <span class="lead-modal-eyebrow">Gracias</span>
       <h2 class="lead-modal-title" id="leadModalSuccessTitle">Tu descuento ya es tuyo</h2>
       <div class="lead-modal-code-box"><span class="lead-modal-code" id="leadModalCode"></span></div>
-      <p class="lead-modal-sub">Te lo enviamos también por correo, por si lo necesitás después.</p>
+      <p class="lead-modal-sub" id="leadModalSuccessSub">Te lo enviamos también por correo, por si lo necesitás después.</p>
       <button class="lead-modal-btn" onclick="_leadCapture.close()">Explorar la colección</button>
     </div>
   </div>
@@ -4037,6 +4037,17 @@ var _leadCapture = (function(){
       document.getElementById('leadModalCode').textContent = d.code;
       document.getElementById('leadModalForm').style.display = 'none';
       document.getElementById('leadModalSuccess').style.display = 'block';
+      // Guardar el cupón para que se aplique solo (ver _tryAutoApplyPendingPromo,
+      // llamada desde renderCart) en vez de obligar a copiarlo y pegarlo después.
+      try{ localStorage.setItem('sillage_pending_promo', d.code); }catch(e){}
+      _pendingPromoLastTried = null;
+      _tryAutoApplyPendingPromo();
+      var successSub = document.getElementById('leadModalSuccessSub');
+      if(successSub){
+        successSub.textContent = (typeof cart !== 'undefined' && cart.length)
+          ? 'Ya lo aplicamos a tu carrito — se descuenta automáticamente en el pago.'
+          : 'Se aplica solo en cuanto agregues algo al carrito, no necesitás copiarlo.';
+      }
       trackEvent('lead_captured');
     }).catch(function(){
       btn.disabled = false;
@@ -4624,12 +4635,47 @@ function productUrl(p){
 // PROMO CODES
 // ═══════════════════════════════════════════════════════
 var _appliedPromo = null; // { code, type, value, discount }
+var _pendingPromoLastTried = null;
 
-function applyPromo(){
-  var code = document.getElementById('promoInput').value.trim().toUpperCase();
+// Aplica automáticamente el cupón que el modal de bienvenida haya guardado
+// (ver _leadCapture.submit) apenas el carrito tenga algo que no sea un bundle
+// — así el cliente no tiene que copiar el código y pegarlo a mano después.
+// Se reintenta cada vez que cambia el subtotal (renderCart la llama), pero
+// nunca dos veces seguidas con el mismo subtotal, para no repetir la llamada.
+function _tryAutoApplyPendingPromo(){
+  if(_appliedPromo) return;
+  var pending;
+  try { pending = localStorage.getItem('sillage_pending_promo'); } catch(e){ return; }
+  if(!pending) return;
+  var base = standaloneCartSum();
+  if(base <= 0 || _pendingPromoLastTried === base) return;
+  _pendingPromoLastTried = base;
+  fetch(API+'/promo/validate',{
+    method:'POST', headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({code:pending, cartTotal:base})
+  }).then(function(r){return r.json();}).then(function(res){
+    if(!res.ok){ try{ localStorage.removeItem('sillage_pending_promo'); }catch(e){} return; }
+    _appliedPromo = res;
+    var inputEl = document.getElementById('promoInput');
+    if(inputEl) inputEl.value = pending;
+    var msg = document.getElementById('promoMsg');
+    if(msg){ msg.style.color='var(--success)'; msg.textContent='✓ Tu cupón de bienvenida se aplicó automáticamente — ahorras $'+parseFloat(res.discount).toFixed(2); }
+    renderCart();
+  }).catch(function(){});
+}
+
+function applyPromo(codeOverride){
+  var inputEl = document.getElementById('promoInput');
+  var code = (codeOverride || (inputEl && inputEl.value) || '').trim().toUpperCase();
+  if(inputEl && codeOverride) inputEl.value = code;
   var msg  = document.getElementById('promoMsg');
   if(!code){ msg.style.color='var(--error)'; msg.textContent='Ingresa un código.'; return; }
-  var total = cartSum();
+  var total = standaloneCartSum();
+  if(total <= 0){
+    msg.style.color='var(--error)';
+    msg.textContent='Los códigos de descuento no aplican a bundles — agrega un producto individual para usarlo.';
+    return;
+  }
   msg.style.color='var(--muted)'; msg.textContent='Verificando...';
   fetch(API+'/promo/validate',{
     method:'POST',
@@ -4651,14 +4697,23 @@ function applyPromo(){
 }
 
 function clearPromo(){
+  // El usuario lo quitó a propósito — no debe volver a aplicarse solo.
+  try{ localStorage.removeItem('sillage_pending_promo'); }catch(e){}
   if(_appliedPromo){ _appliedPromo=null; renderCart(); }
   var msg=document.getElementById('promoMsg');
   if(msg) msg.textContent='';
 }
 
+// Recalcula en vivo contra el subtotal actual (sin bundles) en vez de confiar
+// en el monto congelado al momento de aplicar — así si el carrito cambia
+// después (se agregan/quitan productos), el descuento mostrado sigue
+// coincidiendo con lo que el servidor va a validar en /api/orders.
 function getPromoDiscount(){
   if(!_appliedPromo) return 0;
-  return parseFloat(_appliedPromo.discount)||0;
+  var base = standaloneCartSum();
+  var value = parseFloat(_appliedPromo.value)||0;
+  if(_appliedPromo.type==='percent') return Math.round(base * value) / 100;
+  return Math.min(value, base);
 }
 
 // ═══════════════════════════════════════════════════════
@@ -4772,6 +4827,18 @@ function getShipping(){
   var sub = cartSum();
   return sub >= shippingThreshold ? 0 : shippingCost;
 }
+// Subtotal SIN bundles — los códigos de descuento no aplican sobre un bundle
+// (ya trae su propio precio especial). Debe reflejar exactamente lo que
+// valida el servidor en /api/promo/validate y en /api/orders.
+function standaloneCartSum(){
+  var sum = 0;
+  cart.forEach(function(i){
+    if(i.bundleId) return;
+    var up = i.unitPrice !== undefined ? i.unitPrice : effectivePrice(i.p);
+    sum += up * i.qty;
+  });
+  return sum;
+}
 function orderTotal(){return Math.max(0, cartSum() + getShipping() - getPromoDiscount());}
 // Agregar al carrito un producto que Nez recomendó es una señal de seguimiento
 // más fuerte que solo verlo — refuerza el perfil con sus atributos reales.
@@ -4849,6 +4916,7 @@ function changeQtyKey(key,d){
 window.changeQty=changeQty;window.removeFromCart=removeFromCart;
 window.changeQtyKey=changeQtyKey;window.removeFromCartKey=removeFromCartKey;
 function renderCart(){
+  _tryAutoApplyPendingPromo();
   var qty=cartQty();
   var cc=document.getElementById('cartCount');cc.textContent=qty;cc.classList.toggle('show',qty>0);
   var fc=document.getElementById('cartFabCount');

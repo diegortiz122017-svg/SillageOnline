@@ -4078,7 +4078,11 @@ app.post('/api/orders', orderLimiter, async (req, res) => {
     const catalogue  = await getCatalogue();
     const invMap     = await getInventoryMap();
     const priceMap   = await getPricingMap();
-    let   serverTotal = 0;
+    // Bundles y estándares se acumulan por separado — un bundle ya trae su
+    // propio precio con descuento, así que un código de promo NO debe aplicar
+    // sobre esa parte (ver validatePromoCode más abajo).
+    let   bundleTotal = 0;
+    let   standaloneTotal = 0;
     // Group bundle items to validate bundle price as a unit
     const bundleGroups = {}; // bundleId → { items, bundleName }
     const standaloneItems = [];
@@ -4107,12 +4111,12 @@ app.post('/api/orders', orderLimiter, async (req, res) => {
             console.warn(`Bundle price mismatch — client:$${clientBundleTotal} db:$${dbBundlePrice}`);
             return res.status(400).json({ error: 'El precio del bundle no coincide. Por favor recarga la página.' });
           }
-          serverTotal += dbBundlePrice;
+          bundleTotal += dbBundlePrice;
           continue;
         }
       }
       // Bundle not found in DB — fall back to accepting client price with abuse tracking
-      serverTotal += clientBundleTotal;
+      bundleTotal += clientBundleTotal;
     }
 
     // Validate standalone items
@@ -4166,8 +4170,9 @@ app.post('/api/orders', orderLimiter, async (req, res) => {
         if (unitPrice < 0.50) unitPrice = fullPrice;
       }
 
-      serverTotal += unitPrice * qty;
+      standaloneTotal += unitPrice * qty;
     }
+    let serverTotal = bundleTotal + standaloneTotal;
     // El envío gratis se evalúa sobre el subtotal de ÍTEMS antes del descuento
     // (igual que el frontend: getShipping() usa cartSum(), no el total con
     // descuento aplicado) — si se evaluara después, un descuento que baje el
@@ -4177,9 +4182,10 @@ app.post('/api/orders', orderLimiter, async (req, res) => {
     const shipping = serverTotal < shippingThreshold ? shippingCost : 0;
 
     // ── Código de descuento — validado server-side, nunca se confía en lo que
-    // mande el cliente. Se aplica sobre el subtotal de ítems (antes de envío).
+    // mande el cliente. Se aplica SOLO sobre los ítems estándar: los bundles ya
+    // tienen su propio precio especial y no deben apilar además un cupón.
     if (req.body.promoCode) {
-      promoResult = await validatePromoCode(req.body.promoCode, serverTotal);
+      promoResult = await validatePromoCode(req.body.promoCode, standaloneTotal);
       if (!promoResult.ok) return res.status(400).json({ error: promoResult.error });
       serverTotal = Math.max(0, Math.round((serverTotal - promoResult.discount) * 100) / 100);
     }
@@ -4853,7 +4859,10 @@ async function computeServerTotal(rawItems, promoCode, clientTotal) {
     const catalogue = await getCatalogue();
     const invMap    = await getInventoryMap();
     const priceMap  = await getPricingMap();
-    let   serverTotal = 0;
+    // Igual que en /api/orders: bundles aparte de ítems estándar, para que un
+    // código de promo no aplique sobre el precio ya especial del bundle.
+    let   bundleTotal = 0;
+    let   standaloneTotal = 0;
 
     const bundleGroups = {};
     const standaloneItems = [];
@@ -4878,11 +4887,11 @@ async function computeServerTotal(rawItems, promoCode, clientTotal) {
           if (Math.abs(clientBundleTotal - dbBundlePrice) > 0.02) {
             return { ok: false, status: 400, error: 'El precio del bundle no coincide. Por favor recarga la página.' };
           }
-          serverTotal += dbBundlePrice;
+          bundleTotal += dbBundlePrice;
           continue;
         }
       }
-      serverTotal += clientBundleTotal;
+      bundleTotal += clientBundleTotal;
     }
 
     const decantsEnabled = (await getSetting('decants_enabled', '1')) !== '0';
@@ -4924,8 +4933,9 @@ async function computeServerTotal(rawItems, promoCode, clientTotal) {
         unitPrice = parseFloat(item.unitPrice || fullPrice);
         if (unitPrice < 0.50) unitPrice = fullPrice;
       }
-      serverTotal += unitPrice * qty;
+      standaloneTotal += unitPrice * qty;
     }
+    let serverTotal = bundleTotal + standaloneTotal;
 
     const shippingCost      = parseFloat(await getSetting('shipping_cost', '5')) || 5;
     const shippingThreshold = parseFloat(await getSetting('shipping_threshold', '50')) || 50;
@@ -4933,7 +4943,8 @@ async function computeServerTotal(rawItems, promoCode, clientTotal) {
 
     let promoResult = null;
     if (promoCode) {
-      promoResult = await validatePromoCode(promoCode, serverTotal);
+      // Solo sobre ítems estándar — ver nota arriba.
+      promoResult = await validatePromoCode(promoCode, standaloneTotal);
       if (!promoResult.ok) return { ok: false, status: 400, error: promoResult.error };
       serverTotal = Math.max(0, Math.round((serverTotal - promoResult.discount) * 100) / 100);
     }
