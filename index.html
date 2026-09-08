@@ -262,6 +262,8 @@ nav a:hover{color:var(--gold)}
 .dg-f{background:rgba(212,160,150,0.12);color:#c47060;border:1px solid rgba(196,112,96,0.25)}
 .dg-m{background:rgba(100,130,180,0.12);color:#5070b0;border:1px solid rgba(80,112,176,0.25)}
 .dg-u{background:rgba(150,150,150,0.12);color:#707070;border:1px solid rgba(112,112,112,0.25)}
+.dg-mix{background:rgba(184,149,90,0.12);color:#b8955a;border:1px solid rgba(184,149,90,0.3)}
+.bsc-gender{position:absolute;top:1.2rem;right:1.2rem}
 .d-name{font-family:Cormorant Garamond,serif;font-size:clamp(2rem,4vw,3.2rem);font-weight:300;color:var(--charcoal);line-height:1;margin-bottom:0.4rem}
 .d-tagline{font-size:0.72rem;color:var(--muted);font-style:italic;margin-bottom:1.8rem;padding-bottom:1.8rem;border-bottom:1px solid var(--border)}
 .d-price-row{display:flex;align-items:baseline;gap:0.8rem;margin-bottom:1.8rem}
@@ -2374,7 +2376,7 @@ footer{background:var(--dark);padding:3.5rem 4rem;text-align:center;border-top:1
   <div class="bundle-modal">
     <div class="bundle-modal-hdr">
       <div>
-        <div style="font-size:0.5rem;letter-spacing:0.2em;text-transform:uppercase;color:var(--gold);margin-bottom:0.3rem">Bundle</div>
+        <div style="font-size:0.5rem;letter-spacing:0.2em;text-transform:uppercase;color:var(--gold);margin-bottom:0.3rem;display:flex;align-items:center;gap:0.5rem">Bundle<span id="bundleDetailGender"></span></div>
         <div id="bundleDetailName" style="font-family:Cormorant Garamond,serif;font-size:1.4rem;color:var(--cream);font-weight:300"></div>
         <div id="bundleDetailDesc" style="font-size:0.7rem;color:var(--muted);margin-top:0.3rem"></div>
       </div>
@@ -5606,6 +5608,7 @@ function openBundleDetail(b){
   _lastBundleViewed = b;
   document.getElementById('bundleDetailName').textContent = b.name;
   document.getElementById('bundleDetailDesc').textContent = b.description || '';
+  document.getElementById('bundleDetailGender').innerHTML = _bundleGenderBadge(b.items);
   document.getElementById('bundleDetailPrice').textContent = '$'+parseFloat(b.price).toFixed(2);
   var saving = b.orig_price && parseFloat(b.orig_price) > parseFloat(b.price)
     ? parseFloat(b.orig_price) - parseFloat(b.price) : 0;
@@ -5708,6 +5711,24 @@ function openBundleProdDetail(pid){
   }, 500);
 }
 
+// Género del bundle a partir de los productos que contiene: si mezcla M y F
+// se etiqueta "Pareja"; si no, gana el género no-unisex presente (si lo hay).
+function _bundleGenderBadge(items){
+  var hasM=false, hasF=false, hasU=false;
+  (items||[]).forEach(function(it){
+    var prod = P.find(function(x){ return x.id===it.productId || x.id===+it.productId; });
+    if(!prod) return;
+    if(prod.g==='M') hasM=true;
+    else if(prod.g==='F') hasF=true;
+    else hasU=true;
+  });
+  if(hasM && hasF) return '<span class="d-gender dg-mix">Pareja</span>';
+  if(hasM) return '<span class="d-gender dg-m">Hombre</span>';
+  if(hasF) return '<span class="d-gender dg-f">Mujer</span>';
+  if(hasU) return '<span class="d-gender dg-u">Unisex</span>';
+  return '';
+}
+
 function _bundleCardsHtml(bundles){
   return bundles.map(function(b){
     var saving = b.orig_price && parseFloat(b.orig_price) > parseFloat(b.price)
@@ -5716,6 +5737,7 @@ function _bundleCardsHtml(bundles){
       return '<div class="bsc-item">'+esc(it.name)+(it.size?' <span style="color:var(--muted);font-size:0.6rem">'+esc(it.size)+'</span>':'')+'</div>';
     }).join('');
     return '<div class="bundle-store-card" data-bid="'+b.id+'">'+
+      '<div class="bsc-gender">'+_bundleGenderBadge(b.items)+'</div>'+
       '<span class="bsc-tag">Bundle · '+b.items.length+' producto'+(b.items.length!==1?'s':'')+'</span>'+
       '<div class="bsc-name">'+esc(b.name)+'</div>'+
       (b.description?'<div class="bsc-desc">'+esc(b.description)+'</div>':'')+
