@@ -834,23 +834,15 @@ async function emitForOrder(order, options = {}) {
 //  DTE del cuerpo: referencia un DTE con sello y lo deja sin efecto.
 // ════════════════════════════════════════════════════════════════════════════
 
-// IVA del DTE a anular: FC/NC usan resumen.totalIva; el CCF lo lleva en el tributo 20.
-function _montoIvaDe(json) {
-  const r = json && json.resumen ? json.resumen : {};
-  if (typeof r.totalIva === 'number') return round2(r.totalIva);
-  if (Array.isArray(r.tributos)) {
-    const t = r.tributos.find(x => x && x.codigo === '20');
-    if (t && typeof t.valor === 'number') return round2(t.valor);
-  }
-  return 0;
-}
-
 // docRow = fila de dte_documents (con json_dte, sello, numero_control, etc.)
 // motivo = { tipoAnulacion, motivoAnulacion, nombreResponsable, tipDocResponsable,
 //            numDocResponsable, nombreSolicita, tipDocSolicita, numDocSolicita,
 //            codigoGeneracionR? }
 function buildAnulacion(docRow, motivo, opts) {
-  const { fecEmi: fecAnula, horEmi: horAnula } = nowSV();
+  // Esquema v3 (Normativa DTE 2.0): identificacion usa fecEmi/horEmi (antes
+  // fecAnula/horAnula) y agrega "fusion". Nombres distintos para no chocar
+  // con el fecEmi del DOCUMENTO ORIGINAL que se anula (json.identificacion.fecEmi).
+  const { fecEmi: fEvento, horEmi: hEvento } = nowSV();
   const json = typeof docRow.json_dte === 'string' ? JSON.parse(docRow.json_dte) : docRow.json_dte;
   const e    = cfg.DTE_EMISOR;
   const rec  = (json && json.receptor) || {};
@@ -861,23 +853,24 @@ function buildAnulacion(docRow, motivo, opts) {
 
   return {
     identificacion: {
-      version:          2,
+      version:          3,
       ambiente:         cfg.DTE_AMBIENTE,
       codigoGeneracion: opts.codigoGeneracion,        // UUID del EVENTO (nuevo)
-      fecAnula,
-      horAnula,
+      fecEmi:           fEvento,
+      horEmi:           hEvento,
+      fusion:           null,                          // v3: fusiones y otros — no aplica
     },
+    // v3: solo nit/nombre/codEstableMH/codEstable/codPuntoVentaMH/codPuntoVenta/telefono/correo
+    // (tipoEstablecimiento y nomEstablecimiento ya no son parte del esquema — additionalProperties:false).
     emisor: {
-      nit:                 e.nit,
-      nombre:              e.nombre,
-      tipoEstablecimiento: '02',                       // CAT-009: 02 = Casa Matriz
-      telefono:            e.telefono,
-      correo:              e.correo,
-      codEstableMH:        null,
-      codEstable:          e.codEstable || null,
-      codPuntoVentaMH:     null,
-      codPuntoVenta:       e.codPuntoVenta || null,
-      nomEstablecimiento:  e.nombreComercial || e.nombre,
+      nit:              e.nit,
+      nombre:           e.nombre,
+      codEstableMH:     null,
+      codEstable:       e.codEstable || null,
+      codPuntoVentaMH:  null,
+      codPuntoVenta:    e.codPuntoVenta || null,
+      telefono:         e.telefono,
+      correo:           e.correo,
     },
     documento: {
       tipoDte:           docRow.tipo_dte,
@@ -885,8 +878,7 @@ function buildAnulacion(docRow, motivo, opts) {
       codigoGeneracionR: motivo.codigoGeneracionR || null, // reemplazo (solo tipo 1)
       selloRecibido:     docRow.sello_recibido,
       numeroControl:     docRow.numero_control,
-      fecEmi:            (json.identificacion && json.identificacion.fecEmi) || fecAnula,
-      montoIva:          _montoIvaDe(json),
+      fecEmi:            (json.identificacion && json.identificacion.fecEmi) || fEvento,
       tipoDocumento:     tipoDoc,
       numDocumento:      numDoc,
       nombre:            rec.nombre || null,
@@ -1006,7 +998,7 @@ function buildContingencia(dteList, motivo, opts) {
   const e = cfg.DTE_EMISOR;
   return {
     identificacion: {
-      version:          3,
+      version:          4,
       ambiente:         cfg.DTE_AMBIENTE,
       codigoGeneracion: opts.codigoGeneracion,       // UUID del EVENTO
       fTransmision,
@@ -1019,8 +1011,8 @@ function buildContingencia(dteList, motivo, opts) {
       tipoDocResponsable:   motivo.tipoDocResponsable || '36',   // 36 = NIT
       numeroDocResponsable: motivo.numeroDocResponsable,
       tipoEstablecimiento:  '02',                    // CAT-009: 02 = Casa Matriz
-      codEstableMH:         null,                     // MH pide codEstableMH (asignado por Hacienda)
-      codPuntoVenta:        e.codPuntoVenta || null,  // …pero codPuntoVenta (no la variante MH)
+      codEstableMH:         null,                     // asignado por Hacienda — no lo tenemos
+      codPuntoVentaMH:      null,                     // v4: era "codPuntoVenta" (esquema viejo, rechazado)
       telefono:             e.telefono,
       correo:               e.correo,
     },
