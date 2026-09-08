@@ -318,6 +318,10 @@ tr:hover td{background:rgba(255,255,255,0.02)}
 .frag-zoom-row:last-child{margin-bottom:0}
 .frag-zoom-preview{width:70px;height:70px;flex-shrink:0;overflow:hidden;background:rgba(184,149,90,0.08);border:1px solid var(--border);display:flex;align-items:center;justify-content:center}
 .frag-zoom-preview img{max-width:100%;max-height:100%;object-fit:contain;transition:transform 0.15s}
+.popup-active-btn{padding:0.65rem 1.3rem;background:transparent;border:1px solid var(--border);color:var(--muted);font-family:'Jost',sans-serif;font-size:0.6rem;letter-spacing:0.1em;text-transform:uppercase;cursor:pointer;transition:all 0.2s}
+.popup-active-btn.active{background:var(--gold);border-color:var(--gold);color:var(--dark)}
+.popup-preview-frame{background:#2a2622;border:1px solid var(--border);padding:2rem 1.2rem;display:flex;justify-content:center;position:sticky;top:1rem}
+@media(max-width:900px){.popup-editor-grid{grid-template-columns:1fr!important}.popup-preview-frame{position:static}}
 .frag-url-add:hover{border-color:var(--gold);color:var(--gold)}
 .frag-save{width:100%;padding:0.85rem;background:var(--gold);border:none;color:var(--dark);font-family:'Jost',sans-serif;font-size:0.68rem;letter-spacing:0.22em;text-transform:uppercase;cursor:pointer;font-weight:500;margin-top:1.2rem;transition:background 0.3s}
 .frag-save:hover{background:var(--gold-light)}
@@ -802,6 +806,7 @@ tr:hover td{background:rgba(255,255,255,0.02)}
         <div class="sb-section">Clientes</div>
         <button class="nav-btn" data-page="clientes"><span class="nav-icon">👤</span>Clientes</button>
         <button class="nav-btn" data-page="leads"><span class="nav-icon">✨</span>Leads</button>
+        <button class="nav-btn" data-page="popups"><span class="nav-icon">🪧</span>Modales</button>
         <button class="nav-btn" data-page="promos"><span class="nav-icon">🏷️</span>Descuentos</button>
         <button class="nav-btn" data-page="emails"><span class="nav-icon">✉️</span>Emails</button>
         <div class="sb-section">Fiscal</div>
@@ -1234,6 +1239,117 @@ tr:hover td{background:rgba(255,255,255,0.02)}
             </tbody>
           </table>
         </div>
+      </div>
+      <!-- MODAL DE BIENVENIDA / PROMOCIÓN -->
+      <div class="page" id="page-popups">
+        <div class="page-title">Modal de Bienvenida y Promoción</div>
+        <div class="page-sub">Diseña el modal emergente que ven tus visitantes. Solo se muestra uno a la vez — elige cuál abajo.</div>
+
+        <div class="frag-section" style="margin-top:1rem">¿Qué modal está activo en la tienda?</div>
+        <div id="popupActiveSelector" style="display:flex;gap:0.8rem;flex-wrap:wrap;margin-bottom:1.8rem">
+          <button class="popup-active-btn" data-active="none" onclick="setPopupActive('none')">Ninguno</button>
+          <button class="popup-active-btn" data-active="welcome" onclick="setPopupActive('welcome')">Bienvenida (captura correo)</button>
+          <button class="popup-active-btn" data-active="promo" onclick="setPopupActive('promo')">Promoción</button>
+        </div>
+
+        <div class="inner-tabs">
+          <button class="inner-tab active" id="popupTabBtnWelcome" onclick="switchPopupTab('welcome',this)">👋 Diseñar Bienvenida</button>
+          <button class="inner-tab" id="popupTabBtnPromo" onclick="switchPopupTab('promo',this)">🎉 Diseñar Promoción</button>
+        </div>
+
+        <div class="popup-editor-grid" style="display:grid;grid-template-columns:1fr 320px;gap:2rem;margin-top:1.5rem;align-items:start">
+          <div>
+            <!-- FORM: BIENVENIDA -->
+            <div id="popupFormWelcome">
+              <div class="frag-row">
+                <div class="frag-field"><label>Texto pequeño (eyebrow)</label><input type="text" id="pwEyebrow" placeholder="Bienvenido/a" oninput="updatePopupPreview()"/></div>
+                <div class="frag-field"><label>Descuento del cupón (%)</label><input type="number" id="pwDiscount" min="1" max="100" placeholder="10" oninput="updatePopupPreview()"/></div>
+              </div>
+              <div class="frag-row full">
+                <div class="frag-field"><label>Título</label><input type="text" id="pwTitle" placeholder="10% de descuento en tu primera fragancia" oninput="updatePopupPreview()"/></div>
+              </div>
+              <div class="frag-row full">
+                <div class="frag-field"><label>Subtítulo</label><textarea id="pwSub" rows="2" oninput="updatePopupPreview()"></textarea></div>
+              </div>
+              <div class="frag-row full">
+                <div class="frag-field"><label>Imagen (URL, opcional)</label><input type="url" id="pwImage" placeholder="https://..." oninput="updatePopupPreview()"/></div>
+              </div>
+              <div class="frag-section" style="margin-top:0.8rem;padding-top:0.8rem">Colores</div>
+              <div style="display:flex;gap:0.8rem;flex-wrap:wrap;margin-bottom:0.8rem">
+                <div class="frag-field"><label>Fondo</label><input type="color" id="pwBg" oninput="updatePopupPreview()" style="padding:0.2rem;height:2.4rem;cursor:pointer"/></div>
+                <div class="frag-field"><label>Texto</label><input type="color" id="pwText" oninput="updatePopupPreview()" style="padding:0.2rem;height:2.4rem;cursor:pointer"/></div>
+                <div class="frag-field"><label>Acento</label><input type="color" id="pwAccent" oninput="updatePopupPreview()" style="padding:0.2rem;height:2.4rem;cursor:pointer"/></div>
+                <div class="frag-field"><label>Fondo botón</label><input type="color" id="pwBtnBg" oninput="updatePopupPreview()" style="padding:0.2rem;height:2.4rem;cursor:pointer"/></div>
+                <div class="frag-field"><label>Texto botón</label><input type="color" id="pwBtnText" oninput="updatePopupPreview()" style="padding:0.2rem;height:2.4rem;cursor:pointer"/></div>
+              </div>
+              <div class="frag-row">
+                <div class="frag-field"><label>Texto del botón</label><input type="text" id="pwBtnLabel" placeholder="Quiero mi descuento" oninput="updatePopupPreview()"/></div>
+                <div class="frag-field"><label>Retraso de aparición (segundos)</label><input type="number" id="pwDelay" min="0" placeholder="17" oninput="updatePopupPreview()"/></div>
+              </div>
+              <div class="frag-row full">
+                <div class="frag-field"><label>Letra pequeña (legal)</label><input type="text" id="pwFine" oninput="updatePopupPreview()"/></div>
+              </div>
+            </div>
+            <!-- FORM: PROMOCIÓN -->
+            <div id="popupFormPromo" style="display:none">
+              <div class="frag-row">
+                <div class="frag-field"><label>Texto pequeño (eyebrow)</label><input type="text" id="ppEyebrow" placeholder="Oferta" oninput="updatePopupPreview()"/></div>
+                <div class="frag-field"><label>Código a mostrar (opcional)</label><input type="text" id="ppCode" placeholder="SALE20" oninput="updatePopupPreview()"/></div>
+              </div>
+              <div class="frag-row full">
+                <div class="frag-field"><label>Título</label><input type="text" id="ppTitle" placeholder="Envío gratis esta semana" oninput="updatePopupPreview()"/></div>
+              </div>
+              <div class="frag-row full">
+                <div class="frag-field"><label>Subtítulo</label><textarea id="ppSub" rows="2" oninput="updatePopupPreview()"></textarea></div>
+              </div>
+              <div class="frag-row full">
+                <div class="frag-field"><label>Imagen (URL, opcional)</label><input type="url" id="ppImage" placeholder="https://..." oninput="updatePopupPreview()"/></div>
+              </div>
+              <div class="frag-section" style="margin-top:0.8rem;padding-top:0.8rem">Colores</div>
+              <div style="display:flex;gap:0.8rem;flex-wrap:wrap;margin-bottom:0.8rem">
+                <div class="frag-field"><label>Fondo</label><input type="color" id="ppBg" oninput="updatePopupPreview()" style="padding:0.2rem;height:2.4rem;cursor:pointer"/></div>
+                <div class="frag-field"><label>Texto</label><input type="color" id="ppText" oninput="updatePopupPreview()" style="padding:0.2rem;height:2.4rem;cursor:pointer"/></div>
+                <div class="frag-field"><label>Acento</label><input type="color" id="ppAccent" oninput="updatePopupPreview()" style="padding:0.2rem;height:2.4rem;cursor:pointer"/></div>
+                <div class="frag-field"><label>Fondo botón</label><input type="color" id="ppBtnBg" oninput="updatePopupPreview()" style="padding:0.2rem;height:2.4rem;cursor:pointer"/></div>
+                <div class="frag-field"><label>Texto botón</label><input type="color" id="ppBtnText" oninput="updatePopupPreview()" style="padding:0.2rem;height:2.4rem;cursor:pointer"/></div>
+              </div>
+              <div class="frag-row">
+                <div class="frag-field"><label>Texto del botón</label><input type="text" id="ppBtnLabel" placeholder="Ver la colección" oninput="updatePopupPreview()"/></div>
+                <div class="frag-field"><label>Retraso de aparición (segundos)</label><input type="number" id="ppDelay" min="0" placeholder="12" oninput="updatePopupPreview()"/></div>
+              </div>
+              <div class="frag-row full">
+                <div class="frag-field"><label>Link al hacer clic (opcional — vacío = solo cierra)</label><input type="text" id="ppLink" placeholder="/tienda?filtro=oferta" oninput="updatePopupPreview()"/></div>
+              </div>
+              <div class="frag-row full">
+                <div class="frag-field"><label>Letra pequeña (opcional)</label><input type="text" id="ppFine" oninput="updatePopupPreview()"/></div>
+              </div>
+            </div>
+          </div>
+
+          <!-- VISTA PREVIA -->
+          <div>
+            <div class="frag-section" style="margin-top:0">Vista previa en vivo</div>
+            <div class="popup-preview-frame">
+              <div id="popupPreviewBox" style="width:100%;max-width:280px;border:1px solid;padding:1.6rem 1.3rem;position:relative;font-family:'Jost',sans-serif;box-sizing:border-box">
+                <img id="popupPreviewImg" style="display:none;width:100%;max-height:110px;object-fit:cover;margin-bottom:0.9rem;border-radius:0"/>
+                <span id="popupPreviewEyebrow" style="display:block;font-size:0.52rem;letter-spacing:0.25em;text-transform:uppercase;margin-bottom:0.6rem"></span>
+                <h3 id="popupPreviewTitle" style="font-family:'Cormorant Garamond',serif;font-weight:300;font-size:1.3rem;line-height:1.2;margin:0 0 0.6rem"></h3>
+                <p id="popupPreviewSub" style="font-size:0.66rem;line-height:1.6;margin:0 0 0.9rem;opacity:0.85"></p>
+                <div id="popupPreviewEmailFields" style="display:none">
+                  <div style="border:1px solid rgba(255,255,255,0.25);padding:0.55rem 0.75rem;font-size:0.62rem;margin-bottom:0.5rem;opacity:0.55">Tu nombre (opcional)</div>
+                  <div style="border:1px solid rgba(255,255,255,0.25);padding:0.55rem 0.75rem;font-size:0.62rem;margin-bottom:0.5rem;opacity:0.55">tu@correo.com</div>
+                </div>
+                <div id="popupPreviewCodeBox" style="display:none;border:1px dashed;padding:0.6rem;text-align:center;margin-bottom:0.7rem">
+                  <span id="popupPreviewCode" style="font-family:'Cormorant Garamond',serif;font-size:1.1rem"></span>
+                </div>
+                <button id="popupPreviewBtn" style="width:100%;border:none;padding:0.65rem;font-size:0.56rem;letter-spacing:0.15em;text-transform:uppercase;cursor:default;font-family:'Jost',sans-serif"></button>
+                <p id="popupPreviewFine" style="font-size:0.5rem;line-height:1.5;margin:0.65rem 0 0"></p>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <button class="frag-save" id="popupSaveBtn" style="margin-top:1.8rem;max-width:320px" onclick="savePopupConfig()">Guardar Configuración</button>
       </div>
       <!-- CÓDIGOS DE DESCUENTO -->
       <div class="page" id="page-promos">
@@ -1681,6 +1797,7 @@ tr:hover td{background:rgba(255,255,255,0.02)}
       <button class="mob-drawer-item" data-page="cod" onclick="navToFromDrawer('cod')"><span class="mob-icon">🛡️</span>COD</button>
       <button class="mob-drawer-item" data-page="clientes" onclick="navToFromDrawer('clientes')"><span class="mob-icon">👤</span>Clientes</button>
       <button class="mob-drawer-item" data-page="leads" onclick="navToFromDrawer('leads')"><span class="mob-icon">✨</span>Leads</button>
+      <button class="mob-drawer-item" data-page="popups" onclick="navToFromDrawer('popups')"><span class="mob-icon">🪧</span>Modales</button>
       <button class="mob-drawer-item" data-page="emails" onclick="navToFromDrawer('emails')"><span class="mob-icon">✉️</span>Emails</button>
       <button class="mob-drawer-item" data-page="dte" onclick="navToFromDrawer('dte')"><span class="mob-icon">📄</span>DTE</button>
     </div>
@@ -2378,6 +2495,7 @@ function navTo(page){
   if(page==='cod'){         renderCODPage(); }
   if(page==='clientes')  loadClientes();
   if(page==='leads')     loadLeads();
+  if(page==='popups')    loadPopupConfig();
   if(page==='dte')       renderDtePage();
   if(page==='promos'){    loadPromoCodes(); renderPricing(); setTimeout(initSaleEmailUI, 800); }
   if(page==='emails')    loadSentEmails();
@@ -3677,6 +3795,124 @@ var LEAD_STEP_LABELS = {
   welcome:'Bienvenida enviada', reminder_5d:'Recordatorio enviado',
   last_chance_30d:'Último aviso enviado', converted:'Convertido'
 };
+// ── Modal de Bienvenida / Promoción ──────────────────────────────────────────
+var _popupCfg = null;
+var _popupTab = 'welcome';
+
+function loadPopupConfig(){
+  adminFetch(API+'/settings/popups',{})
+    .then(function(r){ return r?r.json():null; })
+    .then(function(cfg){
+      if(!cfg) return;
+      _popupCfg = cfg;
+      document.querySelectorAll('.popup-active-btn').forEach(function(b){
+        b.classList.toggle('active', b.dataset.active===cfg.active);
+      });
+      fillPopupForm('welcome', cfg.welcome);
+      fillPopupForm('promo', cfg.promo);
+      updatePopupPreview();
+    })
+    .catch(function(){ toast('Error','No se pudo cargar la configuración','err'); });
+}
+
+function fillPopupForm(type, data){
+  data = data || {};
+  var p = type==='welcome' ? 'pw' : 'pp';
+  var set = function(id,val){ var el=document.getElementById(id); if(el) el.value = val; };
+  set(p+'Eyebrow', data.eyebrow||'');
+  set(p+'Title',   data.title||'');
+  set(p+'Sub',     data.sub||'');
+  set(p+'Image',   data.imageUrl||'');
+  set(p+'Bg',      data.bgColor||'#0e0c0a');
+  set(p+'Text',    data.textColor||'#f5f0e8');
+  set(p+'Accent',  data.accentColor||'#b8955a');
+  set(p+'BtnBg',   data.buttonBgColor||'#b8955a');
+  set(p+'BtnText', data.buttonTextColor||'#0e0c0a');
+  set(p+'BtnLabel',data.buttonText||'');
+  set(p+'Delay',   data.delaySeconds!=null ? data.delaySeconds : (type==='welcome'?17:12));
+  set(p+'Fine',    data.finePrint||'');
+  if(type==='welcome') set('pwDiscount', data.discountPercent!=null ? data.discountPercent : 10);
+  else set('ppLink', data.buttonLink||'');
+  if(type==='promo') set('ppCode', data.promoCode||'');
+}
+
+function readPopupForm(type){
+  var p = type==='welcome' ? 'pw' : 'pp';
+  var g = function(id){ var el=document.getElementById(id); return el ? el.value : ''; };
+  var out = {
+    eyebrow: g(p+'Eyebrow'), title: g(p+'Title'), sub: g(p+'Sub'), imageUrl: g(p+'Image'),
+    bgColor: g(p+'Bg')||'#0e0c0a', textColor: g(p+'Text')||'#f5f0e8', accentColor: g(p+'Accent')||'#b8955a',
+    buttonBgColor: g(p+'BtnBg')||'#b8955a', buttonTextColor: g(p+'BtnText')||'#0e0c0a',
+    buttonText: g(p+'BtnLabel'), delaySeconds: parseInt(g(p+'Delay'),10)||0, finePrint: g(p+'Fine'),
+  };
+  if(type==='welcome') out.discountPercent = parseFloat(g('pwDiscount'))||0;
+  else { out.buttonLink = g('ppLink'); out.promoCode = g('ppCode'); }
+  return out;
+}
+
+function setPopupActive(active){
+  document.querySelectorAll('.popup-active-btn').forEach(function(b){
+    b.classList.toggle('active', b.dataset.active===active);
+  });
+  if(_popupCfg) _popupCfg.active = active;
+}
+
+function switchPopupTab(type, btn){
+  _popupTab = type;
+  document.getElementById('popupTabBtnWelcome').classList.toggle('active', type==='welcome');
+  document.getElementById('popupTabBtnPromo').classList.toggle('active', type==='promo');
+  document.getElementById('popupFormWelcome').style.display = type==='welcome' ? 'block' : 'none';
+  document.getElementById('popupFormPromo').style.display   = type==='promo'   ? 'block' : 'none';
+  updatePopupPreview();
+}
+
+function updatePopupPreview(){
+  var data = readPopupForm(_popupTab);
+  var box = document.getElementById('popupPreviewBox');
+  if(!box) return;
+  box.style.background   = data.bgColor;
+  box.style.borderColor  = data.accentColor;
+  var eyebrow = document.getElementById('popupPreviewEyebrow');
+  eyebrow.textContent = data.eyebrow; eyebrow.style.color = data.accentColor;
+  var title = document.getElementById('popupPreviewTitle');
+  title.textContent = data.title || 'Título del modal'; title.style.color = data.textColor;
+  var sub = document.getElementById('popupPreviewSub');
+  sub.textContent = data.sub; sub.style.color = data.textColor;
+  var img = document.getElementById('popupPreviewImg');
+  if(data.imageUrl){ img.src = data.imageUrl; img.style.display = 'block'; } else { img.removeAttribute('src'); img.style.display = 'none'; }
+  document.getElementById('popupPreviewEmailFields').style.display = _popupTab==='welcome' ? 'block' : 'none';
+  var codeBox = document.getElementById('popupPreviewCodeBox');
+  var codeEl  = document.getElementById('popupPreviewCode');
+  if(_popupTab==='promo' && data.promoCode){
+    codeBox.style.display = 'block'; codeBox.style.borderColor = data.accentColor;
+    codeEl.textContent = data.promoCode; codeEl.style.color = data.accentColor;
+  } else { codeBox.style.display = 'none'; }
+  var btn = document.getElementById('popupPreviewBtn');
+  btn.textContent = data.buttonText || 'Botón';
+  btn.style.background = data.buttonBgColor; btn.style.color = data.buttonTextColor;
+  var fine = document.getElementById('popupPreviewFine');
+  fine.textContent = data.finePrint; fine.style.color = data.textColor; fine.style.opacity = 0.75;
+}
+
+function savePopupConfig(){
+  if(!_popupCfg){ toast('Error','Espera a que cargue la configuración','err'); return; }
+  var payload = { active: _popupCfg.active, welcome: readPopupForm('welcome'), promo: readPopupForm('promo') };
+  var btn = document.getElementById('popupSaveBtn');
+  btn.textContent = 'Guardando...'; btn.disabled = true;
+  adminFetch(API+'/settings/popups', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(payload) })
+    .then(function(r){ return r ? r.json() : null; })
+    .then(function(res){
+      btn.textContent = 'Guardar Configuración'; btn.disabled = false;
+      if(res && res.ok){
+        _popupCfg = res.config;
+        toast('Guardado', 'La configuración del modal se actualizó', 'ok');
+      } else {
+        toast('Error', (res && res.error) || 'No se pudo guardar', 'err');
+      }
+    })
+    .catch(function(){ btn.textContent = 'Guardar Configuración'; btn.disabled = false; toast('Error','Error de conexión','err'); });
+}
+
 function loadLeads(){
   var tbody=document.getElementById('leadsBody');
   tbody.innerHTML='<tr><td colspan="6" style="text-align:center;padding:2rem;color:var(--muted);font-size:0.72rem">Cargando leads...</td></tr>';

@@ -166,6 +166,35 @@ const DEFAULT_BRAND_HIERARCHY = [
   'Al Haramain', 'Lattafa', 'Afnan', 'Armaf', 'Ajmal', 'Zimaya', 'Sospiro',
 ];
 
+// ─── Modal de bienvenida / promoción (editable desde el admin) ────────────────
+// Un solo modal proactivo se muestra por visita — `active` decide cuál.
+const DEFAULT_POPUP_CONFIG = {
+  active: 'welcome', // 'none' | 'welcome' | 'promo'
+  welcome: {
+    eyebrow: 'Bienvenido/a',
+    title: '10% de descuento en tu primera fragancia',
+    sub: 'Dejanos tu correo y te compartimos un código de descuento único — sin apuro, para cuando quieras usarlo.',
+    imageUrl: '',
+    bgColor: '#0e0c0a', textColor: '#f5f0e8', accentColor: '#b8955a',
+    buttonText: 'Quiero mi descuento', buttonBgColor: '#b8955a', buttonTextColor: '#0e0c0a',
+    finePrint: 'Un correo, un cupón de descuento. Podés darte de baja cuando quieras.',
+    delaySeconds: 17,
+    discountPercent: 10,
+  },
+  promo: {
+    eyebrow: 'Oferta',
+    title: 'Envío gratis esta semana',
+    sub: 'Aprovecha antes de que termine la promoción.',
+    imageUrl: '',
+    bgColor: '#0e0c0a', textColor: '#f5f0e8', accentColor: '#b8955a',
+    buttonText: 'Ver la colección', buttonBgColor: '#b8955a', buttonTextColor: '#0e0c0a',
+    finePrint: '',
+    delaySeconds: 12,
+    buttonLink: '',
+    promoCode: '',
+  },
+};
+
 module.exports = {
   PORT, NODE_ENV, IS_PROD, BASE_URL,
   SESSION_SECRET, SESSION_TTL_ADMIN, SESSION_TTL_CUSTOMER,
@@ -186,4 +215,5 @@ module.exports = {
   ANON_SESSION_TTL, ANON_WS_LIMIT, ANON_SOMMELIER_MAX,
   REG_SOMMELIER_LIMIT, ANON_SOMMELIER_LIMIT,
   DEFAULT_BRAND_HIERARCHY,
+  DEFAULT_POPUP_CONFIG,
 };

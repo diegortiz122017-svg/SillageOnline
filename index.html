@@ -2414,21 +2414,25 @@ footer{background:var(--dark);padding:3.5rem 4rem;text-align:center;border-top:1
 
 <!-- Lead capture modal — 10% a cambio del correo, primera visita -->
 <div class="lead-modal-overlay" id="leadModalOverlay" onclick="if(event.target===this)_leadCapture.dismiss()">
-  <div class="lead-modal">
+  <div class="lead-modal" id="leadModalBox">
     <button class="lead-modal-close" onclick="_leadCapture.dismiss()" aria-label="Cerrar">&#10005;</button>
+    <img id="leadModalImg" style="display:none;width:100%;max-height:140px;object-fit:cover;margin-bottom:1rem"/>
     <div id="leadModalForm">
-      <span class="lead-modal-eyebrow">Bienvenido/a</span>
-      <h2 class="lead-modal-title">10% de descuento en tu primera fragancia</h2>
-      <p class="lead-modal-sub">Dejanos tu correo y te compartimos un código de descuento único — sin apuro, para cuando quieras usarlo.</p>
-      <input type="text" id="leadModalName" class="lead-modal-input" placeholder="Tu nombre (opcional)" onkeydown="if(event.key==='Enter')_leadCapture.submit()"/>
-      <input type="email" id="leadModalEmail" class="lead-modal-input" placeholder="tu@correo.com" onkeydown="if(event.key==='Enter')_leadCapture.submit()"/>
-      <div class="lead-modal-err" id="leadModalErr"></div>
-      <button class="lead-modal-btn" id="leadModalSubmitBtn" onclick="_leadCapture.submit()">Quiero mi descuento</button>
-      <p class="lead-modal-fine">Un correo, un cupón de descuento. Podés darte de baja cuando quieras.</p>
+      <span class="lead-modal-eyebrow" id="leadModalEyebrow">Bienvenido/a</span>
+      <h2 class="lead-modal-title" id="leadModalTitle">10% de descuento en tu primera fragancia</h2>
+      <p class="lead-modal-sub" id="leadModalSub">Dejanos tu correo y te compartimos un código de descuento único — sin apuro, para cuando quieras usarlo.</p>
+      <div id="leadModalEmailFields">
+        <input type="text" id="leadModalName" class="lead-modal-input" placeholder="Tu nombre (opcional)" onkeydown="if(event.key==='Enter')_leadCapture.submit()"/>
+        <input type="email" id="leadModalEmail" class="lead-modal-input" placeholder="tu@correo.com" onkeydown="if(event.key==='Enter')_leadCapture.submit()"/>
+        <div class="lead-modal-err" id="leadModalErr"></div>
+      </div>
+      <div class="lead-modal-code-box" id="leadModalPromoCodeBox" style="display:none"><span class="lead-modal-code" id="leadModalPromoCode"></span></div>
+      <button class="lead-modal-btn" id="leadModalSubmitBtn" onclick="_leadCapture.primaryAction()">Quiero mi descuento</button>
+      <p class="lead-modal-fine" id="leadModalFine">Un correo, un cupón de descuento. Podés darte de baja cuando quieras.</p>
     </div>
     <div id="leadModalSuccess" style="display:none;text-align:center">
       <span class="lead-modal-eyebrow">Gracias</span>
-      <h2 class="lead-modal-title">Tu 10% de descuento ya es tuyo</h2>
+      <h2 class="lead-modal-title" id="leadModalSuccessTitle">Tu descuento ya es tuyo</h2>
       <div class="lead-modal-code-box"><span class="lead-modal-code" id="leadModalCode"></span></div>
       <p class="lead-modal-sub">Te lo enviamos también por correo, por si lo necesitás después.</p>
       <button class="lead-modal-btn" onclick="_leadCapture.close()">Explorar la colección</button>
@@ -4061,13 +4065,30 @@ var _nezNudge = (function(){
 // se auto-desactiva hasta que este modal ya se mostró — ver su propio guard
 // más arriba). Se marca como visto apenas se muestra (mismo criterio que el
 // fix del toast duplicado), no al enviar o cerrar.
+// Defaults locales — si /api/settings/popups falla (offline, etc.) el modal
+// de bienvenida se sigue comportando como siempre en vez de no aparecer.
+var _POPUP_DEFAULTS = {
+  active: 'welcome',
+  welcome: { eyebrow:'Bienvenido/a', title:'10% de descuento en tu primera fragancia',
+    sub:'Dejanos tu correo y te compartimos un código de descuento único — sin apuro, para cuando quieras usarlo.',
+    imageUrl:'', bgColor:'#0e0c0a', textColor:'#f5f0e8', accentColor:'#b8955a',
+    buttonText:'Quiero mi descuento', buttonBgColor:'#b8955a', buttonTextColor:'#0e0c0a',
+    finePrint:'Un correo, un cupón de descuento. Podés darte de baja cuando quieras.',
+    delaySeconds:17, discountPercent:10 },
+  promo: { eyebrow:'Oferta', title:'Envío gratis esta semana', sub:'Aprovecha antes de que termine la promoción.',
+    imageUrl:'', bgColor:'#0e0c0a', textColor:'#f5f0e8', accentColor:'#b8955a',
+    buttonText:'Ver la colección', buttonBgColor:'#b8955a', buttonTextColor:'#0e0c0a',
+    finePrint:'', delaySeconds:12, buttonLink:'', promoCode:'' }
+};
+
 var _leadCapture = (function(){
-  var TRIGGER_DELAY_MS = 17000;
   var shownKey = 'sillage_lead_seen';
+  var _cfg = _POPUP_DEFAULTS;
 
   function eligible(){
     try { if(localStorage.getItem(shownKey)) return false; } catch(e){ return false; }
     if(typeof customerToken !== 'undefined' && customerToken) return false;
+    if(!_cfg || _cfg.active==='none') return false;
     return true;
   }
 
@@ -4078,23 +4099,69 @@ var _leadCapture = (function(){
     show();
   }
 
+  // Aplica el diseño configurado en el admin (colores/texto/imagen) y alterna
+  // entre el formulario de correo (bienvenida) y el CTA directo (promoción).
+  function applyContent(){
+    var mode = _cfg.active;
+    var data = _cfg[mode] || {};
+    var box = document.getElementById('leadModalBox');
+    box.style.background  = data.bgColor || '';
+    box.style.borderColor = data.accentColor || '';
+    var img = document.getElementById('leadModalImg');
+    if(data.imageUrl){ img.src = data.imageUrl; img.style.display = 'block'; } else { img.removeAttribute('src'); img.style.display = 'none'; }
+    var eyebrow = document.getElementById('leadModalEyebrow');
+    eyebrow.textContent = data.eyebrow || ''; eyebrow.style.color = data.accentColor || '';
+    var title = document.getElementById('leadModalTitle');
+    title.textContent = data.title || ''; title.style.color = data.textColor || '';
+    var sub = document.getElementById('leadModalSub');
+    sub.textContent = data.sub || ''; sub.style.color = data.textColor || '';
+    document.getElementById('leadModalEmailFields').style.display = mode==='welcome' ? 'block' : 'none';
+    var codeBox = document.getElementById('leadModalPromoCodeBox');
+    if(mode==='promo' && data.promoCode){
+      codeBox.style.display = 'block'; codeBox.style.borderColor = data.accentColor || '';
+      var codeEl = document.getElementById('leadModalPromoCode');
+      codeEl.textContent = data.promoCode; codeEl.style.color = data.accentColor || '';
+    } else { codeBox.style.display = 'none'; }
+    var btn = document.getElementById('leadModalSubmitBtn');
+    btn.textContent = data.buttonText || '';
+    btn.style.background = data.buttonBgColor || ''; btn.style.color = data.buttonTextColor || '';
+    var fine = document.getElementById('leadModalFine');
+    fine.textContent = data.finePrint || ''; fine.style.color = data.textColor || ''; fine.style.opacity = '0.75';
+  }
+
   function show(){
     var ov = document.getElementById('leadModalOverlay');
     if(!ov) return;
+    document.getElementById('leadModalForm').style.display = '';
+    document.getElementById('leadModalSuccess').style.display = 'none';
+    applyContent();
     ov.classList.add('open');
     try{ localStorage.setItem(shownKey,'1'); }catch(e){}
-    trackEvent('lead_modal_shown');
+    trackEvent('lead_modal_shown', {mode:_cfg.active});
   }
 
   function dismiss(){
     var ov = document.getElementById('leadModalOverlay');
     if(ov) ov.classList.remove('open');
-    trackEvent('lead_modal_dismissed');
+    trackEvent('lead_modal_dismissed', {mode:_cfg.active});
   }
 
   function close(){
     var ov = document.getElementById('leadModalOverlay');
     if(ov) ov.classList.remove('open');
+  }
+
+  // El botón principal hace cosas distintas según el modo: en "bienvenida"
+  // envía el formulario de correo; en "promoción" navega al link configurado
+  // (o solo cierra si no hay link).
+  function primaryAction(){
+    if(_cfg.active==='promo'){
+      var link = (_cfg.promo||{}).buttonLink;
+      trackEvent('promo_modal_cta_click');
+      if(link){ window.location.href = link; } else { close(); }
+      return;
+    }
+    submit();
   }
 
   function submit(){
@@ -4113,6 +4180,8 @@ var _leadCapture = (function(){
     }).then(function(r){ return r.json(); }).then(function(d){
       btn.disabled = false;
       if(!d || d.error){ err.textContent = (d && d.error) || 'No se pudo procesar. Intenta de nuevo.'; return; }
+      var discount = (_cfg.welcome && _cfg.welcome.discountPercent) || 10;
+      document.getElementById('leadModalSuccessTitle').textContent = 'Tu '+discount+'% de descuento ya es tuyo';
       document.getElementById('leadModalCode').textContent = d.code;
       document.getElementById('leadModalForm').style.display = 'none';
       document.getElementById('leadModalSuccess').style.display = 'block';
@@ -4123,8 +4192,14 @@ var _leadCapture = (function(){
     });
   }
 
-  setTimeout(fire, TRIGGER_DELAY_MS);
-  return { dismiss: dismiss, close: close, submit: submit };
+  fetch(API+'/settings/popups').then(function(r){ return r.json(); }).then(function(cfg){
+    _cfg = (cfg && cfg.active) ? cfg : _POPUP_DEFAULTS;
+    setTimeout(fire, ((_cfg[_cfg.active]||{}).delaySeconds || 15) * 1000);
+  }).catch(function(){
+    setTimeout(fire, ((_cfg[_cfg.active]||{}).delaySeconds || 17) * 1000);
+  });
+
+  return { dismiss: dismiss, close: close, submit: submit, primaryAction: primaryAction };
 })();
 
 // ════════════════════════════════════════════

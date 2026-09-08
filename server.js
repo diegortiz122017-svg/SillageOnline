@@ -28,7 +28,7 @@ const security     = require('./middleware/security');
 const auth         = require('./middleware/auth');
 
 // ─── Aliases for backwards compatibility within this file ──────────────────
-const { getCatalogue, saveCatalogue, deleteProduct, getInventoryMap, invalidateInventory, getPricingMap, invalidatePricing, getActivity, getSetting, setSetting, getBrandHierarchy } = catalogueSvc;
+const { getCatalogue, saveCatalogue, deleteProduct, getInventoryMap, invalidateInventory, getPricingMap, invalidatePricing, getActivity, getSetting, setSetting, getBrandHierarchy, getPopupConfig, setPopupConfig } = catalogueSvc;
 const { calcIntensity } = require('./services/noteIntensity');
 const { calcChords }    = require('./services/chords');
 
@@ -3516,14 +3516,16 @@ app.post('/api/leads/capture', leadCaptureLimiter, async (req, res) => {
 
     const now     = new Date();
     const expires = new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000);
+    const popupCfg = await getPopupConfig();
+    const discount = parseFloat(popupCfg.welcome.discountPercent) || 10;
     let code, promoOk = false;
     for (let i = 0; i < 5 && !promoOk; i++) {
       code = genLeadCode();
       try {
         await db.execute(
           `INSERT INTO promo_codes (code, type, value, active, max_uses, used_count, expires_at, created_at, updated_at)
-           VALUES (?, 'percent', 10, 1, 1, 0, ?, ?, ?)`,
-          [code, expires, now, now]
+           VALUES (?, 'percent', ?, 1, 1, 0, ?, ?, ?)`,
+          [code, discount, expires, now, now]
         );
         promoOk = true;
       } catch(e) { if (e.code !== 'ER_DUP_ENTRY') throw e; }
@@ -7569,6 +7571,26 @@ app.patch('/api/customer/link-order', requireCustomer, async (req, res) => {
   );
   logActivity(`Pedido ${orderId} vinculado a cliente ${req.customer.user.email}`);
   res.json({ ok: true });
+});
+
+// ── Settings / Modal de bienvenida y promoción ─────────
+app.get('/api/settings/popups', async (req, res) => res.json(await getPopupConfig()));
+
+app.post('/api/settings/popups', requireAdmin, async (req, res) => {
+  const body = req.body || {};
+  if (!['none', 'welcome', 'promo'].includes(body.active)) {
+    return res.status(400).json({ error: 'active debe ser none, welcome o promo.' });
+  }
+  const current = await getPopupConfig();
+  const next = {
+    active: body.active,
+    welcome: { ...current.welcome, ...(body.welcome || {}) },
+    promo:   { ...current.promo,   ...(body.promo   || {}) },
+  };
+  await setPopupConfig(next);
+  broadcast('popup_update', next);
+  await logActivity('Configuración de modal de bienvenida/promoción actualizada — activo: ' + next.active);
+  res.json({ ok: true, config: next });
 });
 
 // ── Settings / Shipping ───────────────────────────────

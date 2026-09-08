@@ -288,6 +288,26 @@ async function getBrandHierarchy() {
   return cfg.DEFAULT_BRAND_HIERARCHY;
 }
 
+// ── Modal de bienvenida / promoción ────────────────────────────────────────────
+// Deep-merge con los defaults para que guardar solo algunos campos (o una config
+// vieja de antes de agregar un campo nuevo) no deje huecos a mitad de camino.
+async function getPopupConfig() {
+  const def = cfg.DEFAULT_POPUP_CONFIG;
+  const stored = await getSetting('popup_config');
+  if (!stored) return def;
+  let parsed;
+  try { parsed = JSON.parse(stored); } catch { return def; }
+  return {
+    active: parsed.active || def.active,
+    welcome: { ...def.welcome, ...(parsed.welcome || {}) },
+    promo:   { ...def.promo,   ...(parsed.promo   || {}) },
+  };
+}
+
+async function setPopupConfig(cfgObj) {
+  await setSetting('popup_config', JSON.stringify(cfgObj));
+}
+
 module.exports = {
   getCatalogue,
   saveCatalogue,
@@ -304,4 +324,6 @@ module.exports = {
   getSetting,
   setSetting,
   getBrandHierarchy,
+  getPopupConfig,
+  setPopupConfig,
 };
