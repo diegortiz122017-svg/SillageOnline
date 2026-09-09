@@ -71,6 +71,12 @@ const PAYWAY_ENCRYPTION_KEY  = process.env.PAYWAY_ENCRYPTION_KEY  || null; // To
 const PAYWAY_MODE   = process.env.PAYWAY_MODE === 'prod' ? 'prod' : 'test';
 const PAYWAY_DOMAIN = PAYWAY_MODE === 'prod' ? 'www.payway.sv' : 'test.payway.sv';
 const PAYWAY_JS_URL = `https://${PAYWAY_DOMAIN}/web-payway-sv/resources/js/paywayOneButton.js`;
+// Interruptor aparte del gateway: permite usar PAYWAY_MODE=prod (dinero real,
+// banco real) para las últimas pruebas SIN que además se dispare un DTE real
+// ni un evento de compra a Meta. Default true (comportamiento normal de
+// producción) — poner PAYWAY_DTE_ENABLED=false solo mientras se prueba, y
+// quitarla (o volver a true) antes de operar en serio.
+const PAYWAY_DTE_ENABLED = process.env.PAYWAY_DTE_ENABLED !== 'false';
 
 // ─── AI ───────────────────────────────────────────────────────────────────────
 const OPENAI_API_KEY = process.env.OPENAI_API_KEY || null;
@@ -203,7 +209,7 @@ module.exports = {
   WOMPI_CLIENT_ID, WOMPI_CLIENT_SECRET, WOMPI_PUBLIC_KEY,
   PAYPAL_CLIENT_ID, PAYPAL_CLIENT_SECRET, PAYPAL_MODE, PAYPAL_API_BASE,
   PAYWAY_ENABLED, PAYWAY_TOKEN, PAYWAY_RETAILER_OWNER, PAYWAY_USER_OPERATION,
-  PAYWAY_ENCRYPTION_KEY, PAYWAY_MODE, PAYWAY_DOMAIN, PAYWAY_JS_URL,
+  PAYWAY_ENCRYPTION_KEY, PAYWAY_MODE, PAYWAY_DOMAIN, PAYWAY_JS_URL, PAYWAY_DTE_ENABLED,
   OPENAI_API_KEY,
   ADMIN_USER, ADMIN_PASS,
   DTE_ENABLED, DTE_AMBIENTE, DTE_MH_BASE,

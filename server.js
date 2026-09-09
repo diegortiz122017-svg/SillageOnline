@@ -4783,14 +4783,18 @@ async function handlePaywayCallback(req, res) {
     // PAYWAY_MODE=test apunta al sandbox de PayWay (test.payway.sv) — nunca es
     // dinero real, así que nunca debe emitir un DTE real a Hacienda ni reportar
     // una compra real a Meta, aunque DTE_ENABLED esté en producción para el
-    // resto del sitio. Solo se activa con PAYWAY_MODE=prod (credenciales reales).
+    // resto del sitio. PAYWAY_DTE_ENABLED=false es un segundo interruptor
+    // aparte, para poder probar el gateway de PRODUCCIÓN (dinero real) sin que
+    // eso dispare todavía DTE/Meta — quitar esa variable (o ponerla en true)
+    // apenas se termine de probar.
+    const paywayLive = cfg.PAYWAY_MODE === 'prod' && cfg.PAYWAY_DTE_ENABLED;
     let paywayDte = null;
-    if (cfg.PAYWAY_MODE === 'prod') {
+    if (paywayLive) {
       try { paywayDte = await emitDteForOrder(orderId); } catch(e) { console.error('PayWay DTE error:', e.message); }
     }
     try { await sendOrderConfirmation(fullOrder, paywayDte); } catch(e) { console.error('PayWay confirmation email error:', e.message); }
     try { await notifyAdmins(fullOrder); } catch(e) {}
-    if (cfg.PAYWAY_MODE === 'prod') {
+    if (paywayLive) {
       sendMetaCAPIEvent('Purchase', {
         email: o.email, value: parseFloat(o.total) || 0,
         contentIds: items.map(i => String(i.productId)),
@@ -6054,8 +6058,11 @@ app.patch('/api/orders/:id', requireAdmin, async (req, res) => {
   // real — mismo gate que ya existe en el callback automático de PayWay
   // (handlePaywayCallback), que aquí faltaba: confirmar manualmente el pago
   // de una orden PayWay de prueba desde este botón sí llegaba a emitir un DTE.
+  // PAYWAY_DTE_ENABLED=false extiende el mismo gate a "producción real pero
+  // todavía sin facturar" (ver nota en handlePaywayCallback).
   let manualPagoDte = null;
-  const isPaywayTest = existing[0].payment_method === 'payway' && cfg.PAYWAY_MODE !== 'prod';
+  const isPaywayTest = existing[0].payment_method === 'payway'
+    && (cfg.PAYWAY_MODE !== 'prod' || !cfg.PAYWAY_DTE_ENABLED);
   if (paymentStatus === 'Pagado' && prevPayment !== 'Pagado') {
     broadcastAdmin('order_update', { id: req.params.id, paymentStatus: 'Pagado' });
     await logActivity(`Pago confirmado manualmente para pedido ${escHtml(req.params.id)}`);
