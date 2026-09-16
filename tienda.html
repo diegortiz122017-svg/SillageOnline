@@ -2371,6 +2371,10 @@ footer{background:var(--dark);padding:3.5rem 4rem;text-align:center;border-top:1
       <span class="csv" id="cartShipping">—</span>
     </div>
     <div class="shipping-bar" id="cartShippingBar" style="display:none"></div>
+    <div class="cart-subtotal-row" id="cartDiscountRow" style="display:none;color:var(--success)">
+      <span class="csl" id="cartDiscountLabel">Descuento</span>
+      <span class="csv" id="cartDiscount">−$0</span>
+    </div>
     <div class="cart-subtotal-row" style="border-top:1px solid rgba(184,149,90,0.2);margin-top:0.3rem;padding-top:0.5rem">
       <span class="csl" style="color:var(--cream);font-size:0.75rem">Total</span>
       <span class="csv" id="cartGrandTotal" style="color:var(--cream);font-size:1rem">$0</span>
@@ -4924,12 +4928,24 @@ function renderCart(){
   if(typeof updateDetailCartBtn==='function')updateDetailCartBtn();
   document.getElementById('checkoutBtn').disabled=cart.length===0;
 
-  // Subtotal, shipping, grand total
+  // Subtotal, shipping, descuento, grand total
   var sub      = cartSum();
   var shipping = getShipping();
-  var grand    = sub + shipping;
+  var discount = getPromoDiscount();
+  var grand    = Math.max(0, sub + shipping - discount);
 
   document.getElementById('cartTotal').textContent='$'+sub.toFixed(2);
+
+  var discRow = document.getElementById('cartDiscountRow');
+  if(discRow){
+    if(discount > 0){
+      discRow.style.display = 'flex';
+      document.getElementById('cartDiscountLabel').textContent = 'Descuento' + (_appliedPromo ? ' ('+_appliedPromo.code+')' : '');
+      document.getElementById('cartDiscount').textContent = '−$'+discount.toFixed(2);
+    } else {
+      discRow.style.display = 'none';
+    }
+  }
 
   // Shipping row
   var shipEl  = document.getElementById('cartShipping');
@@ -5231,7 +5247,7 @@ function fillReview(){
     return'<div class="ms-row"><span>'+esc(label)+' \u00d7'+it.qty+'</span><span class="ms-price">$'+parseFloat(up*it.qty).toFixed(2)+'</span></div>';
   }).join('');
   var shipping = getShipping();
-  var total    = cartSum() + shipping;
+  var total    = orderTotal(); // cartSum() + envío − descuento (ver getPromoDiscount())
   var summaryEl = document.getElementById('mSummaryItems');
   // Append shipping row to summary
   var shippingRow = shipping > 0
