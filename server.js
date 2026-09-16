@@ -3766,11 +3766,20 @@ setInterval(runLeadSequence, 60 * 60 * 1000);
 const ONLINE_PAYMENT_METHODS = ['payway', 'wompi', 'btcpay', 'paypal'];
 async function sweepAbandonedOrders() {
   try {
+    // db.execute() usa prepared statements (mysql2 pool.execute) — cada "?"
+    // se envía como UN valor escalar. Pasar el array completo como el valor
+    // de un solo "?" no lo expande a una lista: mysql2 lo trata como JSON y
+    // lo serializa a texto ('["payway","wompi",...]'), así que el IN (?)
+    // terminaba comparando cada payment_method contra ESE string completo —
+    // nunca coincidía con nada, el UPDATE afectaba 0 filas siempre, sin
+    // tirar ningún error (por eso pasó desapercibido). Un placeholder por
+    // valor sí funciona con prepared statements.
+    const placeholders = ONLINE_PAYMENT_METHODS.map(() => '?').join(',');
     await db.execute(
       `UPDATE orders SET payment_status='Abandonado', updated_at=NOW()
-       WHERE payment_status='Pendiente' AND payment_method IN (?)
+       WHERE payment_status='Pendiente' AND payment_method IN (${placeholders})
        AND created_at < DATE_SUB(NOW(), INTERVAL 1 HOUR)`,
-      [ONLINE_PAYMENT_METHODS]
+      ONLINE_PAYMENT_METHODS
     );
   } catch (e) { console.error('sweepAbandonedOrders error:', e.message); }
 }
