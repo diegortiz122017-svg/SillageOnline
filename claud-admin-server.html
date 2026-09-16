@@ -2645,6 +2645,14 @@ function getPaidOrders(list){
     return o.paymentStatus==='Pagado' || (o.payment_method==='cod' && o.status==='Entregado');
   });
 }
+// Para "Pendientes" (despacho): a diferencia de getPaidOrders() (ingresos ya
+// COBRADOS, exige COD entregado), acá un COD sin entregar SÍ cuenta — es
+// justo el caso típico de "hay que despacharlo, se cobra al entregar". Lo
+// que no debe contar es un pedido con tarjeta/cripto que nunca se confirmó
+// (Pendiente/Abandonado) — no hay nada que despachar todavía.
+function isRealOrder(o){
+  return o.paymentStatus==='Pagado' || o.payment_method==='cod';
+}
 
 // ── OVERVIEW ──────────────────────────────────────
 function renderOverview(){
@@ -2652,7 +2660,8 @@ function renderOverview(){
   var paid=getPaidOrders(filtered);
   var rev=paid.reduce(function(s,o){return s+parseFloat(o.total||0);},0);
   var pending=filtered.filter(function(o){
-    return o.status==='Procesando'||o.status==='Processing'||o.status==='Empaquetado'||o.status==='Packaged'||o.status==='Pendiente de Pago';
+    var needsShip=o.status==='Procesando'||o.status==='Processing'||o.status==='Empaquetado'||o.status==='Packaged'||o.status==='Pendiente de Pago';
+    return needsShip && isRealOrder(o);
   }).length;
   var lowCnt=Object.values(inventory).filter(function(v){return v.lowStock&&!v.outOfStock;}).length;
   var oosCnt=Object.values(inventory).filter(function(v){return v.outOfStock;}).length;
@@ -4237,9 +4246,10 @@ function openQV(type, forceRefresh){
 
   else if(type==='pending'){
     var pend=getFilteredOrders().filter(function(o){
-      return o.status==='Procesando'||o.status==='Processing'||
+      var needsShip=o.status==='Procesando'||o.status==='Processing'||
              o.status==='Empaquetado'||o.status==='Packaged'||
              o.status==='Pendiente de Pago';
+      return needsShip && isRealOrder(o);
     });
     title.textContent='Pedidos Pendientes ('+pend.length+')';
     renderQVOrders(pend);
