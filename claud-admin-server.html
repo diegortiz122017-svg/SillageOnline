@@ -2663,9 +2663,15 @@ function renderOverview(){
     var needsShip=o.status==='Procesando'||o.status==='Processing'||o.status==='Empaquetado'||o.status==='Packaged'||o.status==='Pendiente de Pago';
     return needsShip && isRealOrder(o);
   }).length;
-  var lowCnt=Object.values(inventory).filter(function(v){return v.lowStock&&!v.outOfStock;}).length;
-  var oosCnt=Object.values(inventory).filter(function(v){return v.outOfStock;}).length;
-  var saleCnt=Object.values(pricing).filter(function(v){return v.onSale;}).length;
+  // Las tres cruzadas contra PRODUCTS (catálogo activo), no contra
+  // inventory/pricing directo — igual que sus respectivos desgloses
+  // (openQV('low'/'out'/'sales')). Si no, un producto desactivado/eliminado
+  // (borrado lógico — `deleteProduct` no toca `inventory` ni `pricing`)
+  // cuya fila quedó marcada con stock bajo/agotado/en oferta infla la
+  // tarjeta sin aparecer nunca en la lista real del desglose.
+  var lowCnt=PRODUCTS.filter(function(p){return inventory[p.id]&&inventory[p.id].lowStock&&!inventory[p.id].outOfStock;}).length;
+  var oosCnt=PRODUCTS.filter(function(p){return inventory[p.id]&&inventory[p.id].outOfStock;}).length;
+  var saleCnt=PRODUCTS.filter(function(p){return pricing[p.id]&&pricing[p.id].onSale;}).length;
   var revFormatted='$'+rev.toFixed(2).replace(/\B(?=(\d{3})+(?!\d))/g,',');
 
   // Bottle inventory alerts — fetch async and update stat card
