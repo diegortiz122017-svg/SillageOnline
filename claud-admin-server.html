@@ -2634,10 +2634,23 @@ function updateRangeLabel(){
   }, 500);
 })();
 
+// Pedidos con dinero efectivamente cobrado — misma regla que ya usa
+// /api/analytics en el servidor (pagado, o contra entrega ya entregado).
+// Sin este filtro, "Ingresos Totales"/"Total Pedidos" en el Resumen sumaban
+// TODOS los pedidos sin importar payment_status — incluyendo Pendiente y
+// Abandonado (dinero que nunca se cobró). "Pendientes" no usa esto: mide
+// estado de despacho (status), no de pago, y ya estaba correcto.
+function getPaidOrders(list){
+  return (list||orders).filter(function(o){
+    return o.paymentStatus==='Pagado' || (o.payment_method==='cod' && o.status==='Entregado');
+  });
+}
+
 // ── OVERVIEW ──────────────────────────────────────
 function renderOverview(){
   var filtered=getFilteredOrders();
-  var rev=filtered.reduce(function(s,o){return s+parseFloat(o.total||0);},0);
+  var paid=getPaidOrders(filtered);
+  var rev=paid.reduce(function(s,o){return s+parseFloat(o.total||0);},0);
   var pending=filtered.filter(function(o){
     return o.status==='Procesando'||o.status==='Processing'||o.status==='Empaquetado'||o.status==='Packaged'||o.status==='Pendiente de Pago';
   }).length;
@@ -2650,7 +2663,7 @@ function renderOverview(){
   var bottleAlertCard = '<div class="stat-card" onclick="navTo(\'inventory\')" style="cursor:pointer"><div class="stat-val c-warn" id="bottleAlertVal">—</div><div class="stat-label">Botellas Bajas</div><div class="stat-hint">→ Ver rastreador</div></div>';
   document.getElementById('statsRow').innerHTML=
     sc(revFormatted,'Ingresos Totales','c-gold','openQV(\'revenue\')','→ Ver desglose')+
-    sc(filtered.length,'Total Pedidos','','openQV(\'orders\')','→ Ver todos')+
+    sc(paid.length,'Total Pedidos','','openQV(\'orders\')','→ Ver todos')+
     sc(pending,'Pendientes','c-warn','openQV(\'pending\')','→ Ver pendientes')+
     sc(saleCnt,'Ofertas Activas','c-gold','openQV(\'sales\')','→ Ver ofertas')+
     sc(lowCnt,'Stock Bajo','c-warn','openQV(\'low\')','→ Ver productos')+
@@ -4195,10 +4208,10 @@ function openQV(type, forceRefresh){
 
   if(type==='revenue'){
     title.textContent='Desglose de Ingresos';
-    var rev=getFilteredOrders().reduce(function(s,o){return s+parseFloat(o.total||0);},0);
+    var rev=getPaidOrders(getFilteredOrders()).reduce(function(s,o){return s+parseFloat(o.total||0);},0);
     // Group by month
     var byMonth={};
-    getFilteredOrders().forEach(function(o){
+    getPaidOrders(getFilteredOrders()).forEach(function(o){
       if(!o.createdAt)return;
       var m=new Date(o.createdAt).toLocaleDateString('es-ES',{month:'long',year:'numeric'});
       byMonth[m]=(byMonth[m]||0)+parseFloat(o.total||0);
@@ -4217,8 +4230,8 @@ function openQV(type, forceRefresh){
   }
 
   else if(type==='orders'){
-    var fo=getFilteredOrders();
-    title.textContent='Todos los Pedidos ('+fo.length+')';
+    var fo=getPaidOrders(getFilteredOrders());
+    title.textContent='Pedidos Pagados ('+fo.length+')';
     renderQVOrders(fo);
   }
 
