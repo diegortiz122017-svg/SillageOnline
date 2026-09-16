@@ -4108,12 +4108,16 @@ function deletePromo(id, code){
   }).catch(function(){});
 }
 
+var _clientesCache=[]; // guarda la respuesta completa de /api/customers para que
+                        // openCustomerDetail() pueda mostrar contacto/dirección
+                        // sin tener que volver a pedirla (el click solo recibe id+nombre).
 function loadClientes(){
   var tbody=document.getElementById('clientesBody');
   tbody.innerHTML='<tr><td colspan="5" style="text-align:center;padding:2rem;color:var(--muted);font-size:0.72rem">Cargando...</td></tr>';
   adminFetch(API+'/customers',{})
     .then(function(r){ if(!r)return null; return r.json(); })
     .then(function(customers){
+      _clientesCache=customers||[];
       // Count orders per customer
       var orderCounts={};
       orders.forEach(function(o){
@@ -4149,7 +4153,7 @@ function loadClientes(){
         (function(cid, cname){
           tr.addEventListener('click', function(e){
             if(e.target.tagName === 'BUTTON') return;
-            openCustomerHistory(cid, cname);
+            openCustomerDetail(cid, cname);
           });
         })(cu.id, cu.name);
         tr.innerHTML=
@@ -4421,32 +4425,134 @@ function openOrderDetail(orderId){
   openSlidePanel('Pedido '+orderId, html);
 }
 
-function openCustomerHistory(customerId, customerName){
+// Perfil de cliente completo: contacto + gasto total + perfil olfativo de Nez
+// + direcciones guardadas + favoritos + historial de pedidos. Antes solo
+// mostraba el historial — ni siquiera el correo/teléfono quedaban a la vista
+// sin volver a la tabla.
+function openCustomerDetail(customerId, customerName){
+  var cu = _clientesCache.find(function(c){ return String(c.id)===String(customerId); }) || {};
   var customerOrders = orders.filter(function(o){ return o.customer_id === customerId; });
-  var html;
+  var lifetimeSpent = getPaidOrders(customerOrders).reduce(function(s,o){ return s+parseFloat(o.total||0); },0);
+  var addrLine = [cu.address, cu.city, cu.state, cu.country].filter(Boolean).join(', ');
+  var regDate  = cu.created_at ? new Date(cu.created_at).toLocaleDateString('es-ES',{day:'numeric',month:'short',year:'numeric'}) : '—';
+  var lastLogin = cu.last_login ? (new Date(cu.last_login).toLocaleDateString('es-ES',{day:'numeric',month:'short',year:'numeric'})+' '+new Date(cu.last_login).toLocaleTimeString('es-ES',{hour:'2-digit',minute:'2-digit'})) : 'Nunca';
+
+  var ordersHtml;
   if(!customerOrders.length){
-    html = '<p style="color:var(--muted);font-size:0.75rem">Este cliente aún no tiene pedidos.</p>';
+    ordersHtml = '<p style="color:var(--muted);font-size:0.72rem">Este cliente aún no tiene pedidos.</p>';
   } else {
-    html = '<div style="display:flex;flex-direction:column;gap:0.8rem">'+
-      customerOrders.map(function(o){
-        var t = o.createdAt ? new Date(o.createdAt).toLocaleDateString('es-ES',{day:'numeric',month:'short',year:'numeric'}) : '';
-        var statusSlug = (o.status||'').toLowerCase().replace(/[^a-z]/g,'-');
-        return '<div data-oid="'+o.id+'" class="qv-order-link" style="background:var(--card);border:1px solid var(--border-light);padding:1rem;cursor:pointer;transition:border-color 0.2s" '+
-          'onmouseenter="this.style.borderColor=\'var(--gold)\'" onmouseleave="this.style.borderColor=\'\'">'+
-          '<div style="display:flex;justify-content:space-between;margin-bottom:0.4rem">'+
-            '<span style="font-size:0.72rem;color:var(--gold);letter-spacing:0.05em">'+esc(o.id)+'</span>'+
-            '<span style="font-size:0.72rem;color:var(--gold)">$'+parseFloat(o.total||0).toFixed(2)+'</span>'+
-          '</div>'+
-          '<div style="font-size:0.68rem;color:var(--muted)">'+t+'</div>'+
-          '<div style="font-size:0.68rem;color:var(--muted);margin-top:0.3rem">'+
-            (o.items||[]).map(function(i){return esc(i.name);}).join(' · ')+
-          '</div>'+
-          '<div style="font-size:0.6rem;color:var(--muted);margin-top:0.4rem;letter-spacing:0.08em;text-transform:uppercase">'+esc(o.status)+'</div>'+
-        '</div>';
-      }).join('')+
-    '</div>';
+    ordersHtml = customerOrders.map(function(o){
+      var t = o.createdAt ? new Date(o.createdAt).toLocaleDateString('es-ES',{day:'numeric',month:'short',year:'numeric'}) : '';
+      return '<div data-oid="'+o.id+'" class="qv-order-link" style="background:var(--card);border:1px solid var(--border-light);padding:1rem;cursor:pointer;transition:border-color 0.2s;margin-bottom:0.6rem" '+
+        'onmouseenter="this.style.borderColor=\'var(--gold)\'" onmouseleave="this.style.borderColor=\'\'">'+
+        '<div style="display:flex;justify-content:space-between;margin-bottom:0.4rem">'+
+          '<span style="font-size:0.72rem;color:var(--gold);letter-spacing:0.05em">'+esc(o.id)+'</span>'+
+          '<span style="font-size:0.72rem;color:var(--gold)">$'+parseFloat(o.total||0).toFixed(2)+'</span>'+
+        '</div>'+
+        '<div style="font-size:0.68rem;color:var(--muted)">'+t+'</div>'+
+        '<div style="font-size:0.68rem;color:var(--muted);margin-top:0.3rem">'+(o.items||[]).map(function(i){return esc(i.name);}).join(' · ')+'</div>'+
+        '<div style="font-size:0.6rem;color:var(--muted);margin-top:0.4rem;letter-spacing:0.08em;text-transform:uppercase">'+esc(o.status)+(o.paymentStatus&&o.paymentStatus!=='Pagado'?' · '+esc(o.paymentStatus):'')+'</div>'+
+      '</div>';
+    }).join('');
   }
+
+  var html =
+    '<div style="display:grid;grid-template-columns:1fr 1fr;gap:0.8rem">'+
+      '<div style="background:var(--card);padding:0.8rem;border:1px solid var(--border-light)">'+
+        '<div style="font-size:0.5rem;letter-spacing:0.2em;text-transform:uppercase;color:var(--muted);margin-bottom:0.3rem">Contacto</div>'+
+        '<a href="mailto:'+esc(cu.email||'')+'" style="font-size:0.76rem;color:var(--gold);text-decoration:none;display:block">✉ '+esc(cu.email||'—')+'</a>'+
+        (cu.phone?'<div style="font-size:0.72rem;color:var(--cream);margin-top:0.3rem">📞 '+esc(cu.phone)+'</div>':'')+
+      '</div>'+
+      '<div style="background:var(--card);padding:0.8rem;border:1px solid var(--border-light)">'+
+        '<div style="font-size:0.5rem;letter-spacing:0.2em;text-transform:uppercase;color:var(--muted);margin-bottom:0.3rem">Cliente desde</div>'+
+        '<div style="font-size:0.76rem;color:var(--cream)">'+regDate+'</div>'+
+        '<div style="font-size:0.66rem;color:var(--muted);margin-top:0.3rem">Último acceso: '+lastLogin+'</div>'+
+      '</div>'+
+    '</div>'+
+    (addrLine?
+      '<div style="background:var(--card);padding:0.8rem;border:1px solid var(--border-light);margin-top:0.8rem">'+
+        '<div style="font-size:0.5rem;letter-spacing:0.2em;text-transform:uppercase;color:var(--muted);margin-bottom:0.3rem">Dirección principal</div>'+
+        '<div style="font-size:0.76rem;color:var(--cream)">'+esc(addrLine)+'</div>'+
+      '</div>':'')+
+    '<div style="display:flex;justify-content:flex-end;margin-top:0.8rem">'+
+      '<div style="text-align:right">'+
+        '<div style="font-size:0.5rem;letter-spacing:0.2em;text-transform:uppercase;color:var(--muted)">Gasto Total (pagado)</div>'+
+        '<div style="font-family:Cormorant Garamond,serif;font-size:1.5rem;color:var(--gold)">$'+lifetimeSpent.toFixed(2)+'</div>'+
+      '</div>'+
+    '</div>'+
+    '<div style="margin-top:1.3rem">'+
+      '<div style="font-size:0.5rem;letter-spacing:0.2em;text-transform:uppercase;color:var(--muted);margin-bottom:0.5rem">Perfil Olfativo (Nez)</div>'+
+      '<div id="custDetailScent" style="font-size:0.72rem;color:var(--muted)">Cargando…</div>'+
+    '</div>'+
+    '<div style="margin-top:1.3rem">'+
+      '<div style="font-size:0.5rem;letter-spacing:0.2em;text-transform:uppercase;color:var(--muted);margin-bottom:0.5rem">Direcciones Guardadas</div>'+
+      '<div id="custDetailAddrs" style="font-size:0.72rem;color:var(--muted)">Cargando…</div>'+
+    '</div>'+
+    '<div style="margin-top:1.3rem">'+
+      '<div style="font-size:0.5rem;letter-spacing:0.2em;text-transform:uppercase;color:var(--muted);margin-bottom:0.5rem">Favoritos</div>'+
+      '<div id="custDetailFavs" style="font-size:0.72rem;color:var(--muted)">Cargando…</div>'+
+    '</div>'+
+    '<div style="margin-top:1.3rem">'+
+      '<div style="font-size:0.5rem;letter-spacing:0.2em;text-transform:uppercase;color:var(--muted);margin-bottom:0.5rem">Historial de Pedidos ('+customerOrders.length+')</div>'+
+      ordersHtml+
+    '</div>';
+
   openSlidePanel(customerName, html);
+
+  adminFetch(API+'/admin/customers/'+customerId+'/scent-profile',{})
+    .then(function(r){ return r?r.json():null; })
+    .then(function(d){ renderCustDetailScent(d&&d.profile); })
+    .catch(function(){ _custDetailErr('custDetailScent'); });
+
+  adminFetch(API+'/admin/customers/'+customerId+'/addresses',{})
+    .then(function(r){ return r?r.json():null; })
+    .then(function(d){ renderCustDetailAddrs(d||[]); })
+    .catch(function(){ _custDetailErr('custDetailAddrs'); });
+
+  adminFetch(API+'/admin/customers/'+customerId+'/favorites',{})
+    .then(function(r){ return r?r.json():null; })
+    .then(function(d){ renderCustDetailFavs(d||[]); })
+    .catch(function(){ _custDetailErr('custDetailFavs'); });
+}
+function _custDetailErr(id){ var el=document.getElementById(id); if(el) el.innerHTML='<span style="color:#c0504a">No se pudo cargar.</span>'; }
+
+function renderCustDetailScent(profile){
+  var el=document.getElementById('custDetailScent'); if(!el) return;
+  if(!profile){ el.innerHTML='<span>Aún no ha hablado con Nez.</span>'; return; }
+  var genderLbl={M:'Hombre',F:'Mujer',U:'Unisex'};
+  var chips=(profile.families||[]).map(function(f){
+    return '<span style="display:inline-block;padding:0.2rem 0.6rem;margin:0 0.3rem 0.3rem 0;background:rgba(184,149,90,0.1);border:1px solid rgba(184,149,90,0.3);color:var(--gold);font-size:0.6rem;text-transform:uppercase;letter-spacing:0.06em">'+esc(f)+'</span>';
+  }).join('');
+  el.innerHTML=
+    '<div style="display:flex;flex-wrap:wrap;margin-bottom:0.5rem">'+(chips||'<span>Sin familias definidas todavía</span>')+'</div>'+
+    '<div style="font-size:0.72rem;color:var(--cream);line-height:1.9">'+
+      (profile.gender_pref?'Prefiere: '+esc(genderLbl[profile.gender_pref]||profile.gender_pref)+'<br>':'')+
+      (profile.intensity?'Intensidad: '+esc(profile.intensity)+'<br>':'')+
+      (profile.season&&profile.season!=='All'?'Temporada: '+esc(profile.season)+'<br>':'')+
+      (profile.price_max?'Presupuesto hasta: $'+esc(profile.price_max)+'<br>':'')+
+      ((profile.avoid||[]).length?'Evita: '+esc(profile.avoid.join(', ')):'')+
+    '</div>';
+}
+function renderCustDetailAddrs(addrs){
+  var el=document.getElementById('custDetailAddrs'); if(!el) return;
+  if(!addrs.length){ el.innerHTML='<span>Sin direcciones guardadas.</span>'; return; }
+  el.innerHTML=addrs.map(function(a){
+    var line=[a.line,a.city,a.state,a.country].filter(Boolean).join(', ');
+    return '<div style="background:var(--card);padding:0.6rem 0.8rem;border:1px solid var(--border-light);margin-bottom:0.4rem">'+
+      '<div style="font-size:0.7rem;color:var(--cream)">'+(a.is_default?'<span style="color:var(--gold)">★ </span>':'')+esc(a.label||'Dirección')+'</div>'+
+      '<div style="font-size:0.66rem;color:var(--muted);margin-top:0.2rem">'+esc(line)+(a.phone?' · '+esc(a.phone):'')+'</div>'+
+    '</div>';
+  }).join('');
+}
+function renderCustDetailFavs(ids){
+  var el=document.getElementById('custDetailFavs'); if(!el) return;
+  if(!ids.length){ el.innerHTML='<span>Sin favoritos.</span>'; return; }
+  var list=(typeof catalogFragrances!=='undefined'&&catalogFragrances)?catalogFragrances:[];
+  var names=ids.map(function(pid){
+    var p=list.find(function(x){return x.id===pid;});
+    return p?(p.brand+' '+p.name):('Producto #'+pid);
+  });
+  el.innerHTML='<div style="font-size:0.72rem;color:var(--cream);line-height:2">'+names.map(function(n){return esc(n);}).join('<br>')+'</div>';
 }
 
 function goToOrder(orderId){

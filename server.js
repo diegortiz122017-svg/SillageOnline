@@ -6251,8 +6251,63 @@ app.patch('/api/orders/:id', requireAdmin, async (req, res) => {
 });
 
 app.get('/api/customers', requireAdmin, async (req, res) => {
-  const [rows] = await db.query('SELECT id,name,email,phone,address,city,country,created_at,last_login FROM customers ORDER BY created_at DESC');
+  const [rows] = await db.query('SELECT id,name,email,phone,address,city,state,postcode,country,created_at,last_login FROM customers ORDER BY created_at DESC');
   res.json(rows);
+});
+
+// ── Perfil de cliente (admin) — direcciones, favoritos y perfil olfativo ────
+// Mismas consultas que ya usan los endpoints del propio cliente
+// (/api/customer/addresses, /api/customer/favorites, /api/sommelier/profile),
+// solo que resueltas por :id en vez del token de sesión del cliente — para
+// que el panel de Clientes pueda mostrar algo más que el historial de pedidos.
+app.get('/api/admin/customers/:id/addresses', requireAdmin, async (req, res) => {
+  const [rows] = await db.execute(
+    'SELECT id,label,line,city,state,postcode,country,phone,is_default FROM customer_addresses WHERE customer_id=? ORDER BY is_default DESC, id ASC',
+    [req.params.id]
+  );
+  res.json(rows);
+});
+
+app.get('/api/admin/customers/:id/favorites', requireAdmin, async (req, res) => {
+  const [rows] = await db.execute(
+    'SELECT product_id FROM customer_favorites WHERE customer_id=? ORDER BY created_at DESC',
+    [req.params.id]
+  );
+  res.json(rows.map(r => r.product_id));
+});
+
+app.get('/api/admin/customers/:id/scent-profile', requireAdmin, async (req, res) => {
+  try {
+    const [rows] = await db.execute(
+      'SELECT profile FROM scent_profiles WHERE customer_id=? ORDER BY created_at DESC LIMIT 7',
+      [req.params.id]
+    );
+    if (!rows.length) return res.json({ profile: null });
+    if (rows.length === 1) return res.json({ profile: JSON.parse(rows[0].profile) });
+    // Mismo merge que /api/sommelier/profile para usuarios registrados con
+    // varias sesiones de Nez — un promedio/voto entre los perfiles guardados.
+    const profiles = rows.map(r => { try { return JSON.parse(r.profile); } catch(e) { return null; } }).filter(Boolean);
+    const famCount = {}, intCount = {}, seaCount = {}, genderVotes = { M:0, F:0, U:0 };
+    profiles.forEach(p => {
+      if (p.gender_pref) genderVotes[p.gender_pref] = (genderVotes[p.gender_pref]||0) + 1;
+      (p.families||[]).forEach(f => { famCount[f] = (famCount[f]||0) + 1; });
+      if (p.intensity) intCount[p.intensity] = (intCount[p.intensity]||0) + 1;
+      if (p.season && p.season !== 'All') seaCount[p.season] = (seaCount[p.season]||0) + 1;
+    });
+    const total = profiles.length;
+    const merged = {
+      gender_pref: Object.entries(genderVotes).sort((a,b)=>b[1]-a[1])[0][0],
+      families: Object.entries(famCount).filter(([,c])=>c>=Math.max(1,total*0.2)).sort((a,b)=>b[1]-a[1]).map(([f])=>f).slice(0,5),
+      intensity: Object.entries(intCount).sort((a,b)=>b[1]-a[1])[0]?.[0]||null,
+      season: Object.entries(seaCount).sort((a,b)=>b[1]-a[1])[0]?.[0]||'All',
+      price_max: (() => { const p=profiles.map(x=>x.price_max).filter(Boolean); return p.length?Math.round(p.reduce((a,b)=>a+b,0)/p.length):null; })(),
+      avoid: [...new Set(profiles.flatMap(p=>p.avoid||[]))],
+      recommended_ids: [...new Set(profiles.flatMap(p=>(p.recommended_ids||[]).map(Number)))]
+    };
+    res.json({ profile: merged });
+  } catch(e) {
+    res.json({ profile: null });
+  }
 });
 
 
