@@ -5603,6 +5603,18 @@ function _doPlaceOrder(){
     .finally(function(){ _placingOrder = false; });
 }
 
+// Reconstruye subtotal/env\u00edo/descuento a partir de items+total+promoDiscount \u2014
+// el env\u00edo nunca se guarda como columna propia, as\u00ed que se deriva por \u00e1lgebra
+// (ver auditor\u00eda: total = subtotal - descuento + env\u00edo).
+function _orderBreakdown(order, fallbackTotal){
+  var items    = order.items || [];
+  var subtotal = items.reduce(function(s,i){return s+parseFloat(i.total||0);},0);
+  var discount = parseFloat(order.promoDiscount!=null?order.promoDiscount:(order.promo_discount||0)) || 0;
+  var total    = parseFloat(order.total!=null?order.total:fallbackTotal||0);
+  var shipping = Math.max(0, Math.round((total-subtotal+discount)*100)/100);
+  return {subtotal:subtotal, shipping:shipping, discount:discount, total:total, promoCode:order.promoCode||order.promo_code||''};
+}
+
 // Pantalla de \u00e9xito compartida \u2014 usada por el flujo normal (/api/orders) y por
 // PayPal (que confirma el pago en /api/paypal/capture-order antes de llegar aqu\u00ed).
 function renderOrderSuccess(order, orderItems, total, email){
@@ -5614,8 +5626,16 @@ function renderOrderSuccess(order, orderItems, total, email){
     e.preventDefault();
     openInvoice(order.id);
   };
+  var bd=_orderBreakdown(Object.assign({items:orderItems},order), total);
+  var shippingRow = bd.shipping > 0
+    ? '<div class="ms-shipping"><span>Env\u00edo</span><span>$'+bd.shipping.toFixed(2)+'</span></div>'
+    : '<div class="ms-shipping"><span>Env\u00edo</span><span class="shipping-free">Gratis \u2713</span></div>';
+  var discountRow = bd.discount > 0
+    ? '<div class="ms-shipping" style="color:var(--success)"><span>Descuento'+(bd.promoCode?' ('+esc(bd.promoCode)+')':'')+'</span><span>\u2212$'+bd.discount.toFixed(2)+'</span></div>'
+    : '';
   document.getElementById('successItems').innerHTML='<div class="ms-title">Tu Pedido</div>'+
     orderItems.map(function(i){return'<div class="ms-row"><span>'+i.name+' \u00d7'+i.qty+'</span><span class="ms-price">$'+parseFloat(i.total||0).toFixed(2)+'</span></div>';}).join('')+
+    shippingRow+discountRow+
     '<div class="ms-div"></div><div class="ms-total"><span class="ms-total-lbl">Total Pagado</span><span class="ms-total-val">$'+parseFloat(total).toLocaleString()+'</span></div>';
   if(typeof fbq==='function') fbq('track','Purchase',{content_ids:orderItems.map(function(i){return String(i.productId);}),content_type:'product',value:parseFloat(total)||0,currency:'USD'},{eventID:'order_'+order.id});
   resetTracker();
@@ -6388,15 +6408,21 @@ function _wompiHandleSuccess(order) {
   document.getElementById('notifyEmail').textContent = order.email || '';
   // Build items summary
   var orderItems = order.items || [];
-  var shipping   = getShipping();
   var total      = parseFloat(order.total || 0);
+  var bd = _orderBreakdown(order, total);
+  var shippingRow = bd.shipping > 0
+    ? '<div class="ms-shipping"><span>Envío</span><span>$' + bd.shipping.toFixed(2) + '</span></div>'
+    : '<div class="ms-shipping"><span>Envío</span><span class="shipping-free">Gratis ✓</span></div>';
+  var discountRow = bd.discount > 0
+    ? '<div class="ms-shipping" style="color:var(--success)"><span>Descuento' + (bd.promoCode ? ' (' + esc(bd.promoCode) + ')' : '') + '</span><span>−$' + bd.discount.toFixed(2) + '</span></div>'
+    : '';
   document.getElementById('successItems').innerHTML =
     '<div class="ms-title">Tu Pedido</div>' +
     orderItems.map(function(i){
       return '<div class="ms-row"><span>' + esc(i.name) + ' ×' + i.qty + '</span>' +
              '<span class="ms-price">$' + parseFloat(i.total||0).toFixed(2) + '</span></div>';
     }).join('') +
-    (shipping > 0 ? '<div class="ms-shipping"><span>Envío</span><span>$' + shipping.toFixed(2) + '</span></div>' : '') +
+    shippingRow + discountRow +
     '<div class="ms-div"></div>' +
     '<div class="ms-total"><span class="ms-total-lbl">Total</span><span class="ms-total-val">$' + total.toFixed(2) + '</span></div>';
   // Open checkout modal to show step 4
@@ -7543,6 +7569,14 @@ function loadAcctOrders(){
             '<span class="ap-order-date">'+date+'</span>'+
           '</div>'+
           '<div class="ap-order-items">'+items+'</div>'+
+          (function(){
+            var bd=_orderBreakdown(o);
+            if(bd.shipping<=0 && bd.discount<=0) return '';
+            var parts=['Subtotal $'+bd.subtotal.toFixed(2)];
+            parts.push('Envío '+(bd.shipping>0?'$'+bd.shipping.toFixed(2):'Gratis'));
+            if(bd.discount>0) parts.push('Descuento −$'+bd.discount.toFixed(2));
+            return '<div class="ap-order-items" style="opacity:0.75">'+parts.join(' · ')+'</div>';
+          })()+
           '<div class="ap-order-foot">'+
             '<span class="ap-order-status '+scls+'">'+o.status+'</span>'+
             '<span class="ap-order-total">$'+parseFloat(o.total||0).toFixed(2)+'</span>'+

@@ -4377,6 +4377,17 @@ function openOrderDetail(orderId){
     '</div>';
   }).join('');
   var addrParts = [o.address, o.city, o.state_province, o.country].filter(Boolean);
+  // Envío nunca se guarda como columna propia — se deriva por álgebra
+  // (total = subtotal - descuento + envío), igual que en el resto del sitio.
+  var obSubtotal = (o.items||[]).reduce(function(s,i){return s+parseFloat(i.total||0);},0);
+  var obDiscount = parseFloat(o.promo_discount||0) || 0;
+  var obShipping = Math.max(0, Math.round((parseFloat(o.total||0)-obSubtotal+obDiscount)*100)/100);
+  var breakdownHtml = (obShipping>0.009 || obDiscount>0.009) ?
+    '<div style="display:flex;flex-direction:column;gap:0.2rem;padding:0.6rem 0;border-bottom:1px solid var(--border-light)">'+
+      '<div style="display:flex;justify-content:space-between"><span style="font-size:0.68rem;color:var(--muted)">Subtotal</span><span style="font-size:0.68rem;color:var(--muted)">$'+obSubtotal.toFixed(2)+'</span></div>'+
+      '<div style="display:flex;justify-content:space-between"><span style="font-size:0.68rem;color:var(--muted)">Envío</span><span style="font-size:0.68rem;color:var(--muted)">'+(obShipping>0?'$'+obShipping.toFixed(2):'Gratis')+'</span></div>'+
+      (obDiscount>0.009?'<div style="display:flex;justify-content:space-between"><span style="font-size:0.68rem;color:var(--success)">Descuento'+(o.promo_code?' ('+esc(o.promo_code)+')':'')+'</span><span style="font-size:0.68rem;color:var(--success)">−$'+obDiscount.toFixed(2)+'</span></div>':'')+
+    '</div>' : '';
   var html =
     '<div style="display:flex;flex-direction:column;gap:1.2rem">'+
       '<div style="display:grid;grid-template-columns:1fr 1fr;gap:0.8rem">'+
@@ -4407,6 +4418,7 @@ function openOrderDetail(orderId){
       '<div>'+
         '<div style="font-size:0.5rem;letter-spacing:0.2em;text-transform:uppercase;color:var(--muted);margin-bottom:0.6rem">Productos</div>'+
         items+
+        breakdownHtml+
         '<div style="display:flex;justify-content:flex-end;padding-top:0.8rem">'+
           '<span style="font-family:Cormorant Garamond,serif;font-size:1.4rem;color:var(--gold)">$'+parseFloat(o.total||0).toFixed(2)+'</span>'+
         '</div>'+

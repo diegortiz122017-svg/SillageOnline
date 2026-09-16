@@ -989,6 +989,25 @@ async function sendOrderConfirmation(order, dte) {
      <td style="padding:8px 12px;border-bottom:1px solid #f0e6d0;color:#1a1714;text-align:right">$${i.total}</td></tr>`
   ).join('');
 
+  // Subtotal/Envío/Descuento — el envío nunca se guarda como columna propia,
+  // así que se deriva por álgebra (total = subtotal - descuento + envío).
+  const mailTotal    = parseFloat(order.total || 0);
+  const mailSubtotal = order.items.reduce((s, i) => s + parseFloat(i.total || 0), 0);
+  const mailDiscount = parseFloat(order.promoDiscount != null ? order.promoDiscount : (order.promo_discount || 0)) || 0;
+  const mailShipping = Math.max(0, Math.round((mailTotal - mailSubtotal + mailDiscount) * 100) / 100);
+  const mailPromoCode = order.promoCode || order.promo_code || '';
+  const breakdownHtml = (mailShipping > 0.009 || mailDiscount > 0.009) ? `
+    <div style="padding:8px 12px;background:#faf8f4;border:1px solid #e8d8b8;border-bottom:none;font-size:12px;color:#8a7f72">
+      <span style="float:right;color:#1a1714">$${mailSubtotal.toFixed(2)}</span>Subtotal<div style="clear:both"></div>
+    </div>
+    <div style="padding:8px 12px;background:#faf8f4;border:1px solid #e8d8b8;border-top:none;${mailDiscount>0.009?'border-bottom:none;':''}font-size:12px;color:#8a7f72">
+      <span style="float:right;color:#1a1714">${mailShipping > 0 ? '$'+mailShipping.toFixed(2) : 'Gratis'}</span>Envío<div style="clear:both"></div>
+    </div>
+    ${mailDiscount > 0.009 ? `
+    <div style="padding:8px 12px;background:#faf8f4;border:1px solid #e8d8b8;border-top:none;font-size:12px;color:#8a7f72">
+      <span style="float:right;color:#2e7d32">−$${mailDiscount.toFixed(2)}</span>Descuento${mailPromoCode ? ' ('+escHtml(mailPromoCode)+')' : ''}<div style="clear:both"></div>
+    </div>` : ''}` : '';
+
   // Generate Nez's personal note (non-blocking — if it fails, email still sends)
   const nezNote = await buildNezNote(order.items).catch(() => null);
   const nezBlock = nezNote ? `
@@ -1011,6 +1030,7 @@ async function sendOrderConfirmation(order, dte) {
         <th style="padding:8px 12px;text-align:right;font-size:10px;color:#8a7f72;font-weight:400">Precio</th>
       </tr></thead><tbody>${itemsHtml}</tbody>
     </table>
+    ${breakdownHtml}
     <div style="padding:12px;background:#faf8f4;border:1px solid #e8d8b8;margin-bottom:4px">
       <span style="font-size:11px;text-transform:uppercase;color:#8a7f72">Total</span>
       <span style="font-family:Georgia,serif;font-size:22px;color:#1a1714;float:right">$${parseFloat(order.total||0).toFixed(2)}</span>
@@ -2558,6 +2578,26 @@ app.get('/api/orders/:id/invoice', optionalCustomer, async (req, res) => {
   const ivaMonto  = dte ? (parseFloat(total) - parseFloat(total) / 1.13) : 0;
   const netoMonto = parseFloat(total) - ivaMonto;
 
+  // Subtotal/Envío/Descuento — el envío nunca se guarda como columna propia,
+  // así que se deriva por álgebra (total = subtotal - descuento + envío).
+  const invSubtotal = items.reduce((s, i) => s + parseFloat(i.total || 0), 0);
+  const invDiscount = parseFloat(order.promo_discount || 0);
+  const invShipping = Math.max(0, Math.round((parseFloat(total) - invSubtotal + invDiscount) * 100) / 100);
+  const breakdownRows = (invShipping > 0.009 || invDiscount > 0.009) ? `
+        <div class="inv-total-row"><div class="inv-total-box">
+          <div class="inv-total-label">Subtotal</div>
+          <div class="inv-subval">$${invSubtotal.toFixed(2)}</div>
+        </div></div>
+        <div class="inv-total-row"><div class="inv-total-box">
+          <div class="inv-total-label">Envío</div>
+          <div class="inv-subval">${invShipping > 0 ? '$' + invShipping.toFixed(2) : 'Gratis'}</div>
+        </div></div>
+        ${invDiscount > 0.009 ? `
+        <div class="inv-total-row"><div class="inv-total-box">
+          <div class="inv-total-label">Descuento${order.promo_code ? ' (' + escHtml(order.promo_code) + ')' : ''}</div>
+          <div class="inv-subval">−$${invDiscount.toFixed(2)}</div>
+        </div></div>` : ''}` : '';
+
   const dteHeaderBlock = dte ? `
         <div class="dte-legal">
           <div class="dte-legal-row"><span>Documento Tributario Electrónico</span><strong>${dte.tipo_dte === '03' ? 'Comprobante de Crédito Fiscal' : dte.tipo_dte === '05' ? 'Nota de Crédito' : 'Factura (Consumidor Final)'}</strong></div>
@@ -2671,6 +2711,7 @@ app.get('/api/orders/:id/invoice', optionalCustomer, async (req, res) => {
             <tbody>${itemRows}</tbody>
           </table>
         </div>
+        ${breakdownRows}
         ${ivaRows}
         <div class="inv-total-row">
           <div class="inv-total-box">
@@ -4711,13 +4752,17 @@ app.get('/api/wompi/status', async (req, res) => {
     if (pending.length) return res.json({ status: 'pending' });
 
     const [rows] = await db.execute(
-      'SELECT id, customer, email, items, total, payment_status FROM orders WHERE wompi_reference=?', [ref]
+      'SELECT id, customer, email, items, total, promo_code, promo_discount, payment_status FROM orders WHERE wompi_reference=?', [ref]
     );
     if (!rows.length || rows[0].payment_status !== 'Pagado') return res.json({ status: 'pending' });
     const o = rows[0];
     res.json({
       status: 'paid',
-      order: { id: o.id, customer: o.customer, email: o.email, total: o.total, items: JSON.parse(o.items || '[]') },
+      order: {
+        id: o.id, customer: o.customer, email: o.email, total: o.total,
+        items: JSON.parse(o.items || '[]'),
+        promoCode: o.promo_code, promoDiscount: o.promo_discount,
+      },
     });
   } catch(e) {
     res.status(500).json({ error: 'Server error' });
