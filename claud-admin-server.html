@@ -1588,7 +1588,31 @@ tr:hover td{background:rgba(255,255,255,0.02)}
           <!-- Datos del cliente (nombre/correo) -->
           <div style="display:flex;gap:0.6rem;flex-wrap:wrap;margin-bottom:0.9rem">
             <div style="flex:1;min-width:200px"><label class="dte-lbl">Cliente / contacto</label><input id="dteManualCliente" class="dte-inp" style="width:100%" placeholder="Nombre del cliente"/></div>
-            <div style="flex:1;min-width:200px"><label class="dte-lbl">Correo (opcional)</label><input id="dteManualCorreo" class="dte-inp" style="width:100%" placeholder="cliente@correo.com"/></div>
+            <div style="flex:1;min-width:200px"><label class="dte-lbl">Correo (opcional)</label><input id="dteManualCorreo" class="dte-inp" style="width:100%" placeholder="cliente@correo.com" oninput="dteManualToggleEmail()"/></div>
+          </div>
+
+          <!-- Envío del correo al cliente (opcional) -->
+          <div style="display:flex;gap:0.6rem;flex-wrap:wrap;align-items:flex-end;margin-bottom:0.9rem;padding:0.6rem 0;border-top:1px dashed var(--border-light);border-bottom:1px dashed var(--border-light)">
+            <div style="display:flex;align-items:center;gap:0.4rem">
+              <input type="checkbox" id="dteManualSendEmail" onchange="dteManualToggleEmail()"/>
+              <label class="dte-lbl" for="dteManualSendEmail" style="margin:0">Enviar factura al correo del cliente</label>
+            </div>
+            <div id="dteManualEmailOpts" style="display:none;gap:0.6rem;flex-wrap:wrap;align-items:flex-end;width:100%">
+              <div>
+                <label class="dte-lbl">Motivo del correo</label>
+                <select id="dteManualReason" class="dte-inp">
+                  <option value="compra_manual">Compra procesada manualmente</option>
+                  <option value="correccion_dte">Corrección de una factura anterior</option>
+                  <option value="reenvio">Reenvío de una factura ya enviada</option>
+                  <option value="otro">Otro (usar solo el mensaje de abajo)</option>
+                </select>
+              </div>
+              <div style="flex:1;min-width:240px">
+                <label class="dte-lbl">Mensaje adicional (opcional)</label>
+                <input id="dteManualCustomMsg" class="dte-inp" style="width:100%" placeholder="Se agrega debajo del mensaje del motivo elegido"/>
+              </div>
+            </div>
+            <div id="dteManualEmailWarn" style="display:none;font-size:0.62rem;color:#d98a3a;width:100%">Escribe el correo del cliente arriba para poder enviarle la factura.</div>
           </div>
 
           <!-- Líneas de la transacción -->
@@ -3002,6 +3026,12 @@ function dteManualToggle(){
   var t=document.getElementById('dteManualTipo').value;
   document.getElementById('dteManualReceptor').style.display=(t==='03'||t==='05')?'flex':'none';
 }
+function dteManualToggleEmail(){
+  var checked=document.getElementById('dteManualSendEmail').checked;
+  var hasEmail=(document.getElementById('dteManualCorreo').value||'').trim().length>0;
+  document.getElementById('dteManualEmailOpts').style.display=(checked&&hasEmail)?'flex':'none';
+  document.getElementById('dteManualEmailWarn').style.display=(checked&&!hasEmail)?'block':'none';
+}
 function dteManualFillDemo(){
   document.getElementById('dteManualNit').value='06140812951023';
   document.getElementById('dteManualNrc').value='899100';
@@ -3024,12 +3054,21 @@ function dteManualEmit(){
   var tipo=document.getElementById('dteManualTipo').value||'03';
   var items=dteManualReadItems();
   if(!items.length){ out.innerHTML='<span style="color:#d9534f">Agrega al menos un ítem con descripción, cantidad y precio.</span>'; return; }
+  var sendEmail=document.getElementById('dteManualSendEmail').checked;
+  var custEmail=(document.getElementById('dteManualCorreo').value||'').trim();
+  if(sendEmail&&!custEmail){
+    out.innerHTML='<span style="color:#d9534f">Marcaste "Enviar factura al correo del cliente" pero no escribiste un correo.</span>';
+    return;
+  }
   var body={
     tipoDte:tipo,
     customer:(document.getElementById('dteManualCliente').value||'').trim()||undefined,
-    email:(document.getElementById('dteManualCorreo').value||'').trim()||undefined,
+    email:custEmail||undefined,
     paymentMethod:document.getElementById('dteManualPago').value,
-    items:items
+    items:items,
+    sendEmail:sendEmail,
+    reason:document.getElementById('dteManualReason').value,
+    customMessage:(document.getElementById('dteManualCustomMsg').value||'').trim()||undefined
   };
   if(tipo==='03'||tipo==='05'){
     var nit=(document.getElementById('dteManualNit').value||'').trim();
@@ -3058,6 +3097,7 @@ function dteManualEmit(){
       (d.numeroControl?' · N.º Control '+_dteEsc(d.numeroControl):'')+
       (d.selloRecibido?' · Sello '+_dteEsc(d.selloRecibido).slice(0,16)+'…':'')+
       (d.total!=null?' · $'+_dteEsc(Number(d.total).toFixed(2)):'')+
+      (sendEmail?(d.emailSent?' · <span style="color:var(--gold)">✓ Correo enviado</span>':' · <span style="color:#d9534f">Correo NO enviado</span>'):'')+
       (d.observaciones?'<div style="color:#d98a3a;margin-top:0.3rem">'+_dteEsc(d.observaciones)+'</div>':'');
     // Tras una emisión PROCESADA, limpiar el formulario para no enviar dobles.
     if(d.ok) dteManualReset();
@@ -3067,9 +3107,12 @@ function dteManualEmit(){
 function dteManualReset(){
   document.getElementById('dteManualItems').innerHTML='';
   dteManualAddItem('',1,'');
-  ['dteManualNit','dteManualNrc','dteManualNom','dteManualTel','dteManualDir','dteManualDepto','dteManualMuni','dteManualDist','dteManualCodAct','dteManualDescAct','dteManualCliente','dteManualCorreo'].forEach(function(id){
+  ['dteManualNit','dteManualNrc','dteManualNom','dteManualTel','dteManualDir','dteManualDepto','dteManualMuni','dteManualDist','dteManualCodAct','dteManualDescAct','dteManualCliente','dteManualCorreo','dteManualCustomMsg'].forEach(function(id){
     var el=document.getElementById(id); if(el) el.value='';
   });
+  document.getElementById('dteManualSendEmail').checked=false;
+  document.getElementById('dteManualReason').value='compra_manual';
+  dteManualToggleEmail();
   dteManualRecalc();
 }
 

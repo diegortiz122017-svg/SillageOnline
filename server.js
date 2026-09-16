@@ -1053,6 +1053,54 @@ async function sendDteReadyEmail(order, dte) {
   });
 }
 
+// Correo del DTE emitido a mano desde el admin (POST /api/admin/dte/emit-manual).
+// El "motivo" cambia el encabezado/mensaje para que el cliente entienda POR QUÉ
+// recibe este documento — no es lo mismo una compra que se procesó manualmente
+// que la corrección de una factura anterior con un error.
+const DTE_MANUAL_EMAIL_REASONS = {
+  compra_manual: {
+    subject:  order => `🧾 Tu factura — ${order.id} | Sillage Parfumerie`,
+    heading:  'Aquí tienes tu factura',
+    intro:    order => `Hola <strong style="color:#1a1714">${escHtml(order.customer)}</strong>, gracias por tu compra. Adjuntamos el documento tributario electrónico correspondiente.`,
+  },
+  correccion_dte: {
+    subject:  order => `Corrección de tu factura — ${order.id} | Sillage Parfumerie`,
+    heading:  'Corregimos tu factura',
+    intro:    order => `Hola <strong style="color:#1a1714">${escHtml(order.customer)}</strong>, detectamos un error en el documento tributario que te habíamos enviado antes. Adjuntamos la versión corregida — este documento reemplaza al anterior. Disculpa las molestias.`,
+  },
+  reenvio: {
+    subject:  order => `Copia de tu factura — ${order.id} | Sillage Parfumerie`,
+    heading:  'Aquí tienes de nuevo tu factura',
+    intro:    order => `Hola <strong style="color:#1a1714">${escHtml(order.customer)}</strong>, como nos pediste, te reenviamos tu documento tributario electrónico.`,
+  },
+  otro: {
+    subject:  order => `Tu factura — ${order.id} | Sillage Parfumerie`,
+    heading:  'Tu factura',
+    intro:    order => `Hola <strong style="color:#1a1714">${escHtml(order.customer)}</strong>,`,
+  },
+};
+
+async function sendDteManualEmail(order, dte, reason, customMessage) {
+  if (!dteIsReady(dte) || !order.email) return false;
+  const preset = DTE_MANUAL_EMAIL_REASONS[reason] || DTE_MANUAL_EMAIL_REASONS.otro;
+  const customBlock = customMessage
+    ? `<p style="font-size:13px;color:#1a1714;margin:0 0 20px;white-space:pre-line">${escHtml(customMessage)}</p>`
+    : '';
+  const html = emailTemplate(`
+    <h2 style="font-family:Georgia,serif;font-size:24px;font-weight:300;color:#1a1714;margin:0 0 8px">${escHtml(preset.heading)}</h2>
+    <p style="font-size:13px;color:#8a7f72;margin:0 0 20px">${preset.intro(order)}</p>
+    ${customBlock}
+    ${buildDteEmailBlock(dte)}`);
+  await sendEmail({
+    to:      order.email,
+    subject: escHtml(preset.subject(order)),
+    from:    `Sillage Pedidos <${EMAIL_PEDIDOS}>`,
+    html,
+    attachments: buildDteAttachments(dte),
+  });
+  return true;
+}
+
 async function sendWelcomeEmail(customer) {
   const html = emailTemplate(`
     <h2 style="font-family:Georgia,serif;font-size:24px;font-weight:300;color:#1a1714;margin:0 0 8px">Bienvenido a Sillage ✨</h2>
@@ -3020,6 +3068,22 @@ app.post('/api/admin/dte/emit-manual', requireAdmin, async (req, res) => {
       options.docRelacionado = ccf;
     }
     const rec = await dteSvc.emitForOrder(order, options);
+
+    // Envío opcional del correo al cliente — nunca al correo de respaldo del
+    // emisor (order.email cae ahí si no se dio un correo real, ver arriba).
+    let emailSent = false;
+    const customerEmail = b.email ? String(b.email).trim() : '';
+    if (b.sendEmail && customerEmail && dteIsReady(rec)) {
+      try {
+        emailSent = await sendDteManualEmail(
+          { ...order, email: customerEmail },
+          rec,
+          String(b.reason || 'otro'),
+          b.customMessage ? String(b.customMessage).slice(0, 2000) : ''
+        );
+      } catch(e) { console.error('sendDteManualEmail error:', e.message); }
+    }
+
     res.json({
       ok:            rec && rec.estado === 'PROCESADO',
       estado:        rec?.estado || 'ERROR',
@@ -3028,6 +3092,7 @@ app.post('/api/admin/dte/emit-manual', requireAdmin, async (req, res) => {
       observaciones: rec?.observaciones || null,
       total,
       numItems:      items.length,
+      emailSent,
     });
   } catch(e) { res.status(500).json({ error: e.message }); }
 });
