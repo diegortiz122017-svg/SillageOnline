@@ -4585,13 +4585,15 @@ app.post('/api/wompi/webhook', express.json(), async (req, res) => {
         `INSERT INTO orders
            (id,customer,email,phone,address,city,state_province,country,
             items,total,status,payment_status,payment_method,tracker_step,
-            customer_id,wompi_reference,created_at,updated_at)
-         VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
+            customer_id,wompi_reference,promo_code,promo_discount,created_at,updated_at)
+         VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
         [orderObj.id, orderObj.customer, orderObj.email, orderObj.phone,
          orderObj.address, orderObj.city, orderObj.state, orderObj.country,
          JSON.stringify(items), orderObj.total,
          'Procesando', 'Pagado', 'wompi', 1,
-         custId || null, reference, pending.created_at, now]
+         custId || null, reference,
+         orderObj.promoCode || null, orderObj.promoDiscount || 0,
+         pending.created_at, now]
       );
     }
 

@@ -144,7 +144,32 @@ function normalizeItems(items) {
     descripcion:    String(i.name || i.descripcion || 'Producto').slice(0, 1000),
     cantidad:       Number(i.qty || i.cantidad || 1),
     precioUnitario: round2(Number(i.price || i.precioUni || 0)),
+    bundleId:       i.bundleId || null, // los ítems de bundle nunca llevan descuento de promo
   }));
+}
+
+// Reparte un descuento total entre los ítems de la orden, proporcional a su
+// venta bruta (antes de descuento). El último ítem elegible absorbe el
+// remanente de redondeo para que la suma dé EXACTO el descuento total —
+// mismo patrón que el reparto de IVA en buildNotaCreditoExacta. Los ítems de
+// bundle se excluyen del reparto: un bundle ya trae su propio precio especial
+// y el código de promo nunca se le aplica (ver validatePromoCode en server.js).
+function distribuirDescuento(items, brutos, totalDescuento) {
+  const cero = brutos.map(() => 0);
+  if (!totalDescuento || totalDescuento <= 0) return cero;
+  const elegibles = items.map((it, i) => it.bundleId ? 0 : brutos[i]);
+  const sumaElegible = elegibles.reduce((s, b) => s + b, 0);
+  if (sumaElegible <= 0) return cero;
+  let asignado = 0;
+  const idxUltimo = elegibles.reduce((last, b, i) => b > 0 ? i : last, -1);
+  return brutos.map((bruto, idx) => {
+    if (elegibles[idx] <= 0) return 0;
+    const monto = idx === idxUltimo
+      ? round2(totalDescuento - asignado)
+      : round2(totalDescuento * (elegibles[idx] / sumaElegible));
+    asignado = round2(asignado + monto);
+    return monto;
+  });
 }
 
 // ════════════════════════════════════════════════════════════════════════════
@@ -153,9 +178,17 @@ function normalizeItems(items) {
 function buildFactura(order, opts) {
   const { fecEmi, horEmi } = nowSV();
   const items = normalizeItems(JSON.parse(order.items || '[]'));
+  // Descuento total de la orden (código de promo, en términos de precio con
+  // IVA incluido — así se calculó en checkout). Antes esto se ignoraba por
+  // completo y el DTE salía por el precio de lista, no por lo que pagó el
+  // cliente. Se reparte proporcional entre los ítems (nunca en bundles).
+  const descuentoTotal = round2(parseFloat(order.promo_discount) || 0);
+  const brutos = items.map(it => round2(it.cantidad * it.precioUnitario));
+  const descuentos = distribuirDescuento(items, brutos, descuentoTotal);
 
   const cuerpoDocumento = items.map((it, idx) => {
-    const ventaGravada = round2(it.cantidad * it.precioUnitario); // IVA incluido
+    const montoDescu   = descuentos[idx];
+    const ventaGravada = round2(brutos[idx] - montoDescu); // IVA incluido, neto de descuento
     const ivaItem      = round2(ventaGravada - ventaGravada / (1 + IVA_RATE));
     return {
       numItem:        idx + 1,
@@ -167,7 +200,7 @@ function buildFactura(order, opts) {
       uniMedida:      59,           // 59 = unidad
       descripcion:    it.descripcion,
       precioUni:      it.precioUnitario,
-      montoDescu:     0,
+      montoDescu,
       ventaNoSuj:     0,
       ventaExenta:    0,
       ventaGravada,
@@ -178,19 +211,22 @@ function buildFactura(order, opts) {
     };
   });
 
-  const totalGravada = round2(cuerpoDocumento.reduce((s, c) => s + c.ventaGravada, 0));
-  const totalIva     = round2(cuerpoDocumento.reduce((s, c) => s + c.ivaItem, 0));
+  const totalGravada       = round2(cuerpoDocumento.reduce((s, c) => s + c.ventaGravada, 0));
+  const totalIva           = round2(cuerpoDocumento.reduce((s, c) => s + c.ivaItem, 0));
+  const totalDescu         = round2(cuerpoDocumento.reduce((s, c) => s + c.montoDescu, 0));
+  const subTotalVentas     = round2(brutos.reduce((s, b) => s + b, 0));
+  const porcentajeDescuento = subTotalVentas > 0 ? round2((totalDescu / subTotalVentas) * 100) : 0;
 
   const resumen = {
     totalNoSuj:           0,
     totalExenta:          0,
     totalGravada:         totalGravada,
-    subTotalVentas:       totalGravada,
+    subTotalVentas:       subTotalVentas,
     descuNoSuj:           0,
     descuExenta:          0,
-    descuGravada:         0,
-    porcentajeDescuento:  0,
-    totalDescu:           0,
+    descuGravada:         totalDescu,
+    porcentajeDescuento:  porcentajeDescuento,
+    totalDescu:           totalDescu,
     tributos:             null,        // FC: null (IVA incluido vía totalIva)
     subTotal:             totalGravada,
     ivaRete:              0,
@@ -246,11 +282,17 @@ function buildFactura(order, opts) {
 function buildCreditoFiscal(order, receptor, opts) {
   const { fecEmi, horEmi } = nowSV();
   const items = normalizeItems(JSON.parse(order.items || '[]'));
+  // El descuento de la orden se calculó sobre el precio con IVA incluido
+  // (checkout) — lo convertimos a neto para repartirlo en términos de CCF.
+  const descuentoTotalNeto = round2((parseFloat(order.promo_discount) || 0) / (1 + IVA_RATE));
+  const brutosNetos = items.map(it => round2(it.cantidad * round8(it.precioUnitario / (1 + IVA_RATE))));
+  const descuentos  = distribuirDescuento(items, brutosNetos, descuentoTotalNeto);
 
   const cuerpoDocumento = items.map((it, idx) => {
     // El precio guardado incluye IVA → lo convertimos a neto para el CCF.
     const precioNeto   = round8(it.precioUnitario / (1 + IVA_RATE));
-    const ventaGravada = round2(it.cantidad * precioNeto);
+    const montoDescu   = descuentos[idx];
+    const ventaGravada = round2(brutosNetos[idx] - montoDescu);
     return {
       numItem:         idx + 1,
       tipoItem:        1,
@@ -261,7 +303,7 @@ function buildCreditoFiscal(order, receptor, opts) {
       cantidad:        it.cantidad,
       uniMedida:       59,
       precioUni:       precioNeto,
-      montoDescu:      0,
+      montoDescu,
       ventaNoSuj:      0,
       ventaExenta:     0,
       ventaGravada,
@@ -271,20 +313,23 @@ function buildCreditoFiscal(order, receptor, opts) {
     };
   });
 
-  const totalGravada = round2(cuerpoDocumento.reduce((s, c) => s + c.ventaGravada, 0));
-  const iva          = round2(totalGravada * IVA_RATE);
-  const montoTotal   = round2(totalGravada + iva);
+  const totalGravada       = round2(cuerpoDocumento.reduce((s, c) => s + c.ventaGravada, 0));
+  const iva                = round2(totalGravada * IVA_RATE);
+  const montoTotal         = round2(totalGravada + iva);
+  const totalDescu         = round2(cuerpoDocumento.reduce((s, c) => s + c.montoDescu, 0));
+  const subTotalVentas     = round2(brutosNetos.reduce((s, b) => s + b, 0));
+  const porcentajeDescuento = subTotalVentas > 0 ? round2((totalDescu / subTotalVentas) * 100) : 0;
 
   const resumen = {
     totalNoSuj:          0,
     totalExenta:         0,
     totalGravada:        totalGravada,
-    subTotalVentas:      totalGravada,
+    subTotalVentas:      subTotalVentas,
     descuNoSuj:          0,
     descuExenta:         0,
-    descuGravada:        0,
-    porcentajeDescuento: 0,
-    totalDescu:          0,
+    descuGravada:        totalDescu,
+    porcentajeDescuento: porcentajeDescuento,
+    totalDescu:          totalDescu,
     tributos: [
       { codigo: '20', descripcion: 'Impuesto al Valor Agregado 13%', valor: iva },
     ],
