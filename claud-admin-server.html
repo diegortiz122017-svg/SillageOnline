@@ -1988,6 +1988,9 @@ tr:hover td{background:rgba(255,255,255,0.02)}
       <label style="display:flex;align-items:center;gap:0.5rem;font-size:0.72rem;color:#e8dcc8">
         <input id="promoActive" type="checkbox" checked/> Activo
       </label>
+      <label style="display:flex;align-items:center;gap:0.5rem;font-size:0.72rem;color:#e8dcc8">
+        <input id="promoFreeShipping" type="checkbox"/> No cobrar envío (envío gratis con este código)
+      </label>
       <div id="promoModalErr" style="color:#d9534f;font-size:0.68rem"></div>
       <button class="save-btn" style="width:100%" onclick="savePromo()">Guardar</button>
     </div>
@@ -4037,6 +4040,7 @@ function loadPromoCodes(){
     }
     tbody.innerHTML=list.map(function(p){
       var valor = p.type==='percent' ? (parseFloat(p.value)+'%') : ('$'+parseFloat(p.value).toFixed(2));
+      if(p.free_shipping) valor = (parseFloat(p.value)>0 ? valor+' + ' : '')+'<span style="color:var(--success)">Envío gratis</span>';
       var minOrder = p.min_order!=null ? ('$'+parseFloat(p.min_order).toFixed(2)) : '—';
       var usos = p.used_count + (p.max_uses!=null ? (' / '+p.max_uses) : ' / ∞');
       var vence = p.expires_at ? new Date(p.expires_at).toLocaleDateString() : '—';
@@ -4072,6 +4076,7 @@ function openPromoModal(id){
   document.getElementById('promoMaxUses').value = p && p.max_uses!=null ? p.max_uses : '';
   document.getElementById('promoExpiresAt').value = p && p.expires_at ? String(p.expires_at).slice(0,10) : '';
   document.getElementById('promoActive').checked = p ? !!p.active : true;
+  document.getElementById('promoFreeShipping').checked = p ? !!p.free_shipping : false;
   document.getElementById('promoModal').style.display='flex';
 }
 function closePromoModal(){ document.getElementById('promoModal').style.display='none'; }
@@ -4081,14 +4086,15 @@ function savePromo(){
   var body={
     code:  document.getElementById('promoCode').value.trim(),
     type:  document.getElementById('promoType').value,
-    value: parseFloat(document.getElementById('promoValue').value),
+    value: parseFloat(document.getElementById('promoValue').value) || 0,
     active: document.getElementById('promoActive').checked,
+    freeShipping: document.getElementById('promoFreeShipping').checked,
     minOrder: document.getElementById('promoMinOrder').value || null,
     maxUses:  document.getElementById('promoMaxUses').value || null,
     expiresAt: document.getElementById('promoExpiresAt').value || null,
   };
   if(!_promoEditId && !body.code){ err.textContent='El código es requerido.'; return; }
-  if(!body.value || body.value<=0){ err.textContent='Ingresa un valor válido.'; return; }
+  if(!body.freeShipping && (!body.value || body.value<=0)){ err.textContent='Ingresa un valor válido.'; return; }
   var url = _promoEditId ? (API+'/admin/promo-codes/'+_promoEditId) : (API+'/admin/promo-codes');
   var method = _promoEditId ? 'PUT' : 'POST';
   adminFetch(url,{method:method,headers:{'Content-Type':'application/json'},body:JSON.stringify(body)})

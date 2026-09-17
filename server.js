@@ -182,19 +182,22 @@ async function initDB() {
 
   await db.execute(`
     CREATE TABLE IF NOT EXISTS promo_codes (
-      id          INT AUTO_INCREMENT PRIMARY KEY,
-      code        VARCHAR(30)  NOT NULL UNIQUE,
-      type        VARCHAR(10)  NOT NULL,           -- 'percent' | 'fixed'
-      value       DECIMAL(10,2) NOT NULL,
-      active      TINYINT(1)   DEFAULT 1,
-      min_order   DECIMAL(10,2) DEFAULT NULL,       -- subtotal mínimo requerido
-      max_uses    INT           DEFAULT NULL,       -- NULL = ilimitado
-      used_count  INT           DEFAULT 0,
-      expires_at  DATETIME      DEFAULT NULL,       -- NULL = sin vencimiento
-      created_at  DATETIME NOT NULL,
-      updated_at  DATETIME NOT NULL
+      id            INT AUTO_INCREMENT PRIMARY KEY,
+      code          VARCHAR(30)  NOT NULL UNIQUE,
+      type          VARCHAR(10)  NOT NULL,           -- 'percent' | 'fixed'
+      value         DECIMAL(10,2) NOT NULL,
+      active        TINYINT(1)   DEFAULT 1,
+      min_order     DECIMAL(10,2) DEFAULT NULL,       -- subtotal mínimo requerido
+      max_uses      INT           DEFAULT NULL,       -- NULL = ilimitado
+      used_count    INT           DEFAULT 0,
+      expires_at    DATETIME      DEFAULT NULL,       -- NULL = sin vencimiento
+      free_shipping TINYINT(1)    DEFAULT 0,          -- además del descuento, exime el costo de envío
+      created_at    DATETIME NOT NULL,
+      updated_at    DATETIME NOT NULL
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
   `);
+  // Tabla ya existía en producción antes de agregar esta columna.
+  try { await db.execute('ALTER TABLE promo_codes ADD COLUMN free_shipping TINYINT(1) DEFAULT 0'); } catch(e) {}
 
   // Leads capturados por el modal de bienvenida (10% a cambio del correo) —
   // sequence_step avanza welcome -> reminder_5d -> last_chance_30d -> converted,
@@ -3852,7 +3855,7 @@ async function validatePromoCode(rawCode, subtotal) {
     ? Math.round(subtotal * value / 100 * 100) / 100
     : Math.min(value, subtotal);
   discount = Math.max(0, Math.round(discount * 100) / 100);
-  return { ok: true, id: p.id, code: p.code, type: p.type, value, discount };
+  return { ok: true, id: p.id, code: p.code, type: p.type, value, discount, freeShipping: !!p.free_shipping };
 }
 
 // Público — usado por el checkout mientras el cliente escribe el código.
@@ -3863,7 +3866,7 @@ app.post('/api/promo/validate', promoValidateLimiter, async (req, res) => {
   const subtotal = Math.max(0, parseFloat(req.body.cartTotal ?? req.body.subtotal) || 0);
   const result = await validatePromoCode(req.body.code, subtotal).catch(() => ({ ok: false, error: 'Error al validar el código.' }));
   if (!result.ok) return res.json({ ok: false, error: result.error });
-  res.json({ ok: true, code: result.code, type: result.type, value: result.value, discount: result.discount });
+  res.json({ ok: true, code: result.code, type: result.type, value: result.value, discount: result.discount, freeShipping: result.freeShipping });
 });
 
 // ── Admin: CRUD de códigos de descuento ───────────────────────────────────────
@@ -3876,20 +3879,24 @@ app.post('/api/admin/promo-codes', requireAdmin, async (req, res) => {
   const b = req.body || {};
   const code = String(b.code || '').trim().toUpperCase().replace(/[^A-Z0-9_-]/g, '').slice(0, 30);
   const type = (b.type === 'fixed') ? 'fixed' : 'percent';
-  const value = parseFloat(b.value);
+  const freeShipping = !!b.freeShipping;
+  const value = parseFloat(b.value) || 0;
   if (!code) return res.status(400).json({ error: 'El código es requerido.' });
-  if (!value || value <= 0 || (type === 'percent' && value > 100)) {
+  // Con envío gratis el valor puede ser 0 (cupón solo de envío) — sin envío
+  // gratis, el descuento monetario sigue siendo obligatorio como antes.
+  if ((!freeShipping || value > 0) && (!value || value <= 0 || (type === 'percent' && value > 100))) {
     return res.status(400).json({ error: type === 'percent' ? 'El porcentaje debe ser entre 1 y 100.' : 'El monto debe ser mayor a 0.' });
   }
   const n = new Date();
   try {
     await db.execute(
-      `INSERT INTO promo_codes (code, type, value, active, min_order, max_uses, expires_at, created_at, updated_at)
-       VALUES (?,?,?,?,?,?,?,?,?)`,
+      `INSERT INTO promo_codes (code, type, value, active, min_order, max_uses, expires_at, free_shipping, created_at, updated_at)
+       VALUES (?,?,?,?,?,?,?,?,?,?)`,
       [code, type, value, b.active === false ? 0 : 1,
        b.minOrder ? parseFloat(b.minOrder) : null,
        b.maxUses ? parseInt(b.maxUses, 10) : null,
        b.expiresAt ? new Date(b.expiresAt) : null,
+       freeShipping ? 1 : 0,
        n, n]
     );
     await logActivity(`Código de descuento creado: ${code}`);
@@ -3903,16 +3910,18 @@ app.post('/api/admin/promo-codes', requireAdmin, async (req, res) => {
 app.put('/api/admin/promo-codes/:id', requireAdmin, async (req, res) => {
   const b = req.body || {};
   const type = (b.type === 'fixed') ? 'fixed' : 'percent';
-  const value = parseFloat(b.value);
-  if (!value || value <= 0 || (type === 'percent' && value > 100)) {
+  const freeShipping = !!b.freeShipping;
+  const value = parseFloat(b.value) || 0;
+  if ((!freeShipping || value > 0) && (!value || value <= 0 || (type === 'percent' && value > 100))) {
     return res.status(400).json({ error: type === 'percent' ? 'El porcentaje debe ser entre 1 y 100.' : 'El monto debe ser mayor a 0.' });
   }
   await db.execute(
-    `UPDATE promo_codes SET type=?, value=?, active=?, min_order=?, max_uses=?, expires_at=?, updated_at=? WHERE id=?`,
+    `UPDATE promo_codes SET type=?, value=?, active=?, min_order=?, max_uses=?, expires_at=?, free_shipping=?, updated_at=? WHERE id=?`,
     [type, value, b.active === false ? 0 : 1,
      b.minOrder ? parseFloat(b.minOrder) : null,
      b.maxUses ? parseInt(b.maxUses, 10) : null,
      b.expiresAt ? new Date(b.expiresAt) : null,
+     freeShipping ? 1 : 0,
      new Date(), parseInt(req.params.id, 10)]
   );
   res.json({ ok: true });
@@ -4294,7 +4303,7 @@ app.post('/api/orders', orderLimiter, async (req, res) => {
     // subtotal por debajo del umbral generaría "total no coincide".
     const shippingCost      = parseFloat(await getSetting('shipping_cost', '5')) || 5;
     const shippingThreshold = parseFloat(await getSetting('shipping_threshold', '50')) || 50;
-    const shipping = serverTotal < shippingThreshold ? shippingCost : 0;
+    let shipping = serverTotal < shippingThreshold ? shippingCost : 0;
 
     // ── Código de descuento — validado server-side, nunca se confía en lo que
     // mande el cliente. Se aplica SOLO sobre los ítems estándar: los bundles ya
@@ -4303,6 +4312,7 @@ app.post('/api/orders', orderLimiter, async (req, res) => {
       promoResult = await validatePromoCode(req.body.promoCode, standaloneTotal);
       if (!promoResult.ok) return res.status(400).json({ error: promoResult.error });
       serverTotal = Math.max(0, Math.round((serverTotal - promoResult.discount) * 100) / 100);
+      if (promoResult.freeShipping) shipping = 0;
     }
 
     serverTotal = Math.round((serverTotal + shipping) * 100) / 100;
@@ -5064,7 +5074,7 @@ async function computeServerTotal(rawItems, promoCode, clientTotal) {
 
     const shippingCost      = parseFloat(await getSetting('shipping_cost', '5')) || 5;
     const shippingThreshold = parseFloat(await getSetting('shipping_threshold', '50')) || 50;
-    const shipping = serverTotal < shippingThreshold ? shippingCost : 0;
+    let shipping = serverTotal < shippingThreshold ? shippingCost : 0;
 
     let promoResult = null;
     if (promoCode) {
@@ -5072,6 +5082,7 @@ async function computeServerTotal(rawItems, promoCode, clientTotal) {
       promoResult = await validatePromoCode(promoCode, standaloneTotal);
       if (!promoResult.ok) return { ok: false, status: 400, error: promoResult.error };
       serverTotal = Math.max(0, Math.round((serverTotal - promoResult.discount) * 100) / 100);
+      if (promoResult.freeShipping) shipping = 0;
     }
 
     serverTotal = Math.round((serverTotal + shipping) * 100) / 100;

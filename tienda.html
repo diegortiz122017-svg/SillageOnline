@@ -4692,8 +4692,12 @@ function applyPromo(codeOverride){
     }
     _appliedPromo = res;
     msg.style.color='var(--success)';
-    var label = res.type==='percent' ? res.value+'% descuento' : '$'+parseFloat(res.value).toFixed(2)+' de descuento';
-    msg.textContent='✓ '+label+' aplicado — ahorras $'+parseFloat(res.discount).toFixed(2);
+    var parts=[];
+    if(parseFloat(res.value)>0) parts.push(res.type==='percent' ? res.value+'% descuento' : '$'+parseFloat(res.value).toFixed(2)+' de descuento');
+    if(res.freeShipping) parts.push('envío gratis');
+    var label = parts.join(' + ')||'Cupón';
+    var savedTxt = parseFloat(res.discount)>0 ? ' — ahorras $'+parseFloat(res.discount).toFixed(2) : '';
+    msg.textContent='✓ '+label+' aplicado'+savedTxt;
     renderCart();
   }).catch(function(){
     msg.style.color='var(--error)'; msg.textContent='Error al verificar.';
@@ -4828,6 +4832,7 @@ function cartSum(){
   return sum;
 }
 function getShipping(){
+  if(_appliedPromo && _appliedPromo.freeShipping) return 0;
   var sub = cartSum();
   return sub >= shippingThreshold ? 0 : shippingCost;
 }
