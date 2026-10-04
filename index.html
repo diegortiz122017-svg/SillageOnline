@@ -7057,32 +7057,59 @@ function getBrandColor(brand){
 var _topSellerIds = {};   // { productId: units }
 
 // ── Helpers de filtrado de colecciones ───────────────────────────────────────
-// Los acordes (p.chords) ya vienen normalizados en español por services/chords.js.
-// Como respaldo se busca en el texto de notas/familia, con sinónimos ES/EN.
-function _collChords(p){ return (p.chords||[]).map(function(x){ return String(x).toLowerCase(); }); }
-function _collText(p){ return [(p.notes||''),(p.family||''),(p.top||''),(p.mid||''),(p.base||'')].join(' ').toLowerCase(); }
-function _hasAnyChord(p, list){ var c=_collChords(p); return list.some(function(x){ return c.indexOf(x)!==-1; }); }
-function _hasAnyWord(p, list){ var t=_collText(p); return list.some(function(x){ return t.indexOf(x)!==-1; }); }
+// Cada colección exige un PERFIL (proyección, duración, estación, intensidad de
+// la base y un mínimo de notas afines), no "cualquier coincidencia": los acordes
+// (p.chords) son demasiado genéricos — Sensual está en ~70% del catálogo y
+// Floral en ~60% — y la regla anterior ("tiene alguno de estos acordes o
+// palabras", por subcadena) metía casi todo en casi todas las colecciones
+// (39/38/35 de 40 productos). Las notas se comparan como palabras completas, sin
+// acentos, y "pimienta rosa" no cuenta como nota de rosa.
+function _collNorm(s){ return String(s||'').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/pimi?enta rosa/g,'pimienta'); }
+function _collLevel(p, lv){ return _collNorm(lv==='all' ? [p.notes,p.top,p.mid,p.base].join(', ') : p[lv]); }
+function _collScore(text, list){ return list.filter(function(w){ return new RegExp('(^|[^a-z])'+w+'([^a-z]|$)').test(text); }).length; }
+function _collChord(p, list){ return (p.chords||[]).some(function(c){ return list.indexOf(_collNorm(c))!==-1; }); }
+function _collHours(p){ var m=String(p.long||'').match(/\d+/); return m ? parseInt(m[0],10) : 0; }
+function _collStrong(p){ return p.sillage==='Strong' || p.sillage==='Very Strong'; }
+function _collSoft(p){ return p.sillage==='Moderate' || p.sillage==='Light'; }
+function _collWinterOnly(p){ return /fall/i.test(p.season||'') && !/all|spring/i.test(p.season||''); }
+
+var _COLL_SWEET   = ['vainilla','vanilla','praline','caramelo','cacao','cafe','miel','tonka','ron','coco','datiles','helado','chocolate'];
+var _COLL_FLORAL  = ['rosa','rose','jazmin','jasmine','peonia','peony','lirio','lily','azahar','magnolia','fresia','freesia','violeta','gardenia','nardo','nardos','flor de loto','loto','orquidea','flor de pomelo','heliotropo','lichi','durazno','chabacano','fresa','frutos rojos','bayas silvestres','grosella','almizcle blanco','pera','higo'];
+var _COLL_CLEAN   = ['cedro','cedar','vetiver','lavanda','lavender','salvia','te negro','te verde','bergamota','bergamot','limon','lemon','pomelo','grapefruit','mandarina','mandarin','cachemira','cashmere','sandalo','sandalwood','romero','cipres','geranio','enebro','ambroxan','pino','albahaca','musgo de roble','citricos','cidro','naranja','orange','maderas blancas','secuoya'];
+var _COLL_FRESHTOP= ['bergamota','bergamot','limon','lemon','pomelo','grapefruit','mandarina','mandarin','naranja','orange','lima','cidro','citricos','yuzu','neroli','manzana','melon','menta','pepino','te verde','salvia','agua de coco','acuaticas','pino','albahaca'];
+var _COLL_HEAVY   = ['cuero','oud','incienso','vetiver','pachuli','cedro','gamuza'];
+function _collSweetness(p){ return _collScore(_collLevel(p,'all'), _COLL_SWEET) + (_collChord(p,['dulce','gourmand']) ? 1 : 0); }
 
 // Fallback estático — se usa solo si la DB no tiene colecciones
 var CURATED_FALLBACK = [
   { id:'office',     icon:'💼', name:'La Oficina',       desc:'Presente sin saturar. El tipo que hace que pregunten.',
-    filter:function(p){ return _hasAnyChord(p,['amaderado','aromático','aromatico','verde','herbal'])
-      || _hasAnyWord(p,['cedar','cedro','vetiver','sandalwood','sándalo','sandalo','woody','amaderado','tea','té verde','lavand']); } },
+    // Proyección moderada/ligera, nada dulce ni solo-invierno, base liviana y
+    // al menos 4 notas limpias (cítricos, aromáticas, maderas secas) con poco floral.
+    filter:function(p){ return _collSoft(p) && _collSweetness(p)<=1 && !_collWinterOnly(p) && p.base_intensity<=72
+      && _collScore(_collLevel(p,'all'), _COLL_CLEAN)>=4 && _collScore(_collLevel(p,'all'), _COLL_FLORAL)<=2; } },
   { id:'evening',    icon:'🕯️', name:'Noche Especial',   desc:'Para cuando quieres dejar rastro.',
-    filter:function(p){ return _hasAnyChord(p,['ambarado','oriental','sensual','ahumado','gourmand'])
-      || _hasAnyWord(p,['oud','oudh','amber','ámbar','ambar','incense','incienso','tobacco','tabaco','oriental','vanilla','vainilla'])
-      || (p.sillage||'')==='Very Strong' || (p.sillage||'')==='Strong'; } },
+    // Dejar rastro = proyección fuerte con cuerpo o duración, o duración larga con
+    // base profunda, o una fragancia de otoño/invierno con base marcada.
+    filter:function(p){ return (_collStrong(p) && (p.base_intensity>=60 || _collHours(p)>=8))
+      || (_collHours(p)>=10 && p.base_intensity>=68)
+      || (_collWinterOnly(p) && p.base_intensity>=65); } },
   { id:'fresh',      icon:'🌊', name:'Frescos & Cítricos', desc:'Abre una ventana. Energía inmediata.',
-    filter:function(p){ return _hasAnyChord(p,['fresco','cítrico','citrico','acuático','acuatico','verde'])
-      || _hasAnyWord(p,['fresh','fresco','citrus','cítric','citric','bergamot','bergamota','lemon','limón','limon','lima','lime','aquatic','acuátic','acuatic','marine','marino','mint','menta']); } },
+    // Acorde fresco/cítrico confirmado por al menos 2 notas de SALIDA frescas, sin
+    // dulzor, sin proyección fuerte, base liviana y que no sea solo de invierno.
+    filter:function(p){ return _collChord(p,['fresco','citrico']) && _collScore(_collLevel(p,'top'), _COLL_FRESHTOP)>=2
+      && _collSweetness(p)<=1 && !_collStrong(p) && !_collWinterOnly(p) && p.base_intensity<=70; } },
   { id:'gift',       icon:'🎁', name:'Para Regalar',      desc:'Piezas que impresionan. Para quien merece lo mejor.',
     filter:function(p){ return parseFloat(p.price) >= 80 || !!p.luxury; } },
   { id:'bestseller', icon:'⭐', name:'Los Más Vendidos',   desc:'Las fragancias más queridas por nuestros clientes.',
     filter:function(p){ return !!_topSellerIds[+p.id] || !!p.homeFavorite || p.badge==='bestseller'; } },
   { id:'romantic',   icon:'🌹', name:'Una Primera Cita',  desc:'Suave, memorable. Que invite a acercarse.',
-    filter:function(p){ return _hasAnyChord(p,['floral','empolvado','dulce','sensual'])
-      || _hasAnyWord(p,['rose','rosa','floral','jasmine','jazmín','jazmin','jasmin','musk','almizcle','powdery','empolvad','vanilla','vainilla','peony','peonía','peonia','iris']); } },
+    // Suave (no proyecta fuerte, base no pesada, sin humo) y con carácter
+    // afín: floral/frutal (≥3 notas y poco amaderado-pesado) o dulce-envolvente (≥3 señales).
+    filter:function(p){ if(!_collSoft(p) || _collChord(p,['ahumado'])) return false;
+      var floralFruity = p.base_intensity<=78 && _collScore(_collLevel(p,'all'), _COLL_FLORAL)>=3
+        && _collScore(_collLevel(p,'all'), _COLL_HEAVY)<=1;
+      var sweetWarm = _collSweetness(p)>=3 && p.base_intensity<=75;
+      return floralFruity || sweetWarm; } },
 ];
 
 // Carga los más vendidos reales (sin datos sensibles) para la colección bestseller
