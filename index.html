@@ -2571,6 +2571,7 @@ footer{background:var(--dark);padding:3.5rem 4rem;text-align:center;border-top:1
             · Máximo 2 pedidos COD pendientes por contacto<br/>
             · Máximo 2 pedidos COD por día
           </div>
+          <div id="codCheckMsg"></div>
         </div>
         <!-- Promo code -->
         <div style="margin-top:1.2rem">
@@ -5220,6 +5221,7 @@ function goStep(n){
   document.getElementById('mTitle').textContent={1:'Entrega',2:'Pago',3:'Revisar Pedido',4:'Pedido Confirmado'}[n];
   document.getElementById('mSteps').style.display=n===4?'none':'flex';
   document.querySelector('.modal-box').scrollTop=0;
+  if(n===2||n===3) trackEvent('checkout_step', String(n));
 }
 function openCheckout(){
   closeCart();goStep(1);
@@ -5352,12 +5354,14 @@ function normalizeSVPhone(input){
 function formatSVPhone(input){
   input.style.borderColor = '';
 }
+var _v1Failed=[];
 function v1(){
   var ok=true;
+  _v1Failed=[];
   [['fn','en'],['fe','ee'],['fa','ea'],['fc','ec'],['fco','eco']].forEach(function(pair){
-    if(!gv(pair[0])){se(pair[1],'Required');sfe(pair[0],true);ok=false;}else{se(pair[1],'');sfe(pair[0],false);}
+    if(!gv(pair[0])){se(pair[1],'Requerido');sfe(pair[0],true);ok=false;_v1Failed.push(pair[0]);}else{se(pair[1],'');sfe(pair[0],false);}
   });
-  if(gv('fe')&&!/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(gv('fe'))){se('ee','Correo inválido');sfe('fe',true);ok=false;}
+  if(gv('fe')&&!/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(gv('fe'))){se('ee','Correo inválido');sfe('fe',true);ok=false;_v1Failed.push('fe:invalido');}
   return ok;
 }
 var selectedPayMethod='cod';
@@ -5372,17 +5376,40 @@ function selectPayMethod(method){
   var info=document.getElementById('pmInfo'+method.charAt(0).toUpperCase()+method.slice(1));
   if(info)info.style.display='block';
   // Load COD min order if not yet fetched
+  var codMsg=document.getElementById('codCheckMsg');
+  if(codMsg) codMsg.innerHTML='';
   if(method==='cod'){
-    fetch(API+'/settings/shipping').then(function(r){ return r.json(); }).catch(function(){ return {}; });
-    fetch(API+'/admin/cod-settings').then(function(r){ return r.ok?r.json():{minOrder:25}; })
+    fetch(API+'/settings/cod').then(function(r){ return r.ok?r.json():{minOrder:25}; })
       .then(function(s){
         _codMinOrder = parseFloat(s.minOrder)||25;
         var note = document.getElementById('codMinOrderNote');
-        if(note) note.textContent = 'Pedido mínimo: $'+_codMinOrder;
+        if(note) note.textContent = '$'+_codMinOrder;
       }).catch(function(){});
   }
 }
-function v2(){return true;}
+// Contra entrega: el servidor rechaza el pedido sin teléfono o bajo el mínimo,
+// pero antes eso solo se descubría al presionar "Realizar Pedido" en el último
+// paso. Se valida aquí, al salir del paso de pago, con el motivo claro.
+function v2(){
+  if(selectedPayMethod!=='cod') return true;
+  var msg=document.getElementById('codCheckMsg');
+  var digits=gv('fph').replace(/\D/g,'');
+  var problem='', reason='';
+  if(digits.length<7){
+    problem='Para pago contra entrega necesitamos tu teléfono (el repartidor te contacta al llegar). <a href="#" onclick="goStep(1);var p=document.getElementById(\'fph\');if(p)p.focus();return false" style="color:var(--gold);text-decoration:underline">Agregar teléfono</a>';
+    reason='cod: sin telefono';
+  } else if(orderTotal()<_codMinOrder){
+    problem='El pedido mínimo para pago contra entrega es $'+_codMinOrder+' (el tuyo es $'+orderTotal().toFixed(2)+'). Agrega un producto más o paga con tarjeta o Bitcoin.';
+    reason='cod: bajo minimo';
+  }
+  if(problem){
+    if(msg) msg.innerHTML='<div style="margin-top:0.6rem;padding:0.6rem 0.8rem;border-left:2px solid var(--error);background:rgba(192,80,74,0.07);font-size:0.68rem;line-height:1.6;color:var(--error)">'+problem+'</div>';
+    trackEvent('order_error',reason);
+    return false;
+  }
+  if(msg) msg.innerHTML='';
+  return true;
+}
 
 function fillReview(){
   document.getElementById('mSummaryItems').innerHTML=cart.map(function(it){
@@ -5435,7 +5462,7 @@ function fillReview(){
   }
 }
 document.getElementById('s1next').addEventListener('click',function(){
-  if(!v1()) return;
+  if(!v1()){ trackEvent('order_error','paso1 campos: '+_v1Failed.join(',')); return; }
   // Capture cart for abandoned cart recovery
   var emailVal = document.getElementById('fe') ? document.getElementById('fe').value.trim() : '';
   var nameVal  = document.getElementById('fn') ? document.getElementById('fn').value.trim() : '';
@@ -5558,6 +5585,7 @@ function _doPlaceOrder(){
 
   var _headers={'Content-Type':'application/json'};
   if(typeof customerToken!=='undefined'&&customerToken)_headers['x-customer-token']=customerToken;
+  trackEvent('order_submit', selectedPayMethod);
   fetch(API+'/orders',{method:'POST',headers:_headers,body:JSON.stringify(orderData)})
     .then(function(r){return r.json();})
     .then(function(res){
@@ -5601,6 +5629,7 @@ function _doPlaceOrder(){
     })
     .catch(function(err){
       console.error(err);
+      trackEvent('order_error', (selectedPayMethod+': '+String((err&&err.message)||'sin respuesta')).slice(0,120));
       toast('Error', err.message || 'No se pudo conectar con el servidor. Intenta de nuevo.','');
       placeBtn.textContent='Realizar Pedido';
       placeBtn.disabled=false;

@@ -3498,6 +3498,10 @@ setInterval(() => {
 // abuse/log-flooding vector.
 const ACTIVITY_EVENT_TYPES = new Set([
   'pageview', 'nez_open', 'nez_message', 'product_view', 'cart_add', 'checkout_start',
+  // Pasos intermedios del checkout — meta: nº de paso (checkout_step), método de
+  // pago (order_submit) o motivo corto del fallo (order_error). Sin esto el embudo
+  // se cortaba en checkout_start y no se podía ver DÓNDE se caía la gente.
+  'checkout_step', 'order_submit', 'order_error',
   // Experimento de nudge de Nez (rama conversion-experiments) — etapas + cohorte A/B
   'cohort_assigned', 'nez_nudge_shown', 'nez_nudge_clicked', 'nez_nudge_dismissed',
   // Modal de bienvenida (10% a cambio del correo)
@@ -7575,6 +7579,15 @@ app.get('/api/admin/cod-noshows', requireAdmin, async (req, res) => {
   res.json(rows);
 });
 
+// GET /api/settings/cod — público: solo el mínimo de pedido contra entrega, para
+// que el checkout avise ANTES del último paso. (El checkout llamaba a
+// /api/admin/cod-settings, que exige admin: a los clientes les daba 401 y caían
+// siempre al $25 por defecto aunque el admin lo hubiera cambiado.)
+app.get('/api/settings/cod', async (req, res) => {
+  const minOrder = parseFloat(await getSetting('cod_min_order', '25')) || 25;
+  res.json({ minOrder });
+});
+
 // GET /api/admin/cod-settings — get COD config
 app.get('/api/admin/cod-settings', requireAdmin, async (req, res) => {
   const minOrder    = parseFloat(await getSetting('cod_min_order', '25')) || 25;
@@ -8143,9 +8156,32 @@ app.get('/api/analytics', requireAdmin, async (req, res) => {
         COUNT(DISTINCT CASE WHEN event_type='nez_message'     THEN session_id END)       AS nezMessaged,
         COUNT(DISTINCT CASE WHEN event_type='product_view'    THEN session_id END)       AS viewedProduct,
         COUNT(DISTINCT CASE WHEN event_type='cart_add'        THEN session_id END)       AS addedToCart,
-        COUNT(DISTINCT CASE WHEN event_type='checkout_start'  THEN session_id END)       AS startedCheckout
+        COUNT(DISTINCT CASE WHEN event_type='checkout_start'  THEN session_id END)       AS startedCheckout,
+        COUNT(DISTINCT CASE WHEN event_type='checkout_step' AND meta='2' THEN session_id END) AS reachedPayment,
+        COUNT(DISTINCT CASE WHEN event_type='checkout_step' AND meta='3' THEN session_id END) AS reachedReview,
+        COUNT(DISTINCT CASE WHEN event_type='order_submit'    THEN session_id END)       AS submittedOrder
       FROM activity_events
       WHERE DATE(created_at) BETWEEN ? AND ?
+    `, [rangeFrom, rangeTo]);
+
+    // Compras reales (no eventos del navegador): pedido pagado, o contra entrega
+    // ya creado — el cliente completó su parte del checkout en ambos casos.
+    const [purchaseRows] = await db.query(`
+      SELECT COUNT(*) AS purchased
+      FROM orders
+      WHERE DATE(created_at) BETWEEN ? AND ?
+        AND (payment_status='Pagado' OR payment_method='cod')
+    `, [rangeFrom, rangeTo]);
+
+    // Motivos de fallo del checkout (validación de formulario, rechazos del
+    // servidor, errores de red) — los más frecuentes primero.
+    const [checkoutErrRows] = await db.query(`
+      SELECT meta AS reason, COUNT(*) AS cnt, COUNT(DISTINCT session_id) AS sessions
+      FROM activity_events
+      WHERE event_type='order_error' AND DATE(created_at) BETWEEN ? AND ?
+      GROUP BY meta
+      ORDER BY cnt DESC
+      LIMIT 8
     `, [rangeFrom, rangeTo]);
 
     // Duración de sesión promedio — diferencia entre primer y último evento por sesión
@@ -8168,7 +8204,8 @@ app.get('/api/analytics', requireAdmin, async (req, res) => {
       customers:  custRows[0],
       nez:      { ...nezRows[0], ...consultRows[0] },
       paymentMethods: pmRows.map(r => ({ method: r.payment_method, count: r.cnt, revenue: parseFloat(r.rev||0) })),
-      traffic: { ...trafficRows[0], avgSessionSeconds: Math.round(durationRows[0].avgSessionSeconds || 0) },
+      traffic: { ...trafficRows[0], purchased: purchaseRows[0].purchased, avgSessionSeconds: Math.round(durationRows[0].avgSessionSeconds || 0) },
+      checkoutErrors: checkoutErrRows,
     });
   } catch(e) {
     console.error('Analytics error:', e.message);

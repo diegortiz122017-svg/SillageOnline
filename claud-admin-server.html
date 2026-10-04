@@ -3502,6 +3502,10 @@ function renderAnalytics(d){
       {label:'Vieron un producto',val:t.viewedProduct||0},
       {label:'Agregaron al carrito',val:t.addedToCart||0},
       {label:'Iniciaron checkout',val:t.startedCheckout||0},
+      {label:'↳ Llegaron al pago (paso 2)',val:t.reachedPayment||0},
+      {label:'↳ Llegaron a revisar (paso 3)',val:t.reachedReview||0},
+      {label:'↳ Presionaron "Realizar Pedido"',val:t.submittedOrder||0},
+      {label:'↳ Compraron (pedidos pagados o contra entrega)',val:t.purchased||0},
       {label:'Abrieron a Nez',val:t.nezOpened||0},
       {label:'Le escribieron a Nez',val:t.nezMessaged||0},
     ];
@@ -3511,7 +3515,17 @@ function renderAnalytics(d){
         '<span style="color:var(--muted)">'+s.label+'</span>'+
         '<span>'+fmtN(s.val)+' <span style="color:var(--muted)">('+pct+'%)</span></span>'+
       '</div>';
-    }).join('');
+    }).join('')+
+    (function(){
+      var errs=d.checkoutErrors||[];
+      var head='<div style="margin-top:1rem;padding-top:0.8rem;border-top:1px solid var(--border-light);font-size:0.58rem;letter-spacing:0.15em;text-transform:uppercase;color:var(--muted);margin-bottom:0.5rem">Por qué se cae el checkout</div>';
+      if(!errs.length) return head+'<div style="font-size:0.66rem;color:var(--muted)">Sin fallos registrados en este período (se empezó a medir al publicar esta versión).</div>';
+      return head+errs.map(function(r){
+        return '<div style="display:flex;justify-content:space-between;gap:1rem;margin-bottom:0.3rem;font-size:0.66rem">'+
+          '<span style="color:var(--muted)">'+esc(r.reason||'—')+'</span>'+
+          '<span>'+fmtN(r.sessions)+(r.sessions==1?' sesión':' sesiones')+'</span></div>';
+      }).join('');
+    })();
   }
   // Top products
   var tp=document.getElementById('an-top-products');
