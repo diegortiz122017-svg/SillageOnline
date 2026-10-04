@@ -3801,7 +3801,7 @@ function buildGrid(){
       card.className='product-card'+(oos?' oos':'');
       card.dataset.id=p.id;card.dataset.brand=p.brand;
       card.dataset.gender=p.g;card.dataset.name=p.name.toLowerCase();
-      card.dataset.notes=(p.notes||'').toLowerCase();
+      card.dataset.notes=[cardNotes(p),p.top,p.mid,p.base].join(' ').toLowerCase();
       card.innerHTML=
         '<div class="card-img">'+
           '<div class="gender-dot '+gCls[p.g]+'">'+gMap[p.g]+'</div>'+
@@ -3813,7 +3813,7 @@ function buildGrid(){
         '<div class="card-body">'+
           '<div class="card-brand">'+esc(p.brand)+'</div>'+
           '<div class="card-name">'+esc(p.name)+'</div>'+
-          '<div class="card-notes">'+esc(p.notes)+'</div>'+
+          '<div class="card-notes">'+esc(cardNotes(p))+'</div>'+
           '<div class="card-footer">'+
             '<div class="card-price-row">'+
               (function(){
@@ -4645,6 +4645,21 @@ document.getElementById('slides').addEventListener('touchend',function(e){var dx
 // ════════════════════════════════════════════
 
 // ── Security: HTML escape to prevent XSS ─────────────
+// Resumen corto de notas para la tarjeta: usa p.notes si el admin lo escribió;
+// si no (la mayoría del catálogo solo trae la pirámide top/mid/base), arma uno
+// con 1 nota de salida, 2 de corazón y 1 de fondo.
+function cardNotes(p){
+  if(p.notes && String(p.notes).trim()) return String(p.notes).trim();
+  function list(s){ return String(s||'').split(',').map(function(x){return x.trim();}).filter(Boolean); }
+  var t=list(p.top), m=list(p.mid), b=list(p.base), seen={}, out=[];
+  [t[0],m[0],m[1],b[0],t[1],b[1],m[2],t[2],b[2]].forEach(function(n){
+    if(!n || out.length>=4) return;
+    var k=n.toLowerCase();
+    if(seen[k]) return;
+    seen[k]=1; out.push(n);
+  });
+  return out.join(', ');
+}
 function esc(str){
   if(str===null||str===undefined) return '';
   return String(str)
