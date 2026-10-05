@@ -576,6 +576,28 @@ async function initDB() {
       FOREIGN KEY (customer_id) REFERENCES customers(id) ON DELETE CASCADE
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
   `);
+  // Tercera preferencia del panel de cuenta ("Recordatorio de carrito"); la tabla
+  // ya existía en producción sin esta columna.
+  try { await db.execute('ALTER TABLE email_preferences ADD COLUMN abandoned_cart TINYINT(1) DEFAULT 1'); } catch(e) {}
+
+  // Carrito capturado cuando el cliente escribe su correo en el paso 1 del
+  // checkout. Una fila por correo (la más reciente). opted_out sobrevive a
+  // nuevas capturas; la tabla se depura sola a los 30 días.
+  await db.execute(`
+    CREATE TABLE IF NOT EXISTS abandoned_carts (
+      id          INT AUTO_INCREMENT PRIMARY KEY,
+      email       VARCHAR(255) NOT NULL UNIQUE,
+      name        VARCHAR(120) DEFAULT NULL,
+      customer_id INT          DEFAULT NULL,
+      session_id  VARCHAR(100) DEFAULT NULL,
+      cart        LONGTEXT     NOT NULL,
+      total       DECIMAL(10,2) NOT NULL DEFAULT 0,
+      opted_out   TINYINT(1)   DEFAULT 0,
+      created_at  DATETIME NOT NULL,
+      updated_at  DATETIME NOT NULL,
+      INDEX idx_updated (updated_at)
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
+  `);
 
   console.log('✅ Tables ready');
 }
@@ -1296,7 +1318,7 @@ async function ensureEmailPreferences(customerId) {
     'INSERT INTO email_preferences (customer_id, marketing, followup, unsubscribe_token, updated_at) VALUES (?,1,1,?,?)',
     [customerId, token, new Date()]
   );
-  return { customer_id: customerId, marketing: 1, followup: 1, unsubscribe_token: token };
+  return { customer_id: customerId, marketing: 1, followup: 1, abandoned_cart: 1, unsubscribe_token: token };
 }
 
 async function buildUnsubscribeFooter(customerId) {
@@ -3502,6 +3524,9 @@ const ACTIVITY_EVENT_TYPES = new Set([
   // pago (order_submit) o motivo corto del fallo (order_error). Sin esto el embudo
   // se cortaba en checkout_start y no se podía ver DÓNDE se caía la gente.
   'checkout_step', 'order_submit', 'order_error',
+  // Clic en el botón del modal en modo "promoción" (el cliente ya lo mandaba,
+  // pero sin estar en esta lista el servidor lo rechazaba con 400).
+  'promo_modal_cta_click',
   // Experimento de nudge de Nez (rama conversion-experiments) — etapas + cohorte A/B
   'cohort_assigned', 'nez_nudge_shown', 'nez_nudge_clicked', 'nez_nudge_dismissed',
   // Modal de bienvenida (10% a cambio del correo)
@@ -8409,6 +8434,10 @@ p{font-size:0.72rem;color:#8a7f72;line-height:1.8;margin-bottom:1.5rem}
       <div><div class="pref-label">Emails de seguimiento</div><div class="pref-sub">Recomendaciones personalizadas de Nez</div></div>
       <label class="tog-wrap"><input type="checkbox" id="flwp" ${prefs.followup ? 'checked' : ''}/><span class="tog-track"></span><span class="tog-thumb"></span></label>
     </div>
+    <div class="pref-row">
+      <div><div class="pref-label">Recordatorio de carrito</div><div class="pref-sub">Un aviso si dejas productos sin completar el pedido</div></div>
+      <label class="tog-wrap"><input type="checkbox" id="cart" ${prefs.abandoned_cart == null || prefs.abandoned_cart ? 'checked' : ''}/><span class="tog-track"></span><span class="tog-thumb"></span></label>
+    </div>
     <button type="button" class="save-btn" onclick="save()">Guardar preferencias</button>
     <div class="msg" id="msg">✓ PREFERENCIAS GUARDADAS</div>
   </form>
@@ -8418,7 +8447,7 @@ function save(){
   fetch('/api/email-preferences',{
     method:'POST',
     headers:{'Content-Type':'application/json'},
-    body:JSON.stringify({token:'${token}',marketing:document.getElementById('mktg').checked,followup:document.getElementById('flwp').checked})
+    body:JSON.stringify({token:'${token}',marketing:document.getElementById('mktg').checked,followup:document.getElementById('flwp').checked,abandoned_cart:document.getElementById('cart').checked})
   }).then(function(r){return r.json();}).then(function(){
     var m=document.getElementById('msg');m.style.display='block';setTimeout(function(){m.style.display='none';},3000);
   }).catch(function(){alert('Error al guardar. Intenta de nuevo.');});
@@ -8429,18 +8458,112 @@ function save(){
 });
 
 app.post('/api/email-preferences', async (req, res) => {
-  const { token, marketing, followup } = req.body;
+  const { token, marketing, followup, abandoned_cart } = req.body;
   if (!token) return res.status(400).json({ error: 'Token requerido' });
   try {
     await db.execute(
-      'UPDATE email_preferences SET marketing=?, followup=?, updated_at=? WHERE unsubscribe_token=?',
-      [marketing ? 1 : 0, followup ? 1 : 0, new Date(), token]
+      'UPDATE email_preferences SET marketing=?, followup=?, abandoned_cart=COALESCE(?, abandoned_cart), updated_at=? WHERE unsubscribe_token=?',
+      [marketing ? 1 : 0, followup ? 1 : 0, abandoned_cart === undefined ? null : (abandoned_cart ? 1 : 0), new Date(), token]
     );
     res.json({ ok: true });
   } catch(e) {
     res.status(500).json({ error: 'Error al guardar preferencias' });
   }
 });
+
+// GET/POST /api/customer/email-prefs — las tres casillas "Comunicaciones por
+// Email" del panel de cuenta. El front las llamaba pero estas rutas no existían,
+// así que el panel siempre mostraba "Error al cargar preferencias" y nada de lo
+// que el cliente elegía se guardaba (ni se respetaba al enviar correos).
+app.get('/api/customer/email-prefs', requireCustomer, async (req, res) => {
+  try {
+    const p = await ensureEmailPreferences(req.customer.user.id);
+    res.json({
+      marketing:      !!p.marketing,
+      followup:       !!p.followup,
+      abandoned_cart: p.abandoned_cart == null ? true : !!p.abandoned_cart,
+    });
+  } catch(e) {
+    res.status(500).json({ error: 'No se pudieron cargar las preferencias.' });
+  }
+});
+
+app.post('/api/customer/email-prefs', requireCustomer, async (req, res) => {
+  const b = req.body || {};
+  const id = req.customer.user.id;
+  try {
+    await ensureEmailPreferences(id);
+    await db.execute(
+      'UPDATE email_preferences SET marketing=?, followup=?, abandoned_cart=?, updated_at=? WHERE customer_id=?',
+      [b.marketing ? 1 : 0, b.followup ? 1 : 0, b.abandoned_cart ? 1 : 0, new Date(), id]
+    );
+    res.json({ ok: true });
+  } catch(e) {
+    res.status(500).json({ error: 'No se pudieron guardar las preferencias.' });
+  }
+});
+
+// POST /api/cart/capture — guarda el carrito de quien ya escribió su correo en el
+// paso 1 del checkout (antes el front llamaba a esta ruta pero no existía y el
+// 404 se tragaba en silencio). Los precios del cliente son solo informativos: no
+// se crea ningún pedido ni cobro desde aquí. Respeta la preferencia
+// "Recordatorio de carrito" si el correo es de un cliente registrado.
+const cartCaptureLimiter = rateLimit(10, 10 * 60 * 1000);
+app.post('/api/cart/capture', cartCaptureLimiter, async (req, res) => {
+  const email = String(req.body.email || '').toLowerCase().trim();
+  if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(email) || email.length > 255) {
+    return res.status(400).json({ error: 'Correo inválido.' });
+  }
+  const rawCart = Array.isArray(req.body.cart) ? req.body.cart.slice(0, 30) : [];
+  const cart = rawCart.map(i => ({
+    productId: parseInt(i.productId, 10) || null,
+    name:      String(i.name || '').slice(0, 150),
+    qty:       Math.min(Math.max(parseInt(i.qty, 10) || 1, 1), 99),
+    price:     Math.min(Math.max(parseFloat(i.price) || 0, 0), 10000),
+  })).filter(i => i.productId && i.name);
+  if (!cart.length) return res.status(400).json({ error: 'Carrito vacío.' });
+  const total = Math.round(cart.reduce((s, i) => s + i.price * i.qty, 0) * 100) / 100;
+
+  const customerToken   = req.headers['x-customer-token'];
+  const customerSession = customerToken ? validateSession(customerToken) : null;
+  const customerId      = (customerSession && customerSession.role === 'customer') ? customerSession.user.id : null;
+
+  try {
+    const [prefRows] = await db.execute(
+      `SELECT ep.abandoned_cart FROM customers c
+       JOIN email_preferences ep ON ep.customer_id = c.id
+       WHERE c.email = ? LIMIT 1`,
+      [email]
+    );
+    if (prefRows.length && prefRows[0].abandoned_cart === 0) return res.json({ ok: true, skipped: true });
+
+    const now = new Date();
+    await db.execute(
+      `INSERT INTO abandoned_carts (email, name, customer_id, session_id, cart, total, created_at, updated_at)
+       VALUES (?,?,?,?,?,?,?,?)
+       ON DUPLICATE KEY UPDATE
+         name        = COALESCE(VALUES(name), name),
+         customer_id = COALESCE(VALUES(customer_id), customer_id),
+         session_id  = VALUES(session_id),
+         cart        = VALUES(cart),
+         total       = VALUES(total),
+         updated_at  = VALUES(updated_at)`,
+      [email,
+       String(req.body.name || '').trim().slice(0, 120) || null,
+       customerId,
+       req.body.sessionId ? String(req.body.sessionId).slice(0, 100) : null,
+       JSON.stringify(cart), total, now, now]
+    );
+    res.json({ ok: true });
+  } catch(e) {
+    console.error('cart/capture error:', e.message);
+    res.status(500).json({ error: 'No se pudo guardar el carrito.' });
+  }
+});
+// Minimización de datos: los carritos capturados no se conservan más de 30 días.
+setInterval(() => {
+  db.execute('DELETE FROM abandoned_carts WHERE updated_at < DATE_SUB(NOW(), INTERVAL 30 DAY)').catch(() => {});
+}, 24 * 60 * 60 * 1000).unref();
 
 // Create email preferences when customer registers
 async function initEmailPreferencesForCustomer(customerId) {
