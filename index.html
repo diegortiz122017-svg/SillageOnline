@@ -4271,6 +4271,7 @@ function openDetail(pid){
   document.getElementById('bcName').textContent=p.name;
   document.getElementById('backBtn').textContent = _detailFromBundle
     ? '← Volver al bundle "'+_detailFromBundle.name+'"'
+    : _detailFromNez ? '← Volver a Nez'
     : '← Volver a la Colección';
   var slidesEl=document.getElementById('slides');slidesEl.innerHTML='';
   var bgs=['background:linear-gradient(135deg,#f2ede4,#e8e0d4)'];
@@ -4600,6 +4601,10 @@ function closeDetail(){
   if(window.history.state && window.history.state.producto){
     window.history.pushState({}, '', '/');
   }
+  if(_detailFromNez){
+    _detailFromNez = false;
+    _somReturnToChat();
+  }
 }
 document.getElementById('backBtn').addEventListener('click',closeDetail);
 
@@ -4609,6 +4614,7 @@ window.addEventListener('popstate', function(e) {
   if (detailOverlay && detailOverlay.classList.contains('open')) {
     detailOverlay.classList.remove('open');
     document.body.style.overflow = '';
+    if (_detailFromNez) { _detailFromNez = false; _somReturnToChat(); }
     return;
   }
   var bundleOverlay = document.getElementById('bundleDetailOverlay');
@@ -5831,6 +5837,10 @@ var currentCustomer = null;
 // modos, esto solo cubre el caso residual de un ?bundle= directo en la home.
 var _lastBundleViewed = null;
 var _detailFromBundle = null;
+// _detailFromNez: el detalle de producto se abrió desde una recomendación de Nez;
+// "volver" (botón, Escape, fondo o atrás del navegador) regresa a la consulta
+// en vez de dejar al cliente en la colección.
+var _detailFromNez = false;
 
 function openBundleDetail(b){
   _lastBundleViewed = b;
@@ -8124,6 +8134,16 @@ function openSommelierModal(){
   setTimeout(function(){ var inp=document.getElementById('somInput'); if(inp)inp.focus(); }, 350);
 }
 
+// Reabre la consulta tal como estaba (sin reiniciarla ni contarla como una
+// apertura nueva) — openSommelierModal() empezaría otra consulta si la anterior ya llegó a 5 preguntas.
+function _somReturnToChat(){
+  _somOpen = true;
+  document.getElementById('somModal').classList.add('open');
+  document.body.style.overflow = 'hidden';
+  var c = document.getElementById('somMessages');
+  if(c) c.scrollTop = c.scrollHeight;
+}
+
 function closeSommelierModal(){
   _somOpen = false;
   document.getElementById('somModal').classList.remove('open');
@@ -8528,7 +8548,11 @@ function somAddMsg(role, text, recs){
         // not just its ID.
         enrichProfileFromProduct(p);
         closeSommelierModal();
-        setTimeout(function(){ openDetail(p.id); }, 200);
+        setTimeout(function(){
+          _detailFromNez = true;
+          openDetail(p.id);
+          if(_detailOpenPid !== p.id) _detailFromNez = false; // producto no encontrado: no dejar la marca puesta
+        }, 200);
       });
       recsDiv.appendChild(card);
     });
