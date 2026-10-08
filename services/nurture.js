@@ -39,6 +39,11 @@ function effectivePrice(p, priceMap) {
 function decantPrice(p, priceMap) {
   return p.decantPrice ? parseFloat(p.decantPrice) : Math.round(effectivePrice(p, priceMap) * 0.30);
 }
+// El decant solo se ofrece si la venta de decants está activa (ajuste global) y
+// a ese producto le quedan decants (decantOut = ids con stock 0 en decant_inventory).
+function decantOffered(p, ctx) {
+  return !!ctx.decantsEnabled && !(ctx.decantOut && ctx.decantOut.has(Number(p.id)));
+}
 function available(p, invMap) {
   return !(invMap && invMap[p.id] && invMap[p.id].outOfStock);
 }
@@ -260,7 +265,7 @@ function thumb(p) {
 
 function productCard(p, why, campaign, ctx) {
   const ep = effectivePrice(p, ctx.priceMap);
-  const priceLine = ctx.decantsEnabled
+  const priceLine = decantOffered(p, ctx)
     ? `Frasco $${ep} &nbsp;·&nbsp; <strong>Decant 10 ml $${decantPrice(p, ctx.priceMap)}</strong>`
     : `Frasco $${ep}`;
   return `<table width="100%" cellpadding="0" cellspacing="0" style="${S.card}"><tr>${thumb(p)}
@@ -284,8 +289,9 @@ function couponBlock(code, expires) {
   </div>`;
 }
 
-function minDecant(catalogue, invMap, priceMap) {
-  const prices = catalogue.filter(p => available(p, invMap)).map(p => decantPrice(p, priceMap)).filter(x => x > 0);
+function minDecant(catalogue, invMap, priceMap, decantOut) {
+  const prices = catalogue.filter(p => available(p, invMap) && !(decantOut && decantOut.has(Number(p.id))))
+    .map(p => decantPrice(p, priceMap)).filter(x => x > 0);
   return prices.length ? Math.min(...prices) : 0;
 }
 
@@ -311,34 +317,42 @@ function buildNurtureEmail(ctx) {
     if (fl.length) recall.push(`fragancias ${joinEs(fl)}`);
     const nt = (prof.notes || []).map(norm).map(displayNote).slice(0, 3);
     if (nt.length) recall.push(`notas como ${joinEs(nt)}`);
-    subject = step === 1 ? 'Nez guardó 3 opciones que van contigo'
-      : 'Tus 3 opciones siguen disponibles — y el envío del primer pedido va por nuestra cuenta';
-    body = `<h2 style="${S.h}">${step === 1 ? 'Nez ya te conoce' : 'Tus opciones siguen ahí'}</h2>
+    const n = choice.picks.length;
+    const nWord = n === 2 ? 'Dos' : 'Tres';
+    const anyDecant = choice.picks.some(r => decantOffered(r.p, ctx));
+    // Encabezado específico: usa lo que la persona le dijo a Nez (familias o notas).
+    const what = fl.length ? `fragancias ${joinEs(fl)}` : (nt.length ? `opciones con ${joinEs(nt.slice(0, 2))}` : 'opciones');
+    const heading = step === 1
+      ? `${nWord} ${what}${fl.length ? ' que siguen en stock' : ''}`
+      : `Siguen disponibles: ${nWord.toLowerCase()} ${what}`;
+    subject = step === 1 ? `Nez guardó ${n} opciones que van contigo`
+      : `Tus ${n} opciones siguen disponibles — y el envío del primer pedido va por nuestra cuenta`;
+    body = `<h2 style="${S.h}">${esc(heading)}</h2>
       <p style="${S.p}">${hello}</p>
       <p style="${S.p}">Nez recuerda lo que le contaste${recall.length ? ': ' + esc(joinEs(recall)) : ''}. Con eso, estas ${choice.picks.length} están en stock ahora mismo:</p>
       ${choice.picks.map(r => productCard(r.p, reasonForPick(r), campaign, ctx)).join('')}
-      <p style="${S.p}">Si dudas entre dos, el decant te deja probar antes de comprar el frasco.</p>
+      <p style="${S.p}">${anyDecant ? 'Si dudas entre dos, el decant te deja probar antes de comprar el frasco.' : 'Si dudas entre dos, cuéntale a Nez y te ayuda a decidir.'}</p>
       ${coupon}
       <a href="${esc(nezUrl(campaign))}" style="${S.btn}">Seguir con Nez</a>`;
   } else if (v === 'B') {
     const m = choice.main;
     const first = m[0].p;
     subject = step === 1
-      ? (ctx.decantsEnabled ? `${first.name}: ¿lo pruebas en decant antes de decidir?` : `Lo que estabas mirando: ${first.name}`)
+      ? (decantOffered(first, ctx) ? `${first.name}: ¿lo pruebas en decant antes de decidir?` : `Lo que estabas mirando: ${first.name}`)
       : `${first.name} sigue disponible — y el envío del primer pedido va por nuestra cuenta`;
     const sim = choice.similar;
     const cmpQ = sim ? `Estoy dudando entre ${first.brand} ${first.name} y ${sim.p.brand} ${sim.p.name}. ¿Cuál me conviene?`
       : `Me interesa ${first.brand} ${first.name}. ¿Qué me recomiendas parecido?`;
     body = `<h2 style="${S.h}">${esc(first.name)} sigue disponible</h2>
       <p style="${S.p}">${hello}</p>
-      <p style="${S.p}">${ctx.decantsEnabled ? 'Un frasco completo es una compra a ciegas; el decant no.' : 'Esto es lo que dejaste pendiente.'}</p>
+      <p style="${S.p}">${decantOffered(first, ctx) ? 'Un frasco completo es una compra a ciegas; el decant no.' : 'Esto es lo que dejaste pendiente.'}</p>
       ${m.map(x => productCard(x.p, SOURCE_ES[x.source] + '.', campaign, ctx)).join('')}
       ${sim ? `<p style="${S.p}">Si quieres comparar con algo parecido:</p>
         ${productCard(sim.p, sim.shared.length ? `Comparte lo ${joinEs(sim.shared.slice(0, 3))} de ${first.name} y está en un precio similar.` : `Es del mismo estilo que ${first.name} y está en un precio similar.`, campaign, ctx)}` : ''}
       ${coupon}
       <a href="${esc(nezUrl(campaign, cmpQ))}" style="${S.btn}">${sim ? 'Preguntarle a Nez cuál va mejor' : 'Preguntarle a Nez'}</a>`;
   } else {
-    const md = minDecant(ctx.catalogue || [], ctx.invMap, ctx.priceMap);
+    const md = minDecant(ctx.catalogue || [], ctx.invMap, ctx.priceMap, ctx.decantOut);
     subject = step === 1 ? 'Dime una ocasión y te doy tres opciones'
       : 'Todavía sin elegir — el envío del primer pedido va por nuestra cuenta';
     body = `<h2 style="${S.h}">Dime una ocasión y una nota que te guste</h2>

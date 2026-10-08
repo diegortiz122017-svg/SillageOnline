@@ -8544,14 +8544,17 @@ async function nurtureCreateCoupon() {
 
 // Arma el correo completo (sin enviarlo). Lo usan el temporizador y la vista previa.
 async function buildNurtureForCustomer(c, step, code, codeExpires) {
-  const [catalogue, invMap, priceMap, decantsFlag, profile, signals] = await Promise.all([
+  const [catalogue, invMap, priceMap, decantsFlag, profile, signals, decantRows] = await Promise.all([
     getCatalogue(), getInventoryMap(), getPricingMap(), getSetting('decants_enabled', '1'),
     nurtureProfile(c), nurtureSignals(c),
+    // Decant de 10 ml con stock 0 = agotado (NULL = sin límite), igual que en POST /api/orders.
+    db.execute('SELECT product_id FROM decant_inventory WHERE size_ml = 10 AND stock IS NOT NULL AND stock <= 0').then(r => r[0]),
   ]);
+  const decantOut = new Set(decantRows.map(r => Number(r.product_id)));
   const choice = nurture.chooseNurture({ profile, signals, catalogue, invMap, priceMap });
   const mail = nurture.buildNurtureEmail({
     step, choice, firstName: String(c.name || '').trim().split(/\s+/)[0],
-    code, codeExpires, decantsEnabled: decantsFlag !== '0', priceMap, catalogue, invMap,
+    code, codeExpires, decantsEnabled: decantsFlag !== '0', decantOut, priceMap, catalogue, invMap,
   });
   const footer = await buildUnsubscribeFooter(c.id, 'Recibiste este correo porque creaste una cuenta en Sillage Parfumerie.');
   return { variant: mail.variant, subject: mail.subject, html: emailTemplate(mail.bodyHtml + footer) };
