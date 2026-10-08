@@ -778,7 +778,7 @@ function emailTemplate(bodyHtml) {
   </div>
   <div style="padding:40px">${bodyHtml}</div>
   <div style="background:#0e0c0a;padding:24px 40px;text-align:center">
-    <div style="font-size:10px;letter-spacing:3px;text-transform:uppercase;color:#8a7f72">&copy; 2025 Sillage Parfumerie</div>
+    <div style="font-size:10px;letter-spacing:3px;text-transform:uppercase;color:#8a7f72">&copy; ${new Date().getFullYear()} Sillage Parfumerie</div>
   </div>
 </div></body></html>`;
 }
