@@ -5694,8 +5694,12 @@ function _orderBreakdown(order, fallbackTotal){
   var subtotal = items.reduce(function(s,i){return s+parseFloat(i.total||0);},0);
   var discount = parseFloat(order.promoDiscount!=null?order.promoDiscount:(order.promo_discount||0)) || 0;
   var total    = parseFloat(order.total!=null?order.total:fallbackTotal||0);
-  var shipping = Math.max(0, Math.round((total-subtotal+discount)*100)/100);
-  return {subtotal:subtotal, shipping:shipping, discount:discount, total:total, promoCode:order.promoCode||order.promo_code||''};
+  // Si el admin ajustó el total (pedido contra entrega), el envío sale del monto ORIGINAL
+  // y la diferencia se muestra aparte como ajuste — si no, se disfrazaría de envío.
+  var base       = order.original_total!=null ? parseFloat(order.original_total) : total;
+  var shipping   = Math.max(0, Math.round((base-subtotal+discount)*100)/100);
+  var adjustment = Math.round((total-base)*100)/100;
+  return {subtotal:subtotal, shipping:shipping, discount:discount, adjustment:adjustment, total:total, promoCode:order.promoCode||order.promo_code||''};
 }
 
 // Pantalla de \u00e9xito compartida \u2014 usada por el flujo normal (/api/orders) y por
@@ -7685,10 +7689,11 @@ function loadAcctOrders(){
           '<div class="ap-order-items">'+items+'</div>'+
           (function(){
             var bd=_orderBreakdown(o);
-            if(bd.shipping<=0 && bd.discount<=0) return '';
+            if(bd.shipping<=0 && bd.discount<=0 && Math.abs(bd.adjustment)<0.009) return '';
             var parts=['Subtotal $'+bd.subtotal.toFixed(2)];
             parts.push('Envío '+(bd.shipping>0?'$'+bd.shipping.toFixed(2):'Gratis'));
             if(bd.discount>0) parts.push('Descuento −$'+bd.discount.toFixed(2));
+            if(Math.abs(bd.adjustment)>=0.009) parts.push('Ajuste '+(bd.adjustment<0?'−':'+')+'$'+Math.abs(bd.adjustment).toFixed(2));
             return '<div class="ap-order-items" style="opacity:0.75">'+parts.join(' · ')+'</div>';
           })()+
           '<div class="ap-order-foot">'+

@@ -173,6 +173,99 @@ function distribuirDescuento(items, brutos, totalDescuento) {
 }
 
 // ════════════════════════════════════════════════════════════════════════════
+//  AJUSTE MANUAL DEL TOTAL (órdenes contra entrega)
+//  Los DTE se arman SOLO con los ítems y el descuento del cupón; no leen
+//  orders.total. Si el admin ajustó el total de una orden contra entrega
+//  (orders.total_adjusted_at no es null), el documento se cuadra contra ese monto
+//  FINAL (IVA incluido): si baja, se resta como descuento adicional proporcional
+//  en todas las líneas; si sube, se agrega una línea de servicio "Cargo adicional".
+// ════════════════════════════════════════════════════════════════════════════
+function hayAjusteDeTotal(order) {
+  return order.total_adjusted_at != null && order.total != null && !isNaN(parseFloat(order.total));
+}
+
+// Resta `extra` (>0) de la venta gravada de las líneas con venta, proporcional a
+// cada una; la última absorbe el remanente de redondeo.
+function repartirEnLineas(cuerpo, extra) {
+  const bases = cuerpo.map(c => c.ventaGravada);
+  const total = round2(bases.reduce((s, b) => s + b, 0));
+  if (extra >= total) throw new Error('El ajuste deja el DTE en cero o negativo');
+  const idxUltimo = bases.reduce((last, b, i) => b > 0 ? i : last, -1);
+  let asignado = 0;
+  cuerpo.forEach((c, i) => {
+    if (bases[i] <= 0) return;
+    let d = i === idxUltimo ? round2(extra - asignado) : round2(extra * bases[i] / total);
+    d = Math.min(d, bases[i]);
+    asignado = round2(asignado + d);
+    c.montoDescu   = round2(c.montoDescu + d);
+    c.ventaGravada = round2(c.ventaGravada - d);
+  });
+}
+
+function lineaCargoAdicional(numItem, monto, conTributo20) {
+  return {
+    numItem, tipoItem: 2, numeroDocumento: null, cantidad: 1, codigo: null, codTributo: null,
+    uniMedida: 59, descripcion: 'Cargo adicional (envío / ajuste)', precioUni: monto,
+    montoDescu: 0, ventaNoSuj: 0, ventaExenta: 0, ventaGravada: monto,
+    tributos: conTributo20 ? ['20'] : null, psv: 0, noGravado: 0,
+  };
+}
+
+function ajustarFacturaATotal(cuerpo, resumen, target) {
+  const diff = round2(target - resumen.totalGravada);
+  if (diff === 0) return;
+  if (diff < 0) repartirEnLineas(cuerpo, -diff);
+  else {
+    cuerpo.push(lineaCargoAdicional(cuerpo.length + 1, diff, false));
+    resumen.subTotalVentas = round2(resumen.subTotalVentas + diff);
+  }
+  cuerpo.forEach(c => { c.ivaItem = round2(c.ventaGravada - c.ventaGravada / (1 + IVA_RATE)); });
+  const tg = round2(cuerpo.reduce((s, c) => s + c.ventaGravada, 0));
+  const td = round2(cuerpo.reduce((s, c) => s + c.montoDescu, 0));
+  resumen.totalGravada        = tg;
+  resumen.totalIva            = round2(cuerpo.reduce((s, c) => s + c.ivaItem, 0));
+  resumen.totalDescu          = td;
+  resumen.descuGravada        = td;
+  resumen.porcentajeDescuento = resumen.subTotalVentas > 0 ? round2((td / resumen.subTotalVentas) * 100) : 0;
+  resumen.subTotal            = tg;
+  resumen.montoTotalOperacion = tg;
+  resumen.totalPagar          = tg;
+  resumen.totalLetras         = numeroALetras(tg);
+  (resumen.pagos || []).forEach(p => { p.montoPago = tg; });
+}
+
+function ajustarCcfATotal(cuerpo, resumen, target) {
+  // Neto cuyo total con IVA dé EXACTAMENTE target (el redondeo puede mover 1 centavo).
+  const n0 = round2(target / (1 + IVA_RATE));
+  let neto = n0;
+  for (const off of [0, -0.01, 0.01, -0.02, 0.02]) {
+    const n = round2(n0 + off);
+    if (round2(n + round2(n * IVA_RATE)) === target) { neto = n; break; }
+  }
+  const diff = round2(neto - resumen.totalGravada);
+  if (diff === 0) return;
+  if (diff < 0) repartirEnLineas(cuerpo, -diff);
+  else {
+    cuerpo.push(lineaCargoAdicional(cuerpo.length + 1, diff, true));
+    resumen.subTotalVentas = round2(resumen.subTotalVentas + diff);
+  }
+  const tg    = round2(cuerpo.reduce((s, c) => s + c.ventaGravada, 0));
+  const iva   = round2(tg * IVA_RATE);
+  const total = round2(tg + iva);
+  const td    = round2(cuerpo.reduce((s, c) => s + c.montoDescu, 0));
+  resumen.totalGravada        = tg;
+  resumen.totalDescu          = td;
+  resumen.descuGravada        = td;
+  resumen.porcentajeDescuento = resumen.subTotalVentas > 0 ? round2((td / resumen.subTotalVentas) * 100) : 0;
+  resumen.tributos            = [{ codigo: '20', descripcion: 'Impuesto al Valor Agregado 13%', valor: iva }];
+  resumen.subTotal            = tg;
+  resumen.montoTotalOperacion = total;
+  resumen.totalPagar          = total;
+  resumen.totalLetras         = numeroALetras(total);
+  (resumen.pagos || []).forEach(p => { p.montoPago = total; });
+}
+
+// ════════════════════════════════════════════════════════════════════════════
 //  TIPO 01 — Factura Consumidor Final (IVA incluido en el precio)
 // ════════════════════════════════════════════════════════════════════════════
 function buildFactura(order, opts) {
@@ -250,6 +343,8 @@ function buildFactura(order, opts) {
     numPagoElectronico:   null,
     observaciones:        null,
   };
+
+  if (hayAjusteDeTotal(order)) ajustarFacturaATotal(cuerpoDocumento, resumen, round2(parseFloat(order.total)));
 
   return {
     identificacion:      buildIdentificacion('01', 2, opts.numeroControl, opts.codigoGeneracion, fecEmi, horEmi),
@@ -349,6 +444,8 @@ function buildCreditoFiscal(order, receptor, opts) {
     numPagoElectronico:  null,
     observaciones:       null,
   };
+
+  if (hayAjusteDeTotal(order)) ajustarCcfATotal(cuerpoDocumento, resumen, round2(parseFloat(order.total)));
 
   return {
     identificacion:      buildIdentificacion('03', 4, opts.numeroControl, opts.codigoGeneracion, fecEmi, horEmi),
@@ -1252,6 +1349,7 @@ module.exports = {
   numeroALetras,           // exported for tests
   buildFactura,
   buildCreditoFiscal,
+  hayAjusteDeTotal,
   buildNotaCredito,
   buildNotaCreditoExacta,
   buildAnulacion,

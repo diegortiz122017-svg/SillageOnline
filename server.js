@@ -622,6 +622,20 @@ async function initDB() {
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
   `);
 
+  // Historial de ajustes de total (quién, cuándo, de cuánto a cuánto y por qué).
+  await db.execute(`
+    CREATE TABLE IF NOT EXISTS order_total_adjustments (
+      id         INT AUTO_INCREMENT PRIMARY KEY,
+      order_id   VARCHAR(60)   NOT NULL,
+      old_total  DECIMAL(10,2) NOT NULL,
+      new_total  DECIMAL(10,2) NOT NULL,
+      reason     VARCHAR(255)  DEFAULT NULL,
+      admin_user VARCHAR(100)  DEFAULT NULL,
+      created_at DATETIME      NOT NULL,
+      INDEX idx_order (order_id)
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
+  `);
+
   console.log('✅ Tables ready');
 }
 
@@ -657,6 +671,11 @@ async function migrateOrders() {
     "promo_code     VARCHAR(30)  DEFAULT NULL",
     "promo_discount DECIMAL(10,2) DEFAULT 0",
     "wompi_reference VARCHAR(60) DEFAULT NULL",
+    // Ajuste manual del total en pedidos contra entrega (antes de emitir el DTE):
+    // original_total = monto previo al primer ajuste (NULL si nunca se ajustó).
+    "original_total     DECIMAL(10,2) DEFAULT NULL",
+    "total_adjusted_at  DATETIME      DEFAULT NULL",
+    "total_adjust_note  VARCHAR(255)  DEFAULT NULL",
   ];
   for (const col of cols) {
     const colName = col.trim().split(' ')[0];
@@ -2632,8 +2651,13 @@ app.get('/api/orders/:id/invoice', optionalCustomer, async (req, res) => {
   // así que se deriva por álgebra (total = subtotal - descuento + envío).
   const invSubtotal = items.reduce((s, i) => s + parseFloat(i.total || 0), 0);
   const invDiscount = parseFloat(order.promo_discount || 0);
-  const invShipping = Math.max(0, Math.round((parseFloat(total) - invSubtotal + invDiscount) * 100) / 100);
-  const breakdownRows = (invShipping > 0.009 || invDiscount > 0.009) ? `
+  // Si el total se ajustó a mano (pedido contra entrega), el envío se deriva del
+  // monto original y la diferencia se muestra como "Ajuste" — si no, el ajuste
+  // quedaría disfrazado de envío.
+  const invBase   = order.original_total != null ? parseFloat(order.original_total) : parseFloat(total);
+  const invAdjust = Math.round((parseFloat(total) - invBase) * 100) / 100;
+  const invShipping = Math.max(0, Math.round((invBase - invSubtotal + invDiscount) * 100) / 100);
+  const breakdownRows = (invShipping > 0.009 || invDiscount > 0.009 || Math.abs(invAdjust) > 0.009) ? `
         <div class="inv-total-row"><div class="inv-total-box">
           <div class="inv-total-label">Subtotal</div>
           <div class="inv-subval">$${invSubtotal.toFixed(2)}</div>
@@ -2646,6 +2670,11 @@ app.get('/api/orders/:id/invoice', optionalCustomer, async (req, res) => {
         <div class="inv-total-row"><div class="inv-total-box">
           <div class="inv-total-label">Descuento${order.promo_code ? ' (' + escHtml(order.promo_code) + ')' : ''}</div>
           <div class="inv-subval">−$${invDiscount.toFixed(2)}</div>
+        </div></div>` : ''}
+        ${Math.abs(invAdjust) > 0.009 ? `
+        <div class="inv-total-row"><div class="inv-total-box">
+          <div class="inv-total-label">Ajuste</div>
+          <div class="inv-subval">${invAdjust < 0 ? '−' : '+'}$${Math.abs(invAdjust).toFixed(2)}</div>
         </div></div>` : ''}` : '';
 
   const dteHeaderBlock = dte ? `
@@ -2803,6 +2832,85 @@ app.get('/api/admin/orders/:id/dte', requireAdmin, async (req, res) => {
     })));
   } catch(e) {
     res.status(500).json({ error: e.message });
+  }
+});
+
+// POST /api/admin/orders/:id/adjust-total — { newTotal, reason }
+// Ajusta el total de un pedido CONTRA ENTREGA (p. ej. el cliente pagó otro monto
+// en efectivo, se aplicó un descuento al entregar, un cargo de envío) ANTES de
+// emitir su DTE: el documento se cuadra contra este total final, IVA incluido
+// (ver hayAjusteDeTotal en services/dte.js). Solo contra entrega — en los pagos
+// en línea el monto lo fija la pasarela. Si ya hay un DTE emitido no se permite:
+// habría que corregirlo con una nota de crédito. Poner de vuelta el monto
+// original restablece el pedido. Todo queda registrado en order_total_adjustments.
+app.post('/api/admin/orders/:id/adjust-total', requireAdmin, async (req, res) => {
+  const b = req.body || {};
+  const newTotal = Math.round(parseFloat(b.newTotal) * 100) / 100;
+  const reason = String(b.reason || '').trim().slice(0, 255);
+  if (!isFinite(newTotal) || newTotal <= 0 || newTotal > 10000) {
+    return res.status(400).json({ error: 'Ingresa un monto válido, mayor a $0 y de hasta $10,000.' });
+  }
+  try {
+    const [rows] = await db.execute(
+      'SELECT id, customer, total, original_total, status, payment_method FROM orders WHERE id=?', [req.params.id]
+    );
+    if (!rows.length) return res.status(404).json({ error: 'Pedido no encontrado.' });
+    const o = rows[0];
+    if (o.payment_method !== 'cod') {
+      return res.status(400).json({ error: 'Solo se puede ajustar el monto de pedidos contra entrega; en los pagos en línea el monto lo fija la pasarela.' });
+    }
+    if (o.status === 'Cancelado') return res.status(400).json({ error: 'El pedido está cancelado.' });
+
+    const dtes = await dteSvc.getByOrderId(o.id);
+    const emitido = dtes.find(d => d.estado === 'PROCESADO' || d.estado === 'CONTINGENCIA');
+    if (emitido) {
+      return res.status(409).json({ error: `Este pedido ya tiene un DTE ${String(emitido.estado).toLowerCase()} (tipo ${emitido.tipo_dte}). Ajustar el monto ahora no cambiaría ese documento; hay que corregirlo con una nota de crédito.` });
+    }
+
+    const current  = parseFloat(o.total);
+    const original = o.original_total != null ? parseFloat(o.original_total) : current;
+    const isReset  = o.original_total != null && Math.abs(newTotal - original) < 0.005;
+    if (!isReset && Math.abs(newTotal - current) < 0.005) {
+      return res.status(400).json({ error: 'Ese es el monto actual del pedido.' });
+    }
+    if (!isReset && reason.length < 3) return res.status(400).json({ error: 'Escribe el motivo del ajuste.' });
+
+    const now = new Date();
+    if (isReset) {
+      await db.execute(
+        'UPDATE orders SET total=?, original_total=NULL, total_adjusted_at=NULL, total_adjust_note=NULL, updated_at=? WHERE id=?',
+        [newTotal, now, o.id]
+      );
+    } else {
+      await db.execute(
+        'UPDATE orders SET total=?, original_total=COALESCE(original_total, ?), total_adjusted_at=?, total_adjust_note=?, updated_at=? WHERE id=?',
+        [newTotal, current, now, reason, now, o.id]
+      );
+    }
+    await db.execute(
+      'INSERT INTO order_total_adjustments (order_id, old_total, new_total, reason, admin_user, created_at) VALUES (?,?,?,?,?,?)',
+      [o.id, current, newTotal, isReset ? ('Restablecido al monto original' + (reason ? ': ' + reason : '')).slice(0, 255) : reason,
+       String(req.adminSession.user || 'admin').slice(0, 100), now]
+    );
+    await logActivity(isReset
+      ? `Monto del pedido ${o.id} restablecido al original: $${newTotal.toFixed(2)}`
+      : `Monto del pedido ${o.id} ajustado de $${current.toFixed(2)} a $${newTotal.toFixed(2)} — ${reason}`);
+
+    res.json({
+      ok: true,
+      order: {
+        id: o.id, total: newTotal,
+        original_total:    isReset ? null : original,
+        total_adjusted_at: isReset ? null : now,
+        total_adjust_note: isReset ? null : reason,
+      },
+    });
+  } catch(e) {
+    console.error('adjust-total error:', e.message);
+    if (/Unknown column|doesn't exist/i.test(e.message)) {
+      return res.status(500).json({ error: 'La base de datos aún no tiene las columnas del ajuste (migración pendiente). Revisa los logs del servidor.' });
+    }
+    res.status(500).json({ error: 'No se pudo ajustar el monto.' });
   }
 });
 

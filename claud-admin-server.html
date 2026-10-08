@@ -4547,12 +4547,15 @@ function openOrderDetail(orderId){
   // (total = subtotal - descuento + envío), igual que en el resto del sitio.
   var obSubtotal = (o.items||[]).reduce(function(s,i){return s+parseFloat(i.total||0);},0);
   var obDiscount = parseFloat(o.promo_discount||0) || 0;
-  var obShipping = Math.max(0, Math.round((parseFloat(o.total||0)-obSubtotal+obDiscount)*100)/100);
-  var breakdownHtml = (obShipping>0.009 || obDiscount>0.009) ?
+  var obBase     = o.original_total!=null ? parseFloat(o.original_total) : parseFloat(o.total||0);
+  var obAdjust   = Math.round((parseFloat(o.total||0)-obBase)*100)/100;
+  var obShipping = Math.max(0, Math.round((obBase-obSubtotal+obDiscount)*100)/100);
+  var breakdownHtml = (obShipping>0.009 || obDiscount>0.009 || Math.abs(obAdjust)>0.009) ?
     '<div style="display:flex;flex-direction:column;gap:0.2rem;padding:0.6rem 0;border-bottom:1px solid var(--border-light)">'+
       '<div style="display:flex;justify-content:space-between"><span style="font-size:0.68rem;color:var(--muted)">Subtotal</span><span style="font-size:0.68rem;color:var(--muted)">$'+obSubtotal.toFixed(2)+'</span></div>'+
       '<div style="display:flex;justify-content:space-between"><span style="font-size:0.68rem;color:var(--muted)">Envío</span><span style="font-size:0.68rem;color:var(--muted)">'+(obShipping>0?'$'+obShipping.toFixed(2):'Gratis')+'</span></div>'+
       (obDiscount>0.009?'<div style="display:flex;justify-content:space-between"><span style="font-size:0.68rem;color:var(--success)">Descuento'+(o.promo_code?' ('+esc(o.promo_code)+')':'')+'</span><span style="font-size:0.68rem;color:var(--success)">−$'+obDiscount.toFixed(2)+'</span></div>':'')+
+      (Math.abs(obAdjust)>0.009?'<div style="display:flex;justify-content:space-between"><span style="font-size:0.68rem;color:var(--warn)">Ajuste</span><span style="font-size:0.68rem;color:var(--warn)">'+(obAdjust<0?'−':'+')+'$'+Math.abs(obAdjust).toFixed(2)+'</span></div>':'')+
     '</div>' : '';
   var html =
     '<div style="display:flex;flex-direction:column;gap:1.2rem">'+
@@ -4588,6 +4591,7 @@ function openOrderDetail(orderId){
         '<div style="display:flex;justify-content:flex-end;padding-top:0.8rem">'+
           '<span style="font-family:Cormorant Garamond,serif;font-size:1.4rem;color:var(--gold)">$'+parseFloat(o.total||0).toFixed(2)+'</span>'+
         '</div>'+
+        '<div id="orderAdjustSec"></div>'+
       '</div>'+
       '<div style="display:flex;flex-direction:column;gap:0.6rem">'+
         '<div style="font-size:0.5rem;letter-spacing:0.2em;text-transform:uppercase;color:var(--muted)">Estado</div>'+
@@ -4601,6 +4605,69 @@ function openOrderDetail(orderId){
       '</div>'+
     '</div>';
   openSlidePanel('Pedido '+orderId, html);
+  renderOrderAdjust(o);
+}
+
+// ── Ajuste del monto de un pedido CONTRA ENTREGA, antes de emitir su DTE ──────
+// El DTE se cuadra contra el total final (IVA incluido); ver POST
+// /api/admin/orders/:id/adjust-total. Se bloquea si ya hay un DTE emitido.
+function renderOrderAdjust(o){
+  var sec=document.getElementById('orderAdjustSec');
+  if(!sec || o.payment_method!=='cod') return;
+  var cur=parseFloat(o.total||0), orig=o.original_total!=null?parseFloat(o.original_total):null;
+  function draw(locked){
+    var box='margin-top:1rem;padding:0.9rem;border:1px solid var(--border-light);background:var(--card)';
+    var lbl='<div style="font-size:0.5rem;letter-spacing:0.2em;text-transform:uppercase;color:var(--muted);margin-bottom:0.5rem">Ajustar monto (contra entrega)</div>';
+    var adjusted=orig!=null?'<div style="font-size:0.68rem;color:var(--warn);margin-bottom:0.6rem;line-height:1.6">Monto ajustado: original $'+orig.toFixed(2)+' → $'+cur.toFixed(2)+(o.total_adjust_note?' — «'+esc(o.total_adjust_note)+'»':'')+'</div>':'';
+    if(locked){
+      sec.innerHTML='<div style="'+box+'">'+lbl+adjusted+'<div style="font-size:0.68rem;color:var(--muted);line-height:1.6">Este pedido ya tiene un DTE emitido, así que el monto ya no se puede cambiar. Si hay que corregirlo, se hace con una nota de crédito.</div></div>';
+      return;
+    }
+    var inp='background:#0e0c0a;border:1px solid var(--border);color:var(--cream);font-family:Jost,sans-serif;font-size:0.72rem;padding:0.5rem;outline:none;box-sizing:border-box';
+    sec.innerHTML='<div style="'+box+'">'+lbl+adjusted+
+      '<div style="display:flex;gap:0.5rem;flex-wrap:wrap">'+
+        '<input id="adjTotal" type="number" step="0.01" min="0.01" value="'+cur.toFixed(2)+'" style="'+inp+';width:110px"/>'+
+        '<input id="adjReason" type="text" maxlength="200" placeholder="Motivo (obligatorio)" style="'+inp+';flex:1;min-width:160px"/>'+
+      '</div>'+
+      '<div style="font-size:0.6rem;color:var(--muted);margin:0.5rem 0;line-height:1.6">El DTE saldrá por este monto final, IVA incluido: si baja, se resta como descuento en las líneas; si sube, se agrega una línea de cargo adicional. En Crédito Fiscal puede variar $0.01 por el redondeo del IVA.</div>'+
+      '<div style="display:flex;gap:0.5rem;flex-wrap:wrap">'+
+        '<button class="save-btn" style="padding:0.45rem 1rem;font-size:0.6rem" onclick="saveOrderAdjust(\''+esc(o.id)+'\')">Guardar ajuste</button>'+
+        (orig!=null?'<button class="save-btn" style="padding:0.45rem 1rem;font-size:0.6rem;background:transparent;border:1px solid var(--border);color:var(--muted)" onclick="resetOrderAdjust(\''+esc(o.id)+'\')">Restablecer a $'+orig.toFixed(2)+'</button>':'')+
+      '</div>'+
+      '<div id="adjErr" style="color:#d9534f;font-size:0.65rem;margin-top:0.5rem"></div></div>';
+  }
+  draw(false);
+  adminFetch(API+'/admin/orders/'+encodeURIComponent(o.id)+'/dte',{}).then(function(r){return r?r.json():null;}).then(function(list){
+    if(Array.isArray(list) && list.some(function(d){return d.estado==='PROCESADO'||d.estado==='CONTINGENCIA';})) draw(true);
+  }).catch(function(){});
+}
+function _postOrderAdjust(oid, newTotal, reason){
+  var err=document.getElementById('adjErr'); if(err) err.textContent='';
+  adminFetch(API+'/admin/orders/'+encodeURIComponent(oid)+'/adjust-total',{
+    method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({newTotal:newTotal, reason:reason})
+  }).then(function(r){return r?r.json():null;}).then(function(d){
+    if(!d||d.error){ if(err) err.textContent=(d&&d.error)||'Sin respuesta.'; return; }
+    var o=orders.find(function(x){return String(x.id)===String(oid);});
+    if(o){ o.total=d.order.total; o.original_total=d.order.original_total; o.total_adjusted_at=d.order.total_adjusted_at; o.total_adjust_note=d.order.total_adjust_note; }
+    toast('Monto actualizado','$'+parseFloat(d.order.total).toFixed(2),'ok');
+    openOrderDetail(oid);
+    try{ renderOrders(); }catch(e){}
+    try{ renderOverview(); }catch(e){}
+  }).catch(function(e){ if(err) err.textContent='Error: '+e.message; });
+}
+function saveOrderAdjust(oid){
+  var v=parseFloat(document.getElementById('adjTotal').value);
+  var reason=document.getElementById('adjReason').value.trim();
+  var err=document.getElementById('adjErr');
+  if(!isFinite(v)||v<=0){ err.textContent='Ingresa un monto válido, mayor a $0.'; return; }
+  if(reason.length<3){ err.textContent='Escribe el motivo del ajuste.'; return; }
+  _postOrderAdjust(oid, v, reason);
+}
+function resetOrderAdjust(oid){
+  var o=orders.find(function(x){return String(x.id)===String(oid);});
+  if(!o||o.original_total==null) return;
+  if(!confirm('¿Restablecer el monto original ($'+parseFloat(o.original_total).toFixed(2)+')?')) return;
+  _postOrderAdjust(oid, parseFloat(o.original_total), '');
 }
 
 // Perfil de cliente completo: contacto + gasto total + perfil olfativo de Nez
