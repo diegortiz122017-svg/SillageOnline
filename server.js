@@ -1040,12 +1040,41 @@ function buildDteEmailBlock(dte) {
       N.º de Control: <strong>${escHtml(dte.numeroControl)}</strong><br/>
       Código de Generación: <strong>${escHtml(dte.codigoGeneracion)}</strong><br/>
       <a href="${verifUrl}" style="color:#b8955a">Verificar en el Ministerio de Hacienda →</a>
-      <p style="font-size:11px;color:#8a7f72;margin:8px 0 0">Adjuntamos tu documento tributario electrónico a este correo.</p>
+      <p style="font-size:11px;color:#8a7f72;margin:8px 0 0">Adjuntamos tu documento tributario electrónico: el PDF para que puedas leerlo y guardarlo, y el archivo JSON firmado (el documento oficial).</p>
     </div>`;
 }
-function buildDteAttachments(dte) {
+// PDF del DTE (services/dtePdf.js). Se carga perezosamente: si pdfkit faltara o
+// fallara, el correo sale igual con el JSON — el PDF es un extra, no un requisito.
+let _dtePdfMod;
+function getDtePdfModule() {
+  if (_dtePdfMod === undefined) {
+    try { _dtePdfMod = require('./services/dtePdf'); }
+    catch (e) { console.error('PDF del DTE no disponible:', e.message); _dtePdfMod = null; }
+  }
+  return _dtePdfMod;
+}
+function qrPngBuffer(url) {
+  return new Promise(resolve => {
+    if (!global._QRCode) return resolve(null);
+    global._QRCode.toBuffer(url, { errorCorrectionLevel: 'M', margin: 1, width: 240 }, (e, buf) => resolve(e ? null : buf));
+  });
+}
+// d: { jsonDte (objeto), codigoGeneracion, numeroControl, selloRecibido }
+async function buildDtePdfBuffer(d) {
+  const mod = getDtePdfModule();
+  if (!mod) return null;
+  const fecEmi = d.jsonDte && d.jsonDte.identificacion && d.jsonDte.identificacion.fecEmi;
+  const verificacionUrl = dteSvc.verificacionUrl(d.codigoGeneracion, fecEmi);
+  return mod.buildDtePdf({ ...d, verificacionUrl, qrPng: await qrPngBuffer(verificacionUrl) });
+}
+async function buildDteAttachments(dte) {
   if (!dteIsReady(dte) || !dte.jsonFirmado) return undefined;
-  return [{ filename: `DTE-${dte.codigoGeneracion}.json`, content: Buffer.from(String(dte.jsonFirmado), 'utf8').toString('base64') }];
+  const files = [{ filename: `DTE-${dte.codigoGeneracion}.json`, content: Buffer.from(String(dte.jsonFirmado), 'utf8').toString('base64') }];
+  try {
+    const pdf = await buildDtePdfBuffer(dte);
+    if (pdf) files.unshift({ filename: `${dte.numeroControl || ('DTE-' + dte.codigoGeneracion)}.pdf`, content: pdf.toString('base64') });
+  } catch (e) { console.error('PDF del DTE falló (se envía solo el JSON):', e.message); }
+  return files;
 }
 
 // dte: registro devuelto por emitDteForOrder (opcional) — cuando viene con
@@ -1113,7 +1142,7 @@ async function sendOrderConfirmation(order, dte) {
     subject: `✨ Pedido Confirmado — ${escHtml(order.id)} | Sillage Parfumerie`,
     from: `Sillage Pedidos <${EMAIL_PEDIDOS}>`,
     html,
-    attachments: buildDteAttachments(dte),
+    attachments: await buildDteAttachments(dte),
   });
 }
 
@@ -1138,7 +1167,7 @@ async function sendDteReadyEmail(order, dte) {
     subject: `🧾 Tu factura electrónica — ${escHtml(order.id)} | Sillage Parfumerie`,
     from: `Sillage Pedidos <${EMAIL_PEDIDOS}>`,
     html,
-    attachments: buildDteAttachments(dte),
+    attachments: await buildDteAttachments(dte),
   });
 }
 
@@ -3483,6 +3512,31 @@ app.get('/api/admin/dte/documents/:id/json', requireAdmin, async (req, res) => {
     }
     res.json(payload);
   } catch(e) { res.status(500).json({ error: e.message }); }
+});
+
+// GET /api/admin/dte/documents/:id/pdf — representación gráfica (PDF) de un DTE
+// ya guardado, armada solo con su JSON (el mismo que se transmitió al MH).
+app.get('/api/admin/dte/documents/:id/pdf', requireAdmin, async (req, res) => {
+  try {
+    const [rows] = await db.execute(
+      'SELECT id, tipo_dte, numero_control, codigo_generacion, sello_recibido, estado, json_dte FROM dte_documents WHERE id=?',
+      [req.params.id]
+    );
+    if (!rows.length) return res.status(404).json({ error: 'DTE no encontrado' });
+    const r = rows[0];
+    let jsonDte;
+    try { jsonDte = JSON.parse(r.json_dte); } catch(e) { return res.status(422).json({ error: 'El JSON del DTE está dañado.' }); }
+    const pdf = await buildDtePdfBuffer({
+      jsonDte, codigoGeneracion: r.codigo_generacion, numeroControl: r.numero_control, selloRecibido: r.sello_recibido,
+    });
+    if (!pdf) return res.status(503).json({ error: 'El generador de PDF no está disponible.' });
+    res.setHeader('Content-Type', 'application/pdf');
+    res.setHeader('Content-Disposition', `attachment; filename="${r.numero_control || ('DTE-' + r.id)}.pdf"`);
+    res.send(pdf);
+  } catch(e) {
+    console.error('dte pdf error:', e.message);
+    res.status(500).json({ error: 'No se pudo generar el PDF.' });
+  }
 });
 
 // GET /api/admin/orders/:id/dte/json — JSON del DTE más reciente de un pedido.

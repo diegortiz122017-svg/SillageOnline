@@ -2954,7 +2954,8 @@ function loadDteDocuments(){
       var fecha=r.createdAt?String(r.createdAt).slice(0,10):'—';
       var sello=r.selloRecibido?('<span title="'+_dteEsc(r.selloRecibido)+'">'+_dteEsc(r.selloRecibido).slice(0,10)+'…</span>'):'—';
       var ver=r.verificacionUrl?('<a href="'+_dteEsc(r.verificacionUrl)+'" target="_blank" style="color:var(--gold)">Verificar ↗</a>'):'';
-      var jsonLink='<a href="#" onclick="dteViewJson('+r.id+');return false" style="color:var(--gold)">JSON</a> · <a href="#" onclick="dteDownloadJson('+r.id+');return false" style="color:var(--muted)">↓</a>';
+      var jsonLink='<a href="#" onclick="dteViewJson('+r.id+');return false" style="color:var(--gold)">JSON</a> · <a href="#" onclick="dteDownloadJson('+r.id+');return false" style="color:var(--muted)">↓</a>'+
+        (r.estado==='PROCESADO'?' · <a href="#" onclick="dteDownloadPdf('+r.id+');return false" style="color:var(--gold)">PDF</a>':'');
       var obs=r.observaciones?('<div style="font-size:0.56rem;color:#d98a3a;max-width:280px">'+_dteEsc(r.observaciones)+'</div>'):'';
       return '<tr>'+
         '<td>'+_dteEsc(r.orderId)+'</td>'+
@@ -3009,6 +3010,21 @@ function dteDownloadJson(id){
     if(!b){ return; }
     var url=URL.createObjectURL(b);
     var a=document.createElement('a'); a.href=url; a.download='dte-'+id+'.json';
+    document.body.appendChild(a); a.click(); a.remove();
+    setTimeout(function(){ URL.revokeObjectURL(url); }, 2000);
+  }).catch(function(e){ alert('Error: '+e.message); });
+}
+
+// Descarga la representación gráfica (PDF) de un DTE procesado.
+function dteDownloadPdf(id){
+  adminFetch(API+'/admin/dte/documents/'+id+'/pdf',{}).then(function(r){
+    if(!r) return null;
+    if(!r.ok) return r.json().then(function(d){ throw new Error((d&&d.error)||'No se pudo generar el PDF.'); });
+    return r.blob();
+  }).then(function(b){
+    if(!b) return;
+    var url=URL.createObjectURL(b);
+    var a=document.createElement('a'); a.href=url; a.download='dte-'+id+'.pdf';
     document.body.appendChild(a); a.click(); a.remove();
     setTimeout(function(){ URL.revokeObjectURL(url); }, 2000);
   }).catch(function(e){ alert('Error: '+e.message); });
