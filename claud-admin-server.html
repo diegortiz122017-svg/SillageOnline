@@ -1714,6 +1714,9 @@ tr:hover td{background:rgba(255,255,255,0.02)}
             </div>
             <button class="save-btn" onclick="dteEmitForOrder()">Emitir DTE</button>
           </div>
+          <label style="display:flex;align-items:center;gap:0.5rem;margin-top:0.8rem;font-size:0.68rem;color:var(--cream);cursor:pointer">
+            <input id="dteOrderSendEmail" type="checkbox" checked/> Enviar el DTE por correo al cliente si se emite correctamente
+          </label>
           <div id="dteReceptor" style="display:none;margin-top:0.9rem;gap:0.6rem;flex-wrap:wrap">
             <div><label class="dte-lbl">NIT receptor</label><input id="dteRcpNit" class="dte-inp" placeholder="14 dígitos"/></div>
             <div><label class="dte-lbl">NRC receptor</label><input id="dteRcpNrc" class="dte-inp" placeholder="sin guiones"/></div>
@@ -3268,7 +3271,7 @@ function dteEmitForOrder(){
   var orderId=(document.getElementById('dteOrderId').value||'').trim();
   var tipo=document.getElementById('dteTipo').value;
   if(!orderId){ out.innerHTML='<span style="color:#d9534f">Ingresa el N.º de pedido.</span>'; return; }
-  var bodyObj={ tipoDte:tipo };
+  var bodyObj={ tipoDte:tipo, sendEmail:!!document.getElementById('dteOrderSendEmail').checked };
   if(tipo==='03'){
     bodyObj.receptor={
       nit:(document.getElementById('dteRcpNit').value||'').trim(),
@@ -3285,7 +3288,10 @@ function dteEmitForOrder(){
     if(d.error){ out.innerHTML='<span style="color:#d9534f">'+_dteEsc(d.error)+'</span>'; return; }
     out.innerHTML='Resultado: '+_dteChip(d.ok,d.estado||'—')+
       (d.numeroControl?' · N.º Control '+_dteEsc(d.numeroControl):'')+
-      (d.observaciones?'<div style="color:#d98a3a;margin-top:0.3rem">'+_dteEsc(d.observaciones)+'</div>':'');
+      (d.observaciones?'<div style="color:#d98a3a;margin-top:0.3rem">'+_dteEsc(d.observaciones)+'</div>':'')+
+      (d.emailSent===true?'<div style="color:#5fb87a;margin-top:0.3rem">✓ Correo enviado a '+_dteEsc(d.emailTo)+'</div>'
+        :(d.emailSent===false?'<div style="color:#d9534f;margin-top:0.3rem">El DTE se emitió pero el correo NO se pudo enviar'+(d.emailTo?' a '+_dteEsc(d.emailTo):'')+'. Revisa Emails o reenvíalo a mano.</div>'
+        :(d.ok&&bodyObj.sendEmail?'<div style="color:#d98a3a;margin-top:0.3rem">El pedido no tiene un correo válido: no se envió correo.</div>':'')));
     loadDteDocuments(); loadDteStatus();
   }).catch(function(e){ out.innerHTML='<span style="color:#d9534f">Error: '+_dteEsc(e.message)+'</span>'; });
 }

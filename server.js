@@ -1123,7 +1123,7 @@ async function sendOrderConfirmation(order, dte) {
 // factura, para esos casos donde no hay un segundo "confirmación" al que
 // enganchar el adjunto.
 async function sendDteReadyEmail(order, dte) {
-  if (!dteIsReady(dte)) return;
+  if (!dteIsReady(dte)) return false;
   const html = emailTemplate(`
     <h2 style="font-family:Georgia,serif;font-size:24px;font-weight:300;color:#1a1714;margin:0 0 8px">Tu factura electrónica está lista 🧾</h2>
     <p style="font-size:13px;color:#8a7f72;margin:0 0 24px">Hola <strong style="color:#1a1714">${escHtml(order.customer)}</strong>, adjuntamos el documento tributario electrónico de tu pedido.</p>
@@ -1133,7 +1133,7 @@ async function sendDteReadyEmail(order, dte) {
     </div>
     ${buildDteEmailBlock(dte)}`);
 
-  await sendEmail({
+  return await sendEmail({
     to: order.email,
     subject: `🧾 Tu factura electrónica — ${escHtml(order.id)} | Sillage Parfumerie`,
     from: `Sillage Pedidos <${EMAIL_PEDIDOS}>`,
@@ -2921,12 +2921,29 @@ app.post('/api/admin/orders/:id/dte', requireAdmin, async (req, res) => {
     return res.status(409).json({ error: 'DTE deshabilitado. Configura DTE_ENABLED=true y las credenciales del Ministerio de Hacienda.' });
   }
   const { tipoDte, receptor, docRelacionado } = req.body || {};
+  // sendEmail (por defecto sí): si el DTE queda PROCESADO, se le manda al cliente.
+  // Antes este botón solo emitía y NUNCA enviaba correo — un DTE rechazado en el flujo
+  // original (p. ej. al marcar un contra entrega como Entregado) no mandó nada, y el
+  // reintento tampoco.
+  const wantEmail = !(req.body && req.body.sendEmail === false);
   if (tipoDte === '03' && (!receptor || !receptor.nit || !receptor.nrc)) {
     return res.status(400).json({ error: 'El Crédito Fiscal requiere receptor con NIT y NRC.' });
   }
   try {
     const rec = await emitDteForOrder(req.params.id, { tipoDte: tipoDte || '01', receptor, docRelacionado });
     if (!rec) return res.status(404).json({ error: 'Pedido no encontrado o DTE ya emitido.' });
+
+    let emailSent = null, emailTo = null;
+    if (wantEmail && rec.estado === 'PROCESADO') {
+      try {
+        const [oRows] = await db.execute('SELECT id, customer, email FROM orders WHERE id=?', [req.params.id]);
+        const o = oRows[0];
+        if (o && /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(String(o.email || ''))) {
+          emailTo = o.email;
+          emailSent = await sendDteReadyEmail(o, rec);
+        }
+      } catch(e) { console.error('DTE retry email error:', e.message); emailSent = false; }
+    }
     res.json({
       ok:    rec.estado === 'PROCESADO',
       estado: rec.estado,
@@ -2934,6 +2951,7 @@ app.post('/api/admin/orders/:id/dte', requireAdmin, async (req, res) => {
       codigoGeneracion: rec.codigoGeneracion,
       selloRecibido:    rec.selloRecibido,
       observaciones:    rec.observaciones,
+      emailSent, emailTo,
     });
   } catch(e) {
     res.status(500).json({ error: e.message });
