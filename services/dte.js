@@ -202,6 +202,30 @@ function repartirEnLineas(cuerpo, extra) {
   });
 }
 
+// Los descuentos (cupón o ajuste del admin) se reflejan en el PRECIO UNITARIO de
+// cada línea, y los campos de descuento del documento quedan en 0 — la misma
+// estructura que el MH siempre aceptó. El 08-oct-2026 el MH rechazó una Factura
+// con "[003] resumen.subTotalVentas: Cálculo incorrecto": la disposición anterior
+// (subTotalVentas = suma BRUTA, descuento repartido en montoDescu/descuGravada)
+// nunca se había validado contra el MH — solo contra la forma del esquema — y su
+// fórmula de subTotalVentas no coincide con esa. Aquí ventaGravada = cantidad ×
+// precioUni exacto (a 8 decimales, como ya se hace con el neto del CCF),
+// subTotalVentas = totalGravada, y no hay descuento que cuadrar.
+function aplanarDescuentos(cuerpo, resumen) {
+  cuerpo.forEach(c => {
+    if (c.montoDescu > 0) {
+      c.precioUni = round8(c.ventaGravada / c.cantidad);
+      c.montoDescu = 0;
+    }
+  });
+  resumen.subTotalVentas      = resumen.totalGravada;
+  resumen.descuNoSuj          = 0;
+  resumen.descuExenta         = 0;
+  resumen.descuGravada        = 0;
+  resumen.totalDescu          = 0;
+  resumen.porcentajeDescuento = 0;
+}
+
 function lineaCargoAdicional(numItem, monto, conTributo20) {
   return {
     numItem, tipoItem: 2, numeroDocumento: null, cantidad: 1, codigo: null, codTributo: null,
@@ -345,6 +369,7 @@ function buildFactura(order, opts) {
   };
 
   if (hayAjusteDeTotal(order)) ajustarFacturaATotal(cuerpoDocumento, resumen, round2(parseFloat(order.total)));
+  aplanarDescuentos(cuerpoDocumento, resumen);
 
   return {
     identificacion:      buildIdentificacion('01', 2, opts.numeroControl, opts.codigoGeneracion, fecEmi, horEmi),
@@ -446,6 +471,7 @@ function buildCreditoFiscal(order, receptor, opts) {
   };
 
   if (hayAjusteDeTotal(order)) ajustarCcfATotal(cuerpoDocumento, resumen, round2(parseFloat(order.total)));
+  aplanarDescuentos(cuerpoDocumento, resumen);
 
   return {
     identificacion:      buildIdentificacion('03', 4, opts.numeroControl, opts.codigoGeneracion, fecEmi, horEmi),
@@ -1350,6 +1376,7 @@ module.exports = {
   buildFactura,
   buildCreditoFiscal,
   hayAjusteDeTotal,
+  aplanarDescuentos,
   buildNotaCredito,
   buildNotaCreditoExacta,
   buildAnulacion,
