@@ -165,10 +165,11 @@ footer{text-align:center;padding:2rem;font-size:0.6rem;letter-spacing:0.1em;colo
 </main>
 
 <footer>
-  © 2026 Sillage Parfumerie · El Salvador ·
+  © <span id="fYear">2026</span> Sillage Parfumerie · El Salvador ·
   <a href="/terminos">Términos</a> ·
   <a href="/devoluciones">Devoluciones</a>
 </footer>
+<script>document.getElementById('fYear').textContent=new Date().getFullYear();</script>
 
 </body>
 </html>
