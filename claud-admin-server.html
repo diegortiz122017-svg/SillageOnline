@@ -1693,6 +1693,9 @@ tr:hover td{background:rgba(255,255,255,0.02)}
             </div>
           </div>
           <div style="margin-top:0.6rem"><label class="dte-lbl">Motivo</label><input id="dteInvMotivo" class="dte-inp" style="width:100%" placeholder="Motivo de la invalidación" value="Anulación solicitada por el emisor"/></div>
+          <label style="display:flex;align-items:center;gap:0.5rem;margin-top:0.8rem;font-size:0.68rem;color:var(--cream);cursor:pointer">
+            <input id="dteInvSendEmail" type="checkbox" checked/> Avisar al cliente por correo (evento de invalidación en JSON + PDF)
+          </label>
           <button class="save-btn" style="margin-top:0.8rem;border:1px solid #d9534f;background:transparent;color:#d9534f" onclick="dteInvalidar()">Invalidar DTE</button>
           <div id="dteInvOut" style="margin-top:1rem;font-size:0.7rem;line-height:1.8"></div>
         </div>
@@ -3266,13 +3269,16 @@ function dteInvalidar(){
   if(!confirm('¿Invalidar este DTE? La anulación es definitiva ante el MH.')) return;
   out.innerHTML='Invalidando…';
   adminFetch(API+'/admin/dte/invalidar',{method:'POST',headers:{'Content-Type':'application/json'},
-    body:JSON.stringify({dteId:parseInt(dteId,10),tipoAnulacion:parseInt(document.getElementById('dteInvTipo').value,10),motivoAnulacion:(document.getElementById('dteInvMotivo').value||'').trim()})
+    body:JSON.stringify({dteId:parseInt(dteId,10),tipoAnulacion:parseInt(document.getElementById('dteInvTipo').value,10),motivoAnulacion:(document.getElementById('dteInvMotivo').value||'').trim(),sendEmail:!!document.getElementById('dteInvSendEmail').checked})
   }).then(function(r){return r?r.json():null;}).then(function(d){
     if(!d){ out.textContent='Sin respuesta.'; return; }
     if(d.error){ out.innerHTML='<span style="color:#d9534f">'+_dteEsc(d.error)+'</span>'; return; }
     out.innerHTML='Resultado: '+_dteChip(d.ok,d.estado||'—')+
       (d.selloRecibido?' · Sello '+_dteEsc(d.selloRecibido).slice(0,16)+'…':'')+
-      (d.observaciones?'<div style="color:#d98a3a;margin-top:0.3rem">'+_dteEsc(d.observaciones)+'</div>':'');
+      (d.observaciones?'<div style="color:#d98a3a;margin-top:0.3rem">'+_dteEsc(d.observaciones)+'</div>':'')+
+      (d.ok?(d.emailSent
+        ? '<div style="color:#5cb85c;margin-top:0.3rem">✉ Aviso enviado a '+_dteEsc(d.emailTo)+' con el evento (JSON + PDF).</div>'
+        : '<div style="color:#d98a3a;margin-top:0.3rem">✉ No se envió aviso al cliente (desmarcado, sin correo válido o falló el envío). Puedes descargar el PDF del evento desde la tabla de documentos.</div>'):'');
     if(d.ok){ loadInvalidables(); loadDteDocuments(); loadHomologacion(); }
   }).catch(function(e){ out.innerHTML='<span style="color:#d9534f">Error: '+_dteEsc(e.message)+'</span>'; });
 }

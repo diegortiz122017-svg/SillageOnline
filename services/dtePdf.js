@@ -193,6 +193,96 @@ function render(doc, d) {
   doc.font('Helvetica').fontSize(7.5).fillColor(GOLD).text('Sillage Parfumerie · sillage-sv.com', L, doc.y + 6, { width: W, align: 'center' });
 }
 
+// ── Representación gráfica del EVENTO DE INVALIDACIÓN ────────────────────────
+// d: { evento (JSON del evento transmitido), original (JSON del DTE invalidado, opcional — solo
+//      para mostrar su monto), codigoGeneracion, selloRecibido (del EVENTO), verificacionUrl
+//      (consulta pública del DTE ORIGINAL, que muestra su estado), qrPng }
+// Igual que el PDF del DTE: todo sale del JSON transmitido. El motivo se muestra con el texto
+// tal cual lo registró el emisor, sin interpretar el código de tipo de invalidación.
+function renderInvalidacion(doc, d) {
+  const ev = d.evento || {};
+  const ident = ev.identificacion || {}, emisor = ev.emisor || {}, dc = ev.documento || {}, mot = ev.motivo || {};
+  const pruebas = String(ident.ambiente) === '00';
+
+  doc.font('Helvetica-Bold').fontSize(20).fillColor(INK).text('SILLAGE', L, 36, { characterSpacing: 5 });
+  doc.font('Helvetica').fontSize(8).fillColor(GOLD).text('PARFUMERIE', L, doc.y - 1, { characterSpacing: 4 });
+  doc.font('Helvetica-Bold').fontSize(13).fillColor(INK).text('INVALIDACIÓN DE DOCUMENTO', 250, 38, { width: R - 250, align: 'right' });
+  doc.font('Helvetica').fontSize(8.5).fillColor(MUTED).text('Evento de Invalidación de DTE', 250, doc.y + 1, { width: R - 250, align: 'right' });
+  doc.moveTo(L, 84).lineTo(R, 84).strokeColor(GOLD).lineWidth(1.5).stroke();
+
+  let y = 94;
+  if (pruebas) {
+    doc.rect(L, y, W, 18).fill('#fdf3d8');
+    doc.font('Helvetica-Bold').fontSize(8).fillColor('#9a7b2a')
+      .text('AMBIENTE DE PRUEBAS — SIN VALIDEZ TRIBUTARIA', L, y + 5, { width: W, align: 'center', characterSpacing: 1 });
+    y += 26;
+  }
+
+  // Identificación del evento + QR (del documento original)
+  const qrSize = 96, colW = W - qrSize - 16;
+  let cy = y;
+  cy = labelValue(doc, 'Código de generación del evento', d.codigoGeneracion || ident.codigoGeneracion, L, cy, colW);
+  cy = labelValue(doc, 'Sello de recepción del evento', d.selloRecibido || '—', L, cy, colW);
+  cy = labelValue(doc, 'Fecha y hora de la invalidación', `${txt(ident.fecAnula)} ${txt(ident.horAnula)}`, L, cy, colW);
+  if (d.qrPng) doc.image(d.qrPng, R - qrSize, y - 2, { width: qrSize });
+  y = Math.max(cy, y + qrSize) + 6;
+
+  // Documento invalidado
+  const total = d.original && d.original.resumen
+    ? (d.original.resumen.totalPagar != null ? d.original.resumen.totalPagar : d.original.resumen.montoTotalOperacion)
+    : null;
+  const bw = (W - 20) / 2;
+  const yDoc = partyBlock(doc, 'DOCUMENTO INVALIDADO', [
+    ['Tipo', TIPO[String(dc.tipoDte)] || String(dc.tipoDte || ''), true],
+    ['N.º de control', dc.numeroControl],
+    ['Cód. generación', dc.codigoGeneracion],
+    ['Sello', dc.selloRecibido],
+    ['Fecha emisión', dc.fecEmi],
+    ['Receptor', dc.nombre],
+    ['Monto total', total != null ? money(total) : ''],
+  ], L, y, bw);
+  const yEm = partyBlock(doc, 'EMISOR', [
+    ['Nombre', emisor.nombre, true],
+    ['Comercial', emisor.nomEstablecimiento && emisor.nomEstablecimiento !== emisor.nombre ? emisor.nomEstablecimiento : ''],
+    ['NIT', emisor.nit],
+    ['Teléfono', emisor.telefono], ['Correo', emisor.correo],
+  ], L + bw + 20, y, bw);
+  y = Math.max(yDoc, yEm) + 8;
+
+  // Motivo
+  const yMot = partyBlock(doc, 'MOTIVO DE LA INVALIDACIÓN', [
+    ['Motivo', mot.motivoAnulacion, true],
+    ['Documento que lo reemplaza', dc.codigoGeneracionR],
+    ['Responsable', mot.nombreResponsable],
+    ['Solicitante', mot.nombreSolicita],
+  ], L, y, W);
+  y = yMot + 10;
+
+  doc.moveTo(L, y).lineTo(R, y).strokeColor(LINE).lineWidth(0.8).stroke();
+  doc.font('Helvetica').fontSize(7.5).fillColor(MUTED).text(
+    'Representación gráfica de un Evento de Invalidación de Documento Tributario Electrónico. Con este evento el documento indicado dejó de tener validez tributaria. ' +
+    'El documento con validez legal es el archivo JSON firmado que acompaña este PDF. El código QR consulta el estado del documento original en el Ministerio de Hacienda: ' + txt(d.verificacionUrl),
+    L, y + 8, { width: W, lineGap: 2 });
+  doc.font('Helvetica').fontSize(7.5).fillColor(GOLD).text('Sillage Parfumerie · sillage-sv.com', L, doc.y + 6, { width: W, align: 'center' });
+}
+
+function buildInvalidacionPdf(d, options = {}) {
+  return new Promise((resolve, reject) => {
+    try {
+      const doc = new PDFDocument({
+        size: 'LETTER', margin: L, compress: options.compress !== false,
+        info: { Title: `Invalidación ${((d.evento || {}).documento || {}).numeroControl || ''}`.trim(), Author: 'Sillage Parfumerie', Subject: 'Evento de Invalidación de DTE' },
+      });
+      const chunks = [];
+      doc.on('data', c => chunks.push(c));
+      doc.on('end', () => resolve(Buffer.concat(chunks)));
+      doc.on('error', reject);
+      renderInvalidacion(doc, d);
+      doc.end();
+    } catch (e) { reject(e); }
+  });
+}
+
 // d: { jsonDte, codigoGeneracion, numeroControl, selloRecibido, verificacionUrl, qrPng (Buffer PNG, opcional) }
 function buildDtePdf(d, options = {}) {
   return new Promise((resolve, reject) => {
@@ -215,4 +305,4 @@ function buildDtePdf(d, options = {}) {
   });
 }
 
-module.exports = { buildDtePdf };
+module.exports = { buildDtePdf, buildInvalidacionPdf };

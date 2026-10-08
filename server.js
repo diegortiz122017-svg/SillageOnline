@@ -1067,6 +1067,15 @@ async function buildDtePdfBuffer(d) {
   const verificacionUrl = dteSvc.verificacionUrl(d.codigoGeneracion, fecEmi);
   return mod.buildDtePdf({ ...d, verificacionUrl, qrPng: await qrPngBuffer(verificacionUrl) });
 }
+// d: { evento (JSON transmitido), original (JSON del DTE invalidado), codigoGeneracion, selloRecibido }
+// El QR apunta a la consulta pública del DTE ORIGINAL (donde el MH muestra que está invalidado).
+async function buildInvalidacionPdfBuffer(d) {
+  const mod = getDtePdfModule();
+  if (!mod || !mod.buildInvalidacionPdf) return null;
+  const doc = (d.evento && d.evento.documento) || {};
+  const verificacionUrl = dteSvc.verificacionUrl(doc.codigoGeneracion, doc.fecEmi);
+  return mod.buildInvalidacionPdf({ ...d, verificacionUrl, qrPng: await qrPngBuffer(verificacionUrl) });
+}
 async function buildDteAttachments(dte) {
   if (!dteIsReady(dte) || !dte.jsonFirmado) return undefined;
   const files = [{ filename: `DTE-${dte.codigoGeneracion}.json`, content: Buffer.from(String(dte.jsonFirmado), 'utf8').toString('base64') }];
@@ -1214,9 +1223,85 @@ async function sendDteManualEmail(order, dte, reason, customMessage) {
     subject: escHtml(preset.subject(order)),
     from:    `Sillage Pedidos <${EMAIL_PEDIDOS}>`,
     html,
-    attachments: buildDteAttachments(dte),
+    attachments: await buildDteAttachments(dte),
   });
   return true;
+}
+
+// ─── Aviso al cliente cuando se INVALIDA un DTE ──────────────────────────────
+// Normativa v2.0: al invalidar, el emisor entrega al receptor el evento de
+// invalidación (JSON firmado) junto con su representación gráfica (PDF).
+// Destinatario: correo guardado en el DTE → correo del receptor en su JSON →
+// correo del pedido. Se descartan direcciones inválidas, de ejemplo y la del emisor.
+function pickInvalidationRecipient(candidates) {
+  const own = String((cfg.DTE_EMISOR && cfg.DTE_EMISOR.correo) || '').trim().toLowerCase();
+  for (const c of candidates) {
+    const e = String(c || '').trim();
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(e)) continue;
+    if (/@example\.(com|org|net)$/i.test(e)) continue;
+    if (e.toLowerCase() === own) continue;
+    return e;
+  }
+  return null;
+}
+
+const DTE_INVALIDACION_TEXTOS = {
+  1: (rep) => 'Detectamos un error en la información de tu documento tributario, por lo que lo invalidamos ante el Ministerio de Hacienda.' +
+              (rep ? ' El documento que lo reemplaza ya fue emitido; si aún no lo recibes, te lo enviaremos.' : ' Te enviaremos el documento correcto por separado.'),
+  2: () => 'Se rescindió la operación a la que correspondía tu documento tributario, por lo que lo invalidamos ante el Ministerio de Hacienda.',
+  3: () => 'Invalidamos tu documento tributario ante el Ministerio de Hacienda.',
+};
+
+// docRow: fila de dte_documents del DTE invalidado. evento: registro devuelto por
+// dteSvc.invalidarDte (PROCESADO). Devuelve { sent, to }.
+async function sendDteInvalidationEmail(docRow, evento) {
+  if (!evento || evento.estado !== 'PROCESADO' || !evento.selloRecibido || !evento.jsonFirmado) return { sent: false, to: null };
+  let original = null;
+  try { original = typeof docRow.json_dte === 'string' ? JSON.parse(docRow.json_dte) : docRow.json_dte; } catch (e) { /* sin JSON original */ }
+  let orderEmail = null, orderCustomer = null;
+  if (docRow.order_id) {
+    try {
+      const [o] = await db.execute('SELECT email, customer FROM orders WHERE id=?', [docRow.order_id]);
+      if (o && o[0]) { orderEmail = o[0].email; orderCustomer = o[0].customer; }
+    } catch (e) { /* la tabla de pedidos no es imprescindible aquí */ }
+  }
+  const to = pickInvalidationRecipient([docRow.email, original && original.receptor && original.receptor.correo, orderEmail]);
+  if (!to) return { sent: false, to: null };
+
+  const ev = evento.jsonDte || {};
+  const mot = ev.motivo || {};
+  const doc = ev.documento || {};
+  const nombre = docRow.customer || orderCustomer || (original && original.receptor && original.receptor.nombre) || '';
+  const tipoLbl = { '01': 'Factura Electrónica', '03': 'Comprobante de Crédito Fiscal', '05': 'Nota de Crédito' }[doc.tipoDte] || 'Documento Tributario Electrónico';
+  const texto = (DTE_INVALIDACION_TEXTOS[mot.tipoAnulacion] || DTE_INVALIDACION_TEXTOS[3])(doc.codigoGeneracionR);
+  const verifUrl = dteSvc.verificacionUrl(doc.codigoGeneracion, doc.fecEmi);
+
+  const html = emailTemplate(`
+    <h2 style="font-family:Georgia,serif;font-size:24px;font-weight:300;color:#1a1714;margin:0 0 8px">Invalidamos tu documento tributario</h2>
+    <p style="font-size:13px;color:#8a7f72;margin:0 0 20px">${nombre ? 'Hola <strong style="color:#1a1714">' + escHtml(nombre) + '</strong>, ' : ''}${escHtml(texto)}</p>
+    <div style="padding:12px 16px;background:#faf8f4;border:1px solid #e8d8b8;margin-bottom:16px;font-size:12px;color:#4a3f35;line-height:1.9">
+      <span style="font-size:10px;letter-spacing:3px;text-transform:uppercase;color:#8a7f72">Documento invalidado · ${escHtml(tipoLbl)}</span><br/>
+      N.º de Control: <strong>${escHtml(doc.numeroControl)}</strong><br/>
+      Código de Generación: <strong>${escHtml(doc.codigoGeneracion)}</strong>${mot.motivoAnulacion ? '<br/>Motivo: ' + escHtml(mot.motivoAnulacion) : ''}<br/>
+      <a href="${verifUrl}" style="color:#b8955a">Consultar el documento en el Ministerio de Hacienda →</a>
+      <p style="font-size:11px;color:#8a7f72;margin:8px 0 0">Adjuntamos el evento de invalidación: el PDF para que puedas leerlo y guardarlo, y el archivo JSON firmado (el documento oficial). El documento invalidado ya no tiene validez tributaria.</p>
+    </div>
+    <p style="font-size:12px;color:#8a7f72;line-height:1.8">Si tienes dudas, responde a este correo y con gusto te ayudamos.</p>`);
+
+  const files = [{ filename: `Invalidacion-${doc.numeroControl || evento.codigoGeneracion}.json`, content: Buffer.from(String(evento.jsonFirmado), 'utf8').toString('base64') }];
+  try {
+    const pdf = await buildInvalidacionPdfBuffer({ evento: ev, original, codigoGeneracion: evento.codigoGeneracion, selloRecibido: evento.selloRecibido });
+    if (pdf) files.unshift({ filename: `Invalidacion-${doc.numeroControl || evento.codigoGeneracion}.pdf`, content: pdf.toString('base64') });
+  } catch (e) { console.error('PDF de la invalidación falló (se envía solo el JSON):', e.message); }
+
+  const sent = await sendEmail({
+    to,
+    subject: `Invalidación de tu documento tributario — ${escHtml(doc.numeroControl || '')} | Sillage Parfumerie`,
+    from: `Sillage Pedidos <${EMAIL_PEDIDOS}>`,
+    html,
+    attachments: files,
+  });
+  return { sent: !!sent, to };
 }
 
 async function sendWelcomeEmail(customer) {
@@ -3407,11 +3492,19 @@ app.post('/api/admin/dte/invalidar', requireAdmin, async (req, res) => {
       codigoGeneracionR: (req.body && req.body.codigoGeneracionR) || null,
     };
     const rec = await dteSvc.invalidarDte(doc, motivo);
+    // Entrega al cliente: evento firmado + su PDF. Un fallo del correo nunca deshace la invalidación.
+    let email = { sent: false, to: null };
+    if (rec && rec.estado === 'PROCESADO' && !(req.body && req.body.sendEmail === false)) {
+      try { email = await sendDteInvalidationEmail(doc, rec); }
+      catch (e) { console.error('Aviso de invalidación falló:', e.message); }
+    }
     res.json({
       ok:            rec && rec.estado === 'PROCESADO',
       estado:        rec?.estado || 'ERROR',
       selloRecibido: rec?.selloRecibido || null,
       observaciones: rec?.observaciones || null,
+      emailSent:     email.sent,
+      emailTo:       email.to,
     });
   } catch(e) { res.status(500).json({ error: e.message }); }
 });
@@ -3526,9 +3619,23 @@ app.get('/api/admin/dte/documents/:id/pdf', requireAdmin, async (req, res) => {
     const r = rows[0];
     let jsonDte;
     try { jsonDte = JSON.parse(r.json_dte); } catch(e) { return res.status(422).json({ error: 'El JSON del DTE está dañado.' }); }
-    const pdf = await buildDtePdfBuffer({
-      jsonDte, codigoGeneracion: r.codigo_generacion, numeroControl: r.numero_control, selloRecibido: r.sello_recibido,
-    });
+    let pdf;
+    if (r.tipo_dte === 'AN') {
+      // Evento de invalidación: se muestra junto al monto del DTE original (si sigue guardado).
+      let original = null;
+      const origCg = jsonDte.documento && jsonDte.documento.codigoGeneracion;
+      if (origCg) {
+        try {
+          const [o] = await db.execute('SELECT json_dte FROM dte_documents WHERE codigo_generacion=? AND tipo_dte<>?', [origCg, 'AN']);
+          if (o && o[0]) original = JSON.parse(o[0].json_dte);
+        } catch (e) { /* el PDF sale igual, sin el monto */ }
+      }
+      pdf = await buildInvalidacionPdfBuffer({ evento: jsonDte, original, codigoGeneracion: r.codigo_generacion, selloRecibido: r.sello_recibido });
+    } else {
+      pdf = await buildDtePdfBuffer({
+        jsonDte, codigoGeneracion: r.codigo_generacion, numeroControl: r.numero_control, selloRecibido: r.sello_recibido,
+      });
+    }
     if (!pdf) return res.status(503).json({ error: 'El generador de PDF no está disponible.' });
     res.setHeader('Content-Type', 'application/pdf');
     res.setHeader('Content-Disposition', `attachment; filename="${r.numero_control || ('DTE-' + r.id)}.pdf"`);
