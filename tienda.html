@@ -4814,7 +4814,10 @@ function captureAbandonedCart(email, name){
     headers:{'Content-Type':'application/json',
              'x-customer-token': (typeof customerToken!=='undefined'&&customerToken)||''},
     body:JSON.stringify({email:email, name:name, cart:items, sessionId:_somSession||null})
-  }).catch(function(){});
+  }).then(function(r){
+    // Si el servidor rechaza la captura, dejar rastro en "Por qué se cae el checkout".
+    if(!r.ok) trackEvent('order_error','captura carrito: HTTP '+r.status);
+  }).catch(function(){ trackEvent('order_error','captura carrito: sin conexión'); });
   _cartCaptured = true;
 }
 

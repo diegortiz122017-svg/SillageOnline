@@ -4065,7 +4065,12 @@ function loadCarritos(){
   var tbody=document.getElementById('carritosBody');
   tbody.innerHTML='<tr><td colspan="6" style="text-align:center;padding:2rem;color:var(--muted);font-size:0.72rem">Cargando carritos...</td></tr>';
   adminFetch(API+'/admin/abandoned-carts',{}).then(function(r){return r?r.json():null;}).then(function(d){
-    _carritosList=(d&&d.carts)||[];
+    // Antes una respuesta de error se mostraba como "sin carritos" y ocultaba el problema.
+    if(!d || d.error || !Array.isArray(d.carts)){
+      tbody.innerHTML='<tr><td colspan="6" style="text-align:center;padding:2rem;color:#d9534f;font-size:0.72rem">No se pudieron cargar los carritos'+(d&&d.error?' ('+esc(d.error)+')':'')+'. Revisa los logs del servidor.</td></tr>';
+      return;
+    }
+    _carritosList=d.carts;
     renderCarritos();
   }).catch(function(){ tbody.innerHTML='<tr><td colspan="6" style="text-align:center;padding:2rem;color:#d9534f">Error al cargar.</td></tr>'; });
 }
