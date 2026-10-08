@@ -50,7 +50,9 @@ body{background:var(--bg);color:var(--cream);font-family:'Jost',sans-serif;font-
 .logout-btn:hover{border-color:var(--error);color:var(--error)}
 .layout{display:flex;flex:1;overflow:hidden}
 
-.sidebar{width:220px;background:var(--panel);border-right:1px solid var(--border);display:flex;flex-direction:column;flex-shrink:0}
+.sidebar{width:220px;background:var(--panel);border-right:1px solid var(--border);display:flex;flex-direction:column;flex-shrink:0;overflow-y:auto;overflow-x:hidden;min-height:0;scrollbar-width:thin;scrollbar-color:var(--border) transparent}
+.sidebar::-webkit-scrollbar{width:4px}
+.sidebar::-webkit-scrollbar-thumb{background:var(--border)}
 .sb-section{padding:1.5rem 1rem 0.5rem;font-size:0.5rem;letter-spacing:0.25em;text-transform:uppercase;color:var(--muted)}
 .sb-nav{display:flex;flex-direction:column}
 .nav-btn{display:flex;align-items:center;gap:0.8rem;padding:0.8rem 1.2rem;color:var(--muted);font-size:0.7rem;letter-spacing:0.1em;cursor:pointer;transition:all 0.2s;border-left:3px solid transparent;border-right:none;border-top:none;border-bottom:none;background:none;font-family:'Jost',sans-serif;width:100%;text-align:left;text-transform:uppercase}
