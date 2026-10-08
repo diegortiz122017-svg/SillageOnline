@@ -197,7 +197,8 @@ async function initDB() {
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
   `);
   // Tabla ya existía en producción antes de agregar esta columna.
-  try { await db.execute('ALTER TABLE promo_codes ADD COLUMN free_shipping TINYINT(1) DEFAULT 0'); } catch(e) {}
+  try { await db.execute('ALTER TABLE promo_codes ADD COLUMN free_shipping TINYINT(1) DEFAULT 0'); }
+  catch(e) { if (e.code !== 'ER_DUP_FIELDNAME') console.error('⚠️ migración promo_codes.free_shipping falló:', e.message); }
 
   // Leads capturados por el modal de bienvenida (10% a cambio del correo) —
   // sequence_step avanza welcome -> reminder_5d -> last_chance_30d -> converted,
@@ -578,13 +579,19 @@ async function initDB() {
   `);
   // Tercera preferencia del panel de cuenta ("Recordatorio de carrito"); la tabla
   // ya existía en producción sin esta columna.
-  try { await db.execute('ALTER TABLE email_preferences ADD COLUMN abandoned_cart TINYINT(1) DEFAULT 1'); } catch(e) {}
+  try { await db.execute('ALTER TABLE email_preferences ADD COLUMN abandoned_cart TINYINT(1) DEFAULT 1'); }
+  catch(e) { if (e.code !== 'ER_DUP_FIELDNAME') console.error('⚠️ migración email_preferences.abandoned_cart falló:', e.message); }
 
-  // Carrito capturado cuando el cliente escribe su correo en el paso 1 del
-  // checkout. Una fila por correo (la más reciente). opted_out sobrevive a
-  // nuevas capturas; la tabla se depura sola a los 30 días.
+  // Carrito capturado cuando el cliente completa el paso 1 del checkout. Una fila
+  // por correo (la más reciente). opted_out sobrevive a nuevas capturas; la tabla
+  // se depura sola a los 30 días.
+  // OJO: NO se llama abandoned_carts a propósito — en producción ya existía una
+  // tabla con ese nombre y otro esquema (de una versión anterior, con email_sent/
+  // sent_at y sin total/opted_out). CREATE TABLE IF NOT EXISTS no la modifica, así
+  // que reutilizar el nombre hizo fallar la captura y el listado. Esa tabla vieja
+  // (vacía) no se toca.
   await db.execute(`
-    CREATE TABLE IF NOT EXISTS abandoned_carts (
+    CREATE TABLE IF NOT EXISTS checkout_carts (
       id          INT AUTO_INCREMENT PRIMARY KEY,
       email       VARCHAR(255) NOT NULL UNIQUE,
       name        VARCHAR(120) DEFAULT NULL,
@@ -3722,7 +3729,7 @@ app.get('/api/admin/abandoned-carts', requireAdmin, async (req, res) => {
               (SELECT COUNT(*) FROM orders o
                 WHERE LOWER(o.email) = ac.email AND o.created_at >= ac.updated_at
                   AND (o.payment_status = 'Pagado' OR o.payment_method = 'cod')) AS purchased_after
-       FROM abandoned_carts ac
+       FROM checkout_carts ac
        ORDER BY ac.updated_at DESC
        LIMIT 500`
     );
@@ -3748,7 +3755,7 @@ app.get('/api/admin/abandoned-carts', requireAdmin, async (req, res) => {
 // pedido del cliente).
 app.delete('/api/admin/abandoned-carts/:id', requireAdmin, async (req, res) => {
   try {
-    await db.execute('DELETE FROM abandoned_carts WHERE id=?', [parseInt(req.params.id, 10)]);
+    await db.execute('DELETE FROM checkout_carts WHERE id=?', [parseInt(req.params.id, 10)]);
     res.json({ ok: true });
   } catch(e) { res.status(500).json({ error: 'No se pudo eliminar.' }); }
 });
@@ -8581,7 +8588,7 @@ app.post('/api/cart/capture', cartCaptureLimiter, async (req, res) => {
 
     const now = new Date();
     await db.execute(
-      `INSERT INTO abandoned_carts (email, name, customer_id, session_id, cart, total, created_at, updated_at)
+      `INSERT INTO checkout_carts (email, name, customer_id, session_id, cart, total, created_at, updated_at)
        VALUES (?,?,?,?,?,?,?,?)
        ON DUPLICATE KEY UPDATE
          name        = COALESCE(VALUES(name), name),
@@ -8604,7 +8611,7 @@ app.post('/api/cart/capture', cartCaptureLimiter, async (req, res) => {
 });
 // Minimización de datos: los carritos capturados no se conservan más de 30 días.
 setInterval(() => {
-  db.execute('DELETE FROM abandoned_carts WHERE updated_at < DATE_SUB(NOW(), INTERVAL 30 DAY)').catch(() => {});
+  db.execute('DELETE FROM checkout_carts WHERE updated_at < DATE_SUB(NOW(), INTERVAL 30 DAY)').catch(() => {});
 }, 24 * 60 * 60 * 1000).unref();
 
 // Create email preferences when customer registers
