@@ -2527,7 +2527,7 @@ footer{background:var(--dark);padding:3.5rem 4rem;text-align:center;border-top:1
           <div class="f-field"><label>Departamento</label><input type="text" id="fs" placeholder="La Libertad"/></div>
         </div>
         <div class="f-row full"><div class="f-field"><label>País</label>
-          <select id="fco"><option value="">Seleccionar país...</option><option>El Salvador</option><option>Guatemala</option><option>Honduras</option><option>Nicaragua</option><option>Costa Rica</option><option>Panamá</option><option>Belice</option></select>
+          <select id="fco"><option value="">Seleccionar país...</option><option selected>El Salvador</option><option>Guatemala</option><option>Honduras</option><option>Nicaragua</option><option>Costa Rica</option><option>Panamá</option><option>Belice</option></select>
           <div class="f-hint" id="eco"></div></div></div>
         <!-- Save address prompt — shown to logged-in users after filling form -->
         <div id="saveAddrPrompt" style="display:none;margin:0.8rem 0 0.4rem;padding:0.8rem 1rem;background:rgba(184,149,90,0.06);border:1px solid rgba(184,149,90,0.18)">
@@ -3997,6 +3997,10 @@ var _nezNudge = (function(){
 
   function fire(){
     try { if(sessionStorage.getItem(shownKey)) return; } catch(e){}
+    // Con el checkout abierto el cliente ya decidió comprar: un "¿buscás algo?"
+    // encima del formulario solo estorba (z-index del toast > modal de checkout).
+    var checkoutModal = document.getElementById('modalBg');
+    if(checkoutModal && checkoutModal.classList.contains('open')){ api.onCheckout(); return; }
     if(_somOpen || (_somMessages && _somMessages.length)) return;
     if(document.getElementById('newArrivalToast')) return;
     if(_proactiveToastTaken()) return;
@@ -4044,6 +4048,16 @@ var _nezNudge = (function(){
   var api = {
     onProductView: function(){
       if(!active || stage < 2) schedule(STAGE2_DELAY_MS, 2);
+    },
+    // Inicio del checkout: cancela el temporizador, quita el toast si ya estaba
+    // visible (sin contarlo como "descartado" por el cliente) y no vuelve a
+    // aparecer esta sesión — misma lógica que onCartAdd (intención de compra clara).
+    onCheckout: function(){
+      clearTimer();
+      active = false;
+      var t = document.getElementById('nezNudgeToast');
+      if(t) t.remove();
+      try{ sessionStorage.setItem(shownKey,'1'); }catch(e){}
     },
     onCartAdd: function(){
       clearTimer();
@@ -5247,6 +5261,7 @@ function goStep(n){
 function openCheckout(){
   closeCart();goStep(1);
   trackEvent('checkout_start');
+  if(typeof _nezNudge!=='undefined') _nezNudge.onCheckout();
   if(typeof fbq==='function') fbq('track','InitiateCheckout',{content_ids:cart.map(function(i){return String(i.p.id);}),content_type:'product',value:cartSum(),currency:'USD',num_items:cart.reduce(function(s,i){return s+i.qty;},0)});
   selectPayMethod('cod'); // default method — refreshes min-order note from server
   // Hide consent notice for logged-in users — they accepted at registration
