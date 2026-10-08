@@ -806,6 +806,7 @@ tr:hover td{background:rgba(255,255,255,0.02)}
         <div class="sb-section">Clientes</div>
         <button class="nav-btn" data-page="clientes"><span class="nav-icon">👤</span>Clientes</button>
         <button class="nav-btn" data-page="leads"><span class="nav-icon">✨</span>Leads</button>
+        <button class="nav-btn" data-page="carritos"><span class="nav-icon">🛒</span>Carritos</button>
         <button class="nav-btn" data-page="popups"><span class="nav-icon">🪧</span>Modales</button>
         <button class="nav-btn" data-page="promos"><span class="nav-icon">🏷️</span>Descuentos</button>
         <button class="nav-btn" data-page="emails"><span class="nav-icon">✉️</span>Emails</button>
@@ -1236,6 +1237,35 @@ tr:hover td{background:rgba(255,255,255,0.02)}
             </tr></thead>
             <tbody id="leadsBody">
               <tr><td colspan="6" style="text-align:center;padding:2rem;color:var(--muted)">Cargando leads...</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+      <!-- CARRITOS CAPTURADOS EN EL CHECKOUT -->
+      <div class="page" id="page-carritos">
+        <div class="page-title">Carritos</div>
+        <div class="page-sub">Quienes llegaron al paso 2 del checkout (ya dieron su correo) — se borran solos a los 30 días. Todavía no se envían recordatorios automáticos.</div>
+        <div class="stats-row" style="margin-bottom:1.5rem">
+          <div class="stat-card"><div class="stat-val c-gold" id="cartsTotal">—</div><div class="stat-label">Carritos guardados</div></div>
+          <div class="stat-card"><div class="stat-val c-warn" id="cartsOpen">—</div><div class="stat-label">Sin compra</div></div>
+          <div class="stat-card"><div class="stat-val c-gold" id="cartsValue">—</div><div class="stat-label">Valor sin cerrar</div></div>
+          <div class="stat-card"><div class="stat-val c-ok" id="cartsBought">—</div><div class="stat-label">Compraron después</div></div>
+        </div>
+        <div style="display:flex;gap:0.8rem;align-items:center;margin-bottom:1rem">
+          <label class="dte-lbl" style="margin:0">Mostrar</label>
+          <select id="cartsFilter" class="dte-inp" onchange="renderCarritos()">
+            <option value="open">Sin compra</option>
+            <option value="bought">Compraron después</option>
+            <option value="all">Todos</option>
+          </select>
+        </div>
+        <div class="tbl-wrap" style="overflow-x:auto">
+          <table id="cartsTable" style="min-width:760px">
+            <thead><tr>
+              <th>Cliente</th><th>Carrito</th><th>Total</th><th>Última actividad</th><th>Estado</th><th></th>
+            </tr></thead>
+            <tbody id="carritosBody">
+              <tr><td colspan="6" style="text-align:center;padding:2rem;color:var(--muted)">Cargando carritos...</td></tr>
             </tbody>
           </table>
         </div>
@@ -1821,6 +1851,7 @@ tr:hover td{background:rgba(255,255,255,0.02)}
       <button class="mob-drawer-item" data-page="cod" onclick="navToFromDrawer('cod')"><span class="mob-icon">🛡️</span>COD</button>
       <button class="mob-drawer-item" data-page="clientes" onclick="navToFromDrawer('clientes')"><span class="mob-icon">👤</span>Clientes</button>
       <button class="mob-drawer-item" data-page="leads" onclick="navToFromDrawer('leads')"><span class="mob-icon">✨</span>Leads</button>
+      <button class="mob-drawer-item" data-page="carritos" onclick="navToFromDrawer('carritos')"><span class="mob-icon">🛒</span>Carritos</button>
       <button class="mob-drawer-item" data-page="popups" onclick="navToFromDrawer('popups')"><span class="mob-icon">🪧</span>Modales</button>
       <button class="mob-drawer-item" data-page="emails" onclick="navToFromDrawer('emails')"><span class="mob-icon">✉️</span>Emails</button>
       <button class="mob-drawer-item" data-page="dte" onclick="navToFromDrawer('dte')"><span class="mob-icon">📄</span>DTE</button>
@@ -2522,6 +2553,7 @@ function navTo(page){
   if(page==='cod'){         renderCODPage(); }
   if(page==='clientes')  loadClientes();
   if(page==='leads')     loadLeads();
+  if(page==='carritos')  loadCarritos();
   if(page==='popups')    loadPopupConfig();
   if(page==='dte')       renderDtePage();
   if(page==='promos'){    loadPromoCodes(); renderPricing(); setTimeout(initSaleEmailUI, 800); }
@@ -4027,6 +4059,52 @@ function loadLeads(){
       '</tr>';
     }).join('');
   }).catch(function(){ tbody.innerHTML='<tr><td colspan="6" style="text-align:center;padding:2rem;color:#d9534f">Error al cargar.</td></tr>'; });
+}
+var _carritosList=[];
+function loadCarritos(){
+  var tbody=document.getElementById('carritosBody');
+  tbody.innerHTML='<tr><td colspan="6" style="text-align:center;padding:2rem;color:var(--muted);font-size:0.72rem">Cargando carritos...</td></tr>';
+  adminFetch(API+'/admin/abandoned-carts',{}).then(function(r){return r?r.json():null;}).then(function(d){
+    _carritosList=(d&&d.carts)||[];
+    renderCarritos();
+  }).catch(function(){ tbody.innerHTML='<tr><td colspan="6" style="text-align:center;padding:2rem;color:#d9534f">Error al cargar.</td></tr>'; });
+}
+function renderCarritos(){
+  var list=_carritosList;
+  var open=list.filter(function(c){return !c.purchased;});
+  var bought=list.length-open.length;
+  document.getElementById('cartsTotal').textContent=fmtN(list.length);
+  document.getElementById('cartsOpen').textContent=fmtN(open.length);
+  document.getElementById('cartsValue').textContent=fmtRev(open.reduce(function(s,c){return s+(+c.total||0);},0));
+  document.getElementById('cartsBought').textContent=fmtN(bought);
+  var f=document.getElementById('cartsFilter').value;
+  var shown=f==='open'?open:(f==='bought'?list.filter(function(c){return c.purchased;}):list);
+  var tbody=document.getElementById('carritosBody');
+  if(!shown.length){
+    tbody.innerHTML='<tr><td colspan="6" style="text-align:center;padding:2rem;color:var(--muted);font-size:0.72rem">'+
+      (list.length?'Ningún carrito en este filtro.':'Sin carritos todavía — aparecen cuando alguien completa el paso 1 del checkout.')+'</td></tr>';
+    return;
+  }
+  tbody.innerHTML=shown.map(function(c){
+    var items=(c.items||[]).map(function(i){return esc(i.name)+' ×'+i.qty;}).join(' · ');
+    var estado=c.purchased?'<span style="color:#5fb87a">Compró</span>'
+      :(c.optedOut?'<span style="color:var(--muted)">No contactar</span>':'<span style="color:#d98a3a">Sin compra</span>');
+    return '<tr>'+
+      '<td>'+(c.name?esc(c.name)+'<br/>':'')+'<a href="mailto:'+esc(c.email)+'" style="color:var(--gold);text-decoration:none;font-size:0.7rem">'+esc(c.email)+'</a>'+
+        (c.customerId?' <span style="color:var(--muted);font-size:0.58rem">(con cuenta)</span>':'')+'</td>'+
+      '<td style="font-size:0.7rem;max-width:320px">'+items+'</td>'+
+      '<td style="white-space:nowrap">'+fmtRev(c.total)+'</td>'+
+      '<td style="white-space:nowrap;color:var(--muted)">'+esc(fmtActTime(c.updatedAt))+'</td>'+
+      '<td>'+estado+'</td>'+
+      '<td><button class="save-btn" style="padding:0.3rem 0.7rem;font-size:0.55rem;background:transparent;border:1px solid #d9534f;color:#d9534f" onclick="deleteCarrito('+c.id+')">Eliminar</button></td>'+
+    '</tr>';
+  }).join('');
+}
+function deleteCarrito(id){
+  if(!confirm('¿Eliminar este carrito? Se borra el correo y los productos guardados.')) return;
+  adminFetch(API+'/admin/abandoned-carts/'+id,{method:'DELETE'}).then(function(r){return r?r.json():null;}).then(function(d){
+    if(d&&d.ok){ _carritosList=_carritosList.filter(function(c){return c.id!==id;}); renderCarritos(); toast('Carrito eliminado','','ok'); }
+  }).catch(function(){});
 }
 function sendLeadCampaign(){
   var err=document.getElementById('leadCampaignErr');

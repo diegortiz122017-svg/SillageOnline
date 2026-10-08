@@ -3711,6 +3711,48 @@ app.get('/api/admin/leads', requireAdmin, async (req, res) => {
   } catch(e) { res.status(500).json({ error: 'Query failed' }); }
 });
 
+// GET /api/admin/abandoned-carts — carritos capturados en el paso 1 del checkout
+// (ver POST /api/cart/capture). `purchased` = ese correo hizo un pedido real
+// (pagado, o contra entrega) DESPUÉS de la última actividad del carrito.
+app.get('/api/admin/abandoned-carts', requireAdmin, async (req, res) => {
+  try {
+    const [rows] = await db.execute(
+      `SELECT ac.id, ac.email, ac.name, ac.customer_id, ac.cart, ac.total, ac.opted_out,
+              ac.created_at, ac.updated_at,
+              (SELECT COUNT(*) FROM orders o
+                WHERE LOWER(o.email) = ac.email AND o.created_at >= ac.updated_at
+                  AND (o.payment_status = 'Pagado' OR o.payment_method = 'cod')) AS purchased_after
+       FROM abandoned_carts ac
+       ORDER BY ac.updated_at DESC
+       LIMIT 500`
+    );
+    res.json({
+      carts: rows.map(r => {
+        let items = [];
+        try { items = JSON.parse(r.cart || '[]'); } catch(e) {}
+        return {
+          id: r.id, email: r.email, name: r.name, customerId: r.customer_id,
+          items, total: parseFloat(r.total) || 0, optedOut: !!r.opted_out,
+          createdAt: r.created_at, updatedAt: r.updated_at,
+          purchased: r.purchased_after > 0,
+        };
+      }),
+    });
+  } catch(e) {
+    console.error('abandoned-carts list error:', e.message);
+    res.status(500).json({ error: 'Query failed' });
+  }
+});
+
+// DELETE /api/admin/abandoned-carts/:id — borra un carrito capturado (p. ej. a
+// pedido del cliente).
+app.delete('/api/admin/abandoned-carts/:id', requireAdmin, async (req, res) => {
+  try {
+    await db.execute('DELETE FROM abandoned_carts WHERE id=?', [parseInt(req.params.id, 10)]);
+    res.json({ ok: true });
+  } catch(e) { res.status(500).json({ error: 'No se pudo eliminar.' }); }
+});
+
 // POST /api/admin/leads/campaign — envía un correo puntual a un grupo de leads.
 // filter: 'all' | 'welcome' | 'reminder_5d' | 'last_chance_30d' (nunca a 'converted').
 app.post('/api/admin/leads/campaign', requireAdmin, async (req, res) => {
