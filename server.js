@@ -31,6 +31,7 @@ const auth         = require('./middleware/auth');
 const { getCatalogue, saveCatalogue, deleteProduct, getInventoryMap, invalidateInventory, getPricingMap, invalidatePricing, getActivity, getSetting, setSetting, getBrandHierarchy, getPopupConfig, setPopupConfig } = catalogueSvc;
 const { calcIntensity } = require('./services/noteIntensity');
 const { calcChords }    = require('./services/chords');
+const nurture           = require('./services/nurture');
 
 // logActivity also broadcasts to admin WebSocket clients
 async function logActivity(msg) {
@@ -606,6 +607,21 @@ async function initDB() {
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
   `);
 
+  // Registro del seguimiento post-registro (services/nurture.js). UNIQUE(customer_id,
+  // step) garantiza un solo envío por paso; variant 'X' = envío reservado, aún sin confirmar.
+  await db.execute(`
+    CREATE TABLE IF NOT EXISTS nurture_log (
+      id          INT AUTO_INCREMENT PRIMARY KEY,
+      customer_id INT NOT NULL,
+      step        TINYINT NOT NULL,
+      variant     CHAR(1) NOT NULL,
+      promo_code  VARCHAR(30) DEFAULT NULL,
+      sent_at     DATETIME NOT NULL,
+      UNIQUE KEY uq_customer_step (customer_id, step),
+      INDEX idx_sent (sent_at)
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
+  `);
+
   console.log('✅ Tables ready');
 }
 
@@ -824,7 +840,7 @@ async function logSentEmail({ to, subject, html, resendId, status, error }) {
 }
 
 async function sendEmail({ to, subject, html, from, attachments }) {
-  if (!RESEND_API_KEY) return;
+  if (!RESEND_API_KEY) return false;
   try {
     const res = await fetch('https://api.resend.com/emails', {
       method: 'POST',
@@ -844,13 +860,15 @@ async function sendEmail({ to, subject, html, from, attachments }) {
     if (!res.ok) {
       console.error('❌ Resend error:', data);
       await logSentEmail({ to, subject, html, status: 'error', error: JSON.stringify(data) });
-    } else {
-      console.log('✅ Email sent to', to, '— id:', data.id);
-      await logSentEmail({ to, subject, html, resendId: data.id, status: 'sent' });
+      return false;
     }
+    console.log('✅ Email sent to', to, '— id:', data.id);
+    await logSentEmail({ to, subject, html, resendId: data.id, status: 'sent' });
+    return true;
   } catch(e) {
     console.error('❌ Resend fetch error:', e.message);
     await logSentEmail({ to, subject, html, status: 'error', error: e.message });
+    return false;
   }
 }
 
@@ -1328,14 +1346,14 @@ async function ensureEmailPreferences(customerId) {
   return { customer_id: customerId, marketing: 1, followup: 1, abandoned_cart: 1, unsubscribe_token: token };
 }
 
-async function buildUnsubscribeFooter(customerId) {
+async function buildUnsubscribeFooter(customerId, reasonText) {
   const prefs = await ensureEmailPreferences(customerId);
   const BASE  = process.env.BASE_URL || 'https://sillage-sv.com';
   const url   = `${BASE}/preferencias-email?token=${prefs.unsubscribe_token}`;
   return `
     <div style="margin-top:32px;padding-top:16px;border-top:1px solid #e8d8b8;text-align:center">
       <p style="font-size:10px;color:#b0a898;letter-spacing:0.05em;margin:0 0 6px">
-        Recibiste este email porque realizaste una compra en Sillage Parfumerie.
+        ${reasonText || 'Recibiste este email porque realizaste una compra en Sillage Parfumerie.'}
       </p>
       <a href="${url}" style="font-size:10px;color:#b8955a;letter-spacing:1px;text-transform:uppercase;text-decoration:none">
         Gestionar preferencias de email
@@ -8430,6 +8448,237 @@ async function runFollowupCron() {
 setTimeout(runFollowupCron, 30000);
 setInterval(runFollowupCron, 6 * 60 * 60 * 1000);
 
+// ═══════════════════════════════════════════════════════
+//  SEGUIMIENTO POST-REGISTRO — cuentas que todavía no compran
+//  Paso 1 a los 3 días y paso 2 a los 10. La variante (A con perfil olfativo,
+//  B con señales de interés, C invitación a Nez) la decide services/nurture.js
+//  con datos reales de la persona. Se corta con la primera compra, si apagó
+//  "Recomendaciones de Nez", o si le tocó un correo de la secuencia de leads hace
+//  menos de 48 h. Solo envía entre 10:00 y 11:59 (hora de El Salvador) y solo a
+//  cuentas creadas DESPUÉS de activarse la función (nurture_started_at), para no
+//  mandarle de golpe un correo a todos los clientes anteriores.
+//  Apagar sin desplegar: variable de entorno NURTURE_EMAILS=off.
+// ═══════════════════════════════════════════════════════
+function nurtureEnabled() { return String(process.env.NURTURE_EMAILS || '').toLowerCase() !== 'off'; }
+
+function nurtureLocalHour(d = new Date()) {
+  const h = new Intl.DateTimeFormat('en-US', { timeZone: 'America/El_Salvador', hour: 'numeric', hour12: false }).format(d);
+  return parseInt(h, 10) % 24;
+}
+
+async function nurtureStartedAt() {
+  let v = await getSetting('nurture_started_at', null);
+  if (!v) { v = new Date().toISOString(); await setSetting('nurture_started_at', v); }
+  return new Date(v);
+}
+
+// "Ya compró" = pedido pagado, o contra entrega no cancelado — por cuenta O por
+// correo (mucha gente se registra justo después de comprar como invitado).
+async function nurtureHasPurchased(c) {
+  const [rows] = await db.execute(
+    `SELECT 1 FROM orders
+     WHERE (customer_id = ? OR LOWER(email) = ?)
+       AND (payment_status = 'Pagado' OR payment_method = 'cod')
+       AND status NOT IN ('Cancelado','No Entregado')
+     LIMIT 1`,
+    [c.id, String(c.email).toLowerCase()]
+  );
+  return rows.length > 0;
+}
+
+async function nurtureRecentLeadEmail(email) {
+  const since = new Date(Date.now() - 48 * 60 * 60 * 1000);
+  const [rows] = await db.execute(
+    `SELECT 1 FROM email_leads
+     WHERE LOWER(email) = ? AND sequence_step IN ('reminder_5d','last_chance_30d') AND updated_at > ?
+     LIMIT 1`,
+    [String(email).toLowerCase(), since]
+  );
+  return rows.length > 0;
+}
+
+async function nurtureProfile(c) {
+  const [rows] = await db.execute(
+    'SELECT profile FROM scent_profiles WHERE customer_id=? ORDER BY created_at DESC LIMIT 7', [c.id]
+  );
+  for (const r of rows) {
+    try { const p = JSON.parse(r.profile); if (nurture.hasUsefulProfile(p)) return p; } catch(e) {}
+  }
+  return null;
+}
+
+async function nurtureSignals(c) {
+  const [favs]  = await db.execute('SELECT product_id FROM customer_favorites WHERE customer_id=? ORDER BY created_at DESC LIMIT 5', [c.id]);
+  const [views] = await db.execute(
+    `SELECT meta FROM activity_events WHERE customer_id=? AND event_type='product_view' ORDER BY created_at DESC LIMIT 30`, [c.id]
+  );
+  const viewIds = [];
+  for (const r of views) {
+    try { const id = Number(JSON.parse(r.meta).id); if (id && !viewIds.includes(id)) viewIds.push(id); } catch(e) {}
+  }
+  let cartIds = [];
+  const [carts] = await db.execute('SELECT cart FROM checkout_carts WHERE email=? LIMIT 1', [String(c.email).toLowerCase()]);
+  if (carts.length) {
+    try { cartIds = JSON.parse(carts[0].cart).map(i => Number(i.productId)).filter(Boolean); } catch(e) {}
+  }
+  return { cartIds, favIds: favs.map(r => Number(r.product_id)), viewIds: viewIds.slice(0, 6) };
+}
+
+// Código de envío gratis de un solo uso (cupón con free_shipping) para el paso 2.
+async function nurtureCreateCoupon() {
+  const now = new Date();
+  const expires = new Date(now.getTime() + 14 * 24 * 60 * 60 * 1000);
+  for (let i = 0; i < 5; i++) {
+    const code = 'ENVIO' + secureRandomBase36(5);
+    try {
+      await db.execute(
+        `INSERT INTO promo_codes (code, type, value, active, max_uses, used_count, expires_at, free_shipping, created_at, updated_at)
+         VALUES (?, 'fixed', 0, 1, 1, 0, ?, 1, ?, ?)`,
+        [code, expires, now, now]
+      );
+      return { code, expires };
+    } catch(e) { if (e.code !== 'ER_DUP_ENTRY') throw e; }
+  }
+  return null;
+}
+
+// Arma el correo completo (sin enviarlo). Lo usan el temporizador y la vista previa.
+async function buildNurtureForCustomer(c, step, code, codeExpires) {
+  const [catalogue, invMap, priceMap, decantsFlag, profile, signals] = await Promise.all([
+    getCatalogue(), getInventoryMap(), getPricingMap(), getSetting('decants_enabled', '1'),
+    nurtureProfile(c), nurtureSignals(c),
+  ]);
+  const choice = nurture.chooseNurture({ profile, signals, catalogue, invMap, priceMap });
+  const mail = nurture.buildNurtureEmail({
+    step, choice, firstName: String(c.name || '').trim().split(/\s+/)[0],
+    code, codeExpires, decantsEnabled: decantsFlag !== '0', priceMap, catalogue, invMap,
+  });
+  const footer = await buildUnsubscribeFooter(c.id, 'Recibiste este correo porque creaste una cuenta en Sillage Parfumerie.');
+  return { variant: mail.variant, subject: mail.subject, html: emailTemplate(mail.bodyHtml + footer) };
+}
+
+async function nurtureProcess(c, step) {
+  try {
+    if (!c.email || !/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(c.email)) return;
+    const prefs = await ensureEmailPreferences(c.id);
+    if (!prefs.followup) return;
+    if (await nurtureHasPurchased(c)) return;
+    if (await nurtureRecentLeadEmail(c.email)) return;
+  } catch(e) { console.warn(`Nurture check failed (cliente ${c.id}):`, e.message); return; } // ante la duda, no enviar
+
+  // Se reserva el envío ANTES de mandarlo: UNIQUE(customer_id, step) evita
+  // duplicados si dos instancias corren a la vez (p. ej. durante un deploy).
+  try {
+    await db.execute(
+      "INSERT INTO nurture_log (customer_id, step, variant, sent_at) VALUES (?, ?, 'X', ?)",
+      [c.id, step, new Date()]
+    );
+  } catch(e) { if (e.code !== 'ER_DUP_ENTRY') console.warn('Nurture reserve failed:', e.message); return; }
+
+  let coupon = null;
+  try {
+    if (step === 2) coupon = await nurtureCreateCoupon().catch(e => { console.warn('Nurture coupon failed:', e.message); return null; });
+    const built = await buildNurtureForCustomer(c, step, coupon && coupon.code, coupon && coupon.expires);
+    const ok = await sendEmail({
+      to: c.email, subject: built.subject, html: built.html,
+      from: `Nez · Sillage <${EMAIL_HOLA}>`,
+    });
+    if (!ok) throw new Error('el envío no se confirmó');
+    await db.execute('UPDATE nurture_log SET variant=?, promo_code=? WHERE customer_id=? AND step=?',
+      [built.variant, coupon ? coupon.code : null, c.id, step]);
+    await logActivity(`Seguimiento post-registro (paso ${step}, variante ${built.variant}) enviado a ${c.email}`);
+  } catch(e) {
+    console.warn(`Nurture send failed (cliente ${c.id}, paso ${step}):`, e.message);
+    // Liberar la reserva (se reintenta en la próxima ventana) y anular el cupón creado.
+    await db.execute("DELETE FROM nurture_log WHERE customer_id=? AND step=? AND variant='X'", [c.id, step]).catch(() => {});
+    if (coupon) await db.execute('UPDATE promo_codes SET active=0 WHERE code=?', [coupon.code]).catch(() => {});
+  }
+}
+
+let _nurtureRunning = false;
+async function runNurtureCron() {
+  if (_nurtureRunning || !nurtureEnabled() || !RESEND_API_KEY) return;
+  const hour = nurtureLocalHour();
+  if (hour < 10 || hour >= 12) return;
+  _nurtureRunning = true;
+  try {
+    const startedAt = await nurtureStartedAt();
+    const now = Date.now(), DAY = 24 * 60 * 60 * 1000;
+    for (const step of [1, 2]) {
+      const [rows] = step === 1
+        ? await db.execute(
+            `SELECT c.id, c.name, c.email FROM customers c
+             LEFT JOIN nurture_log n ON n.customer_id = c.id AND n.step = 1
+             WHERE n.id IS NULL AND c.created_at >= ? AND c.created_at <= ? AND c.created_at >= ?
+             ORDER BY c.created_at ASC LIMIT 20`,
+            [new Date(now - 9 * DAY), new Date(now - 3 * DAY), startedAt])
+        : await db.execute(
+            `SELECT c.id, c.name, c.email FROM customers c
+             JOIN nurture_log n1 ON n1.customer_id = c.id AND n1.step = 1 AND n1.variant <> 'X'
+             LEFT JOIN nurture_log n2 ON n2.customer_id = c.id AND n2.step = 2
+             WHERE n2.id IS NULL AND n1.sent_at <= ? AND n1.sent_at >= ?
+             ORDER BY n1.sent_at ASC LIMIT 20`,
+            [new Date(now - 7 * DAY), new Date(now - 14 * DAY)]);
+      for (const c of rows) {
+        await nurtureProcess(c, step);
+        await new Promise(r => setTimeout(r, 600));
+      }
+    }
+  } catch(e) {
+    console.warn('Nurture cron error:', e.message);
+  } finally { _nurtureRunning = false; }
+}
+setTimeout(() => nurtureStartedAt().catch(e => console.warn('nurture_started_at:', e.message)), 15 * 1000);
+setTimeout(runNurtureCron, 90 * 1000);
+setInterval(runNurtureCron, 20 * 60 * 1000);
+
+// Admin: resultados por paso y variante (compró = pedido real en los 14 días
+// siguientes al envío; es una correlación, no mide aperturas ni clics).
+app.get('/api/admin/nurture/stats', requireAdmin, async (req, res) => {
+  try {
+    const [rows] = await db.execute(
+      `SELECT n.step, n.variant, COUNT(*) AS sent,
+              SUM(EXISTS (
+                SELECT 1 FROM orders o JOIN customers c2 ON c2.id = n.customer_id
+                WHERE (o.customer_id = n.customer_id OR LOWER(o.email) = LOWER(c2.email))
+                  AND o.created_at >= n.sent_at AND o.created_at < DATE_ADD(n.sent_at, INTERVAL 14 DAY)
+                  AND (o.payment_status = 'Pagado' OR o.payment_method = 'cod')
+                  AND o.status NOT IN ('Cancelado','No Entregado')
+              )) AS bought
+       FROM nurture_log n WHERE n.variant <> 'X'
+       GROUP BY n.step, n.variant ORDER BY n.step, n.variant`
+    );
+    res.json({
+      rows: rows.map(r => ({ step: r.step, variant: r.variant, sent: Number(r.sent), bought: Number(r.bought) || 0 })),
+      startedAt: await getSetting('nurture_started_at', null),
+      enabled: nurtureEnabled(),
+    });
+  } catch(e) {
+    console.error('nurture stats error:', e.message);
+    res.status(500).json({ error: 'Query failed' });
+  }
+});
+
+// Admin: cómo se vería el correo para un cliente registrado (no envía nada).
+app.get('/api/admin/nurture/preview', requireAdmin, async (req, res) => {
+  const email = String(req.query.email || '').toLowerCase().trim();
+  const step = req.query.step === '2' ? 2 : 1;
+  try {
+    const [rows] = await db.execute('SELECT id, name, email FROM customers WHERE email=? LIMIT 1', [email]);
+    if (!rows.length) return res.status(404).json({ error: 'No hay un cliente registrado con ese correo.' });
+    const c = rows[0];
+    const [built, purchased, prefs] = await Promise.all([
+      buildNurtureForCustomer(c, step, step === 2 ? 'ENVIO-EJEMPLO' : null, new Date(Date.now() + 14 * 24 * 60 * 60 * 1000)),
+      nurtureHasPurchased(c), ensureEmailPreferences(c.id),
+    ]);
+    res.json({ ...built, purchased, followupOptIn: !!prefs.followup });
+  } catch(e) {
+    console.error('nurture preview error:', e.message);
+    res.status(500).json({ error: 'No se pudo armar la vista previa.' });
+  }
+});
+
+
 // ── Unsubscribe / Email preferences page ─────────────────
 app.get('/preferencias-email', async (req, res) => {
   const { token } = req.query;
@@ -8480,7 +8729,7 @@ p{font-size:0.72rem;color:#8a7f72;line-height:1.8;margin-bottom:1.5rem}
       <label class="tog-wrap"><input type="checkbox" id="mktg" ${prefs.marketing ? 'checked' : ''}/><span class="tog-track"></span><span class="tog-thumb"></span></label>
     </div>
     <div class="pref-row">
-      <div><div class="pref-label">Emails de seguimiento</div><div class="pref-sub">Recomendaciones personalizadas de Nez</div></div>
+      <div><div class="pref-label">Emails de seguimiento</div><div class="pref-sub">Recomendaciones personalizadas de Nez: tras tu entrega y, si aún no compras, tras registrarte</div></div>
       <label class="tog-wrap"><input type="checkbox" id="flwp" ${prefs.followup ? 'checked' : ''}/><span class="tog-track"></span><span class="tog-thumb"></span></label>
     </div>
     <div class="pref-row">

@@ -1201,6 +1201,24 @@ tr:hover td{background:rgba(255,255,255,0.02)}
         </div>
 
         <div style="background:rgba(255,255,255,0.03);border:1px solid var(--border-light);padding:1.2rem;margin-bottom:1.5rem">
+          <div style="font-size:0.6rem;letter-spacing:0.2em;text-transform:uppercase;color:var(--gold);margin-bottom:0.5rem">Seguimiento tras el registro</div>
+          <div class="page-sub" id="nurtureSub" style="margin-bottom:1rem">Cargando…</div>
+          <div class="tbl-wrap" style="overflow-x:auto;margin-bottom:1rem">
+            <table id="nurtureTable" style="min-width:520px">
+              <thead><tr><th>Paso</th><th>Variante</th><th>Enviados</th><th>Compraron en 14 días</th><th>%</th></tr></thead>
+              <tbody id="nurtureBody"><tr><td colspan="5" style="text-align:center;padding:1.2rem;color:var(--muted)">Cargando…</td></tr></tbody>
+            </table>
+          </div>
+          <div style="display:flex;gap:0.8rem;flex-wrap:wrap;align-items:flex-end">
+            <div><label class="dte-lbl">Vista previa para</label><input id="nurturePrevEmail" class="dte-inp" style="min-width:240px" placeholder="correo de un cliente registrado"/></div>
+            <div><label class="dte-lbl">Paso</label>
+              <select id="nurturePrevStep" class="dte-inp"><option value="1">1 · a los 3 días</option><option value="2">2 · a los 10 días</option></select></div>
+            <button class="save-btn" onclick="previewNurture()">Ver correo</button>
+          </div>
+          <div id="nurturePrevErr" style="color:#d9534f;font-size:0.68rem;margin-top:0.5rem"></div>
+        </div>
+
+        <div style="background:rgba(255,255,255,0.03);border:1px solid var(--border-light);padding:1.2rem;margin-bottom:1.5rem">
           <div style="font-size:0.6rem;letter-spacing:0.2em;text-transform:uppercase;color:var(--gold);margin-bottom:1rem">Campaña Manual</div>
           <div style="display:flex;flex-direction:column;gap:0.8rem;max-width:600px">
             <div>
@@ -4034,6 +4052,7 @@ function savePopupConfig(){
 }
 
 function loadLeads(){
+  loadNurtureStats();
   var tbody=document.getElementById('leadsBody');
   tbody.innerHTML='<tr><td colspan="6" style="text-align:center;padding:2rem;color:var(--muted);font-size:0.72rem">Cargando leads...</td></tr>';
   adminFetch(API+'/admin/leads',{}).then(function(r){return r?r.json():null;}).then(function(d){
@@ -4110,6 +4129,50 @@ function deleteCarrito(id){
   adminFetch(API+'/admin/abandoned-carts/'+id,{method:'DELETE'}).then(function(r){return r?r.json():null;}).then(function(d){
     if(d&&d.ok){ _carritosList=_carritosList.filter(function(c){return c.id!==id;}); renderCarritos(); toast('Carrito eliminado','','ok'); }
   }).catch(function(){});
+}
+var NURTURE_VARIANTS={A:'Con perfil olfativo',B:'Con señales de interés',C:'Invitación a Nez'};
+function loadNurtureStats(){
+  var tbody=document.getElementById('nurtureBody'), sub=document.getElementById('nurtureSub');
+  adminFetch(API+'/admin/nurture/stats',{}).then(function(r){return r?r.json():null;}).then(function(d){
+    if(!d||d.error||!Array.isArray(d.rows)){
+      sub.textContent='No se pudieron cargar los resultados'+(d&&d.error?' ('+d.error+')':'')+'.';
+      tbody.innerHTML='<tr><td colspan="5" style="text-align:center;padding:1.2rem;color:#d9534f">Error al cargar.</td></tr>';
+      return;
+    }
+    var since=d.startedAt?new Date(d.startedAt).toLocaleDateString('es-ES',{day:'numeric',month:'long',year:'numeric'}):null;
+    sub.textContent=(d.enabled?'Activo':'APAGADO (NURTURE_EMAILS=off)')+' · Correo automático a quien se registra y aún no compra: paso 1 a los 3 días y paso 2 a los 10 (con código de envío gratis). Se envía entre 10:00 y 11:59, hora de El Salvador. '+
+      (since?'Aplica a cuentas creadas desde el '+since+'.':'Todavía no se ha ejecutado.')+' "Compraron" es una correlación (pedido real en los 14 días siguientes), no mide aperturas ni clics.';
+    if(!d.rows.length){
+      tbody.innerHTML='<tr><td colspan="5" style="text-align:center;padding:1.2rem;color:var(--muted);font-size:0.72rem">Todavía no se ha enviado ninguno.</td></tr>';
+      return;
+    }
+    tbody.innerHTML=d.rows.map(function(r){
+      return '<tr><td>Paso '+r.step+' ('+(r.step===1?'3':'10')+' días)</td>'+
+        '<td>'+esc(r.variant)+' · '+esc(NURTURE_VARIANTS[r.variant]||'')+'</td>'+
+        '<td>'+fmtN(r.sent)+'</td><td>'+fmtN(r.bought)+'</td>'+
+        '<td>'+(r.sent?Math.round(r.bought/r.sent*100)+'%':'—')+'</td></tr>';
+    }).join('');
+  }).catch(function(){
+    sub.textContent='No se pudieron cargar los resultados.';
+    tbody.innerHTML='<tr><td colspan="5" style="text-align:center;padding:1.2rem;color:#d9534f">Error al cargar.</td></tr>';
+  });
+}
+function previewNurture(){
+  var err=document.getElementById('nurturePrevErr'); err.textContent='';
+  var email=document.getElementById('nurturePrevEmail').value.trim();
+  var step=document.getElementById('nurturePrevStep').value;
+  if(!email){ err.textContent='Escribe el correo de un cliente registrado.'; return; }
+  adminFetch(API+'/admin/nurture/preview?email='+encodeURIComponent(email)+'&step='+step,{}).then(function(r){return r?r.json():null;}).then(function(d){
+    if(!d||d.error){ err.textContent=(d&&d.error)||'Sin respuesta.'; return; }
+    var meta='<div style="font-size:0.7rem;color:var(--muted);margin-bottom:0.8rem;line-height:1.8">'+
+      '<strong style="color:var(--cream)">Asunto:</strong> '+esc(d.subject)+'<br/>'+
+      '<strong style="color:var(--cream)">Variante:</strong> '+esc(d.variant)+' — '+esc(NURTURE_VARIANTS[d.variant]||'')+'<br/>'+
+      (d.purchased?'<span style="color:#d98a3a">Este cliente ya compró: no recibiría este correo.</span><br/>':'')+
+      (!d.followupOptIn?'<span style="color:#d98a3a">Tiene apagadas las recomendaciones de Nez: no lo recibiría.</span><br/>':'')+
+      (step==='2'?'<span>El código de la vista previa es de ejemplo; el real se crea al enviar.</span>':'')+
+    '</div>';
+    openSlidePanel('Vista previa — paso '+step, meta+'<iframe sandbox="" srcdoc="'+esc(d.html)+'" style="width:100%;height:68vh;border:1px solid var(--border-light);background:#fff"></iframe>');
+  }).catch(function(e){ err.textContent='Error: '+e.message; });
 }
 function sendLeadCampaign(){
   var err=document.getElementById('leadCampaignErr');
