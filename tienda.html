@@ -5002,6 +5002,8 @@ function updateFabThumb(){
 }
 var _lastTap={el:null,t:0};
 document.addEventListener('click',function(e){_lastTap={el:e.target,t:Date.now()};},true);
+// En la tienda el botón flotante se muestra en cuanto hay productos (en cualquier punto de la página).
+function _fabShouldShow(fab){ return fab.classList.contains('has-items')||fab.classList.contains('fab-visible'); }
 // ¿Está el elemento realmente a la vista (no tapado por un modal/overlay)?
 function _isTopmost(el){
   if(!el)return false;
@@ -5021,8 +5023,12 @@ function _isTopmost(el){
 // overlay a pantalla completa (z-index 500, igual que el botón flotante) y lo tapa, así que
 // ahí el destino es el carrito de su barra superior. Si ninguno se ve, no hay vuelo.
 function _cartFlightTarget(){
-  var c=[document.getElementById('detailCartBtn'),document.getElementById('cartFab'),document.getElementById('cartBtn')];
-  for(var i=0;i<c.length;i++){ if(_isTopmost(c[i]))return c[i]; }
+  var fab=document.getElementById('cartFab');
+  var c=[document.getElementById('detailCartBtn'),fab,document.getElementById('cartBtn')];
+  for(var i=0;i<c.length;i++){
+    if(c[i]===fab&&!_fabShouldShow(fab))continue;   // oculto a propósito (p. ej. sobre el hero del landing)
+    if(_isTopmost(c[i]))return c[i];
+  }
   return null;
 }
 function flyToCart(wasEmpty,prod){
