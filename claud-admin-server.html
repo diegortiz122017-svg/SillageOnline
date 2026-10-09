@@ -3012,6 +3012,22 @@ function orderViewDteJson(oid){
     _dteOpenJsonWindow(d, oid);
   }).catch(function(e){ toast('Error', e.message, 'err'); });
 }
+// Descarga la representación gráfica (PDF) del DTE más reciente de un PEDIDO.
+function orderDownloadDtePdf(oid){
+  var name=null;
+  adminFetch(API+'/admin/orders/'+encodeURIComponent(oid)+'/dte/pdf',{}).then(function(r){
+    if(!r) return null;
+    if(!r.ok) return r.json().then(function(d){ toast('Sin PDF', (d&&d.error)||'No se pudo generar el PDF.', 'warn'); return null; });
+    var m=/filename="?([^";]+?)(?:\.pdf)?"?(?:;|$)/i.exec(r.headers.get('Content-Disposition')||''); if(m)name=m[1];
+    return r.blob();
+  }).then(function(b){
+    if(!b) return;
+    var url=URL.createObjectURL(b);
+    var a=document.createElement('a'); a.href=url; a.download=(name||('dte-'+oid))+'.pdf';
+    document.body.appendChild(a); a.click(); a.remove();
+    setTimeout(function(){ URL.revokeObjectURL(url); }, 2000);
+  }).catch(function(e){ toast('Error', e.message, 'err'); });
+}
 // Descarga el JSON del DTE como archivo.
 function dteDownloadJson(id){
   adminFetch(API+'/admin/dte/documents/'+id+'/json?download=1',{}).then(function(r){return r?r.blob():null;}).then(function(b){
@@ -3806,6 +3822,7 @@ function renderOrdersList(list, banner){
           :'')+
         '<span class="oc-total">$'+parseFloat(o.total||0).toFixed(2)+'</span>'+
         '<button onclick="orderViewDteJson(\''+o.id+'\')" title="Ver el JSON del DTE de este pedido" style="background:rgba(184,149,90,0.1);border:1px solid rgba(184,149,90,0.35);color:var(--gold);font-family:\'Jost\',sans-serif;font-size:0.55rem;letter-spacing:0.1em;text-transform:uppercase;padding:0.25rem 0.6rem;cursor:pointer">JSON DTE</button>'+
+        '<button onclick="orderDownloadDtePdf(\''+o.id+'\')" title="Descargar la representación gráfica (PDF) del DTE de este pedido" style="background:rgba(184,149,90,0.1);border:1px solid rgba(184,149,90,0.35);color:var(--gold);font-family:\'Jost\',sans-serif;font-size:0.55rem;letter-spacing:0.1em;text-transform:uppercase;padding:0.25rem 0.6rem;cursor:pointer">PDF DTE</button>'+
         (o.payment_method==='cod'&&o.status!=='Entregado'&&o.status!=='No Entregado'?
           '<button onclick="markNoShow(\''+o.id+'\')" title="Marcar como no entregado y registrar no-show" style="background:rgba(192,80,74,0.12);border:1px solid rgba(192,80,74,0.3);color:#c0504a;font-family:\'Jost\',sans-serif;font-size:0.55rem;letter-spacing:0.1em;text-transform:uppercase;padding:0.25rem 0.6rem;cursor:pointer">No Entregado</button>'
           :'')+

@@ -3663,6 +3663,34 @@ app.post('/api/admin/dte/test-email', requireAdmin, async (req, res) => {
   }
 });
 
+// Envía como descarga la representación gráfica (PDF) de una fila de dte_documents.
+// Sirve para un DTE normal y para un evento de invalidación ('AN').
+async function sendDtePdfResponse(res, r) {
+  let jsonDte;
+  try { jsonDte = JSON.parse(r.json_dte); } catch(e) { return res.status(422).json({ error: 'El JSON del DTE está dañado.' }); }
+  let pdf;
+  if (r.tipo_dte === 'AN') {
+    // Evento de invalidación: se muestra junto al monto del DTE original (si sigue guardado).
+    let original = null;
+    const origCg = jsonDte.documento && jsonDte.documento.codigoGeneracion;
+    if (origCg) {
+      try {
+        const [o] = await db.execute('SELECT json_dte FROM dte_documents WHERE codigo_generacion=? AND tipo_dte<>?', [origCg, 'AN']);
+        if (o && o[0]) original = JSON.parse(o[0].json_dte);
+      } catch (e) { /* el PDF sale igual, sin el monto */ }
+    }
+    pdf = await buildInvalidacionPdfBuffer({ evento: jsonDte, original, codigoGeneracion: r.codigo_generacion, selloRecibido: r.sello_recibido });
+  } else {
+    pdf = await buildDtePdfBuffer({
+      jsonDte, codigoGeneracion: r.codigo_generacion, numeroControl: r.numero_control, selloRecibido: r.sello_recibido,
+    });
+  }
+  if (!pdf) return res.status(503).json({ error: 'El generador de PDF no está disponible.' });
+  res.setHeader('Content-Type', 'application/pdf');
+  res.setHeader('Content-Disposition', `attachment; filename="${r.codigo_generacion || ('DTE-' + r.id)}.pdf"`);
+  res.send(pdf);
+}
+
 // GET /api/admin/dte/documents/:id/pdf — representación gráfica (PDF) de un DTE
 // ya guardado, armada solo con su JSON (el mismo que se transmitió al MH).
 app.get('/api/admin/dte/documents/:id/pdf', requireAdmin, async (req, res) => {
@@ -3672,32 +3700,29 @@ app.get('/api/admin/dte/documents/:id/pdf', requireAdmin, async (req, res) => {
       [req.params.id]
     );
     if (!rows.length) return res.status(404).json({ error: 'DTE no encontrado' });
-    const r = rows[0];
-    let jsonDte;
-    try { jsonDte = JSON.parse(r.json_dte); } catch(e) { return res.status(422).json({ error: 'El JSON del DTE está dañado.' }); }
-    let pdf;
-    if (r.tipo_dte === 'AN') {
-      // Evento de invalidación: se muestra junto al monto del DTE original (si sigue guardado).
-      let original = null;
-      const origCg = jsonDte.documento && jsonDte.documento.codigoGeneracion;
-      if (origCg) {
-        try {
-          const [o] = await db.execute('SELECT json_dte FROM dte_documents WHERE codigo_generacion=? AND tipo_dte<>?', [origCg, 'AN']);
-          if (o && o[0]) original = JSON.parse(o[0].json_dte);
-        } catch (e) { /* el PDF sale igual, sin el monto */ }
-      }
-      pdf = await buildInvalidacionPdfBuffer({ evento: jsonDte, original, codigoGeneracion: r.codigo_generacion, selloRecibido: r.sello_recibido });
-    } else {
-      pdf = await buildDtePdfBuffer({
-        jsonDte, codigoGeneracion: r.codigo_generacion, numeroControl: r.numero_control, selloRecibido: r.sello_recibido,
-      });
-    }
-    if (!pdf) return res.status(503).json({ error: 'El generador de PDF no está disponible.' });
-    res.setHeader('Content-Type', 'application/pdf');
-    res.setHeader('Content-Disposition', `attachment; filename="${r.codigo_generacion || ('DTE-' + r.id)}.pdf"`);
-    res.send(pdf);
+    await sendDtePdfResponse(res, rows[0]);
   } catch(e) {
     console.error('dte pdf error:', e.message);
+    res.status(500).json({ error: 'No se pudo generar el PDF.' });
+  }
+});
+
+// GET /api/admin/orders/:id/dte/pdf — representación gráfica (PDF) del DTE de un pedido: el más
+// reciente que tenga sello (PROCESADO, o ANULADO si ya se invalidó). Los eventos (invalidación,
+// contingencia) y los documentos rechazados no cuentan.
+app.get('/api/admin/orders/:id/dte/pdf', requireAdmin, async (req, res) => {
+  try {
+    const all  = await dteSvc.getByOrderId(req.params.id);          // más reciente primero
+    const docs = all.filter(d => d.tipo_dte !== 'AN' && d.tipo_dte !== 'CG');
+    const r = docs.find(d => d.estado === 'PROCESADO') || docs.find(d => d.estado === 'ANULADO');
+    if (!r) {
+      return res.status(404).json({ error: all.length
+        ? 'El pedido no tiene un DTE procesado (solo rechazados o en contingencia).'
+        : 'El pedido no tiene DTE emitido' });
+    }
+    await sendDtePdfResponse(res, r);
+  } catch(e) {
+    console.error('order dte pdf error:', e.message);
     res.status(500).json({ error: 'No se pudo generar el PDF.' });
   }
 });
