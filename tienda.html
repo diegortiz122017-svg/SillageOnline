@@ -1288,16 +1288,24 @@ footer{background:var(--dark);padding:3.5rem 4rem;text-align:center;border-top:1
   .cart-fab{
     display:flex;align-items:center;justify-content:center;
     position:fixed;bottom:1.5rem;right:1.2rem;z-index:500;
-    width:56px;height:56px;border-radius:50%;
+    min-width:56px;height:56px;border-radius:28px;
     background:var(--gold);border:none;cursor:pointer;
     box-shadow:0 4px 20px rgba(184,149,90,0.45),0 2px 8px rgba(0,0,0,0.4);
     transition:background 0.25s,transform 0.2s,box-shadow 0.25s,opacity 0.3s,visibility 0.3s;
     -webkit-tap-highlight-color:transparent;
     opacity:0;visibility:hidden;
   }
-  .cart-fab.fab-visible{
+  .cart-fab.fab-visible,.cart-fab.has-items{
     opacity:1;visibility:visible;
   }
+  /* Con productos: píldora "Ver mi carrito · $X" siempre visible (no espera al catálogo) */
+  .cart-fab-label{display:none}
+  .cart-fab.has-items{padding:0 20px 0 16px;gap:0.55rem}
+  .cart-fab.has-items .cart-fab-label{
+    display:inline;font-family:'Jost',sans-serif;font-size:0.78rem;font-weight:500;
+    letter-spacing:0.04em;color:var(--dark);white-space:nowrap;pointer-events:none;
+  }
+  .cart-fab.has-items .cart-fab-count{display:none}
   .cart-fab:hover,.cart-fab:active{
     background:var(--gold-light);
     transform:scale(1.07);
@@ -2145,6 +2153,7 @@ footer{background:var(--dark);padding:3.5rem 4rem;text-align:center;border-top:1
 <!-- FLOATING CART BUTTON (mobile) -->
 <button class="cart-fab" id="cartFab" aria-label="Abrir carrito">
   <svg class="cart-fab-icon" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" style="pointer-events:none"><path d="M6 2L3 6v14a2 2 0 002 2h14a2 2 0 002-2V6l-3-4z"/><line x1="3" y1="6" x2="21" y2="6"/><path d="M16 10a4 4 0 01-8 0"/></svg>
+  <span class="cart-fab-label" id="cartFabLabel"></span>
   <span class="cart-fab-count" id="cartFabCount">0</span>
 </button>
 
@@ -4919,14 +4928,55 @@ function _reinforceProfileIfRecommended(pid){
   }
 }
 
+// ── Al agregar: un punto dorado "vuela" del botón tocado al carrito ──────────
+// Enseña dónde está el carrito. Nunca debe romper el agregado: todo va en try/catch.
+var _lastTap={el:null,t:0};
+document.addEventListener('click',function(e){_lastTap={el:e.target,t:Date.now()};},true);
+function flyToCart(wasEmpty){
+  try{
+    var src=(Date.now()-_lastTap.t<900)?_lastTap.el:null; _lastTap={el:null,t:0};
+    var fab=document.getElementById('cartFab'), hdr=document.getElementById('cartBtn');
+    var tgt=(fab&&getComputedStyle(fab).display!=='none')?fab:hdr;
+    if(!tgt||!tgt.animate)return;
+    function pop(){tgt.animate([{transform:'scale(1)'},{transform:'scale(1.1)'},{transform:'scale(1)'}],{duration:320,easing:'ease-out'});}
+    var reduce=window.matchMedia&&matchMedia('(prefers-reduced-motion: reduce)').matches;
+    var btn=src&&src.closest?src.closest('button,a,[onclick]'):null;
+    if(reduce||!btn){pop();return;}
+    var a=btn.getBoundingClientRect(), b=tgt.getBoundingClientRect();
+    if(!a.width||!b.width||a.bottom<0||a.top>window.innerHeight){pop();return;}
+    var first=wasEmpty&&tgt===fab;
+    if(first)tgt.style.opacity='0';           // la píldora aparece cuando el punto llega
+    var dot=document.createElement('div');
+    dot.style.cssText='position:fixed;left:0;top:0;z-index:1000;width:22px;height:22px;border-radius:50%;background:var(--gold);border:2px solid var(--cream);pointer-events:none';
+    document.body.appendChild(dot);
+    var sx=a.left+a.width/2-11, sy=a.top+a.height/2-11;
+    var ex=(tgt===fab?b.left+30:b.left+b.width/2)-11, ey=b.top+b.height/2-11;
+    var done=false;
+    function land(){
+      if(done)return; done=true; dot.remove();
+      if(first){tgt.style.opacity='';}
+      pop();
+    }
+    var an=dot.animate([
+      {transform:'translate('+sx+'px,'+sy+'px) scale(1)',opacity:1},
+      {transform:'translate('+((sx+ex)/2)+'px,'+(Math.min(sy,ey)-60)+'px) scale(1.15)',opacity:1,offset:0.5},
+      {transform:'translate('+ex+'px,'+ey+'px) scale(0.5)',opacity:0.9}
+    ],{duration:650,easing:'cubic-bezier(0.4,0,0.2,1)',fill:'forwards'});
+    an.onfinish=land;
+    setTimeout(land,1200);                    // red de seguridad
+  }catch(e){}
+}
+
 function addToCart(pid){
   var p=P.find(function(x){return x.id===pid;});if(!p)return;
   if(getInv(pid).outOfStock){toast('Sin Stock','Este artículo no está disponible');return;}
+  var wasEmpty=cartQty()===0;
   // Default to full bottle when adding from card/suggestion
   var ex=cart.find(function(i){return i.p.id===pid&&i.type==='full';});
   if(ex)ex.qty++;
   else cart.push({p:p,qty:1,type:'full',label:p.brand+' '+p.name,unitPrice:effectivePrice(p),size:p.size});
   renderCart();saveCart();
+  flyToCart(wasEmpty);
   trackEvent('cart_add', {id:pid});
   if(typeof fbq==='function') fbq('track','AddToCart',{content_ids:[String(pid)],content_type:'product',value:effectivePrice(p),currency:'USD'});
   if(typeof _nezNudge!=='undefined') _nezNudge.onCartAdd();
@@ -4946,11 +4996,13 @@ function addToCartWithOptions(pid, label, price, size, type){
     if(di.out){ toast('Sin Stock','Este decant no está disponible en este momento'); return; }
   }
   // Match by pid + type so full and decant can coexist in cart
+  var wasEmpty=cartQty()===0;
   var ex=cart.find(function(i){return i.p.id===pid&&i.type===type;});
   if(ex)ex.qty++;
   else cart.push({p:p,qty:1,type:type,label:label,unitPrice:price,size:size});
   renderCart();
   saveCart();
+  flyToCart(wasEmpty);
   trackEvent('cart_add', {id:pid,type:type});
   if(typeof fbq==='function') fbq('track','AddToCart',{content_ids:[String(pid)],content_type:'product',value:parseFloat(price)||0,currency:'USD'});
   if(typeof _nezNudge!=='undefined') _nezNudge.onCartAdd();
@@ -4991,6 +5043,13 @@ function renderCart(){
   var cc=document.getElementById('cartCount');cc.textContent=qty;cc.classList.toggle('show',qty>0);
   var fc=document.getElementById('cartFabCount');
   if(fc){fc.textContent=qty;fc.classList.toggle('show',qty>0);}
+  var fabEl=document.getElementById('cartFab');
+  if(fabEl){
+    fabEl.classList.toggle('has-items',qty>0);
+    var fabLbl=document.getElementById('cartFabLabel');
+    if(fabLbl)fabLbl.textContent=qty>0?'Ver mi carrito · $'+(Math.round(cartSum()*100)/100).toFixed(2).replace(/\.00$/,''):'';
+    fabEl.setAttribute('aria-label',qty>0?'Ver mi carrito, '+qty+(qty===1?' artículo':' artículos'):'Abrir carrito');
+  }
   if(typeof updateDetailCartBtn==='function')updateDetailCartBtn();
   document.getElementById('checkoutBtn').disabled=cart.length===0;
 
@@ -5121,11 +5180,11 @@ document.getElementById('cartList').addEventListener('click',function(e){
   if(e.target.classList.contains('q-plus')&&key)changeQtyKey(key,1);
   if(e.target.classList.contains('cr-remove')&&rm)removeFromCartKey(rm);
 });
-function openCart(){document.getElementById('cartDrawer').classList.add('open');document.getElementById('cartOverlay').classList.add('open');document.body.style.overflow='hidden';}
+function openCart(src){trackEvent('cart_open', typeof src==='string'?src:'detail');document.getElementById('cartDrawer').classList.add('open');document.getElementById('cartOverlay').classList.add('open');document.body.style.overflow='hidden';}
 function closeCart(){document.getElementById('cartDrawer').classList.remove('open');document.getElementById('cartOverlay').classList.remove('open');document.body.style.overflow='';}
-document.getElementById('cartBtn').addEventListener('click',openCart);
+document.getElementById('cartBtn').addEventListener('click',function(){openCart('header');});
 var fabBtn=document.getElementById('cartFab');
-if(fabBtn)fabBtn.addEventListener('click',openCart);
+if(fabBtn)fabBtn.addEventListener('click',function(){openCart('fab');});
 document.getElementById('cartX').addEventListener('click',closeCart);
 document.getElementById('cartOverlay').addEventListener('click',closeCart);
 
