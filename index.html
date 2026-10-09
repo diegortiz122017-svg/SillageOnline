@@ -359,6 +359,13 @@ nav a:hover{color:var(--gold)}
 .csl{font-size:0.62rem;letter-spacing:0.18em;text-transform:uppercase;color:var(--muted)}
 .csv{font-family:Cormorant Garamond,serif;font-size:1.5rem;color:var(--cream)}
 .cart-tax-note{font-size:0.58rem;color:var(--muted);margin-bottom:1rem}
+.cart-promo{margin:0 0 0.8rem}
+.cart-promo-toggle{background:none;border:none;padding:0;color:var(--gold);font-family:'Jost',sans-serif;font-size:0.62rem;letter-spacing:0.08em;text-decoration:underline;text-underline-offset:3px;cursor:pointer}
+.cart-promo-row{display:flex;gap:0.5rem}
+.cart-promo-row input{flex:1;min-width:0;padding:0.6rem 0.8rem;background:transparent;border:1px solid rgba(184,149,90,0.45);color:var(--cream);font-family:'Jost',sans-serif;font-size:16px;letter-spacing:0.12em;text-transform:uppercase;outline:none;box-sizing:border-box;border-radius:0}
+.cart-promo-row input:focus{border-color:var(--gold)}
+.cart-promo-row button{padding:0 1rem;background:transparent;border:1px solid var(--gold);color:var(--gold);font-family:'Jost',sans-serif;font-size:0.6rem;letter-spacing:0.15em;text-transform:uppercase;cursor:pointer;flex-shrink:0}
+.cart-promo-msg{font-size:0.62rem;margin:0.4rem 0 0.2rem;min-height:0.9rem;line-height:1.5;color:var(--muted)}
 .checkout-btn{width:100%;padding:0.95rem;background:var(--gold);border:none;color:var(--dark);font-family:'Jost',sans-serif;font-size:0.68rem;letter-spacing:0.22em;text-transform:uppercase;cursor:pointer;transition:background 0.3s;font-weight:500}
 .checkout-btn:hover:not(:disabled){background:var(--gold-light)}
 .checkout-btn:disabled{opacity:0.45;cursor:not-allowed}
@@ -2501,6 +2508,20 @@ footer{background:var(--dark);padding:3.5rem 4rem;text-align:center;border-top:1
       <span class="csv" id="cartShipping">—</span>
     </div>
     <div class="shipping-bar" id="cartShippingBar" style="display:none"></div>
+    <div class="cart-promo" id="cartPromo" style="display:none">
+      <button type="button" class="cart-promo-toggle" id="cartPromoToggle" onclick="openCartPromo(true)">¿Tienes un código de descuento?</button>
+      <div id="cartPromoBox" style="display:none">
+        <div class="cart-promo-row">
+          <input id="promoInput" type="text" placeholder="CÓDIGO" maxlength="30" autocomplete="off" autocapitalize="characters" spellcheck="false"
+            aria-label="Código de descuento"
+            oninput="this.value=this.value.toUpperCase();clearPromo()"
+            onkeydown="if(event.key==='Enter'){event.preventDefault();applyPromo();}"/>
+          <button type="button" onclick="applyPromo()">Aplicar</button>
+        </div>
+        <div class="cart-promo-msg" id="promoMsg"></div>
+        <button type="button" class="cart-promo-toggle" id="cartPromoRemove" style="display:none" onclick="removePromo()">Quitar código</button>
+      </div>
+    </div>
     <div class="cart-subtotal-row" id="cartDiscountRow" style="display:none;color:var(--success)">
       <span class="csl" id="cartDiscountLabel">Descuento</span>
       <span class="csv" id="cartDiscount">−$0</span>
@@ -2593,27 +2614,8 @@ footer{background:var(--dark);padding:3.5rem 4rem;text-align:center;border-top:1
           </div>
           <div id="codCheckMsg"></div>
         </div>
-        <!-- Promo code -->
-        <div style="margin-top:1.2rem">
-          <p class="f-label-top">Código de descuento (opcional)</p>
-          <div style="display:flex;gap:0.5rem;align-items:flex-start">
-            <div style="flex:1">
-              <input id="promoInput" type="text" placeholder="CÓDIGO" maxlength="30"
-                style="width:100%;padding:0.7rem 0.9rem;background:#faf8f4;border:1px solid #c8b898;
-                       color:#1a1714;font-family:'Jost',sans-serif;font-size:0.75rem;
-                       letter-spacing:0.12em;text-transform:uppercase;outline:none;box-sizing:border-box"
-                oninput="this.value=this.value.toUpperCase();clearPromo()"/>
-              <div id="promoMsg" style="font-size:0.62rem;margin-top:0.3rem;min-height:1rem"></div>
-            </div>
-            <button onclick="applyPromo()"
-              style="padding:0.7rem 1rem;background:transparent;border:1px solid #c8b898;
-                     color:#8a7f72;font-family:'Jost',sans-serif;font-size:0.6rem;
-                     letter-spacing:0.15em;text-transform:uppercase;cursor:pointer;white-space:nowrap;
-                     flex-shrink:0">
-              Aplicar
-            </button>
-          </div>
-        </div>
+        <!-- Código de descuento: se captura en el carrito; aquí solo se muestra su estado -->
+        <div id="coPromoLine" style="margin-top:1.2rem;font-size:0.68rem;color:#8a7f72;line-height:1.7"></div>
         <div class="m-actions"><button class="m-btn-s" id="s2back" onclick="goStep(1)">&#8592; Volver</button><button class="m-btn-p" id="s2next">Revisar Pedido &#8594;</button></div>
       </div>
 <div class="m-section" id="ms3">
@@ -4882,7 +4884,7 @@ function applyPromo(codeOverride){
   var code = (codeOverride || (inputEl && inputEl.value) || '').trim().toUpperCase();
   if(inputEl && codeOverride) inputEl.value = code;
   var msg  = document.getElementById('promoMsg');
-  if(!code){ msg.style.color='var(--error)'; msg.textContent='Ingresa un código.'; return; }
+  if(!code){ msg.style.color='var(--error)'; msg.textContent='Ingresa un código.'; _promoOpen=true; syncPromoUI(); return; }
   var total = standaloneCartSum();
   if(total <= 0){
     msg.style.color='var(--error)';
@@ -4897,9 +4899,10 @@ function applyPromo(codeOverride){
   }).then(function(r){return r.json();}).then(function(res){
     if(!res.ok){
       msg.style.color='var(--error)'; msg.textContent=res.error||'Código inválido.';
-      _appliedPromo=null; return;
+      _appliedPromo=null; trackEvent('promo_failed', String(res.error||'invalido').slice(0,80)); renderCart(); return;
     }
     _appliedPromo = res;
+    trackEvent('promo_applied', code);
     msg.style.color='var(--success)';
     var parts=[];
     if(parseFloat(res.value)>0) parts.push(res.type==='percent' ? res.value+'% descuento' : '$'+parseFloat(res.value).toFixed(2)+' de descuento');
@@ -4911,6 +4914,48 @@ function applyPromo(codeOverride){
   }).catch(function(){
     msg.style.color='var(--error)'; msg.textContent='Error al verificar.';
   });
+}
+
+// Estado visual del código de descuento: carrito (campo colapsado) y línea del checkout.
+var _promoOpen = false;
+function openCartPromo(focus){
+  _promoOpen = true;
+  syncPromoUI();
+  trackEvent('promo_open');
+  if(focus){ var i=document.getElementById('promoInput'); if(i) setTimeout(function(){ i.focus(); }, 60); }
+}
+function removePromo(){
+  var i=document.getElementById('promoInput'); if(i) i.value='';
+  clearPromo();
+}
+// Desde el checkout: volver al carrito con el campo abierto.
+function goCartPromo(){
+  closeCheckout();
+  openCart('checkout');
+  openCartPromo(true);
+}
+function syncPromoUI(){
+  var wrap=document.getElementById('cartPromo');
+  if(wrap){
+    var on=!!_appliedPromo, show=on||_promoOpen;
+    wrap.style.display = cart.length>0 ? 'block' : 'none';
+    var box=document.getElementById('cartPromoBox'), tog=document.getElementById('cartPromoToggle'), rm=document.getElementById('cartPromoRemove');
+    if(box) box.style.display = show ? 'block' : 'none';
+    if(tog) tog.style.display = show ? 'none' : 'inline';
+    if(rm)  rm.style.display  = on ? 'inline' : 'none';
+  }
+  var co=document.getElementById('coPromoLine');
+  if(co){
+    if(_appliedPromo){
+      var d=getPromoDiscount(), parts=[];
+      if(d>0) parts.push('ahorras $'+d.toFixed(2));
+      if(_appliedPromo.freeShipping) parts.push('envío gratis');
+      co.innerHTML='<span style="color:var(--success)">\u2713 Código <strong>'+esc(_appliedPromo.code||'')+'</strong> aplicado</span>'+(parts.length?' \u2014 '+parts.join(' + '):'')+
+        ' \u00b7 <a href="#" onclick="removePromo();return false" style="color:#8a7f72">Quitar</a>';
+    } else {
+      co.innerHTML='\u00bfTienes un código de descuento? <a href="#" onclick="goCartPromo();return false" style="color:var(--gold)">Agrégalo en el carrito</a>';
+    }
+  }
 }
 
 function clearPromo(){
@@ -5250,6 +5295,8 @@ function renderCart(){
       discRow.style.display = 'none';
     }
   }
+
+  syncPromoUI();
 
   // Shipping row
   var shipEl  = document.getElementById('cartShipping');
