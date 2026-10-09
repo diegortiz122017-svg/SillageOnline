@@ -3260,7 +3260,8 @@ function loadInvalidables(){
     if(!Array.isArray(list)||!list.length){ sel.innerHTML='<option value="">No hay DTEs procesados para anular</option>'; return; }
     var tipoLbl={'01':'Factura','03':'CCF','05':'Nota de Crédito'};
     sel.innerHTML='<option value="">— Elegir DTE —</option>'+list.map(function(d){
-      return '<option value="'+d.id+'">'+(tipoLbl[d.tipoDte]||d.tipoDte)+' · '+_dteEsc(d.numeroControl)+' · pedido '+_dteEsc(d.orderId)+'</option>';
+      var lim=d.limiteInvalidacion?(d.vencido?' · FUERA DE PLAZO':' · hasta '+_dteEsc(d.limiteInvalidacion)):'';
+      return '<option value="'+d.id+'"'+(d.vencido?' disabled':'')+'>'+(tipoLbl[d.tipoDte]||d.tipoDte)+' · '+_dteEsc(d.numeroControl)+' · pedido '+_dteEsc(d.orderId)+lim+'</option>';
     }).join('');
   }).catch(function(){ sel.innerHTML='<option value="">Error al cargar</option>'; });
 }

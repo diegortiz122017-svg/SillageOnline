@@ -3465,16 +3465,21 @@ app.post('/api/admin/dte/contingencia/declarar', requireAdmin, async (req, res) 
 app.get('/api/admin/dte/invalidables', requireAdmin, async (req, res) => {
   try {
     const [rows] = await db.execute(
-      `SELECT id, order_id, tipo_dte, numero_control, codigo_generacion, created_at
+      `SELECT id, order_id, tipo_dte, numero_control, codigo_generacion, created_at, json_dte
          FROM dte_documents
         WHERE estado='PROCESADO' AND ambiente=? AND tipo_dte NOT IN ('AN','CG')
         ORDER BY id DESC LIMIT 100`,
       [cfg.DTE_AMBIENTE]
     );
-    res.json((rows || []).map(r => ({
-      id: r.id, orderId: r.order_id, tipoDte: r.tipo_dte,
-      numeroControl: r.numero_control, codigoGeneracion: r.codigo_generacion, createdAt: r.created_at,
-    })));
+    res.json((rows || []).map(r => {
+      let v = null;
+      try { v = dteSvc.ventanaInvalidacion(r); } catch (e) { /* JSON ilegible: sin plazo */ }
+      return {
+        id: r.id, orderId: r.order_id, tipoDte: r.tipo_dte,
+        numeroControl: r.numero_control, codigoGeneracion: r.codigo_generacion, createdAt: r.created_at,
+        limiteInvalidacion: v ? v.limite : null, vencido: v ? v.vencido : false,
+      };
+    }));
   } catch(e) { res.status(500).json({ error: e.message }); }
 });
 
@@ -3490,6 +3495,10 @@ app.post('/api/admin/dte/invalidar', requireAdmin, async (req, res) => {
     const doc = rows[0];
     if (doc.estado !== 'PROCESADO' || !doc.sello_recibido) {
       return res.status(409).json({ error: 'Solo se puede invalidar un DTE PROCESADO con sello.' });
+    }
+    const ventana = dteSvc.ventanaInvalidacion(doc);
+    if (ventana.vencido) {
+      return res.status(409).json({ error: 'FECHA FUERA DE PLAZO PERMITIDO para invalidar este DTE. ' + ventana.regla });
     }
     const motivo = {
       ...buildTestMotivoAnulacion(),

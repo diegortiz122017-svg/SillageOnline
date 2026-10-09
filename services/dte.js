@@ -1018,12 +1018,61 @@ function _montoIvaDe(json) {
   return 0;
 }
 
+// ─── Plazos y fecha del Evento de Invalidación ───────────────────────────────
+// Manual de Usuario del Sistema de Facturación V2.1 (MH, sep-2026), sección D:
+//  • Factura (01), Factura de Exportación (11) y Sujeto Excluido (14): se puede invalidar
+//    hasta 3 MESES después del sello, y la Fecha del Evento va del día de generación hasta
+//    3 meses después de la Fecha de Generación del documento.
+//  • Todos los demás (CCF 03, NC 05, ND 06, NR 04, ...): hasta 10 DÍAS HÁBILES posteriores al
+//    PERÍODO (mes) en que se otorgó el sello, y la Fecha del Evento debe ser IGUAL a la Fecha de
+//    Generación del documento a invalidar.
+// Fuera de plazo el MH responde "FECHA FUERA DE PLAZO PERMITIDO".
+const INVALIDACION_3_MESES = new Set(['01', '11', '14']);
+const _pad = n => String(n).padStart(2, '0');
+const _ymd = d => d.getUTCFullYear() + '-' + _pad(d.getUTCMonth() + 1) + '-' + _pad(d.getUTCDate());
+function _parseYmd(s) { const [y, m, d] = String(s).split('-').map(Number); return new Date(Date.UTC(y, m - 1, d)); }
+function _addMonthsYmd(s, months) {
+  const d = _parseYmd(s);
+  const y = d.getUTCFullYear(), m = d.getUTCMonth() + months;
+  const last = new Date(Date.UTC(y, m + 1, 0)).getUTCDate();
+  return _ymd(new Date(Date.UTC(y, m, Math.min(d.getUTCDate(), last))));
+}
+function _addDaysYmd(s, n) { const d = _parseYmd(s); d.setUTCDate(d.getUTCDate() + n); return _ymd(d); }
+function _addBusinessDaysYmd(s, n) {
+  let d = _parseYmd(s), left = n;
+  while (left > 0) { d.setUTCDate(d.getUTCDate() + 1); const w = d.getUTCDay(); if (w !== 0 && w !== 6) left--; }
+  return _ymd(d);
+}
+const _HOLGURA_FERIADOS = 3; // días de margen: los feriados alargan el plazo y el manual los cuenta distinto en sus ejemplos
+
+// Devuelve { fecAnula, horAnula, limite, vencido, regla } para invalidar docRow "ahora".
+function ventanaInvalidacion(docRow, ahora) {
+  const now = ahora || nowSV();                         // { fecEmi: hoy, horEmi: hora } en El Salvador
+  const json = typeof docRow.json_dte === 'string' ? JSON.parse(docRow.json_dte) : (docRow.json_dte || {});
+  const ident = json.identificacion || {};
+  const fecDoc = ident.fecEmi || now.fecEmi;
+  const horDoc = ident.horEmi || '00:00:00';
+  const sello = docRow.created_at
+    ? new Date(new Date(docRow.created_at).getTime() - 6 * 3600 * 1000).toISOString().slice(0, 10)
+    : fecDoc;                                           // día en que se transmitió (≈ sello de recepción)
+  if (INVALIDACION_3_MESES.has(String(docRow.tipo_dte))) {
+    const limite = [_addMonthsYmd(fecDoc, 3), _addMonthsYmd(sello, 3)].sort()[0];
+    return { fecAnula: now.fecEmi, horAnula: now.horEmi, limite, vencido: now.fecEmi > limite,
+             regla: 'Hasta 3 meses desde la emisión (límite ' + limite + ').' };
+  }
+  const finMes = _addDaysYmd(_addMonthsYmd(sello.slice(0, 8) + '01', 1), -1);
+  const limite = _addBusinessDaysYmd(finMes, 10);
+  const hora = fecDoc === now.fecEmi || horDoc < now.horEmi ? now.horEmi : horDoc;
+  return { fecAnula: fecDoc, horAnula: hora, limite, vencido: now.fecEmi > _addDaysYmd(limite, _HOLGURA_FERIADOS),
+           regla: 'Hasta 10 días hábiles después del mes del sello (límite ' + limite + '); la fecha del evento debe ser la de emisión (' + fecDoc + ').' };
+}
+
 // docRow = fila de dte_documents (con json_dte, sello, numero_control, etc.)
 // motivo = { tipoAnulacion, motivoAnulacion, nombreResponsable, tipDocResponsable,
 //            numDocResponsable, nombreSolicita, tipDocSolicita, numDocSolicita,
 //            codigoGeneracionR? }
 function buildAnulacion(docRow, motivo, opts) {
-  const { fecEmi: fecAnula, horEmi: horAnula } = nowSV();
+  const { fecAnula, horAnula } = ventanaInvalidacion(docRow);
   const json = typeof docRow.json_dte === 'string' ? JSON.parse(docRow.json_dte) : docRow.json_dte;
   const e    = cfg.DTE_EMISOR;
   const rec  = (json && json.receptor) || {};
@@ -1385,6 +1434,7 @@ module.exports = {
   buildNotaCredito,
   buildNotaCreditoExacta,
   buildAnulacion,
+  ventanaInvalidacion,
   invalidarDte,
   buildContingencia,
   emitContingencia,
