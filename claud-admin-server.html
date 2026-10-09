@@ -1575,6 +1575,11 @@ tr:hover td{background:rgba(255,255,255,0.02)}
             <button class="save-btn" onclick="dteTest()">🧪 Emitir factura de prueba</button>
             <button class="save-btn" onclick="renderDtePage()">↻ Refrescar</button>
           </div>
+          <div style="display:flex;gap:0.6rem;flex-wrap:wrap;align-items:center;margin-top:0.9rem">
+            <input id="dteTestMailTo" class="dte-inp" type="email" placeholder="tu-correo@ejemplo.com" style="min-width:230px"/>
+            <button class="save-btn" onclick="dteTestMail()">✉ Enviar correo de prueba (datos ficticios)</button>
+          </div>
+          <div style="font-size:0.6rem;color:var(--muted);margin-top:0.4rem">No toca Hacienda ni guarda nada: manda una factura inventada con su PDF y JSON adjuntos para comprobar la entrega.</div>
           <div id="dteDiagOut" style="margin-top:1rem;font-size:0.7rem;color:var(--muted);line-height:1.8"></div>
         </div>
 
@@ -3044,6 +3049,22 @@ function dtePing(){
     out.innerHTML=
       '<div>Firmador: '+_dteChip(d.firmador&&d.firmador.ok, d.firmador&&d.firmador.ok?'OK':'Falla')+' '+_dteEsc(d.firmador&&d.firmador.msg)+'</div>'+
       '<div style="margin-top:0.4rem">Hacienda (auth): '+_dteChip(d.mhAuth&&d.mhAuth.ok, d.mhAuth&&d.mhAuth.ok?'OK':'Falla')+' '+_dteEsc(d.mhAuth&&d.mhAuth.msg)+'</div>';
+  }).catch(function(e){ out.innerHTML='<span style="color:#d9534f">Error: '+_dteEsc(e.message)+'</span>'; });
+}
+
+// Correo de prueba con datos ficticios (PDF + JSON adjuntos) para verificar la entrega por Resend.
+function dteTestMail(){
+  var out=document.getElementById('dteDiagOut');
+  var to=(document.getElementById('dteTestMailTo').value||'').trim();
+  if(!to){ out.innerHTML='<span style="color:#d9534f">Escribe el correo donde quieres recibir la prueba.</span>'; return; }
+  out.innerHTML='Enviando correo de prueba a '+_dteEsc(to)+'…';
+  adminFetch(API+'/admin/dte/test-email',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({to:to})}).then(function(r){return r?r.json():null;}).then(function(d){
+    if(!d){ out.textContent='Sin respuesta.'; return; }
+    if(d.error&&!d.attachments){ out.innerHTML='<span style="color:#d9534f">'+_dteEsc(d.error)+'</span>'; return; }
+    var files=(d.attachments||[]).map(function(a){ return _dteEsc(a.filename)+' ('+_dteEsc(a.kb)+' KB)'; }).join(' · ')||'ninguno';
+    out.innerHTML=(d.ok?_dteChip(true,'Enviado'):_dteChip(false,'No enviado'))+' a '+_dteEsc(d.to)+
+      '<div style="margin-top:0.3rem">Adjuntos: '+files+'</div>'+
+      (d.ok?'<div style="color:var(--muted);margin-top:0.3rem">Revisa tu bandeja (y spam): deben llegar esos mismos archivos.</div>':'<div style="color:#d98a3a;margin-top:0.3rem">'+_dteEsc(d.error||'')+'</div>');
   }).catch(function(e){ out.innerHTML='<span style="color:#d9534f">Error: '+_dteEsc(e.message)+'</span>'; });
 }
 

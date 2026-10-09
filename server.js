@@ -3623,6 +3623,46 @@ app.get('/api/admin/dte/documents/:id/json', requireAdmin, async (req, res) => {
   } catch(e) { res.status(500).json({ error: e.message }); }
 });
 
+// POST /api/admin/dte/test-email — correo de PRUEBA con PDF + JSON adjuntos, con datos 100% ficticios.
+//   body: { to }.  No toca Hacienda ni la base de datos: sirve para comprobar que Resend entrega
+//   los adjuntos. El PDF sale marcado "AMBIENTE DE PRUEBAS — SIN VALIDEZ TRIBUTARIA".
+app.post('/api/admin/dte/test-email', requireAdmin, async (req, res) => {
+  try {
+    const to = String((req.body && req.body.to) || '').trim();
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(to)) return res.status(400).json({ error: 'Escribe un correo válido.' });
+    if (!RESEND_API_KEY) return res.status(503).json({ error: 'RESEND_API_KEY no está configurada: no hay con qué enviar correos.' });
+    const order = {
+      id: 'PRUEBA-0001', customer: 'Cliente de Prueba', email: to, address: 'Calle Ficticia 123, San Salvador (dato de prueba)',
+      payment_method: 'cod', promo_discount: 0,
+      items: JSON.stringify([
+        { name: 'Perfume de prueba A', qty: 1, price: 45 },
+        { name: 'Perfume de prueba B', qty: 2, price: 32.5 },
+        { name: 'Decant de prueba C', qty: 1, price: 12.99 },
+        { name: 'Perfume de prueba D', qty: 1, price: 78.4 },
+      ]),
+    };
+    order.total = String(JSON.parse(order.items).reduce((s, i) => s + i.qty * i.price, 0).toFixed(2));
+    const codigoGeneracion = require('crypto').randomUUID().toUpperCase();
+    const numeroControl = 'DTE-01-M001P001-000000000000000';
+    const jsonDte = dteSvc.buildFactura(order, { numeroControl, codigoGeneracion });
+    jsonDte.identificacion.ambiente = '00';            // el PDF muestra el banner de PRUEBAS
+    const dte = {
+      estado: 'PROCESADO', tipoDte: '01', selloRecibido: 'PRUEBA-SIN-VALOR-FISCAL', numeroControl, codigoGeneracion,
+      jsonDte, jsonFirmado: JSON.stringify(jsonDte, null, 2),   // legible; NO es un JWS firmado
+    };
+    const attachments = (await buildDteAttachments(dte)) || [];
+    const sent = await sendDteReadyEmail(order, dte);
+    res.json({
+      ok: !!sent, to,
+      attachments: attachments.map(a => ({ filename: a.filename, kb: Math.round(Buffer.from(a.content, 'base64').length / 1024 * 10) / 10 })),
+      error: sent ? null : 'Resend no aceptó el correo (revisa los logs de Railway).',
+    });
+  } catch (e) {
+    console.error('dte test-email error:', e.message);
+    res.status(500).json({ error: e.message });
+  }
+});
+
 // GET /api/admin/dte/documents/:id/pdf — representación gráfica (PDF) de un DTE
 // ya guardado, armada solo con su JSON (el mismo que se transmitió al MH).
 app.get('/api/admin/dte/documents/:id/pdf', requireAdmin, async (req, res) => {
