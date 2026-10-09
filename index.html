@@ -5087,11 +5087,34 @@ function updateFabThumb(){
 }
 var _lastTap={el:null,t:0};
 document.addEventListener('click',function(e){_lastTap={el:e.target,t:Date.now()};},true);
+// ¿Está el elemento realmente a la vista (no tapado por un modal/overlay)?
+function _isTopmost(el){
+  if(!el)return false;
+  var r=el.getBoundingClientRect();
+  if(!r.width||!r.height)return false;
+  var cx=r.left+r.width/2, cy=r.top+r.height/2;
+  if(cx<0||cy<0||cx>window.innerWidth||cy>window.innerHeight)return false;
+  // El botón flotante puede estar justo empezando su fundido de entrada (visibility todavía en
+  // hidden y con transición): se prueba como visible y SIN transición, y luego se restaura.
+  var pt=el.style.transition, pv=el.style.visibility;
+  el.style.transition='none'; el.style.visibility='visible';
+  var t=document.elementFromPoint(cx,cy);
+  el.style.visibility=pv; el.style.transition=pt;
+  return !!t&&(t===el||el.contains(t));
+}
+// Destino del vuelo: el botón de carrito que el usuario ve AHORA. La ficha del producto es un
+// overlay a pantalla completa (z-index 500, igual que el botón flotante) y lo tapa, así que
+// ahí el destino es el carrito de su barra superior. Si ninguno se ve, no hay vuelo.
+function _cartFlightTarget(){
+  var c=[document.getElementById('detailCartBtn'),document.getElementById('cartFab'),document.getElementById('cartBtn')];
+  for(var i=0;i<c.length;i++){ if(_isTopmost(c[i]))return c[i]; }
+  return null;
+}
 function flyToCart(wasEmpty,prod){
   try{
     var src=(Date.now()-_lastTap.t<900)?_lastTap.el:null; _lastTap={el:null,t:0};
     var fab=document.getElementById('cartFab'), hdr=document.getElementById('cartBtn');
-    var tgt=(fab&&getComputedStyle(fab).display!=='none')?fab:hdr;
+    var tgt=_cartFlightTarget();
     function settle(){if(prod){_fabPid=prod.id;updateFabThumb();}}
     if(!tgt||!tgt.animate){settle();return;}
     function pop(){settle();tgt.animate([{transform:'scale(1)'},{transform:'scale(1.1)'},{transform:'scale(1)'}],{duration:320,easing:'ease-out'});}
@@ -5101,7 +5124,7 @@ function flyToCart(wasEmpty,prod){
     var a=btn.getBoundingClientRect(), b=tgt.getBoundingClientRect();
     if(!a.width||!b.width||a.bottom<0||a.top>window.innerHeight){pop();return;}
     var first=wasEmpty&&tgt===fab;
-    if(first)tgt.style.opacity='0';           // la píldora aparece cuando el punto llega
+    if(first){tgt.style.transition='none';tgt.style.opacity='0';void tgt.offsetWidth;}   // el botón aparece cuando la miniatura llega
     var dot=document.createElement('div');
     dot.style.cssText='position:fixed;left:0;top:0;z-index:1000;width:44px;height:44px;border-radius:50%;background:#faf8f4;border:2px solid var(--gold);overflow:hidden;display:flex;align-items:center;justify-content:center;pointer-events:none';
     if(prod){dot.innerHTML=_thumbHtml(prod,96);var im=dot.firstElementChild;if(im)im.style.cssText='max-width:68%;max-height:82%;width:auto;height:auto;object-fit:contain';}
@@ -5111,12 +5134,12 @@ function flyToCart(wasEmpty,prod){
     var done=false;
     function land(){
       if(done)return; done=true; dot.remove();
-      if(first){tgt.style.opacity='';}
+      if(first){tgt.style.transition='';void tgt.offsetWidth;tgt.style.opacity='';}
       pop();
     }
     var an=dot.animate([
       {transform:'translate('+sx+'px,'+sy+'px) scale(1)',opacity:1},
-      {transform:'translate('+((sx+ex)/2)+'px,'+(Math.min(sy,ey)-60)+'px) scale(1.15)',opacity:1,offset:0.5},
+      {transform:'translate('+((sx+ex)/2)+'px,'+Math.max(8,Math.min(sy,ey)-60)+'px) scale(1.15)',opacity:1,offset:0.5},
       {transform:'translate('+ex+'px,'+ey+'px) scale(0.85)',opacity:0.9}
     ],{duration:650,easing:'cubic-bezier(0.4,0,0.2,1)',fill:'forwards'});
     an.onfinish=land;
