@@ -243,7 +243,7 @@ function ajustarFacturaATotal(cuerpo, resumen, target) {
     cuerpo.push(lineaCargoAdicional(cuerpo.length + 1, diff, false));
     resumen.subTotalVentas = round2(resumen.subTotalVentas + diff);
   }
-  cuerpo.forEach(c => { c.ivaItem = round2(c.ventaGravada - c.ventaGravada / (1 + IVA_RATE)); });
+  cuerpo.forEach(c => { c.ivaItem = round8(c.ventaGravada - c.ventaGravada / (1 + IVA_RATE)); });
   const tg = round2(cuerpo.reduce((s, c) => s + c.ventaGravada, 0));
   const td = round2(cuerpo.reduce((s, c) => s + c.montoDescu, 0));
   resumen.totalGravada        = tg;
@@ -306,7 +306,9 @@ function buildFactura(order, opts) {
   const cuerpoDocumento = items.map((it, idx) => {
     const montoDescu   = descuentos[idx];
     const ventaGravada = round2(brutos[idx] - montoDescu); // IVA incluido, neto de descuento
-    const ivaItem      = round2(ventaGravada - ventaGravada / (1 + IVA_RATE));
+    // Ítem a 8 decimales; totalIva se redondea a 2 DESPUÉS de sumar (el MH recalcula el Resumen
+    // con los decimales del ítem — sumar ítems ya redondeados a 2 puede desviarse >0.01 con 4+ líneas).
+    const ivaItem      = round8(ventaGravada - ventaGravada / (1 + IVA_RATE));
     return {
       numItem:        idx + 1,
       tipoItem:       1,            // 1 = bien
@@ -744,14 +746,17 @@ async function nextCorrelativo(tipoDte) {
   const codPuntoVenta = cfg.DTE_EMISOR.codPuntoVenta || '001';
   // Separado por ambiente: producción arranca en 1, no continúa donde quedaron
   // las pruebas de homologación (ambiente 00 y 01 son contadores independientes).
+  // Y por ejercicio (año, hora de El Salvador): el consecutivo del Número de Control
+  // se reinicia en 1 cada 1 de enero.
+  const ejercicio = Number(nowSV().fecEmi.slice(0, 4));
   await db.execute(
-    `INSERT INTO dte_correlativos (tipo_dte, cod_estable, cod_punto_venta, ambiente, seq) VALUES (?, ?, ?, ?, 1)
+    `INSERT INTO dte_correlativos (tipo_dte, cod_estable, cod_punto_venta, ambiente, ejercicio, seq) VALUES (?, ?, ?, ?, ?, 1)
      ON DUPLICATE KEY UPDATE seq = seq + 1`,
-    [tipoDte, codEstable, codPuntoVenta, cfg.DTE_AMBIENTE]
+    [tipoDte, codEstable, codPuntoVenta, cfg.DTE_AMBIENTE, ejercicio]
   );
   const [rows] = await db.execute(
-    'SELECT seq FROM dte_correlativos WHERE tipo_dte=? AND cod_estable=? AND cod_punto_venta=? AND ambiente=?',
-    [tipoDte, codEstable, codPuntoVenta, cfg.DTE_AMBIENTE]
+    'SELECT seq FROM dte_correlativos WHERE tipo_dte=? AND cod_estable=? AND cod_punto_venta=? AND ambiente=? AND ejercicio=?',
+    [tipoDte, codEstable, codPuntoVenta, cfg.DTE_AMBIENTE, ejercicio]
   );
   return rows[0].seq;
 }

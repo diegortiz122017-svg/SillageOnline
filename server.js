@@ -534,8 +534,9 @@ async function initDB() {
       cod_estable     VARCHAR(4)  NOT NULL DEFAULT 'M001',
       cod_punto_venta VARCHAR(15) NOT NULL DEFAULT '001',
       ambiente        VARCHAR(2)  NOT NULL DEFAULT '00',
+      ejercicio       SMALLINT    NOT NULL DEFAULT 0,
       seq             BIGINT      NOT NULL DEFAULT 0,
-      PRIMARY KEY (tipo_dte, cod_estable, cod_punto_venta, ambiente)
+      PRIMARY KEY (tipo_dte, cod_estable, cod_punto_venta, ambiente, ejercicio)
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
   `);
   // Migración para tablas existentes (PK antigua = solo tipo_dte): numerar por
@@ -551,6 +552,11 @@ async function initDB() {
   try { await db.execute("ALTER TABLE dte_correlativos ADD COLUMN ambiente VARCHAR(2) NOT NULL DEFAULT '00'"); } catch(e) {}
   try { await db.execute("UPDATE dte_correlativos SET ambiente='00' WHERE ambiente IS NULL OR ambiente=''"); } catch(e) {}
   try { await db.execute("ALTER TABLE dte_correlativos DROP PRIMARY KEY, ADD PRIMARY KEY (tipo_dte, cod_estable, cod_punto_venta, ambiente)"); } catch(e) {}
+  // Migración: el consecutivo del Número de Control se reinicia cada ejercicio (año).
+  // Los contadores existentes pertenecen al año en curso. Idempotente.
+  try { await db.execute("ALTER TABLE dte_correlativos ADD COLUMN ejercicio SMALLINT NOT NULL DEFAULT 0"); } catch(e) {}
+  try { await db.execute("UPDATE dte_correlativos SET ejercicio=? WHERE ejercicio=0", [new Date(Date.now() - 6 * 3600 * 1000).getUTCFullYear()]); } catch(e) {}
+  try { await db.execute("ALTER TABLE dte_correlativos DROP PRIMARY KEY, ADD PRIMARY KEY (tipo_dte, cod_estable, cod_punto_venta, ambiente, ejercicio)"); } catch(e) {}
 
   await db.execute(`
     CREATE TABLE IF NOT EXISTS bottle_inventory (
@@ -1078,10 +1084,10 @@ async function buildInvalidacionPdfBuffer(d) {
 }
 async function buildDteAttachments(dte) {
   if (!dteIsReady(dte) || !dte.jsonFirmado) return undefined;
-  const files = [{ filename: `DTE-${dte.codigoGeneracion}.json`, content: Buffer.from(String(dte.jsonFirmado), 'utf8').toString('base64') }];
+  const files = [{ filename: `${dte.codigoGeneracion}.json`, content: Buffer.from(String(dte.jsonFirmado), 'utf8').toString('base64') }];
   try {
     const pdf = await buildDtePdfBuffer(dte);
-    if (pdf) files.unshift({ filename: `${dte.numeroControl || ('DTE-' + dte.codigoGeneracion)}.pdf`, content: pdf.toString('base64') });
+    if (pdf) files.unshift({ filename: `${dte.codigoGeneracion}.pdf`, content: pdf.toString('base64') });
   } catch (e) { console.error('PDF del DTE falló (se envía solo el JSON):', e.message); }
   return files;
 }
@@ -1288,10 +1294,10 @@ async function sendDteInvalidationEmail(docRow, evento) {
     </div>
     <p style="font-size:12px;color:#8a7f72;line-height:1.8">Si tienes dudas, responde a este correo y con gusto te ayudamos.</p>`);
 
-  const files = [{ filename: `Invalidacion-${doc.numeroControl || evento.codigoGeneracion}.json`, content: Buffer.from(String(evento.jsonFirmado), 'utf8').toString('base64') }];
+  const files = [{ filename: `${evento.codigoGeneracion}.json`, content: Buffer.from(String(evento.jsonFirmado), 'utf8').toString('base64') }];
   try {
     const pdf = await buildInvalidacionPdfBuffer({ evento: ev, original, codigoGeneracion: evento.codigoGeneracion, selloRecibido: evento.selloRecibido });
-    if (pdf) files.unshift({ filename: `Invalidacion-${doc.numeroControl || evento.codigoGeneracion}.pdf`, content: pdf.toString('base64') });
+    if (pdf) files.unshift({ filename: `${evento.codigoGeneracion}.pdf`, content: pdf.toString('base64') });
   } catch (e) { console.error('PDF de la invalidación falló (se envía solo el JSON):', e.message); }
 
   const sent = await sendEmail({
@@ -3513,7 +3519,7 @@ app.post('/api/admin/dte/invalidar', requireAdmin, async (req, res) => {
 app.get('/api/admin/dte/status', requireAdmin, async (req, res) => {
   try {
     const [counts] = await db.execute('SELECT estado, COUNT(*) c FROM dte_documents GROUP BY estado').catch(() => [[]]);
-    const [corr]   = await db.execute('SELECT tipo_dte, cod_estable, cod_punto_venta, ambiente, seq FROM dte_correlativos ORDER BY ambiente, tipo_dte, cod_estable, cod_punto_venta').catch(() => [[]]);
+    const [corr]   = await db.execute('SELECT tipo_dte, cod_estable, cod_punto_venta, ambiente, ejercicio, seq FROM dte_correlativos ORDER BY ambiente, ejercicio DESC, tipo_dte, cod_estable, cod_punto_venta').catch(() => [[]]);
     const byEstado = {};
     (counts || []).forEach(r => { byEstado[r.estado] = r.c; });
     res.json({
@@ -3638,7 +3644,7 @@ app.get('/api/admin/dte/documents/:id/pdf', requireAdmin, async (req, res) => {
     }
     if (!pdf) return res.status(503).json({ error: 'El generador de PDF no está disponible.' });
     res.setHeader('Content-Type', 'application/pdf');
-    res.setHeader('Content-Disposition', `attachment; filename="${r.numero_control || ('DTE-' + r.id)}.pdf"`);
+    res.setHeader('Content-Disposition', `attachment; filename="${r.codigo_generacion || ('DTE-' + r.id)}.pdf"`);
     res.send(pdf);
   } catch(e) {
     console.error('dte pdf error:', e.message);
