@@ -887,7 +887,8 @@ async function sendEmail({ to, subject, html, from, attachments }) {
       await logSentEmail({ to, subject, html, status: 'error', error: JSON.stringify(data) });
       return false;
     }
-    console.log('✅ Email sent to', to, '— id:', data.id);
+    const adj = (attachments || []).map(a => `${a.filename} (${Math.round(Buffer.from(a.content, 'base64').length / 1024)} KB)`).join(', ');
+    console.log('✅ Email sent to', to, '— id:', data.id, adj ? '— adjuntos: ' + adj : '— sin adjuntos');
     await logSentEmail({ to, subject, html, resendId: data.id, status: 'sent' });
     return true;
   } catch(e) {
