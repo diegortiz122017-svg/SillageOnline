@@ -1298,14 +1298,24 @@ footer{background:var(--dark);padding:3.5rem 4rem;text-align:center;border-top:1
   .cart-fab.fab-visible,.cart-fab.has-items{
     opacity:1;visibility:visible;
   }
-  /* Con productos: píldora "Ver mi carrito · $X" siempre visible (no espera al catálogo) */
-  .cart-fab-label{display:none}
-  .cart-fab.has-items{padding:0 20px 0 16px;gap:0.55rem}
-  .cart-fab.has-items .cart-fab-label{
-    display:inline;font-family:'Jost',sans-serif;font-size:0.78rem;font-weight:500;
-    letter-spacing:0.04em;color:var(--dark);white-space:nowrap;pointer-events:none;
+  /* Con productos: el botón muestra la foto del último perfume agregado (siempre visible, no espera al catálogo) */
+  .cart-fab-thumb{display:none}
+  .cart-fab.has-items{
+    width:66px;height:66px;min-width:66px;padding:0;border-radius:50%;
+    background:#faf8f4;border:2px solid var(--gold);
   }
-  .cart-fab.has-items .cart-fab-count{display:none}
+  .cart-fab.has-items .cart-fab-thumb{
+    display:flex;align-items:center;justify-content:center;
+    width:100%;height:100%;border-radius:50%;overflow:hidden;pointer-events:none;
+  }
+  .cart-fab-thumb img,.cart-fab-thumb svg{max-width:68%;max-height:82%;width:auto;height:auto;object-fit:contain}
+  /* La bolsa pasa a ser una insignia en la esquina: así se entiende que es el carrito */
+  .cart-fab.has-items .cart-fab-icon{
+    position:absolute;left:-6px;bottom:-4px;width:28px;height:28px;padding:5px;box-sizing:border-box;
+    background:var(--gold);border:2px solid var(--dark);border-radius:50%;
+  }
+  /* El aviso "Añadido al carrito" sube para no tapar el botón del carrito */
+  .toasts{bottom:calc(6.4rem + env(safe-area-inset-bottom));right:1rem}
   .cart-fab:hover,.cart-fab:active{
     background:var(--gold-light);
     transform:scale(1.07);
@@ -2153,7 +2163,7 @@ footer{background:var(--dark);padding:3.5rem 4rem;text-align:center;border-top:1
 <!-- FLOATING CART BUTTON (mobile) -->
 <button class="cart-fab" id="cartFab" aria-label="Abrir carrito">
   <svg class="cart-fab-icon" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" style="pointer-events:none"><path d="M6 2L3 6v14a2 2 0 002 2h14a2 2 0 002-2V6l-3-4z"/><line x1="3" y1="6" x2="21" y2="6"/><path d="M16 10a4 4 0 01-8 0"/></svg>
-  <span class="cart-fab-label" id="cartFabLabel"></span>
+  <span class="cart-fab-thumb" id="cartFabThumb"></span>
   <span class="cart-fab-count" id="cartFabCount">0</span>
 </button>
 
@@ -4930,15 +4940,31 @@ function _reinforceProfileIfRecommended(pid){
 
 // ── Al agregar: un punto dorado "vuela" del botón tocado al carrito ──────────
 // Enseña dónde está el carrito. Nunca debe romper el agregado: todo va en try/catch.
+var _fabPid=null;
+function _thumbHtml(p,w){
+  return (p.photos&&p.photos.length)?'<img src="'+esc(cdnImg(p.photos[0],w))+'" alt="">':svg(p.c,p.s,'sm');
+}
+// Foto del último perfume agregado (o el último del carrito si ese ya no está)
+function updateFabThumb(){
+  var th=document.getElementById('cartFabThumb'); if(!th)return;
+  var it=null;
+  if(_fabPid!=null)it=cart.find(function(i){return i.p&&i.p.id===_fabPid;});
+  if(!it)it=cart[cart.length-1];
+  var p=it&&it.p, key=p?String(p.id):'';
+  if(th.getAttribute('data-pid')===key)return;
+  th.setAttribute('data-pid',key);
+  th.innerHTML=p?_thumbHtml(p,120):'';
+}
 var _lastTap={el:null,t:0};
 document.addEventListener('click',function(e){_lastTap={el:e.target,t:Date.now()};},true);
-function flyToCart(wasEmpty){
+function flyToCart(wasEmpty,prod){
   try{
     var src=(Date.now()-_lastTap.t<900)?_lastTap.el:null; _lastTap={el:null,t:0};
     var fab=document.getElementById('cartFab'), hdr=document.getElementById('cartBtn');
     var tgt=(fab&&getComputedStyle(fab).display!=='none')?fab:hdr;
-    if(!tgt||!tgt.animate)return;
-    function pop(){tgt.animate([{transform:'scale(1)'},{transform:'scale(1.1)'},{transform:'scale(1)'}],{duration:320,easing:'ease-out'});}
+    function settle(){if(prod){_fabPid=prod.id;updateFabThumb();}}
+    if(!tgt||!tgt.animate){settle();return;}
+    function pop(){settle();tgt.animate([{transform:'scale(1)'},{transform:'scale(1.1)'},{transform:'scale(1)'}],{duration:320,easing:'ease-out'});}
     var reduce=window.matchMedia&&matchMedia('(prefers-reduced-motion: reduce)').matches;
     var btn=src&&src.closest?src.closest('button,a,[onclick]'):null;
     if(reduce||!btn){pop();return;}
@@ -4947,10 +4973,11 @@ function flyToCart(wasEmpty){
     var first=wasEmpty&&tgt===fab;
     if(first)tgt.style.opacity='0';           // la píldora aparece cuando el punto llega
     var dot=document.createElement('div');
-    dot.style.cssText='position:fixed;left:0;top:0;z-index:1000;width:22px;height:22px;border-radius:50%;background:var(--gold);border:2px solid var(--cream);pointer-events:none';
+    dot.style.cssText='position:fixed;left:0;top:0;z-index:1000;width:44px;height:44px;border-radius:50%;background:#faf8f4;border:2px solid var(--gold);overflow:hidden;display:flex;align-items:center;justify-content:center;pointer-events:none';
+    if(prod){dot.innerHTML=_thumbHtml(prod,96);var im=dot.firstElementChild;if(im)im.style.cssText='max-width:68%;max-height:82%;width:auto;height:auto;object-fit:contain';}
     document.body.appendChild(dot);
-    var sx=a.left+a.width/2-11, sy=a.top+a.height/2-11;
-    var ex=(tgt===fab?b.left+30:b.left+b.width/2)-11, ey=b.top+b.height/2-11;
+    var sx=a.left+a.width/2-22, sy=a.top+a.height/2-22;
+    var ex=b.left+b.width/2-22, ey=b.top+b.height/2-22;
     var done=false;
     function land(){
       if(done)return; done=true; dot.remove();
@@ -4960,11 +4987,11 @@ function flyToCart(wasEmpty){
     var an=dot.animate([
       {transform:'translate('+sx+'px,'+sy+'px) scale(1)',opacity:1},
       {transform:'translate('+((sx+ex)/2)+'px,'+(Math.min(sy,ey)-60)+'px) scale(1.15)',opacity:1,offset:0.5},
-      {transform:'translate('+ex+'px,'+ey+'px) scale(0.5)',opacity:0.9}
+      {transform:'translate('+ex+'px,'+ey+'px) scale(0.85)',opacity:0.9}
     ],{duration:650,easing:'cubic-bezier(0.4,0,0.2,1)',fill:'forwards'});
     an.onfinish=land;
     setTimeout(land,1200);                    // red de seguridad
-  }catch(e){}
+  }catch(e){ if(prod){_fabPid=prod.id;updateFabThumb();} }
 }
 
 function addToCart(pid){
@@ -4976,7 +5003,7 @@ function addToCart(pid){
   if(ex)ex.qty++;
   else cart.push({p:p,qty:1,type:'full',label:p.brand+' '+p.name,unitPrice:effectivePrice(p),size:p.size});
   renderCart();saveCart();
-  flyToCart(wasEmpty);
+  flyToCart(wasEmpty,p);
   trackEvent('cart_add', {id:pid});
   if(typeof fbq==='function') fbq('track','AddToCart',{content_ids:[String(pid)],content_type:'product',value:effectivePrice(p),currency:'USD'});
   if(typeof _nezNudge!=='undefined') _nezNudge.onCartAdd();
@@ -5002,7 +5029,7 @@ function addToCartWithOptions(pid, label, price, size, type){
   else cart.push({p:p,qty:1,type:type,label:label,unitPrice:price,size:size});
   renderCart();
   saveCart();
-  flyToCart(wasEmpty);
+  flyToCart(wasEmpty,p);
   trackEvent('cart_add', {id:pid,type:type});
   if(typeof fbq==='function') fbq('track','AddToCart',{content_ids:[String(pid)],content_type:'product',value:parseFloat(price)||0,currency:'USD'});
   if(typeof _nezNudge!=='undefined') _nezNudge.onCartAdd();
@@ -5046,8 +5073,7 @@ function renderCart(){
   var fabEl=document.getElementById('cartFab');
   if(fabEl){
     fabEl.classList.toggle('has-items',qty>0);
-    var fabLbl=document.getElementById('cartFabLabel');
-    if(fabLbl)fabLbl.textContent=qty>0?'Ver mi carrito · $'+(Math.round(cartSum()*100)/100).toFixed(2).replace(/\.00$/,''):'';
+    updateFabThumb();
     fabEl.setAttribute('aria-label',qty>0?'Ver mi carrito, '+qty+(qty===1?' artículo':' artículos'):'Abrir carrito');
   }
   if(typeof updateDetailCartBtn==='function')updateDetailCartBtn();
