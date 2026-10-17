@@ -3729,7 +3729,7 @@ function buildGrid(){
       card.dataset.notes=[cardNotes(p),p.top,p.mid,p.base].join(' ').toLowerCase();
       // Índice de búsqueda sin acentos + familias olfativas (acordes) normalizadas, entre barras para coincidencia exacta
       card.dataset.sx=_srchNorm([p.name,p.brand,card.dataset.notes].join(' '));
-      card.dataset.fam='|'+(p.chords||[]).concat(p.family?String(p.family).split(/[,\s]+/):[]).map(_srchNorm).filter(Boolean).join('|')+'|';
+      card.dataset.fam='|'+_famOf(p).join('|')+'|';
       card.innerHTML=
         '<div class="card-img">'+
           '<div class="gender-dot '+gCls[p.g]+'">'+gMap[p.g]+'</div>'+
@@ -4198,6 +4198,14 @@ function _famForToken(t){
   Object.keys(_famAliasMap).some(function(a){ if(a.indexOf(t) === 0){ hit = _famAliasMap[a]; return true; } return false; });
   return hit;
 }
+// Familias de un producto para la búsqueda: sus 3 primeras familias (la lista viene ordenada por peso,
+// ver services/chords.js) + los matices (Fresco, Cálido...) donde estén + el campo manual p.family
+var _FAM_MODS = ['fresco','herbal','calido','sensual','animalic'];
+function _famOf(p){
+  var out = (p.chords||[]).map(_srchNorm).filter(function(c, i){ return i < 3 || _FAM_MODS.indexOf(c) !== -1; });
+  if(p.family) String(p.family).split(/[,\s]+/).map(_srchNorm).forEach(function(f){ if(f && out.indexOf(f) === -1) out.push(f); });
+  return out;
+}
 function _searchTokens(q){
   return _srchNorm(q).split(/\s+/).filter(Boolean).map(function(t){ return { t:t, fam:_famForToken(t) }; });
 }
@@ -4215,12 +4223,11 @@ function buildFamilyChips(){
   var counts = {}, labels = {};
   (P||[]).forEach(function(p){
     var seen = {};
-    (p.chords||[]).forEach(function(c){
-      var k = _srchNorm(c);
+    _famOf(p).forEach(function(k){
       if(seen[k]) return;
       seen[k] = 1; counts[k] = (counts[k]||0)+1;
-      if(!labels[k]) labels[k] = c;
     });
+    (p.chords||[]).forEach(function(c){ var k = _srchNorm(c); if(!labels[k]) labels[k] = c; });
   });
   var html = '';
   _FAM_CHIPS.forEach(function(k){

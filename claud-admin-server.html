@@ -1049,7 +1049,9 @@ tr:hover td{background:rgba(255,255,255,0.02)}
             <div style="display:flex;gap:0.5rem;align-items:center">
               <button onclick="initBottleInventory()" style="background:none;border:1px solid rgba(184,149,90,0.3);color:#8a7f72;font-family:'Jost',sans-serif;font-size:0.55rem;letter-spacing:0.12em;text-transform:uppercase;padding:0.45rem 0.8rem;cursor:pointer" title="Crear registros para todas las fragancias existentes">Inicializar Todo</button>
               <button onclick="purgeOrphanBottles()" style="background:none;border:1px solid rgba(192,80,80,0.3);color:#8a7f72;font-family:'Jost',sans-serif;font-size:0.55rem;letter-spacing:0.12em;text-transform:uppercase;padding:0.45rem 0.8rem;cursor:pointer" title="Eliminar registros de fragancias que ya no existen">Limpiar Huérfanos</button>
-              <button onclick="backfillChords()" style="background:none;border:1px solid rgba(184,149,90,0.3);color:#8a7f72;font-family:'Jost',sans-serif;font-size:0.55rem;letter-spacing:0.12em;text-transform:uppercase;padding:0.45rem 0.8rem;cursor:pointer" title="Calcular acordes para productos que no los tienen">Recalcular Acordes</button>
+              <button onclick="backfillChords(false)" style="background:none;border:1px solid rgba(184,149,90,0.3);color:#8a7f72;font-family:'Jost',sans-serif;font-size:0.55rem;letter-spacing:0.12em;text-transform:uppercase;padding:0.45rem 0.8rem;cursor:pointer" title="Calcular acordes para productos que no los tienen">Recalcular Acordes</button>
+              <button onclick="chordsReport()" style="background:none;border:1px solid rgba(184,149,90,0.3);color:#8a7f72;font-family:'Jost',sans-serif;font-size:0.55rem;letter-spacing:0.12em;text-transform:uppercase;padding:0.45rem 0.8rem;cursor:pointer" title="Ver cómo quedaría la clasificación por familias y qué notas no se reconocen (no guarda nada)">Reporte de Acordes</button>
+              <button onclick="backfillChords(true)" style="background:none;border:1px solid rgba(184,149,90,0.3);color:#8a7f72;font-family:'Jost',sans-serif;font-size:0.55rem;letter-spacing:0.12em;text-transform:uppercase;padding:0.45rem 0.8rem;cursor:pointer" title="Recalcular los acordes de TODOS los productos con el cálculo actual (no toca los manuales)">Recalcular Todos</button>
               <button onclick="migrateNoteIntensity()" style="background:none;border:1px solid rgba(184,149,90,0.3);color:#8a7f72;font-family:'Jost',sans-serif;font-size:0.55rem;letter-spacing:0.12em;text-transform:uppercase;padding:0.45rem 0.8rem;cursor:pointer" title="Recalcular las barras de intensidad Top/Corazón/Fondo de todos los productos">Recalcular Intensidad de Notas</button>
               <button class="add-btn-lg" onclick="openBottleModal(null)" style="font-size:0.58rem;padding:0.5rem 1rem">+ Registrar Botella</button>
             </div>
@@ -6737,14 +6739,39 @@ function saveDecantInventory(){
 }
 
 // ── BOTTLE INVENTORY ─────────────────────────────────
-function backfillChords(){
-  if(!confirm('¿Recalcular acordes para todos los productos que no los tienen?\nEsto no sobreescribe acordes manuales.')) return;
-  adminFetch(API+'/admin/backfill-chords',{ method:'POST' })
+function backfillChords(all){
+  var msg = all
+    ? '¿Recalcular los acordes de TODOS los productos con el cálculo actual?\nNo toca los acordes manuales (chords_override). Revisa antes el reporte de acordes.'
+    : '¿Recalcular acordes para todos los productos que no los tienen?\nEsto no sobreescribe acordes manuales.';
+  if(!confirm(msg)) return;
+  adminFetch(API+'/admin/backfill-chords'+(all?'?all=1':''),{ method:'POST' })
     .then(function(r){ return r?r.json():null; })
     .then(function(res){
       if(res&&res.ok) toast('Acordes actualizados', res.updated+' productos actualizados','ok');
       else toast('Error','No se pudo completar','');
     });
+}
+// Reporte (solo lectura): cómo quedaría la clasificación por familias y qué notas no se reconocen.
+function chordsReport(){
+  adminFetch(API+'/admin/chords-report',{}).then(function(r){ return r?r.json():null; }).then(function(d){
+    if(!d||d.error){ toast('Error',(d&&d.error)||'Sin respuesta',''); return; }
+    var lines=[];
+    lines.push('REPORTE DE ACORDES (no guarda nada)');
+    lines.push('Productos: '+d.products+'  ·  con acordes manuales: '+d.withOverride+'  ·  cambiarían al recalcular: '+d.wouldChange);
+    lines.push('');
+    lines.push('Distribución (cuántos productos tienen cada acorde):');
+    Object.keys(d.distribution).sort(function(a,b){return d.distribution[b]-d.distribution[a];}).forEach(function(k){ lines.push('  '+k+': '+d.distribution[k]); });
+    lines.push('');
+    lines.push('NOTAS QUE EL CÁLCULO NO RECONOCE ('+d.unknownNotes.length+'):');
+    d.unknownNotes.forEach(function(u){ lines.push('  '+u.note+' ×'+u.count+'  — '+u.products.slice(0,3).join(', ')); });
+    lines.push('');
+    lines.push('PRODUCTOS A REVISAR (0–1 familias o con notas sin reconocer): '+d.needReview.length);
+    d.needReview.forEach(function(p){ lines.push('  '+p.brand+' '+p.name+' → ['+p.chords.join(', ')+']'+(p.unknownNotes.length?'  sin reconocer: '+p.unknownNotes.join(', '):'')); });
+    var w=window.open('','_blank');
+    if(!w){ alert('Permite ventanas emergentes para ver el reporte.'); return; }
+    w.document.write('<html><head><title>Reporte de acordes</title><style>body{margin:0;background:#0e0c0a;color:#e8dcc0;font:12px/1.6 monospace;padding:16px}pre{white-space:pre-wrap;word-break:break-word}</style></head><body><pre>'+_dteEsc(lines.join('\n'))+'</pre></body></html>');
+    w.document.close();
+  }).catch(function(e){ toast('Error',e.message,''); });
 }
 
 function migrateNoteIntensity(){

@@ -30,7 +30,7 @@ const auth         = require('./middleware/auth');
 // ─── Aliases for backwards compatibility within this file ──────────────────
 const { getCatalogue, saveCatalogue, deleteProduct, getInventoryMap, invalidateInventory, getPricingMap, invalidatePricing, getActivity, getSetting, setSetting, getBrandHierarchy, getPopupConfig, setPopupConfig } = catalogueSvc;
 const { calcIntensity } = require('./services/noteIntensity');
-const { calcChords }    = require('./services/chords');
+const { calcChords, analyzeChords } = require('./services/chords');
 const nurture           = require('./services/nurture');
 
 // logActivity also broadcasts to admin WebSocket clients
@@ -8184,20 +8184,47 @@ app.post('/api/admin/sale-email', requireAdmin, async (req, res) => {
   }
 });
 
-// POST /api/admin/backfill-chords — recalculate chords for all products missing them
+// POST /api/admin/backfill-chords — recalcula los acordes de los productos que no los tienen.
+//   ?all=1 → recalcula TODOS (menos los que tienen chords_override, que son manuales).
 app.post('/api/admin/backfill-chords', requireAdmin, async (req, res) => {
+  const all = String(req.query.all || '') === '1';
   const catalogue = await getCatalogue();
   let updated = 0;
   for (const p of catalogue) {
-    if (!p.chords_override && (!p.chords || !p.chords.length)) {
-      p.chords = calcChords(p);
-      updated++;
+    if (p.chords_override) continue;
+    if (all || !p.chords || !p.chords.length) {
+      const fresh = calcChords(p);
+      if (JSON.stringify(fresh) !== JSON.stringify(p.chords || [])) updated++;
+      p.chords = fresh;
     }
   }
   await saveCatalogue(catalogue);
   broadcast('catalogue', catalogue);
-  await logActivity(`Chords recalculados: ${updated} productos actualizados`);
-  res.json({ ok: true, updated });
+  await logActivity(`Chords recalculados (${all ? 'todos' : 'solo faltantes'}): ${updated} productos actualizados`);
+  res.json({ ok: true, updated, all });
+});
+
+// GET /api/admin/chords-report — cómo quedaría la clasificación por familias (no guarda nada):
+// distribución de acordes, productos con pocas familias y NOTAS QUE EL CÁLCULO NO RECONOCE.
+app.get('/api/admin/chords-report', requireAdmin, async (req, res) => {
+  try {
+    const catalogue = await getCatalogue();
+    const dist = {}, unknown = {}, weak = [];
+    let override = 0, changed = 0;
+    for (const p of catalogue) {
+      const a = analyzeChords(p);
+      a.chords.forEach(c => { dist[c] = (dist[c] || 0) + 1; });
+      a.unknown.forEach(n => { const k = n.toLowerCase(); (unknown[k] = unknown[k] || { note: n, count: 0, products: [] }).count++; unknown[k].products.push(p.name); });
+      if (p.chords_override) { override++; continue; }
+      if (JSON.stringify(a.chords) !== JSON.stringify(p.chords || [])) changed++;
+      if (a.chords.length <= 1 || a.unknown.length) weak.push({ id: p.id, brand: p.brand, name: p.name, chords: a.chords, unknownNotes: a.unknown });
+    }
+    res.json({
+      products: catalogue.length, withOverride: override, wouldChange: changed, distribution: dist,
+      unknownNotes: Object.values(unknown).sort((x, y) => y.count - x.count),
+      needReview: weak,
+    });
+  } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
 // POST /api/admin/migrate-note-intensity
