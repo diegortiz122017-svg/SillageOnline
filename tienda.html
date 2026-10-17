@@ -179,12 +179,16 @@ nav a:hover{color:var(--gold)}
 .product-card{background:white;position:relative;overflow:hidden;cursor:pointer;transition:transform 0.3s,box-shadow 0.3s;border:1px solid rgba(184,149,90,0.1)}
 .product-card:hover{transform:translateY(-6px);box-shadow:0 20px 50px rgba(0,0,0,0.12)}
 .product-card.hidden,.product-card.pg-hidden{display:none}
-.catalog-more{text-align:center;padding:3.2rem 0 1.2rem}
-.cm-count{font-size:0.66rem;letter-spacing:0.14em;text-transform:uppercase;color:var(--muted)}
-.cm-bar{width:min(220px,60%);height:2px;background:rgba(184,149,90,0.22);margin:0.9rem auto 1.4rem}
-.cm-bar span{display:block;height:2px;background:var(--gold);transition:width 0.4s}
-.cm-btn{background:transparent;border:1px solid var(--gold);color:#8a6a2a;font-family:'Jost',sans-serif;font-size:0.68rem;letter-spacing:0.22em;text-transform:uppercase;padding:1rem 2.4rem;cursor:pointer;transition:background 0.3s,color 0.3s}
-.cm-btn:hover{background:var(--gold);color:var(--dark)}
+.catalog-more{max-width:520px;margin:0 auto;padding:2.4rem 0 1rem;text-align:center}
+.cm-count{font-size:0.74rem;letter-spacing:0.08em;color:var(--charcoal)}
+.cm-count b{font-weight:500}
+.cm-bar{height:3px;background:rgba(184,149,90,0.25);margin:0.8rem 0 1.3rem}
+.cm-bar span{display:block;height:3px;background:var(--gold);transition:width 0.4s}
+.cm-btn{width:100%;display:flex;align-items:center;justify-content:center;gap:0.7rem;padding:1.25rem 1rem;background:var(--gold);border:1px solid var(--gold);color:var(--dark);font-family:'Jost',sans-serif;font-size:0.8rem;font-weight:500;letter-spacing:0.18em;text-transform:uppercase;cursor:pointer;transition:background 0.25s,transform 0.15s}
+.cm-btn:hover{background:var(--gold-light)}
+.cm-btn:active{transform:scale(0.985)}
+.cm-btn svg{flex-shrink:0}
+@media(max-width:768px){.catalog-more{padding:2rem 1rem 0.6rem}}
 .card-img{position:relative;height:320px;background:linear-gradient(135deg,#f8f4ee,#ede8df);display:flex;align-items:center;justify-content:center;overflow:hidden}
 .view-overlay{position:absolute;inset:0;z-index:2;display:flex;align-items:center;justify-content:center;opacity:0;transition:opacity 0.3s;background:rgba(14,12,10,0.35)}
 .product-card:hover .view-overlay{opacity:1}
@@ -2272,7 +2276,7 @@ footer{background:var(--dark);padding:3.5rem 4rem;text-align:center;border-top:1
   <div class="catalog-more" id="catalogMore" style="display:none">
     <div class="cm-count" id="cmCount" aria-live="polite"></div>
     <div class="cm-bar"><span id="cmBar" style="width:0"></span></div>
-    <button type="button" class="cm-btn" id="cmBtn" onclick="catalogLoadMore()">Ver más fragancias</button>
+    <button type="button" class="cm-btn" id="cmBtn" onclick="catalogLoadMore()"><span id="cmBtnTxt">Ver más fragancias</span><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="6 9 12 15 18 9"/></svg></button>
   </div>
 </section>
 
@@ -4162,8 +4166,10 @@ function applyPagination(){
   var shown = Math.min(_pgShown, total), left = total - shown;
   box.style.display = left > 0 ? '' : 'none';
   if(left > 0){
-    document.getElementById('cmCount').textContent = 'Mostrando '+shown+' de '+total+' · quedan '+left;
+    document.getElementById('cmCount').innerHTML = 'Mostrando <b>'+shown+'</b> de <b>'+total+'</b> fragancias';
     document.getElementById('cmBar').style.width = Math.round(shown/total*100)+'%';
+    var next = Math.min(PAGE_SIZE, left);
+    document.getElementById('cmBtnTxt').textContent = 'Ver '+next+(next === 1 ? ' fragancia más' : ' fragancias más');
   }
 }
 function catalogLoadMore(){
