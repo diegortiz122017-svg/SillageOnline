@@ -178,7 +178,13 @@ nav a:hover{color:var(--gold)}
 .product-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(240px,1fr));gap:1.5rem}
 .product-card{background:white;position:relative;overflow:hidden;cursor:pointer;transition:transform 0.3s,box-shadow 0.3s;border:1px solid rgba(184,149,90,0.1)}
 .product-card:hover{transform:translateY(-6px);box-shadow:0 20px 50px rgba(0,0,0,0.12)}
-.product-card.hidden{display:none}
+.product-card.hidden,.product-card.pg-hidden{display:none}
+.catalog-more{text-align:center;padding:3.2rem 0 1.2rem}
+.cm-count{font-size:0.66rem;letter-spacing:0.14em;text-transform:uppercase;color:var(--muted)}
+.cm-bar{width:min(220px,60%);height:2px;background:rgba(184,149,90,0.22);margin:0.9rem auto 1.4rem}
+.cm-bar span{display:block;height:2px;background:var(--gold);transition:width 0.4s}
+.cm-btn{background:transparent;border:1px solid var(--gold);color:#8a6a2a;font-family:'Jost',sans-serif;font-size:0.68rem;letter-spacing:0.22em;text-transform:uppercase;padding:1rem 2.4rem;cursor:pointer;transition:background 0.3s,color 0.3s}
+.cm-btn:hover{background:var(--gold);color:var(--dark)}
 .card-img{position:relative;height:320px;background:linear-gradient(135deg,#f8f4ee,#ede8df);display:flex;align-items:center;justify-content:center;overflow:hidden}
 .view-overlay{position:absolute;inset:0;z-index:2;display:flex;align-items:center;justify-content:center;opacity:0;transition:opacity 0.3s;background:rgba(14,12,10,0.35)}
 .product-card:hover .view-overlay{opacity:1}
@@ -2263,6 +2269,11 @@ footer{background:var(--dark);padding:3.5rem 4rem;text-align:center;border-top:1
   <div class="product-grid" id="productGrid">
     <div class="empty-state" id="emptyState"><h3>No se encontraron fragancias</h3><p>Intenta ajustar los filtros</p></div>
   </div>
+  <div class="catalog-more" id="catalogMore" style="display:none">
+    <div class="cm-count" id="cmCount" aria-live="polite"></div>
+    <div class="cm-bar"><span id="cmBar" style="width:0"></span></div>
+    <button type="button" class="cm-btn" id="cmBtn" onclick="catalogLoadMore()">Ver más fragancias</button>
+  </div>
 </section>
 
 <!-- EDITORIAL COLLECTIONS -->
@@ -4131,6 +4142,40 @@ var _leadCapture = (function(){
 // FILTERS
 // ════════════════════════════════════════════
 var fBrand='all',fGender='all',fSearch='';
+
+// ── Paginación del catálogo: tandas de PAGE_SIZE tarjetas ("Ver más") ─────────
+// Los filtros siguen marcando cada tarjeta con .hidden; aquí solo se recorta lo que
+// pasa los filtros, en el orden del DOM (incluye el orden por perfil de Nez).
+var PAGE_SIZE = 18, _pgShown = PAGE_SIZE, _pgSig = '';
+function resetPagination(){ _pgShown = PAGE_SIZE; }
+function applyPagination(){
+  var sig = fBrand+'|'+fGender+'|'+fSearch;
+  if(sig !== _pgSig){ _pgSig = sig; _pgShown = PAGE_SIZE; }   // otro filtro → vuelve a la primera tanda
+  var total = 0;
+  document.querySelectorAll('#productGrid .product-card').forEach(function(c){
+    if(c.classList.contains('hidden')){ c.classList.remove('pg-hidden'); return; }
+    total++;
+    c.classList.toggle('pg-hidden', total > _pgShown);
+  });
+  var box = document.getElementById('catalogMore');
+  if(!box) return;
+  var shown = Math.min(_pgShown, total), left = total - shown;
+  box.style.display = left > 0 ? '' : 'none';
+  if(left > 0){
+    document.getElementById('cmCount').textContent = 'Mostrando '+shown+' de '+total+' · quedan '+left;
+    document.getElementById('cmBar').style.width = Math.round(shown/total*100)+'%';
+  }
+}
+function catalogLoadMore(){
+  var root = document.documentElement;
+  // Sin esto el navegador "ancla" el scroll a lo que hay debajo y las tarjetas nuevas quedan arriba, fuera de vista.
+  root.style.overflowAnchor = 'none';
+  _pgShown += PAGE_SIZE;
+  applyPagination();
+  trackEvent('catalog_load_more', String(_pgShown));
+  setTimeout(function(){ root.style.overflowAnchor = ''; }, 300);
+}
+
 function applyFilters(){
   var count=0;
   document.querySelectorAll('.product-card').forEach(function(c){
@@ -4150,6 +4195,7 @@ function applyFilters(){
     var isFiltered = fSearch || fGender!=='all' || fBrand!=='all';
     na.style.display = isFiltered ? 'none' : '';
   }
+  applyPagination();
 }
 document.getElementById('brandPills').addEventListener('click',function(e){
   var pill=e.target.closest('.pill');if(!pill)return;
@@ -7457,6 +7503,7 @@ function filterByCurated(col){
   if(rc) rc.textContent = count;
   var es = document.getElementById('emptyState');
   if(es) es.classList.toggle('show', count === 0);
+  resetPagination(); applyPagination();
   // Scroll to shop and show a toast
   setTimeout(function(){
     var shop = document.getElementById('shop');
@@ -9088,6 +9135,7 @@ function reorderByProfile(profile){
     return parseFloat(b.dataset.profileScore||0) - parseFloat(a.dataset.profileScore||0);
   });
   cards.forEach(function(card){ grid.insertBefore(card, empty); });
+  applyPagination();   // el nuevo orden decide qué tarjetas caen en la primera tanda
 
   // Silent reorder — no banner announcement
 }
