@@ -177,6 +177,20 @@ nav a:hover{color:var(--gold)}
 .search-clear{position:absolute;right:0;top:50%;transform:translateY(-50%);width:2rem;height:2rem;display:none;align-items:center;justify-content:center;background:none;border:none;color:#7a6f62;font-size:1.3rem;line-height:1;cursor:pointer}
 .search-input:not(:placeholder-shown)~.search-clear{display:flex}   /* visible solo con texto; sin JS, siempre sincronizado */
 .search-clear:hover{color:var(--charcoal)}
+/* Búsqueda por familia olfativa: texto con línea, sin cajas, para no competir con el buscador */
+.fam-chips{order:-1;display:flex;align-items:center;justify-content:center;flex-wrap:wrap;gap:0.1rem 1rem;max-width:700px;width:100%;margin:-0.3rem 0 1.1rem}
+.fam-lead{font-family:'Cormorant Garamond',serif;font-style:italic;font-size:1.05rem;color:#7a6f62;margin-right:0.1rem}
+.fam-chip{background:none;border:none;border-bottom:1px solid transparent;border-radius:0;padding:0.4rem 0;font-family:'Jost',sans-serif;font-size:0.6rem;letter-spacing:0.14em;text-transform:uppercase;color:#6b5f52;cursor:pointer;transition:color 0.2s,border-color 0.2s}
+.fam-chip span{color:#a89c8c;margin-left:0.15rem;letter-spacing:0}
+.fam-chip:hover{color:#8a6a2a}
+.fam-chip.active{color:#6b4f1d;border-bottom-color:var(--gold)}
+@media(max-width:768px){
+  .fam-chips{flex-wrap:nowrap;justify-content:flex-start;overflow-x:auto;gap:0 1.1rem;padding:0 0.2rem;-webkit-overflow-scrolling:touch;scrollbar-width:none}
+  .fam-chips::-webkit-scrollbar{display:none}
+  .fam-chips{-webkit-mask-image:linear-gradient(90deg,#000 90%,transparent);mask-image:linear-gradient(90deg,#000 90%,transparent)}   /* pista de que hay más a la derecha */
+  .fam-chip,.fam-lead{flex-shrink:0;white-space:nowrap}
+  .fam-chip{padding:0.65rem 0}
+}
 .results-info{display:none}
 .results-info span{color:var(--gold);font-weight:500}
 
@@ -2273,6 +2287,7 @@ footer{background:var(--dark);padding:3.5rem 4rem;text-align:center;border-top:1
       <input class="search-input" type="search" id="searchBox" placeholder="Busca un perfume, una marca, una nota" autocomplete="off" enterkeyhint="search" aria-label="Buscar fragancias"/>
       <button type="button" class="search-clear" id="searchClear" aria-label="Borrar búsqueda">&times;</button>
     </div>
+    <div class="fam-chips" id="famChips" style="display:none"></div>
   </div>
   <p class="results-info">Mostrando <span id="resultCount">0</span> fragancias</p>
   <div class="product-grid" id="productGrid">
@@ -3712,6 +3727,9 @@ function buildGrid(){
       card.dataset.id=p.id;card.dataset.brand=p.brand;
       card.dataset.gender=p.g;card.dataset.name=p.name.toLowerCase();
       card.dataset.notes=[cardNotes(p),p.top,p.mid,p.base].join(' ').toLowerCase();
+      // Índice de búsqueda sin acentos + familias olfativas (acordes) normalizadas, entre barras para coincidencia exacta
+      card.dataset.sx=_srchNorm([p.name,p.brand,card.dataset.notes].join(' '));
+      card.dataset.fam='|'+(p.chords||[]).concat(p.family?String(p.family).split(/[,\s]+/):[]).map(_srchNorm).filter(Boolean).join('|')+'|';
       card.innerHTML=
         '<div class="card-img">'+
           '<div class="gender-dot '+gCls[p.g]+'">'+gMap[p.g]+'</div>'+
@@ -3759,6 +3777,8 @@ function buildGrid(){
       grid.insertBefore(card,empty);
     }catch(err){console.error('Card build error for product',p.id,err);}
   });
+
+  buildFamilyChips();
 
   // ── Build brand counts (used by pills and cards) ──
   var brandCounts = {};
@@ -4152,6 +4172,71 @@ var _leadCapture = (function(){
 // ════════════════════════════════════════════
 var fBrand='all',fGender='all',fSearch='';
 
+// ── Búsqueda: sin acentos, por palabras y por familia olfativa (acordes) ───────
+function _srchNorm(s){ return String(s||'').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'').trim(); }
+// Vocabulario de acordes (services/chords.js) y las variantes que la gente escribe
+var _FAM_ALIASES = {
+  fresco:['frescos','fresca','frescas','fresh'], citrico:['citricos','citrica','citricas','citrus'],
+  acuatico:['acuaticos','acuatica','aquatic','marino','marina'], verde:['verdes','green'],
+  floral:['florales','flores','flower'], empolvado:['empolvados','polvoso','powdery'], frutal:['frutales','frutas','fruity'],
+  especiado:['especiados','especias','picante','spicy'], aromatico:['aromaticos','aromatica'], herbal:['herbales'],
+  amaderado:['amaderados','amaderada','woody','maderas'], terroso:['terrosos','earthy'], ahumado:['ahumados','smoky'],
+  ambarado:['ambarados','ambar','amber'], oriental:['orientales'], gourmand:['gourmet'], dulce:['dulces','sweet'],
+  calido:['calidos','warm'], sensual:['sensuales'], animalic:['animalico','animal']
+};
+var _famAliasMap = (function(){
+  var m = {};
+  Object.keys(_FAM_ALIASES).forEach(function(k){ m[k]=k; _FAM_ALIASES[k].forEach(function(a){ m[a]=k; }); });
+  return m;
+})();
+// Palabra → acorde (acepta prefijos de 4+ letras mientras se escribe: "amad" → amaderado)
+function _famForToken(t){
+  if(typeof _famAliasMap === 'undefined' || !_famAliasMap) return null;   // buildGrid puede correr antes de que estas variables se inicialicen
+  if(_famAliasMap[t]) return _famAliasMap[t];
+  if(t.length < 4) return null;
+  var hit = null;
+  Object.keys(_famAliasMap).some(function(a){ if(a.indexOf(t) === 0){ hit = _famAliasMap[a]; return true; } return false; });
+  return hit;
+}
+function _searchTokens(q){
+  return _srchNorm(q).split(/\s+/).filter(Boolean).map(function(t){ return { t:t, fam:_famForToken(t) }; });
+}
+function _searchMatch(card, toks){
+  return toks.every(function(k){
+    return card.dataset.sx.indexOf(k.t) !== -1 || (k.fam && card.dataset.fam.indexOf('|'+k.fam+'|') !== -1);
+  });
+}
+// Chips "Por familia": solo familias que separan productos (sin Sensual/Cálido/Animalic) y con 2+ productos
+var _FAM_CHIPS = ['fresco','citrico','acuatico','verde','floral','frutal','especiado','aromatico','amaderado','ahumado','ambarado','oriental','dulce','gourmand','empolvado'];
+function buildFamilyChips(){
+  var box = document.getElementById('famChips');
+  // buildGrid corre una vez durante la carga del script, antes de que _FAM_CHIPS se inicialice: esa vuelta no hace nada
+  if(!box || typeof _FAM_CHIPS === 'undefined') return;
+  var counts = {}, labels = {};
+  (P||[]).forEach(function(p){
+    var seen = {};
+    (p.chords||[]).forEach(function(c){
+      var k = _srchNorm(c);
+      if(seen[k]) return;
+      seen[k] = 1; counts[k] = (counts[k]||0)+1;
+      if(!labels[k]) labels[k] = c;
+    });
+  });
+  var html = '';
+  _FAM_CHIPS.forEach(function(k){
+    if((counts[k]||0) < 2) return;
+    html += '<button type="button" class="fam-chip" data-fam="'+k+'" data-label="'+esc(labels[k])+'">'+esc(labels[k])+' <span>'+counts[k]+'</span></button>';
+  });
+  box.innerHTML = html ? '<span class="fam-lead">Por familia</span>'+html : '';
+  box.style.display = html ? '' : 'none';
+  syncFamChips();
+}
+function syncFamChips(){
+  var sb = document.getElementById('searchBox');
+  var q = sb ? _srchNorm(sb.value) : '';
+  document.querySelectorAll('#famChips .fam-chip').forEach(function(b){ b.classList.toggle('active', b.dataset.fam === q); });
+}
+
 // ── Paginación del catálogo: tandas de PAGE_SIZE tarjetas ("Ver más") ─────────
 // Los filtros siguen marcando cada tarjeta con .hidden; aquí solo se recorta lo que
 // pasa los filtros, en el orden del DOM (incluye el orden por perfil de Nez).
@@ -4189,8 +4274,9 @@ function catalogLoadMore(){
 
 function applyFilters(){
   var count=0;
+  var qt=_searchTokens(fSearch);
   document.querySelectorAll('.product-card').forEach(function(c){
-    var searchMatch=!fSearch||c.dataset.name.indexOf(fSearch)!==-1||c.dataset.brand.toLowerCase().indexOf(fSearch)!==-1||c.dataset.notes.toLowerCase().indexOf(fSearch)!==-1;
+    var searchMatch=_searchMatch(c,qt);
     var genderMatch=fGender==='all'||c.dataset.gender===fGender||(fGender!=='U'&&c.dataset.gender==='U');
     var show=(fBrand==='all'||c.dataset.brand===fBrand)&&genderMatch&&searchMatch;
     c.classList.toggle('hidden',!show);
@@ -4206,6 +4292,7 @@ function applyFilters(){
     var isFiltered = fSearch || fGender!=='all' || fBrand!=='all';
     na.style.display = isFiltered ? 'none' : '';
   }
+  syncFamChips();
   applyPagination();
 }
 document.getElementById('brandPills').addEventListener('click',function(e){
@@ -4221,6 +4308,18 @@ document.getElementById('genderPills').addEventListener('click',function(e){
 document.getElementById('searchBox').addEventListener('input',function(){
   fSearch=this.value.trim().toLowerCase();
   applyFilters();
+});
+document.getElementById('famChips').addEventListener('click',function(e){
+  var b=e.target.closest('.fam-chip'); if(!b) return;
+  var sb=document.getElementById('searchBox');
+  var on=_srchNorm(sb.value)===b.dataset.fam;          // tocar el chip activo lo apaga
+  sb.value = on ? '' : b.dataset.label;
+  sb.dispatchEvent(new Event('input'));
+  if(!on){
+    trackEvent('search_family', b.dataset.label);
+    var row=this;   // en celular la fila hace scroll: deja el chip elegido a la vista
+    if(row.scrollWidth>row.clientWidth) row.scrollTo({left:b.offsetLeft-row.clientWidth/2+b.offsetWidth/2,behavior:'smooth'});
+  }
 });
 document.getElementById('searchClear').addEventListener('click',function(){
   var sb=document.getElementById('searchBox');
@@ -7521,7 +7620,7 @@ function filterByCurated(col){
   if(rc) rc.textContent = count;
   var es = document.getElementById('emptyState');
   if(es) es.classList.toggle('show', count === 0);
-  resetPagination(); applyPagination();
+  resetPagination(); applyPagination(); syncFamChips();
   // Scroll to shop and show a toast
   setTimeout(function(){
     var shop = document.getElementById('shop');
