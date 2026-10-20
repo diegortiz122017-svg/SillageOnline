@@ -1539,6 +1539,19 @@ tr:hover td{background:rgba(255,255,255,0.02)}
               <label class="dte-lbl">Mensaje</label>
               <textarea id="emailBody" rows="8" style="width:100%;box-sizing:border-box;background:var(--card);border:1px solid var(--border-light);color:var(--cream);font-family:'Jost',sans-serif;font-size:0.75rem;padding:0.6rem 0.8rem;outline:none;resize:vertical" placeholder="Escribe el mensaje... (separa párrafos con una línea en blanco)"></textarea>
             </div>
+            <div id="emailProdsBox" style="border:1px solid var(--border-light);padding:0.9rem;background:rgba(255,255,255,0.02)">
+              <label class="dte-lbl">Perfumes en el correo <span style="color:var(--muted);text-transform:none;letter-spacing:0">(opcional, hasta 6)</span></label>
+              <div style="position:relative">
+                <input id="emailProdSearch" class="dte-inp" style="width:100%" placeholder="Busca un perfume por nombre o marca para agregarlo…" autocomplete="off" oninput="emailProdSearch()" onfocus="emailProdSearch()"/>
+                <div id="emailProdResults" style="display:none;position:absolute;left:0;right:0;top:100%;z-index:20;max-height:260px;overflow:auto;background:var(--card);border:1px solid var(--gold)"></div>
+              </div>
+              <div id="emailProdList" style="margin-top:0.6rem"></div>
+              <div id="emailProdOpts" style="display:none;margin-top:0.6rem;gap:0.8rem;flex-wrap:wrap;align-items:center">
+                <input id="emailProdTitle" class="dte-inp" style="flex:1;min-width:180px" maxlength="80" placeholder="Título de la sección (opcional) — ej. Te recomendamos"/>
+                <label style="font-size:0.66rem;color:var(--cream);display:flex;gap:0.4rem;align-items:center;cursor:pointer"><input id="emailProdDecant" type="checkbox" checked/> Mostrar precio de decant</label>
+              </div>
+              <div id="emailProdHint" style="font-size:0.6rem;color:var(--muted);margin-top:0.5rem;line-height:1.6">Aparecen al final del mensaje, o donde escribas <code style="color:var(--gold)">{{perfumes}}</code> en su propio párrafo. Solo con el diseño <b>con marca</b>; no se pueden agregar perfumes agotados.</div>
+            </div>
             <div id="emailSendErr" style="color:#d9534f;font-size:0.68rem"></div>
             <div style="display:flex;gap:0.6rem">
               <button class="save-btn" style="width:fit-content;background:transparent;border:1px solid var(--gold);color:var(--gold)" onclick="previewManualEmail()">Vista previa</button>
@@ -3966,6 +3979,85 @@ function applyEmailTemplate(key){
   if(key!=='blank') document.getElementById('emailDesignSelect').value='formal';
 }
 
+// ── Perfumes dentro del correo ─────────────────────────
+var _emailProds = [];   // [{id, note}] en el orden en que saldrán
+function _epNorm(t){ return String(t||'').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,''); }
+function _epThumb(p){
+  var u=p.photos&&p.photos[0]; if(!u) return '';
+  return u.indexOf('res.cloudinary.com')!==-1 ? u.replace('/upload/','/upload/w_80,c_limit,q_auto:good/') : u;
+}
+function _epPrice(p){
+  var pr=(typeof pricing!=='undefined'&&pricing[p.id])||{};
+  return (pr.onSale&&pr.salePrice) ? Math.round(+pr.salePrice) : parseFloat(p.price);
+}
+function _epSoldOut(p){ return !!((typeof inventory!=='undefined'&&inventory[p.id])||{}).outOfStock; }
+function emailProdSearch(){
+  var q=_epNorm(document.getElementById('emailProdSearch').value).trim();
+  var box=document.getElementById('emailProdResults');
+  var chosen={}; _emailProds.forEach(function(x){ chosen[x.id]=1; });
+  var list=(typeof PRODUCTS!=='undefined'?PRODUCTS:[]).filter(function(p){
+    return !chosen[p.id] && (!q || _epNorm(p.brand+' '+p.name).indexOf(q)!==-1);
+  }).slice(0,8);
+  if(!list.length){ box.innerHTML='<div style="padding:0.6rem 0.8rem;font-size:0.68rem;color:var(--muted)">'+(q?'Sin resultados.':'No quedan perfumes por agregar.')+'</div>'; box.style.display='block'; return; }
+  box.innerHTML=list.map(function(p){
+    var out=_epSoldOut(p);
+    return '<div '+(out?'':'onclick="emailProdAdd('+p.id+')"')+' style="display:flex;align-items:center;gap:0.6rem;padding:0.45rem 0.7rem;border-bottom:1px solid var(--border-light);'+(out?'opacity:0.45;cursor:not-allowed':'cursor:pointer')+'" onmouseenter="if(!'+out+')this.style.background=\'rgba(184,149,90,0.1)\'" onmouseleave="this.style.background=\'\'">'+
+      (_epThumb(p)?'<img src="'+esc(_epThumb(p))+'" alt="" style="width:28px;height:28px;object-fit:contain;background:#faf8f4"/>':'<span style="width:28px"></span>')+
+      '<span style="flex:1;font-size:0.72rem;color:var(--cream)"><span style="color:var(--muted);font-size:0.6rem;letter-spacing:0.1em;text-transform:uppercase">'+esc(p.brand)+'</span> '+esc(p.name)+'</span>'+
+      '<span style="font-size:0.68rem;color:var(--gold)">'+(out?'Agotado':'$'+_epPrice(p))+'</span></div>';
+  }).join('');
+  box.style.display='block';
+}
+function emailProdAdd(id){
+  if(_emailProds.length>=6){ document.getElementById('emailSendErr').textContent='Máximo 6 perfumes por correo.'; return; }
+  if(!_emailProds.some(function(x){return x.id===id;})) _emailProds.push({id:id,note:''});
+  document.getElementById('emailProdSearch').value='';
+  document.getElementById('emailProdResults').style.display='none';
+  document.getElementById('emailSendErr').textContent='';
+  emailProdRender();
+}
+function emailProdRemove(i){ _emailProds.splice(i,1); emailProdRender(); }
+function emailProdMove(i,d){
+  var j=i+d; if(j<0||j>=_emailProds.length) return;
+  var t=_emailProds[i]; _emailProds[i]=_emailProds[j]; _emailProds[j]=t; emailProdRender();
+}
+function emailProdNote(i,v){ if(_emailProds[i]) _emailProds[i].note=v; }
+function emailProdRender(){
+  var box=document.getElementById('emailProdList'), opts=document.getElementById('emailProdOpts');
+  if(!_emailProds.length){ box.innerHTML=''; opts.style.display='none'; return; }
+  opts.style.display='flex';
+  var btn='background:none;border:1px solid var(--border-light);color:var(--muted);cursor:pointer;width:1.5rem;height:1.5rem;font-size:0.7rem;line-height:1';
+  box.innerHTML=_emailProds.map(function(x,i){
+    var p=(PRODUCTS||[]).find(function(q){return q.id===x.id;});
+    if(!p) return '';
+    var out=_epSoldOut(p);
+    return '<div style="display:flex;gap:0.6rem;align-items:center;padding:0.5rem;border:1px solid '+(out?'#d9534f':'var(--border-light)')+';margin-bottom:0.4rem;background:var(--card)">'+
+      (_epThumb(p)?'<img src="'+esc(_epThumb(p))+'" alt="" style="width:40px;height:40px;object-fit:contain;background:#faf8f4;flex-shrink:0"/>':'<span style="width:40px;flex-shrink:0"></span>')+
+      '<div style="flex:1;min-width:0">'+
+        '<div style="font-size:0.72rem;color:var(--cream)"><span style="color:var(--muted);font-size:0.58rem;letter-spacing:0.1em;text-transform:uppercase">'+esc(p.brand)+'</span> '+esc(p.name)+' <span style="color:var(--gold)">$'+_epPrice(p)+'</span>'+(out?' <b style="color:#d9534f">Agotado — quítalo</b>':'')+'</div>'+
+        '<input class="dte-inp" style="width:100%;margin-top:0.3rem;font-size:0.68rem" maxlength="200" placeholder="Nota opcional (si la dejas vacía se muestran sus notas olfativas)" value="'+esc(x.note)+'" oninput="emailProdNote('+i+',this.value)"/>'+
+      '</div>'+
+      '<div style="display:flex;flex-direction:column;gap:0.2rem">'+
+        '<button type="button" style="'+btn+'" title="Subir" onclick="emailProdMove('+i+',-1)">↑</button>'+
+        '<button type="button" style="'+btn+'" title="Bajar" onclick="emailProdMove('+i+',1)">↓</button>'+
+      '</div>'+
+      '<button type="button" style="'+btn+';color:#d9534f" title="Quitar" onclick="emailProdRemove('+i+')">✕</button>'+
+    '</div>';
+  }).join('');
+}
+document.addEventListener('click',function(e){
+  var r=document.getElementById('emailProdResults');
+  if(r&&r.style.display==='block'&&!e.target.closest('#emailProdSearch')&&!e.target.closest('#emailProdResults')) r.style.display='none';
+});
+// Datos de perfumes para preview/envío
+function _emailProdsPayload(){
+  return {
+    products:_emailProds.map(function(x){ return {id:x.id,note:(x.note||'').trim()}; }),
+    productsTitle:(document.getElementById('emailProdTitle').value||'').trim(),
+    showDecant:!!document.getElementById('emailProdDecant').checked
+  };
+}
+
 function previewManualEmail(){
   var err=document.getElementById('emailSendErr');
   err.textContent='';
@@ -3973,7 +4065,9 @@ function previewManualEmail(){
   var body=document.getElementById('emailBody').value.trim();
   var design=document.getElementById('emailDesignSelect').value;
   if(!body){ err.textContent='Escribe el mensaje para poder ver la vista previa.'; return; }
-  adminFetch(API+'/admin/emails/preview',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({subject:subject,body:body,design:design})})
+  if(design==='formal'&&_emailProds.length){ err.textContent='Los perfumes solo van con el diseño con marca de Sillage: cámbialo o quita los perfumes.'; return; }
+  var payload=Object.assign({subject:subject,body:body,design:design},_emailProdsPayload());
+  adminFetch(API+'/admin/emails/preview',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)})
     .then(function(r){return r?r.json():null;}).then(function(d){
       if(!d){ err.textContent='Sin respuesta.'; return; }
       if(d.error){ err.textContent=d.error; return; }
@@ -3990,13 +4084,16 @@ function sendManualEmail(){
   var body=document.getElementById('emailBody').value.trim();
   var design=document.getElementById('emailDesignSelect').value;
   if(!to||!subject||!body){ err.textContent='Completa destinatario, asunto y mensaje.'; return; }
-  adminFetch(API+'/admin/emails/send',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({to:to,subject:subject,body:body,design:design})})
+  if(design==='formal'&&_emailProds.length){ err.textContent='Los perfumes solo van con el diseño con marca de Sillage: cámbialo o quita los perfumes.'; return; }
+  var payload=Object.assign({to:to,subject:subject,body:body,design:design},_emailProdsPayload());
+  adminFetch(API+'/admin/emails/send',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)})
     .then(function(r){return r?r.json():null;}).then(function(d){
       if(!d){ err.textContent='Sin respuesta.'; return; }
       if(d.error){ err.textContent=d.error; return; }
       document.getElementById('emailTo').value='';
       document.getElementById('emailSubject').value='';
       document.getElementById('emailBody').value='';
+      _emailProds=[]; document.getElementById('emailProdTitle').value=''; emailProdRender();
       toast('Email enviado', to, 'ok');
       loadSentEmails();
     }).catch(function(e){ err.textContent='Error: '+e.message; });

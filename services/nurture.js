@@ -47,8 +47,8 @@ function decantOffered(p, ctx) {
 function available(p, invMap) {
   return !(invMap && invMap[p.id] && invMap[p.id].outOfStock);
 }
-function productUrl(p, campaign) {
-  return `${BASE()}/fragancia/${slugify(p.brand + '-' + p.name)}?utm_source=email&utm_medium=nurture&utm_campaign=${campaign}`;
+function productUrl(p, campaign, medium) {
+  return `${BASE()}/fragancia/${slugify(p.brand + '-' + p.name)}?utm_source=email&utm_medium=${medium || 'nurture'}&utm_campaign=${campaign}`;
 }
 function nezUrl(campaign, q) {
   return `${BASE()}/nez?utm_source=email&utm_medium=nurture&utm_campaign=${campaign}` +
@@ -263,7 +263,7 @@ function thumb(p) {
   return `<td width="84" style="padding:12px 0 12px 12px;vertical-align:top"><img src="${esc(src)}" width="72" alt="${esc(p.brand + ' ' + p.name)}" style="display:block;max-width:72px;height:auto;border:0"/></td>`;
 }
 
-function productCard(p, why, campaign, ctx) {
+function productCard(p, why, campaign, ctx, medium) {
   const ep = effectivePrice(p, ctx.priceMap);
   const priceLine = decantOffered(p, ctx)
     ? `Frasco $${ep} &nbsp;·&nbsp; <strong>Decant 10 ml $${decantPrice(p, ctx.priceMap)}</strong>`
@@ -271,10 +271,33 @@ function productCard(p, why, campaign, ctx) {
   return `<table width="100%" cellpadding="0" cellspacing="0" style="${S.card}"><tr>${thumb(p)}
     <td style="padding:12px 14px;vertical-align:top">
       <div style="${S.brand}">${esc(p.brand)}</div>
-      <a href="${esc(productUrl(p, campaign))}" style="${S.name}">${esc(p.name)}</a>
+      <a href="${esc(productUrl(p, campaign, medium))}" style="${S.name}">${esc(p.name)}</a>
       <div style="${S.small}">${esc(why)}</div>
       <div style="${S.price}">${priceLine}</div>
     </td></tr></table>`;
+}
+
+// Línea factual por defecto cuando el admin no escribe una nota: las notas reales del catálogo.
+function notesLine(p) {
+  const list = s => String(s || '').split(',').map(x => x.trim()).filter(Boolean);
+  let notes = list(p.notes);
+  if (!notes.length) {
+    const t = list(p.top), m = list(p.mid), b = list(p.base), seen = new Set();
+    [t[0], m[0], m[1], b[0], t[1], b[1]].forEach(n => { if (n && !seen.has(n.toLowerCase()) && seen.size < 4) { seen.add(n.toLowerCase()); notes.push(n); } });
+  }
+  return notes.length ? 'Notas: ' + notes.slice(0, 4).join(', ') + '.' : '';
+}
+
+// Bloque de perfumes para un correo escrito a mano desde el admin.
+// items: [{ p, note }] · ctx: { decantsEnabled, decantOut, priceMap } · opts: { title, campaign }
+function manualProductsBlock(items, ctx, opts) {
+  if (!items || !items.length) return '';
+  const o = opts || {};
+  const head = o.title
+    ? `<div style="${S.brand};margin:26px 0 12px">${esc(o.title)}</div>`
+    : '<div style="height:10px;line-height:10px">&nbsp;</div>';
+  const cards = items.map(it => productCard(it.p, it.note || notesLine(it.p), o.campaign || 'manual', ctx, 'manual')).join('');
+  return head + cards;
 }
 
 function couponBlock(code, expires) {
@@ -370,4 +393,5 @@ module.exports = {
   norm, slugify, esc, effectivePrice, decantPrice, hasUsefulProfile,
   rankForProfile, pickForProfile, pickSignalProducts, findSimilar,
   chooseNurture, buildNurtureEmail, reasonForPick, productUrl, nezUrl,
+  manualProductsBlock, notesLine,
 };

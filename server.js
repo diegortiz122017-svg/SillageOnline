@@ -845,11 +845,46 @@ function formalEmailTemplate(bodyHtml) {
 }
 
 // Convierte texto plano (párrafos separados por línea en blanco) a HTML simple.
-function bodyToHtml(bodyRaw, formal) {
+// productsHtml (opcional): bloque de perfumes. Va donde el admin escriba {{perfumes}} en su propio
+// párrafo; si no puso el marcador, se agrega al final del mensaje.
+const PRODUCTS_MARK = '{{perfumes}}';
+function bodyToHtml(bodyRaw, formal, productsHtml) {
   const color = formal ? '#1a1a1a' : '#2a231c';
-  return bodyRaw.split(/\n{2,}/).map(p =>
-    `<p style="margin:0 0 16px;color:${color};font-size:14px;line-height:1.7">${escHtml(p).replace(/\n/g, '<br/>')}</p>`
-  ).join('');
+  let placed = false;
+  const parts = bodyRaw.split(/\n{2,}/).map(p => {
+    if (p.trim() === PRODUCTS_MARK) { placed = true; return productsHtml || ''; }
+    return `<p style="margin:0 0 16px;color:${color};font-size:14px;line-height:1.7">${escHtml(p.split(PRODUCTS_MARK).join('')).replace(/\n/g, '<br/>')}</p>`;
+  });
+  if (productsHtml && !placed) parts.push(productsHtml);
+  return parts.join('');
+}
+
+// Arma el bloque de perfumes de un correo manual a partir de [{id, note}] (máx. 6).
+// No envía nada. Rechaza perfumes agotados para no mandar un correo que no se puede cumplir.
+async function buildManualProductsBlock(rawItems, opts = {}) {
+  const items = (Array.isArray(rawItems) ? rawItems : []).slice(0, 6);
+  if (!items.length) return { html: '' };
+  const [catalogue, invMap, priceMap, decantsFlag, decantRows] = await Promise.all([
+    getCatalogue(), getInventoryMap(), getPricingMap(), getSetting('decants_enabled', '1'),
+    db.execute('SELECT product_id FROM decant_inventory WHERE size_ml = 10 AND stock IS NOT NULL AND stock <= 0').then(r => r[0]),
+  ]);
+  const byId = new Map(catalogue.map(p => [Number(p.id), p]));
+  const picked = [], soldOut = [];
+  let missing = 0;
+  for (const it of items) {
+    const p = byId.get(Number(it && it.id));
+    if (!p) { missing++; continue; }
+    if (invMap[p.id] && invMap[p.id].outOfStock) { soldOut.push(`${p.brand} ${p.name}`); continue; }
+    if (!picked.some(x => x.p.id === p.id)) picked.push({ p, note: String((it && it.note) || '').replace(/\s+/g, ' ').trim().slice(0, 200) });
+  }
+  if (soldOut.length) return { error: `Agotado: ${soldOut.join(', ')}. Quítalo del correo.` };
+  if (!picked.length) return { error: missing ? 'Los perfumes elegidos ya no están en el catálogo.' : '' };
+  const ctx = {
+    decantsEnabled: opts.showDecant !== false && decantsFlag !== '0',
+    decantOut: new Set(decantRows.map(r => Number(r.product_id))), priceMap,
+  };
+  const campaign = nurture.slugify(String(opts.campaign || 'manual')).slice(0, 40) || 'manual';
+  return { html: nurture.manualProductsBlock(picked, ctx, { title: String(opts.title || '').trim().slice(0, 80), campaign }) };
 }
 
 // Resend no tiene un endpoint para "listar todos los enviados" — se registra
@@ -4414,7 +4449,12 @@ app.post('/api/admin/emails/send', requireAdmin, async (req, res) => {
   if (!subject) return res.status(400).json({ error: 'El asunto es requerido.' });
   if (!bodyRaw) return res.status(400).json({ error: 'El mensaje no puede estar vacío.' });
 
-  const bodyHtml = bodyToHtml(bodyRaw, design === 'formal');
+  if (design === 'formal' && Array.isArray(req.body.products) && req.body.products.length) {
+    return res.status(400).json({ error: 'Los perfumes solo se pueden agregar con el diseño con marca de Sillage.' });
+  }
+  const prods = await buildManualProductsBlock(req.body.products, { title: req.body.productsTitle, showDecant: req.body.showDecant, campaign: subject });
+  if (prods.error) return res.status(400).json({ error: prods.error });
+  const bodyHtml = bodyToHtml(bodyRaw, design === 'formal', prods.html);
   const html = design === 'formal' ? formalEmailTemplate(bodyHtml) : emailTemplate(bodyHtml);
   await sendEmail({ to, subject, html });
   await logActivity(`Email manual enviado a ${to} — "${subject}"`);
@@ -4422,14 +4462,21 @@ app.post('/api/admin/emails/send', requireAdmin, async (req, res) => {
 });
 
 // Vista previa — arma el HTML sin enviar nada, para revisar antes de mandar.
-app.post('/api/admin/emails/preview', requireAdmin, (req, res) => {
-  const subject = String(req.body.subject || '').trim();
-  const bodyRaw = String(req.body.body || '').trim();
-  const design  = req.body.design === 'formal' ? 'formal' : 'branded';
-  if (!bodyRaw) return res.status(400).json({ error: 'El mensaje no puede estar vacío.' });
-  const bodyHtml = bodyToHtml(bodyRaw, design === 'formal');
-  const html = design === 'formal' ? formalEmailTemplate(bodyHtml) : emailTemplate(bodyHtml);
-  res.json({ ok: true, html, subject });
+app.post('/api/admin/emails/preview', requireAdmin, async (req, res) => {
+  try {
+    const subject = String(req.body.subject || '').trim();
+    const bodyRaw = String(req.body.body || '').trim();
+    const design  = req.body.design === 'formal' ? 'formal' : 'branded';
+    if (!bodyRaw) return res.status(400).json({ error: 'El mensaje no puede estar vacío.' });
+    if (design === 'formal' && Array.isArray(req.body.products) && req.body.products.length) {
+      return res.status(400).json({ error: 'Los perfumes solo se pueden agregar con el diseño con marca de Sillage.' });
+    }
+    const prods = await buildManualProductsBlock(req.body.products, { title: req.body.productsTitle, showDecant: req.body.showDecant, campaign: subject });
+    if (prods.error) return res.status(400).json({ error: prods.error });
+    const bodyHtml = bodyToHtml(bodyRaw, design === 'formal', prods.html);
+    const html = design === 'formal' ? formalEmailTemplate(bodyHtml) : emailTemplate(bodyHtml);
+    res.json({ ok: true, html, subject });
+  } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
 // ── Helper: deduct inventory and broadcast ────────────
