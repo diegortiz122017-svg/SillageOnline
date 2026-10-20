@@ -4911,21 +4911,7 @@ app.post('/api/orders', orderLimiter, async (req, res) => {
     // identity. This used to overwrite `name` unconditionally on every
     // order, silently renaming the account to whatever was typed at
     // checkout.
-    if (customerId) {
-      const { address: addr, city, state, postcode, country, phone } = req.body;
-      await db.execute(
-        `UPDATE customers SET
-          phone    = COALESCE(?, phone),
-          address  = COALESCE(?, address),
-          city     = COALESCE(?, city),
-          state    = COALESCE(?, state),
-          postcode = COALESCE(?, postcode),
-          country  = COALESCE(?, country)
-         WHERE id = ?`,
-        [phone||null, addr||null, city||null,
-         state||null, postcode||null, country||null, parseInt(customerId)]
-      );
-    }
+    if (customerId) await syncCustomerProfileFromOrder(customerId, req.body);
 
     // ── Inventory: only deduct immediately for COD ────────
     // For Wompi/Chivo: deduct AFTER payment confirmed via webhook
@@ -5659,6 +5645,8 @@ app.post('/api/paypal/create-order', orderLimiter, async (req, res) => {
     email:         rawEmail.slice(0, 200),
     phone:         req.body.phone ? String(req.body.phone).slice(0, 30).replace(/[^0-9+\-\s()]/g, '') : null,
     address:       String(req.body.fullAddress || req.body.address || '').slice(0, 500).replace(/[<>]/g, ''),
+    street:        req.body.address ? String(req.body.address).slice(0, 500).replace(/[<>]/g, '') : null,   // para el perfil de la cuenta
+    postcode:      req.body.postcode ? String(req.body.postcode).slice(0, 20).replace(/[<>]/g, '') : null,
     city:          req.body.city    ? String(req.body.city).slice(0,   100).replace(/[<>]/g, '') : null,
     state:         req.body.state   ? String(req.body.state).slice(0,  100).replace(/[<>]/g, '') : null,
     country:       req.body.country ? String(req.body.country).slice(0,100).replace(/[<>]/g, '') : null,
@@ -5749,6 +5737,13 @@ app.post('/api/paypal/capture-order/:id', async (req, res) => {
       if (orderObj.promoCode) {
         await db.execute('UPDATE promo_codes SET used_count = used_count + 1, updated_at=? WHERE code=?', [now, orderObj.promoCode]).catch(() => {});
       }
+    }
+    if (pending.customer_id) {
+      // Antes el pago con PayPal nunca llevaba los datos del pedido al perfil del cliente.
+      await syncCustomerProfileFromOrder(pending.customer_id, {
+        phone: orderObj.phone, address: orderObj.street || orderObj.address, city: orderObj.city,
+        state: orderObj.state, postcode: orderObj.postcode, country: orderObj.country,
+      }).catch(e => console.error('PayPal profile sync error:', e.message));
     }
 
     await deductInventory(orderObj.items);
@@ -6815,6 +6810,90 @@ app.patch('/api/orders/:id', requireAdmin, async (req, res) => {
   }
 
   res.json({ ok: true });
+});
+
+// Copia los datos de contacto y envío de un pedido al perfil de la CUENTA que lo hizo (sesión iniciada).
+// Lo que venga vacío no borra lo que ya había. No toca el nombre: el campo "nombre" del checkout es quien
+// recibe ESE pedido (puede ser un regalo), no la identidad del titular de la cuenta.
+async function syncCustomerProfileFromOrder(customerId, f) {
+  const id = parseInt(customerId, 10);
+  if (!id || !f) return;
+  const clean = (v, n) => { const t = v == null ? '' : String(v).replace(/[<>]/g, '').replace(/\s+/g, ' ').trim().slice(0, n); return t || null; };
+  const phone = f.phone ? (String(f.phone).replace(/[^0-9+\-\s()]/g, '').trim().slice(0, 50) || null) : null;
+  await db.execute(
+    `UPDATE customers SET
+       phone    = COALESCE(?, phone),
+       address  = COALESCE(?, address),
+       city     = COALESCE(?, city),
+       state    = COALESCE(?, state),
+       postcode = COALESCE(?, postcode),
+       country  = COALESCE(?, country)
+     WHERE id = ?`,
+    [phone, clean(f.address, 500), clean(f.city, 100), clean(f.state, 100), clean(f.postcode, 20), clean(f.country, 100), id]
+  );
+}
+
+// GET /api/admin/guest-customers — compradores SIN cuenta, armados a partir de sus pedidos (agrupados por
+// correo). No se crea nada en la base: así registrarse después con ese correo sigue funcionando normal.
+app.get('/api/admin/guest-customers', requireAdmin, async (req, res) => {
+  try {
+    const [rows] = await db.execute(
+      `SELECT o.id, o.customer, o.email, o.phone, o.address, o.city, o.state_province AS state, o.country,
+              o.total, o.status, o.payment_status, o.payment_method, o.created_at
+         FROM orders o
+         LEFT JOIN customers c ON LOWER(c.email) = LOWER(o.email)
+        WHERE c.id IS NULL AND o.email IS NOT NULL AND o.email <> ''
+        ORDER BY o.created_at DESC LIMIT 5000`
+    );
+    const by = new Map();
+    for (const r of rows) {                                   // más reciente primero
+      const key = String(r.email).trim().toLowerCase();
+      let g = by.get(key);
+      if (!g) { g = { email: key, name: '', phone: '', address: '', city: '', state: '', country: '', orders: 0, spent: 0, firstOrder: null, lastOrder: r.created_at, orderIds: [] }; by.set(key, g); }
+      g.orders++; g.orderIds.push(r.id); g.firstOrder = r.created_at;
+      // datos de contacto: el valor más reciente que no esté vacío
+      ['name:customer', 'phone:phone', 'address:address', 'city:city', 'state:state', 'country:country'].forEach(m => {
+        const [k, col] = m.split(':');
+        if (!g[k] && r[col]) g[k] = String(r[col]);
+      });
+      if (r.payment_status === 'Pagado' || (r.payment_method === 'cod' && r.status === 'Entregado')) g.spent += parseFloat(r.total || 0);
+    }
+    res.json([...by.values()].sort((a, b) => new Date(b.lastOrder) - new Date(a.lastOrder)));
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+// POST /api/admin/customers/sync-from-orders — completa los datos VACÍOS de cada cuenta con los de su pedido
+// más reciente (solo pedidos hechos con esa cuenta: el correo escrito por un invitado no basta). No pisa nada.
+app.post('/api/admin/customers/sync-from-orders', requireAdmin, async (req, res) => {
+  try {
+    const [custs] = await db.execute(
+      `SELECT id, phone, address, city, state, country FROM customers
+        WHERE phone IS NULL OR phone='' OR address IS NULL OR address='' OR city IS NULL OR city='' OR country IS NULL OR country=''`
+    );
+    if (!custs.length) return res.json({ ok: true, checked: 0, updated: 0 });
+    const [ords] = await db.execute(
+      `SELECT customer_id, phone, address, city, state_province AS state, country FROM orders
+        WHERE customer_id IS NOT NULL ORDER BY created_at DESC LIMIT 20000`
+    );
+    const latest = new Map();                                  // por cliente: primer valor no vacío de cada campo
+    for (const o of ords) {
+      const cur = latest.get(o.customer_id) || {};
+      for (const k of ['phone', 'address', 'city', 'state', 'country']) if (!cur[k] && o[k]) cur[k] = o[k];
+      latest.set(o.customer_id, cur);
+    }
+    let updated = 0;
+    for (const c of custs) {
+      const o = latest.get(c.id);
+      if (!o) continue;
+      const fill = {};
+      for (const k of ['phone', 'address', 'city', 'state', 'country']) if (!c[k] && o[k]) fill[k] = o[k];
+      if (!Object.keys(fill).length) continue;
+      await syncCustomerProfileFromOrder(c.id, fill);
+      updated++;
+    }
+    await logActivity(`Clientes completados desde pedidos: ${updated} de ${custs.length} revisados`);
+    res.json({ ok: true, checked: custs.length, updated });
+  } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
 app.get('/api/customers', requireAdmin, async (req, res) => {

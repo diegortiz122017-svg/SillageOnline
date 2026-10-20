@@ -1171,10 +1171,17 @@ tr:hover td{background:rgba(255,255,255,0.02)}
       <!-- CLIENTES -->
       <div class="page" id="page-clientes">
         <div class="page-title">Clientes</div>
-        <div class="page-sub">Clientes registrados — datos almacenados en la base de datos</div>
+        <div class="page-sub">Cuentas registradas y compradores que pagaron sin crear cuenta — sus datos de contacto salen de los pedidos</div>
         <div class="stats-row" style="margin-bottom:1.5rem">
-          <div class="stat-card"><div class="stat-val c-gold" id="totalClientes">—</div><div class="stat-label">Total Clientes</div></div>
+          <div class="stat-card"><div class="stat-val c-gold" id="totalClientes">—</div><div class="stat-label">Cuentas Registradas</div></div>
           <div class="stat-card"><div class="stat-val c-ok" id="clientesHoy">—</div><div class="stat-label">Registrados Hoy</div></div>
+          <div class="stat-card"><div class="stat-val" id="totalGuests">—</div><div class="stat-label">Compradores sin Cuenta</div></div>
+        </div>
+        <div style="display:flex;gap:0.5rem;margin-bottom:1rem;flex-wrap:wrap;align-items:center">
+          <button id="cliTabAccounts" class="save-btn" style="width:fit-content" onclick="setClientesMode('accounts')">Cuentas registradas</button>
+          <button id="cliTabGuests" class="save-btn" style="width:fit-content;background:transparent;border:1px solid var(--gold);color:var(--gold)" onclick="setClientesMode('guests')">Compradores sin cuenta</button>
+          <span style="flex:1"></span>
+          <button id="cliSyncBtn" class="save-btn" style="width:fit-content;background:transparent;border:1px solid var(--border-light);color:var(--muted)" onclick="syncCustomersFromOrders()" title="Rellena teléfono, dirección, ciudad y país VACÍOS de cada cuenta con los de su pedido más reciente. No pisa nada.">Completar datos desde pedidos</button>
         </div>
         <div class="tbl-wrap" style="overflow-x:auto">
           <table id="clientesTable" style="min-width:700px">
@@ -1184,8 +1191,8 @@ tr:hover td{background:rgba(255,255,255,0.02)}
               <th>Teléfono</th>
               <th>Ciudad / País</th>
               <th>Pedidos</th>
-              <th>Registrado</th>
-              <th>Último Acceso</th>
+              <th id="thCliA">Registrado</th>
+              <th id="thCliB">Último Acceso</th>
               <th></th>
             </tr></thead>
             <tbody id="clientesBody">
@@ -4447,72 +4454,114 @@ function deletePromo(id, code){
 var _clientesCache=[]; // guarda la respuesta completa de /api/customers para que
                         // openCustomerDetail() pueda mostrar contacto/dirección
                         // sin tener que volver a pedirla (el click solo recibe id+nombre).
+var _guestsCache=[];      // compradores sin cuenta, armados por el servidor a partir de los pedidos
+var _clientesMode='accounts';
+function _cliDate(d){ return d ? new Date(d).toLocaleDateString('es-ES',{day:'numeric',month:'short',year:'numeric'}) : '—'; }
 function loadClientes(){
   var tbody=document.getElementById('clientesBody');
-  tbody.innerHTML='<tr><td colspan="5" style="text-align:center;padding:2rem;color:var(--muted);font-size:0.72rem">Cargando...</td></tr>';
-  adminFetch(API+'/customers',{})
-    .then(function(r){ if(!r)return null; return r.json(); })
-    .then(function(customers){
-      _clientesCache=customers||[];
-      // Count orders per customer
-      var orderCounts={};
-      orders.forEach(function(o){
-        if(o.customer_id) orderCounts[o.customer_id]=(orderCounts[o.customer_id]||0)+1;
-      });
-      // Update stats
-      var today=new Date().toISOString().slice(0,10);
-      var todayCount=customers.filter(function(cu){
-        return cu.created_at&&cu.created_at.toString().slice(0,10)===today;
-      }).length;
-      document.getElementById('totalClientes').textContent=customers.length;
-      document.getElementById('clientesHoy').textContent=todayCount;
-      // Render table
-      if(!customers.length){
-        tbody.innerHTML='<tr><td colspan="8" style="text-align:center;padding:2.5rem;color:var(--muted);font-size:0.72rem;letter-spacing:0.1em">Aún no hay clientes registrados</td></tr>';
-        return;
-      }
-      tbody.innerHTML='';
-      customers.forEach(function(cu){
-        var regDate  = cu.created_at ? new Date(cu.created_at).toLocaleDateString('es-ES',{day:'numeric',month:'short',year:'numeric'}) : '—';
-        var lastLogin = cu.last_login
-          ? new Date(cu.last_login).toLocaleDateString('es-ES',{day:'numeric',month:'short',year:'numeric'}) +
-            ' ' + new Date(cu.last_login).toLocaleTimeString('es-ES',{hour:'2-digit',minute:'2-digit'})
-          : '<span class="never">Nunca</span>';
-        var orderCount = orderCounts[cu.id] || 0;
-        var phone      = cu.phone   || '<span class="never">\u2014</span>';
-        var location   = (cu.city||cu.country)
-          ? (cu.city||'') + ((cu.city&&cu.country)?', ':'') + (cu.country||'')
-          : '<span class="never">\u2014</span>';
-        var safeName   = (cu.name||'').replace(/\\/g,'\\\\').replace(/'/g,"\\'");
-        var tr = document.createElement('tr');
-        tr.style.cursor = 'pointer';
-        (function(cid, cname){
-          tr.addEventListener('click', function(e){
-            if(e.target.tagName === 'BUTTON') return;
-            openCustomerDetail(cid, cname);
-          });
-        })(cu.id, cu.name);
-        tr.innerHTML=
-          '<td><div style="font-size:0.82rem;color:var(--cream)">'+cu.name+'</div></td>'+
-          '<td><div class="client-email">'+cu.email+'</div></td>'+
-          '<td><div class="client-date">'+phone+'</div></td>'+
-          '<td><div class="client-date">'+location+'</div></td>'+
-          '<td><span class="order-count">'+orderCount+'</span></td>'+
-          '<td><div class="client-date">'+regDate+'</div></td>'+
-          '<td><div class="client-date">'+lastLogin+'</div></td>'+
-          '<td><button onclick="deleteCustomer('+cu.id+',\''+safeName+'\')" '+
-            'style="background:none;border:1px solid rgba(192,80,74,0.3);color:rgba(192,80,74,0.7);'+
-            'font-size:0.6rem;padding:0.22rem 0.6rem;cursor:pointer;font-family:\'Jost\',sans-serif;'+
-            'letter-spacing:0.1em;text-transform:uppercase;transition:all 0.2s" '+
-            'onmouseover="this.style.borderColor=\'var(--error)\';this.style.color=\'var(--error)\'" '+
-            'onmouseout="this.style.borderColor=\'rgba(192,80,74,0.3)\';this.style.color=\'rgba(192,80,74,0.7)\'">'+
-            '&#10005;</button></td>';
-        tbody.appendChild(tr);
-      });
-    })
-    .catch(function(){
-      tbody.innerHTML='<tr><td colspan="8" style="text-align:center;padding:2rem;color:var(--error);font-size:0.7rem">Error al cargar clientes</td></tr>';
+  tbody.innerHTML='<tr><td colspan="8" style="text-align:center;padding:2rem;color:var(--muted);font-size:0.72rem">Cargando...</td></tr>';
+  Promise.all([
+    adminFetch(API+'/customers',{}).then(function(r){ return r?r.json():[]; }),
+    adminFetch(API+'/admin/guest-customers',{}).then(function(r){ return r?r.json():[]; }).catch(function(){ return []; })
+  ]).then(function(res){
+    _clientesCache=Array.isArray(res[0])?res[0]:[];
+    _guestsCache=Array.isArray(res[1])?res[1]:[];
+    renderClientes();
+  }).catch(function(){
+    tbody.innerHTML='<tr><td colspan="8" style="text-align:center;padding:2rem;color:var(--error);font-size:0.7rem">Error al cargar clientes</td></tr>';
+  });
+}
+function setClientesMode(m){ _clientesMode=m; renderClientes(); }
+function renderClientes(){
+  var tbody=document.getElementById('clientesBody');
+  var customers=_clientesCache, guests=_guestsCache, isGuests=(_clientesMode==='guests');
+  // Pestañas y encabezados
+  var on='width:fit-content', off='width:fit-content;background:transparent;border:1px solid var(--gold);color:var(--gold)';
+  document.getElementById('cliTabAccounts').style.cssText = isGuests?off:on;
+  document.getElementById('cliTabGuests').style.cssText   = isGuests?on:off;
+  document.getElementById('cliSyncBtn').style.display = isGuests?'none':'';
+  document.getElementById('thCliA').textContent = isGuests?'Primera compra':'Registrado';
+  document.getElementById('thCliB').textContent = isGuests?'Última compra':'Último Acceso';
+  // Estadísticas
+  var today=new Date().toISOString().slice(0,10);
+  document.getElementById('totalClientes').textContent=customers.length;
+  document.getElementById('clientesHoy').textContent=customers.filter(function(cu){ return cu.created_at&&cu.created_at.toString().slice(0,10)===today; }).length;
+  document.getElementById('totalGuests').textContent=guests.length;
+
+  if(isGuests){
+    if(!guests.length){ tbody.innerHTML='<tr><td colspan="8" style="text-align:center;padding:2.5rem;color:var(--muted);font-size:0.72rem;letter-spacing:0.1em">Todos los compradores tienen cuenta</td></tr>'; return; }
+    tbody.innerHTML='';
+    guests.forEach(function(g){
+      var loc=(g.city||g.country)?esc((g.city||'')+((g.city&&g.country)?', ':'')+(g.country||'')):'<span class="never">\u2014</span>';
+      var tr=document.createElement('tr'); tr.style.cursor='pointer';
+      tr.addEventListener('click',function(){ openCustomerDetail(null,g.name||g.email,g.email); });
+      tr.innerHTML=
+        '<td><div style="font-size:0.82rem;color:var(--cream)">'+esc(g.name||'—')+' <span style="font-size:0.5rem;letter-spacing:0.12em;text-transform:uppercase;color:var(--muted);border:1px solid var(--border-light);padding:0.1rem 0.35rem">Sin cuenta</span></div></td>'+
+        '<td><div class="client-email">'+esc(g.email)+'</div></td>'+
+        '<td><div class="client-date">'+(g.phone?esc(g.phone):'<span class="never">\u2014</span>')+'</div></td>'+
+        '<td><div class="client-date">'+loc+'</div></td>'+
+        '<td><span class="order-count">'+g.orders+'</span></td>'+
+        '<td><div class="client-date">'+_cliDate(g.firstOrder)+'</div></td>'+
+        '<td><div class="client-date">'+_cliDate(g.lastOrder)+'</div></td>'+
+        '<td></td>';
+      tbody.appendChild(tr);
     });
+    return;
+  }
+
+  // Pedidos por cuenta: los hechos con sesión iniciada Y los hechos como invitado con el mismo correo
+  var byEmail={}, orderCounts={};
+  customers.forEach(function(c){ if(c.email) byEmail[String(c.email).toLowerCase()]=c.id; });
+  orders.forEach(function(o){
+    var id=o.customer_id || (o.email?byEmail[String(o.email).toLowerCase()]:null);
+    if(id) orderCounts[id]=(orderCounts[id]||0)+1;
+  });
+  if(!customers.length){
+    tbody.innerHTML='<tr><td colspan="8" style="text-align:center;padding:2.5rem;color:var(--muted);font-size:0.72rem;letter-spacing:0.1em">Aún no hay clientes registrados</td></tr>';
+    return;
+  }
+  tbody.innerHTML='';
+  customers.forEach(function(cu){
+    var lastLogin = cu.last_login
+      ? new Date(cu.last_login).toLocaleDateString('es-ES',{day:'numeric',month:'short',year:'numeric'})+' '+new Date(cu.last_login).toLocaleTimeString('es-ES',{hour:'2-digit',minute:'2-digit'})
+      : '<span class="never">Nunca</span>';
+    var phone    = cu.phone ? esc(cu.phone) : '<span class="never">\u2014</span>';
+    var location = (cu.city||cu.country) ? esc((cu.city||'')+((cu.city&&cu.country)?', ':'')+(cu.country||'')) : '<span class="never">\u2014</span>';
+    var safeName = (cu.name||'').replace(/\\/g,'\\\\').replace(/'/g,"\\'");
+    var tr = document.createElement('tr');
+    tr.style.cursor = 'pointer';
+    (function(cid, cname){
+      tr.addEventListener('click', function(e){
+        if(e.target.tagName === 'BUTTON') return;
+        openCustomerDetail(cid, cname);
+      });
+    })(cu.id, cu.name);
+    tr.innerHTML=
+      '<td><div style="font-size:0.82rem;color:var(--cream)">'+esc(cu.name)+'</div></td>'+
+      '<td><div class="client-email">'+esc(cu.email)+'</div></td>'+
+      '<td><div class="client-date">'+phone+'</div></td>'+
+      '<td><div class="client-date">'+location+'</div></td>'+
+      '<td><span class="order-count">'+(orderCounts[cu.id]||0)+'</span></td>'+
+      '<td><div class="client-date">'+_cliDate(cu.created_at)+'</div></td>'+
+      '<td><div class="client-date">'+lastLogin+'</div></td>'+
+      '<td><button onclick="deleteCustomer('+cu.id+',\''+safeName+'\')" '+
+        'style="background:none;border:1px solid rgba(192,80,74,0.3);color:rgba(192,80,74,0.7);'+
+        'font-size:0.6rem;padding:0.22rem 0.6rem;cursor:pointer;font-family:\'Jost\',sans-serif;'+
+        'letter-spacing:0.1em;text-transform:uppercase;transition:all 0.2s" '+
+        'onmouseover="this.style.borderColor=\'var(--error)\';this.style.color=\'var(--error)\'" '+
+        'onmouseout="this.style.borderColor=\'rgba(192,80,74,0.3)\';this.style.color=\'rgba(192,80,74,0.7)\'">'+
+        '&#10005;</button></td>';
+    tbody.appendChild(tr);
+  });
+}
+// Rellena los datos VACÍOS de cada cuenta con los de su pedido más reciente (no pisa nada)
+function syncCustomersFromOrders(){
+  if(!confirm('¿Completar teléfono, dirección, ciudad y país VACÍOS de cada cuenta con los de su pedido más reciente?\nNo cambia ningún dato que ya exista.')) return;
+  adminFetch(API+'/admin/customers/sync-from-orders',{method:'POST'}).then(function(r){ return r?r.json():null; }).then(function(d){
+    if(!d||d.error){ toast('Error',(d&&d.error)||'No se pudo completar','err'); return; }
+    toast('Clientes completados', d.updated+' de '+d.checked+' cuentas con datos vacíos','ok');
+    loadClientes();
+  }).catch(function(e){ toast('Error',e.message,'err'); });
 }
 
 
@@ -4844,12 +4893,20 @@ function resetOrderAdjust(oid){
 // + direcciones guardadas + favoritos + historial de pedidos. Antes solo
 // mostraba el historial — ni siquiera el correo/teléfono quedaban a la vista
 // sin volver a la tabla.
-function openCustomerDetail(customerId, customerName){
-  var cu = _clientesCache.find(function(c){ return String(c.id)===String(customerId); }) || {};
-  var customerOrders = orders.filter(function(o){ return o.customer_id === customerId; });
+function openCustomerDetail(customerId, customerName, guestEmail){
+  var isGuest = !!guestEmail;
+  var cu = isGuest
+    ? (_guestsCache.find(function(g){ return g.email===guestEmail; }) || {email:guestEmail})
+    : (_clientesCache.find(function(c){ return String(c.id)===String(customerId); }) || {});
+  var emailLc = String(cu.email||'').toLowerCase();
+  // Pedidos de la cuenta: los hechos con sesión iniciada y los hechos como invitado con el mismo correo
+  var customerOrders = orders.filter(function(o){
+    return isGuest ? (o.email && String(o.email).toLowerCase()===emailLc)
+                   : (o.customer_id === customerId || (emailLc && o.email && String(o.email).toLowerCase()===emailLc));
+  });
   var lifetimeSpent = getPaidOrders(customerOrders).reduce(function(s,o){ return s+parseFloat(o.total||0); },0);
   var addrLine = [cu.address, cu.city, cu.state, cu.country].filter(Boolean).join(', ');
-  var regDate  = cu.created_at ? new Date(cu.created_at).toLocaleDateString('es-ES',{day:'numeric',month:'short',year:'numeric'}) : '—';
+  var regDate  = isGuest ? _cliDate(cu.firstOrder) : (cu.created_at ? new Date(cu.created_at).toLocaleDateString('es-ES',{day:'numeric',month:'short',year:'numeric'}) : '—');
   var lastLogin = cu.last_login ? (new Date(cu.last_login).toLocaleDateString('es-ES',{day:'numeric',month:'short',year:'numeric'})+' '+new Date(cu.last_login).toLocaleTimeString('es-ES',{hour:'2-digit',minute:'2-digit'})) : 'Nunca';
 
   var ordersHtml;
@@ -4879,9 +4936,9 @@ function openCustomerDetail(customerId, customerName){
         (cu.phone?'<div style="font-size:0.72rem;color:var(--cream);margin-top:0.3rem">📞 '+esc(cu.phone)+'</div>':'')+
       '</div>'+
       '<div style="background:var(--card);padding:0.8rem;border:1px solid var(--border-light)">'+
-        '<div style="font-size:0.5rem;letter-spacing:0.2em;text-transform:uppercase;color:var(--muted);margin-bottom:0.3rem">Cliente desde</div>'+
+        '<div style="font-size:0.5rem;letter-spacing:0.2em;text-transform:uppercase;color:var(--muted);margin-bottom:0.3rem">'+(isGuest?'Primera compra · sin cuenta':'Cliente desde')+'</div>'+
         '<div style="font-size:0.76rem;color:var(--cream)">'+regDate+'</div>'+
-        '<div style="font-size:0.66rem;color:var(--muted);margin-top:0.3rem">Último acceso: '+lastLogin+'</div>'+
+        '<div style="font-size:0.66rem;color:var(--muted);margin-top:0.3rem">'+(isGuest?'Última compra: '+_cliDate(cu.lastOrder):'Último acceso: '+lastLogin)+'</div>'+
       '</div>'+
     '</div>'+
     (addrLine?
@@ -4895,6 +4952,7 @@ function openCustomerDetail(customerId, customerName){
         '<div style="font-family:Cormorant Garamond,serif;font-size:1.5rem;color:var(--gold)">$'+lifetimeSpent.toFixed(2)+'</div>'+
       '</div>'+
     '</div>'+
+    (isGuest ? '' :
     '<div style="margin-top:1.3rem">'+
       '<div style="font-size:0.5rem;letter-spacing:0.2em;text-transform:uppercase;color:var(--muted);margin-bottom:0.5rem">Perfil Olfativo (Nez)</div>'+
       '<div id="custDetailScent" style="font-size:0.72rem;color:var(--muted)">Cargando…</div>'+
@@ -4906,13 +4964,14 @@ function openCustomerDetail(customerId, customerName){
     '<div style="margin-top:1.3rem">'+
       '<div style="font-size:0.5rem;letter-spacing:0.2em;text-transform:uppercase;color:var(--muted);margin-bottom:0.5rem">Favoritos</div>'+
       '<div id="custDetailFavs" style="font-size:0.72rem;color:var(--muted)">Cargando…</div>'+
-    '</div>'+
+    '</div>')+
     '<div style="margin-top:1.3rem">'+
       '<div style="font-size:0.5rem;letter-spacing:0.2em;text-transform:uppercase;color:var(--muted);margin-bottom:0.5rem">Historial de Pedidos ('+customerOrders.length+')</div>'+
       ordersHtml+
     '</div>';
 
   openSlidePanel(customerName, html);
+  if(isGuest) return;   // sin cuenta no hay perfil olfativo, direcciones guardadas ni favoritos
 
   adminFetch(API+'/admin/customers/'+customerId+'/scent-profile',{})
     .then(function(r){ return r?r.json():null; })
