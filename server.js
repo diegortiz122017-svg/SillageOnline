@@ -1636,6 +1636,18 @@ function getReplyCacheKey(messages, profileContext) {
   return 'reply:' + genderHint + ':' + query;
 }
 
+// Los cachés de Nez (resultados de búsqueda 30 min, respuestas a primeras consultas 60 min) no pueden
+// sobrevivir a un cambio en el catálogo, el inventario, los precios o el interruptor de decants: si no, un
+// perfume recién agregado seguía "sin existir" hasta que vencía el caché. Se compara una huella del contenido
+// (no la identidad de los objetos: esos cachés se reconstruyen solos cada pocos segundos sin que nada cambie).
+let _nezFingerprint = null;
+async function nezCacheGuard(decantsOn) {
+  const [catalogue, invMap, priceMap] = await Promise.all([getCatalogue(), getInventoryMap(), getPricingMap()]);
+  const fp = crypto_ref.createHash('sha1').update(JSON.stringify([catalogue, invMap, priceMap, !!decantsOn])).digest('hex');
+  if (_nezFingerprint !== null && fp !== _nezFingerprint) { _toolCache.clear(); _replyCache.clear(); }
+  _nezFingerprint = fp;
+}
+
 // ── Rate limiters — each with isolated store ──────────
 function rateLimit(max, windowMs) {
   const store = new Map();
@@ -7278,7 +7290,7 @@ FLUJO (máx 5 turnos):
 CUÁNDO buscar: cualquier ocasión, vibe, familia, nota, producto o marca → busca. En duda → busca.
 CUÁNDO preguntar: SOLO si el mensaje no da ninguna pista útil.
 NUNCA preguntes lo que ya sabes. NUNCA digas que algo no existe (ni "no tengo información") sin buscarlo PRIMERO.
-CONSULTA POR NOMBRE/OPINIÓN: si preguntan por un perfume específico o "qué opinas de X", llama search_catalogue pasando el nombre en notes (ej. notes:["sherif"]) o la marca en brand. Si aparece, responde con su carácter y notas y muéstralo. Solo si tras buscar realmente no está, dilo con tacto y ofrece una alternativa similar del catálogo.
+CONSULTA POR NOMBRE/OPINIÓN: si preguntan por un perfume específico o "qué opinas de X", llama search_catalogue pasando el nombre en notes (ej. notes:["sherif"]) o la marca en brand. Si el resultado trae [stock:out_of_stock]: SÍ manejamos ese perfume pero está agotado por ahora — dilo así, opina de él y sugiere una alternativa en stock. NUNCA digas que no lo tenemos si aparece en el resultado. Si aparece, responde con su carácter y notas y muéstralo. Solo si tras buscar realmente no está, dilo con tacto y ofrece una alternativa similar del catálogo.
 
 SEÑALES DE INTENCIÓN ALTA — interprétalas y actúa:
 - "Algo que no lo tenga cualquiera", "algo exclusivo", "algo diferente", "algo especial", "algo único", "algo de nicho" → el cliente quiere carácter y rareza. USA min_price:150 en search_catalogue para filtrar el tier diamond/gold y quedarte solo con premium. Busca en families: ["chypre","woody","oriental","leather","oud"]. Las marcas de nicho en nuestro catálogo son: Maison Francis Kurkdjian, Creed, Tom Ford, Initio, Parfums de Marly, Le Labo, Vilhelm Parfumerie, Mancera, Montale, Sospiro. Para estas solicitudes de exclusividad, PRIORIZA esas casas de nicho por encima de marcas más accesibles (Lattafa, Afnan, Armaf, Ajmal, Zimaya). Pero esto es SOLO una priorización para pedidos de "exclusividad": si el cliente pregunta por una de esas marcas accesibles o por un producto específico, recomiéndalo con gusto — todas son parte de nuestro catálogo y las respaldamos.
@@ -7428,6 +7440,16 @@ Responde en el idioma del cliente.`
       // ── Brand filter (exact or partial match, case-insensitive) ──────────────
       const brandFilter = args.brand ? args.brand.toLowerCase().trim() : null;
 
+      // Coincidencia por NOMBRE: sin acentos, espacios ni signos en ambos lados ("santal 33" ↔ "Le Labo Santal 33").
+      // Antes el término perdía los espacios y el nombre no, así que los nombres de varias palabras nunca coincidían.
+      const _flat = t => _stripAccents(String(t || '').toLowerCase()).replace(/[^a-z0-9]/g, '');
+      const nameHit = (p, nt) => {
+        const t = _flat(nt);
+        if (t.length < 3) return false;
+        const full = _flat(p.brand + ' ' + p.name), nm = _flat(p.name);
+        return full.includes(t) || (nm.length >= 3 && t.includes(nm));
+      };
+
       // ── Score every product ───────────────────────────────────────────────
       // Also check if model is searching by product name directly
       const searchTerms = [...families, ...expandedNoteTerms].join(' ').toLowerCase();
@@ -7460,19 +7482,16 @@ Responde en el idioma del cliente.`
           const inv = invMap[p.id] || {};
           const effPrice = (() => { const pr = priceMap[p.id]||{}; return (pr.onSale && pr.salePrice) ? Math.round(+pr.salePrice) : parseFloat(p.price); })();
 
-          // Hard-exclude out of stock
-          if (inv.outOfStock) return { p, score: -999 };
+          // Agotado: se excluye de las recomendaciones, SALVO que el cliente lo haya nombrado — entonces Nez
+          // debe saber que sí está en el catálogo (agotado por ahora) en vez de decir que no lo tenemos.
+          if (inv.outOfStock) return expandedNoteTerms.some(nt => nameHit(p, nt)) ? { p, score: 100, soldOut: true } : { p, score: -999 };
 
           const pText = [(p.notes||''),(p.top||''),(p.mid||''),(p.base||'')].join(' ').toLowerCase();
           const pFamilies = (p.family||'').toLowerCase().split(',').map(f=>f.trim()).filter(Boolean);
           const pFullName = (p.brand+' '+p.name).toLowerCase();
 
           // Direct name/brand match — if model passes product name as note (e.g. "santal 33", "sauvage")
-          expandedNoteTerms.forEach(nt => {
-            const ntNorm = _stripAccents(nt).replace(/[^a-z0-9]/g, '');
-            const nameNorm = _stripAccents(pFullName).replace(/[^a-z0-9 ]/g, '');
-            if(nameNorm.includes(ntNorm) || ntNorm.includes(nameNorm.split(' ').find(w => w.length > 4)||'')) score += 30;
-          });
+          expandedNoteTerms.forEach(nt => { if (nameHit(p, nt)) score += 30; });
 
           // Gender bonus for exact match (unisex already passed the hard filter above)
           if (args.gender && args.gender !== 'any') {
@@ -7495,11 +7514,7 @@ Responde en el idioma del cliente.`
           });
           // Hard penalty: if specific notes requested and product has NONE, bury it
           // But skip penalty if the product matched by NAME (name match was the intent)
-          const hadNameMatch = expandedNoteTerms.some(nt => {
-            const ntNorm = _stripAccents(nt).replace(/[^a-z0-9]/g, '');
-            const nameNorm = _stripAccents((p.brand+' '+p.name).toLowerCase()).replace(/[^a-z0-9 ]/g, '');
-            return nameNorm.includes(ntNorm) || ntNorm.includes(nameNorm.split(' ').find(w => w.length > 4)||'');
-          });
+          const hadNameMatch = expandedNoteTerms.some(nt => nameHit(p, nt));
           if (expandedNoteTerms.length > 0 && noteMatchCount === 0 && !hadNameMatch) score -= 50;
 
           // Price range
@@ -7562,11 +7577,11 @@ Responde en el idioma del cliente.`
         }).join('\n');
       }
 
-      const result = top.map(({p, score}) => {
+      const result = top.map(({p, score, soldOut}) => {
         const inv = invMap[p.id] || {};
         const pr  = priceMap[p.id] || {};
         const effPrice = (pr.onSale && pr.salePrice) ? Math.round(+pr.salePrice) : parseFloat(p.price);
-        const stockLabel = inv.lowStock ? 'low_stock' : 'in_stock';
+        const stockLabel = soldOut ? 'out_of_stock' : (inv.lowStock ? 'low_stock' : 'in_stock');
         const priceLabel = (pr.onSale && pr.salePrice) ? `$${effPrice} (sale, was $${p.price})` : `$${effPrice}`;
         // Sin decantsEnabled, ni el precio ni la palabra "decant" llegan al modelo —
         // así Nez no puede mencionarlos aunque el prompt fallara en suprimirlo.
@@ -7589,6 +7604,7 @@ Responde en el idioma del cliente.`
           p.tagline  ? `tagline:"${p.tagline}"`    : null,
           p.desc     ? `desc:"${p.desc}"`          : null,
           `[stock:${stockLabel}]`,
+          soldOut    ? 'AGOTADO POR AHORA: sí es parte de nuestro catálogo — coméntalo con naturalidad, dilo así, NO lo recomiendes para comprar ni lo incluyas en recommended_ids; ofrece una alternativa en stock' : null,
           p.badge    ? `[${p.badge}]`              : null,
           `[score:${score}]`
         ].filter(Boolean);
@@ -7612,6 +7628,7 @@ Responde en el idioma del cliente.`
 
   // ── OpenAI agentic loop ───────────────────────────────
   try {
+    await nezCacheGuard(decantsEnabled);
     // ── Reply cache check — skip OpenAI if identical first-message query seen recently ──
     // Skip reply cache when user has a profile — personalised responses shouldn't be cached
   const replyCacheKey = profileContext ? null : getReplyCacheKey(messages, profileContext);
@@ -8057,6 +8074,17 @@ app.post('/api/catalogue', requireAdmin, async (req, res) => {
   const catalogue = await getCatalogue();
   broadcast('catalogue', catalogue);
   await logActivity(`Fragancia agregada: ${newFrag.brand} ${newFrag.name}`);
+
+  // Fila de inventario desde el primer momento: antes el perfume nuevo no tenía ninguna hasta el próximo reinicio
+  // (el panel mostraba 99 por defecto, pero el servidor no tenía registro que descontar ni consultar).
+  try {
+    await db.execute(
+      `INSERT IGNORE INTO inventory (product_id, stock, low_stock, out_of_stock, updated_at) VALUES (?, 99, 0, 0, ?)`,
+      [newFrag.id, new Date()]
+    );
+    invalidateInventory();
+    broadcast('inventory', await getInventoryMap());
+  } catch (e) { console.warn('inventory row for new product:', e.message); }
 
   // Auto-create bottle_inventory record for this new fragrance (ml=0, ready to configure)
   try {
