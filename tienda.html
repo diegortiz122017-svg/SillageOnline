@@ -1524,26 +1524,22 @@ footer{background:var(--dark);padding:3.5rem 4rem;text-align:center;border-top:1
 /* Heart — hidden on desktop, shown on mobile */
 .d-wish-mob{display:none}
 .d-share-mob{display:none}
+.d-icon-row{display:none}
 @media(max-width:900px){
-  .d-wish-mob{
-    display:inline-flex;align-items:center;gap:0.4rem;
-    background:transparent;
-    border:1px solid rgba(184,149,90,0.3);
-    color:var(--muted);font-size:0.65rem;letter-spacing:0.12em;text-transform:uppercase;
-    padding:0.35rem 0.8rem;cursor:pointer;
-    transition:all 0.25s;font-family:'Jost',sans-serif;
+  /* Guardar y compartir: solo íconos de línea fina, sin cajas ni texto */
+  .d-icon-row{display:flex;align-items:center;gap:0.1rem}
+  .d-wish-mob,.d-share-mob{
+    display:inline-flex;align-items:center;justify-content:center;
+    width:2.4rem;height:2.4rem;padding:0;border:none;border-radius:50%;
+    background:transparent;color:var(--muted);cursor:pointer;
+    transition:color 0.2s,background 0.2s,transform 0.15s;
+    -webkit-tap-highlight-color:transparent;
   }
-  .d-wish-mob:hover{border-color:var(--gold);color:var(--gold)}
-  .d-wish-mob.saved{border-color:#e06060;color:#e06060;background:rgba(224,96,96,0.08)}
-  .d-share-mob{
-    display:inline-flex;align-items:center;gap:0.4rem;
-    background:transparent;
-    border:1px solid rgba(184,149,90,0.3);
-    color:var(--muted);font-size:0.65rem;letter-spacing:0.12em;text-transform:uppercase;
-    padding:0.35rem 0.8rem;cursor:pointer;
-    transition:all 0.25s;font-family:'Jost',sans-serif;
-  }
-  .d-share-mob:hover{border-color:var(--gold);color:var(--gold)}
+  .d-wish-mob svg,.d-share-mob svg{width:19px;height:19px;fill:none;stroke:currentColor;stroke-width:1.4;stroke-linecap:round;stroke-linejoin:round}
+  .d-wish-mob:hover,.d-share-mob:hover{color:var(--gold);background:rgba(184,149,90,0.08)}
+  .d-wish-mob:active,.d-share-mob:active{transform:scale(0.9)}
+  .d-wish-mob.saved{color:#c0504a}
+  .d-wish-mob.saved svg{fill:currentColor}
   #dWishBtn{display:none}
 }
 
@@ -4386,9 +4382,10 @@ function openDetail(pid){
       '</div>'+
       '<div class="d-header-right">'+
         '<span class="d-gender dg-'+p.g.toLowerCase()+'">'+gLabel[p.g]+'</span>'+
-        '<button class="d-wish-mob'+(isFav(pid)?' saved':'')+'" id="dWishMob">'+
-        (isFav(pid)?'♥ En favoritos':'♡ Guardar')+'</button>'+
-        '<button class="d-share-mob" id="dShareBtn">&#8679; Compartir</button>'+
+        '<div class="d-icon-row">'+
+          '<button class="d-wish-mob'+(isFav(pid)?' saved':'')+'" id="dWishMob" aria-pressed="'+(isFav(pid)?'true':'false')+'" aria-label="'+(isFav(pid)?'Quitar de favoritos':'Guardar en favoritos')+'" title="'+(isFav(pid)?'En favoritos':'Guardar')+'"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/></svg></button>'+
+          '<button class="d-share-mob" id="dShareBtn" aria-label="Compartir" title="Compartir"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 15V4"/><path d="M8 8l4-4 4 4"/><path d="M5 13v6a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1v-6"/></svg></button>'+
+        '</div>'+
       '</div>'+
     '</div>'+
     '<div class="d-tagline">'+esc(p.tagline||'')+'</div>'+
@@ -4537,7 +4534,7 @@ function openDetail(pid){
     var btn2 = document.getElementById('dWishMob');
     function paintWish(s){
       if(btn1){ btn1.classList.toggle('on',s); btn1.textContent=s?'♥':'♡'; }
-      if(btn2){ btn2.classList.toggle('saved',s); btn2.textContent=s?'♥ En favoritos':'♡ Guardar'; }
+      if(btn2){ btn2.classList.toggle('saved',s); btn2.setAttribute('aria-pressed',s?'true':'false'); btn2.setAttribute('aria-label',s?'Quitar de favoritos':'Guardar en favoritos'); btn2.title=s?'En favoritos':'Guardar'; }
     }
     paintWish(isFav(pid));
     if(wasAdded){ toast(esc(p.brand+' '+p.name),'Añadido a favoritos','ok'); _fbqWishlist(pid); }
