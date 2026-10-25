@@ -4309,8 +4309,16 @@ function applyFilters(){
 var curSlide=0;
 var slideCount=4; // se ajusta por producto a la cantidad real de fotos (mínimo 1)
 var _detailOpenPid=null;
-function openDetail(pid){
+// Pila de productos vistos dentro del mismo modal: al tocar una sugerencia se apila el producto actual
+// y "volver" (botón, Esc o atrás del navegador) regresa a él en vez de cerrar todo.
+var _detailStack = [];
+// nav: 'push' = abierto desde una sugerencia del modal · 'pop' = regreso al producto anterior · (nada) = apertura normal
+function openDetail(pid, nav){
   var p=P.find(function(x){return x.id===pid;});if(!p)return;
+  var _ovOpen = document.getElementById('detailOverlay').classList.contains('open');
+  if(nav==='push' && _ovOpen && _detailOpenPid!=null && _detailOpenPid!==pid) _detailStack.push(_detailOpenPid);
+  else if(nav!=='pop') _detailStack = [];
+  var _prevP = _detailStack.length ? P.find(function(x){return x.id===_detailStack[_detailStack.length-1];}) : null;
   trackEvent('product_view', {id:pid});
   if(typeof fbq==='function') fbq('track','ViewContent',{content_ids:[String(pid)],content_type:'product',value:effectivePrice(p),currency:'USD'});
   if(typeof _nezNudge!=='undefined') _nezNudge.onProductView();
@@ -4318,7 +4326,9 @@ function openDetail(pid){
   curSlide=0;
   document.getElementById('bcBrand').textContent=p.brand;
   document.getElementById('bcName').textContent=p.name;
-  document.getElementById('backBtn').textContent = _detailFromBundle
+  document.getElementById('backBtn').textContent = _prevP
+    ? '← Volver a '+_prevP.name
+    : _detailFromBundle
     ? '← Volver al bundle "'+_detailFromBundle.name+'"'
     : _detailFromNez ? '← Volver a Nez'
     : '← Volver a la Colección';
@@ -4616,7 +4626,7 @@ function openDetail(pid){
       (isRand ? '<span class="sugg-random-badge">Descubre</span>' : '')+
       '<div class="sugg-body"><div class="sugg-brand">'+esc(s.brand)+'</div><div class="sugg-name">'+esc(s.name)+'</div><div class="sugg-price">$'+effectivePrice(s)+'</div></div>'+
       '<button class="sugg-plus" data-id="'+s.id+'">+</button>';
-    sc.addEventListener('click',function(e){if(!e.target.closest('.sugg-plus'))openDetail(s.id);});
+    sc.addEventListener('click',function(e){if(!e.target.closest('.sugg-plus'))openDetail(s.id,'push');});
     sc.querySelector('.sugg-plus').addEventListener('click',function(e){
       e.stopPropagation();
       addToCart(s.id);
@@ -4633,9 +4643,14 @@ function openDetail(pid){
   document.querySelector('.detail-panel').scrollTop=0;
   document.body.style.overflow='hidden';
   // Update address bar to clean product URL (for sharing)
-  window.history.pushState({producto: p.id}, '', productUrl(p));
+  if(nav!=='pop') window.history.pushState({producto: p.id}, '', productUrl(p));
 }
 function closeDetail(){
+  // Hay un producto anterior en la pila: retroceder una entrada de historial; popstate lo reabre.
+  if(_detailStack.length && document.getElementById('detailOverlay').classList.contains('open')){
+    window.history.back();
+    return;
+  }
   document.getElementById('detailOverlay').classList.remove('open');
   document.body.style.overflow='';
   _detailOpenPid=null;
@@ -4662,6 +4677,7 @@ document.getElementById('backBtn').addEventListener('click',closeDetail);
 window.addEventListener('popstate', function(e) {
   var detailOverlay = document.getElementById('detailOverlay');
   if (detailOverlay && detailOverlay.classList.contains('open')) {
+    if (_detailStack.length) { openDetail(_detailStack.pop(), 'pop'); return; }
     detailOverlay.classList.remove('open');
     document.body.style.overflow = '';
     if (_detailFromNez) { _detailFromNez = false; _somReturnToChat(); }
