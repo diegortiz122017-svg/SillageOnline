@@ -1648,6 +1648,49 @@ async function nezCacheGuard(decantsOn) {
   _nezFingerprint = fp;
 }
 
+// Si el último mensaje del cliente nombra un perfume del catálogo, sus datos reales (notas, precio, estela,
+// existencias) se le entregan a Nez EN EL PROMPT, sin depender de que el modelo decida llamar bien a
+// search_catalogue. Así un perfume recién agregado —o con pocos datos— nunca es "no tengo información".
+async function buildMentionedProductsBlock(messages, decantsOn) {
+  const lastUser = [...(messages || [])].reverse().find(m => m && m.role === 'user');
+  const text = lastUser && typeof lastUser.content === 'string' ? lastUser.content : '';
+  if (!text) return '';
+  const norm = t => ' ' + _stripAccents(String(t || '').toLowerCase()).replace(/[^a-z0-9]+/g, ' ').trim() + ' ';
+  const msg = norm(text);
+  const [catalogue, invMap, priceMap] = await Promise.all([getCatalogue(), getInventoryMap(), getPricingMap()]);
+  const hits = catalogue.filter(p => {
+    const name = norm(p.name), full = norm(p.brand + ' ' + p.name);
+    return (name.trim().length >= 4 && msg.includes(name)) || msg.includes(full);
+  }).slice(0, 3);
+  if (!hits.length) return '';
+  const lines = hits.map(p => {
+    const inv = invMap[p.id] || {}, pr = priceMap[p.id] || {};
+    const eff = (pr.onSale && pr.salePrice) ? Math.round(+pr.salePrice) : parseFloat(p.price);
+    const priceLabel = (pr.onSale && pr.salePrice) ? `$${eff} (oferta, antes $${p.price})` : `$${eff}`;
+    const stock = inv.outOfStock ? 'out_of_stock — AGOTADO POR AHORA' : (inv.lowStock ? 'low_stock' : 'in_stock');
+    const missing = [];
+    if (!(p.notes || p.top || p.mid || p.base)) missing.push('notas');
+    if (!p.desc && !p.tagline) missing.push('descripción');
+    const decant = decantsOn ? (' decant:$' + (p.decantPrice ? parseFloat(p.decantPrice) : Math.round(eff * 0.30))) : '';
+    return [
+      `id:${p.id} ${p.brand} ${p.name} ${priceLabel}${decant} ${p.g}`,
+      p.family ? `family:${p.family}` : null,
+      p.notes ? `notes:${p.notes}` : null, p.top ? `top:${p.top}` : null, p.mid ? `mid:${p.mid}` : null, p.base ? `base:${p.base}` : null,
+      p.conc ? `conc:${p.conc}` : null, p.sillage ? `sillage:${p.sillage}` : null, p.season ? `season:${p.season}` : null,
+      p.tagline ? `tagline:"${p.tagline}"` : null, p.desc ? `desc:"${p.desc}"` : null,
+      `[stock:${stock}]`,
+      missing.length ? `[datos sin cargar aún: ${missing.join(', ')}]` : null,
+    ].filter(Boolean).join(' | ');
+  }).join('\n');
+  return `
+
+PRODUCTO(S) QUE EL CLIENTE ACABA DE NOMBRAR — datos en vivo de nuestro catálogo, ahora mismo:
+${lines}
+- SÍ los manejamos (aunque sean muy nuevos). Si preguntan tu opinión o por ellos, opina de ESTOS con estos datos reales. NUNCA digas "no tengo información" ni que no los manejamos, y no los sustituyas por otros de otra marca.
+- Si faltan datos (p. ej. notas), dilo en una frase honesta y apóyate en lo que sí hay (marca, concentración, estela, temporada, precio) sin inventar notas.
+- Si dice out_of_stock: confirma que lo manejamos pero está agotado por ahora, opina de él y ofrece una alternativa en stock.`;
+}
+
 // ── Rate limiters — each with isolated store ──────────
 function rateLimit(max, windowMs) {
   const store = new Map();
@@ -7640,8 +7683,9 @@ Responde en el idioma del cliente.`
       }
     }
 
+    const mentionBlock = await buildMentionedProductsBlock(messages, decantsEnabled).catch(() => '');
     const oaiMessages = [
-      { role: 'system', content: systemPrompt },
+      { role: 'system', content: systemPrompt + mentionBlock },
       ...messages.slice(-4).map(m => ({ role: m.role === 'assistant' ? 'assistant' : 'user', content: m.content }))
     ];
 
