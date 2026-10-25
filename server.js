@@ -4731,6 +4731,7 @@ app.post('/api/orders', orderLimiter, async (req, res) => {
     }
 
     // Validate bundle totals against DB bundle prices
+    const decantsOnForBundles = (await getSetting('decants_enabled', '1')) !== '0';
     for (const [bundleId, group] of Object.entries(bundleGroups)) {
       const firstItem = group.items[0];
       const qty = parseInt(firstItem.qty, 10) || 1;
@@ -4739,8 +4740,9 @@ app.post('/api/orders', orderLimiter, async (req, res) => {
       // Validate against DB bundle price
       const bundleDefId = firstItem.bundleId?.split('_')[1]; // bundleId format: bundle_<defId>_<ts>
       if (bundleDefId) {
-        const [bRows] = await db.execute('SELECT price FROM bundles WHERE id=? AND active=1', [parseInt(bundleDefId)]);
+        const [bRows] = await db.execute('SELECT price, items FROM bundles WHERE id=? AND active=1', [parseInt(bundleDefId)]);
         if (bRows.length) {
+          if (!decantsOnForBundles && bundleHasDecants(bRows[0].items)) return res.status(400).json({ error: BUNDLE_DECANTS_OFF_MSG(group.bundleName) });
           const dbBundlePrice = parseFloat(bRows[0].price) * qty;
           if (Math.abs(clientBundleTotal - dbBundlePrice) > 0.02) {
             console.warn(`Bundle price mismatch — client:$${clientBundleTotal} db:$${dbBundlePrice}`);
@@ -4751,6 +4753,9 @@ app.post('/api/orders', orderLimiter, async (req, res) => {
         }
       }
       // Bundle not found in DB — fall back to accepting client price with abuse tracking
+      if (!decantsOnForBundles && group.items.some(i => ['decant', 'decant5', 'sample'].includes(String(i.type || '').toLowerCase()))) {
+        return res.status(400).json({ error: BUNDLE_DECANTS_OFF_MSG(group.bundleName) });
+      }
       bundleTotal += clientBundleTotal;
     }
 
@@ -5507,14 +5512,16 @@ async function computeServerTotal(rawItems, promoCode, clientTotal) {
       }
     }
 
+    const decantsOnForBundles = (await getSetting('decants_enabled', '1')) !== '0';
     for (const [bundleId, group] of Object.entries(bundleGroups)) {
       const firstItem = group.items[0];
       const qty = parseInt(firstItem.qty, 10) || 1;
       const clientBundleTotal = group.items.reduce((s, i) => s + parseFloat(i.price || 0) * parseInt(i.qty, 10), 0);
       const bundleDefId = firstItem.bundleId?.split('_')[1];
       if (bundleDefId) {
-        const [bRows] = await db.execute('SELECT price FROM bundles WHERE id=? AND active=1', [parseInt(bundleDefId)]);
+        const [bRows] = await db.execute('SELECT price, items FROM bundles WHERE id=? AND active=1', [parseInt(bundleDefId)]);
         if (bRows.length) {
+          if (!decantsOnForBundles && bundleHasDecants(bRows[0].items)) return { ok: false, status: 400, error: BUNDLE_DECANTS_OFF_MSG(group.bundleName) };
           const dbBundlePrice = parseFloat(bRows[0].price) * qty;
           if (Math.abs(clientBundleTotal - dbBundlePrice) > 0.02) {
             return { ok: false, status: 400, error: 'El precio del bundle no coincide. Por favor recarga la página.' };
@@ -5522,6 +5529,9 @@ async function computeServerTotal(rawItems, promoCode, clientTotal) {
           bundleTotal += dbBundlePrice;
           continue;
         }
+      }
+      if (!decantsOnForBundles && group.items.some(i => ['decant', 'decant5', 'sample'].includes(String(i.type || '').toLowerCase()))) {
+        return { ok: false, status: 400, error: BUNDLE_DECANTS_OFF_MSG(group.bundleName) };
       }
       bundleTotal += clientBundleTotal;
     }
@@ -7967,11 +7977,23 @@ app.delete('/api/collections/:id', requireAdmin, async (req, res) => {
   } catch(e) { res.status(500).json({ error: e.message }); }
 });
 
-// GET /api/bundles — public
+// Un bundle "con decants" es el que tiene algún ítem que no sea botella (type 'botella' en el admin).
+// Un ítem sin tipo cuenta como decant (así se guardaban los bundles viejos).
+function bundleHasDecants(items) {
+  let list = items;
+  if (typeof list === 'string') { try { list = JSON.parse(list); } catch (e) { list = []; } }
+  return (Array.isArray(list) ? list : []).some(it => String((it && it.type) || 'decant').toLowerCase() !== 'botella');
+}
+const BUNDLE_DECANTS_OFF_MSG = name => `El bundle "${name || ''}" incluye decants y su venta está desactivada por el momento. Los bundles de botellas siguen disponibles.`;
+
+// GET /api/bundles — public. Con la venta de decants desactivada, los bundles que incluyen decants NO se
+// publican; los de solo botellas siguen igual.
 app.get('/api/bundles', async (req, res) => {
   try {
+    const decantsOn = (await getSetting('decants_enabled', '1')) !== '0';
     const [rows] = await db.query('SELECT * FROM bundles WHERE active=1 ORDER BY created_at DESC');
-    const bundles = rows.map(b => ({ ...b, items: JSON.parse(b.items || '[]') }));
+    const bundles = rows.map(b => { const items = JSON.parse(b.items || '[]'); return { ...b, items, hasDecants: bundleHasDecants(items) }; })
+      .filter(b => decantsOn || !b.hasDecants);
     res.json(bundles);
   } catch(e) { res.json([]); }
 });
@@ -7980,7 +8002,7 @@ app.get('/api/bundles', async (req, res) => {
 app.get('/api/bundles/all', requireAdmin, async (req, res) => {
   try {
     const [rows] = await db.query('SELECT * FROM bundles ORDER BY created_at DESC');
-    const bundles = rows.map(b => ({ ...b, items: JSON.parse(b.items || '[]') }));
+    const bundles = rows.map(b => { const items = JSON.parse(b.items || '[]'); return { ...b, items, hasDecants: bundleHasDecants(items) }; });
     res.json(bundles);
   } catch(e) { res.json([]); }
 });

@@ -1146,7 +1146,7 @@ tr:hover td{background:rgba(255,255,255,0.02)}
         <div class="inner-tab-section" id="cat-tab-bundles">
           <div class="page-hdr">
             <div>
-              <div class="page-title" style="font-size:1.2rem">Bundles de Decants</div>
+              <div class="page-title" style="font-size:1.2rem">Bundles</div>
               <div class="page-sub">Crea y gestiona paquetes de decants con precios especiales</div>
             </div>
             <button class="add-btn-lg" onclick="openBundleModal(null)">+ Nuevo Bundle</button>
@@ -6001,6 +6001,7 @@ function renderBundles(){
           '<div class="bc-header">'+
             '<span class="bc-name">'+esc(b.name)+'</span>'+
             '<span class="bc-badge '+(b.active?'active':'inactive')+'">'+(b.active?'Activo':'Inactivo')+'</span>'+
+            '<span class="bc-badge" style="margin-left:0.3rem;border:1px solid var(--border-light);color:'+(b.hasDecants?'var(--muted)':'var(--gold)')+'" title="'+(b.hasDecants?'Se oculta y no se vende mientras la venta de decants esté desactivada':'Solo botellas: se vende aunque la venta de decants esté desactivada')+'">'+(b.hasDecants?'Con decants':'Solo botellas')+'</span>'+
           '</div>'+
           (b.description?'<div class="bc-desc">'+esc(b.description)+'</div>':'')+
           '<div class="bc-items-list">'+itemsList+'</div>'+

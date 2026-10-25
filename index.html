@@ -3131,6 +3131,7 @@ function connectWS() {
           if(!decantsEnabled) removeDecantsFromCart();
           renderCart();
           if(typeof buildGrid==='function') buildGrid();
+          if(typeof reloadBundles==='function') reloadBundles();   // los bundles con decants aparecen/desaparecen
           if(_detailOpenPid) openDetail(_detailOpenPid);
         }
       } catch(err) {}
@@ -5056,17 +5057,22 @@ fetch(API+'/settings/decants')
     decantsEnabled = data.enabled !== false;
     if(!decantsEnabled){
       removeDecantsFromCart();
+      if(window._allBundles && typeof renderCollBundles==='function') renderCollBundles(window._allBundles);   // oculta los bundles con decants
       if(typeof buildGrid==='function') buildGrid();
     }
   }).catch(function(){});
 
 // Quita del carrito cualquier decant/muestra que haya quedado de antes de desactivar la venta.
 function removeDecantsFromCart(){
-  var had = cart.some(function(i){return i.type==='decant'||i.type==='decant5'||i.type==='sample';});
-  if(!had) return;
-  cart = cart.filter(function(i){return i.type!=='decant'&&i.type!=='decant5'&&i.type!=='sample';});
+  var isDec = function(i){ return i.type==='decant'||i.type==='decant5'||i.type==='sample'; };
+  // Un bundle se vende como unidad: si tiene decants se quita COMPLETO; los de solo botellas se quedan.
+  var decantBundles = {};
+  cart.forEach(function(i){ if(i.bundleId && isDec(i)) decantBundles[i.bundleId] = 1; });
+  var before = cart.length;
+  cart = cart.filter(function(i){ return i.bundleId ? !decantBundles[i.bundleId] : !isDec(i); });
+  if(cart.length === before) return;
   saveCart(); renderCart();
-  toast('Decants no disponibles','Se quitaron del carrito — vuelve a intentar con el frasco completo');
+  toast('Decants no disponibles','Se quitaron del carrito los decants y los bundles que los incluyen — los frascos completos y los bundles de botellas siguen disponibles');
 }
 
 function updateDetailCartBtn(){var qty=cartQty();var el=document.getElementById('detailCartCount');if(!el)return;el.textContent=qty;el.classList.toggle('show',qty>0);var btn=document.getElementById('detailCartBtn');if(btn){btn.classList.remove('flash');void btn.offsetWidth;btn.classList.add('flash');}}
@@ -6056,7 +6062,7 @@ function openBundleDetail(b){
       '<div class="bundle-prod-img" style="display:flex;align-items:center;justify-content:center">'+(prod?svg(prod.c,prod.s,'sm'):'🌸')+'</div>';
     var brand = prod ? esc(prod.brand) : '';
     var name  = prod ? esc(prod.name)  : esc(it.name||'');
-    var size  = it.size ? '<div class="bundle-prod-size">'+esc(it.size)+'</div>' : '';
+    var size  = _bundleItemSize(it) ? '<div class="bundle-prod-size">'+esc(_bundleItemSize(it))+'</div>' : '';
     var pid   = prod ? prod.id : null;
     return '<div class="bundle-prod-row"'+(pid?' onclick="openBundleProdDetail('+pid+')"':'')+'>'+
       img+
@@ -6169,7 +6175,8 @@ function _bundleCardsHtml(bundles){
     var saving = b.orig_price && parseFloat(b.orig_price) > parseFloat(b.price)
       ? parseFloat(b.orig_price) - parseFloat(b.price) : 0;
     var items = (b.items||[]).map(function(it){
-      return '<div class="bsc-item">'+esc(it.name)+(it.size?' <span style="color:var(--muted);font-size:0.6rem">'+esc(it.size)+'</span>':'')+'</div>';
+      var sz = _bundleItemSize(it);
+      return '<div class="bsc-item">'+esc(it.name)+(sz?' <span style="color:var(--muted);font-size:0.6rem">'+esc(sz)+'</span>':'')+'</div>';
     }).join('');
     return '<div class="bundle-store-card" data-bid="'+b.id+'">'+
       '<div class="bsc-gender">'+_bundleGenderBadge(b.items)+'</div>'+
@@ -6208,6 +6215,7 @@ function _wireBundleGridClicks(gridEl){
   };
 }
 function renderCollBundles(bundles){
+  bundles = _sellableBundles(bundles);
   var collBundlesGrid  = document.getElementById('collBundlesGrid');
   var collBundlesTitle = document.getElementById('collBundlesTitle');
   if(collBundlesGrid){
@@ -6221,6 +6229,18 @@ function renderCollBundles(bundles){
     }
   }
 }
+
+// Un bundle "con decants" tiene algún ítem que no es botella (type 'botella'; sin tipo = decant, como los viejos).
+function _bundleHasDecants(b){
+  return ((b && b.items) || []).some(function(it){ return String(it.type||'decant').toLowerCase() !== 'botella'; });
+}
+// Con la venta de decants desactivada, los bundles que los incluyen no se muestran ni se venden;
+// los bundles de solo botellas siguen igual.
+function _sellableBundles(list){
+  return (list||[]).filter(function(b){ return decantsEnabled || !_bundleHasDecants(b); });
+}
+function _bundleItemSize(it){ return it.size || (String(it.type||'').toLowerCase()==='botella' ? 'Frasco completo' : ''); }
+function reloadBundles(){ _bundlesLoaded = false; window._allBundles = null; loadBundles(); }
 
 var _bundlesLoaded = false;
 function loadBundles(){
@@ -6238,7 +6258,8 @@ function loadBundles(){
 
 // bundlesGrid removed from homepage
 function addBundleToCart(id, bundle){
-  if(!decantsEnabled){ toast('No disponible','La venta de decants está desactivada por el momento'); return; }
+  // Solo se bloquean los bundles que incluyen decants; los de botellas se venden siempre
+  if(!decantsEnabled && _bundleHasDecants(bundle)){ toast('No disponible','Este bundle incluye decants y su venta está desactivada por el momento'); return; }
   // Check if this exact bundle is already in the cart
   var alreadyInCart = cart.some(function(i){ return i.bundleId === id; });
   if(alreadyInCart){
@@ -6246,18 +6267,22 @@ function addBundleToCart(id, bundle){
     return;
   }
 
-  var added = false;
+  var added = false, nDecants = 0, nBottles = 0;
   var bundleId = 'bundle_' + id + '_' + Date.now();
   (bundle.items||[]).forEach(function(it){
     var p = P.find(function(x){ return x.id === it.productId || x.id === +it.productId; });
     if(p){
+      // 'botella' en el admin = frasco completo ('full' en el pedido: descuenta stock y ml de la botella);
+      // todo lo demás es decant.
+      var isBottle = String(it.type||'decant').toLowerCase() === 'botella';
+      if(isBottle) nBottles++; else nDecants++;
       var label = it.name + (it.size?' ('+it.size+')':'');
       cart.push({
         p:           p,
         qty:         1,
-        type:        'decant',
+        type:        isBottle ? 'full' : 'decant',
         label:       label,
-        size:        it.size || 'Decant',
+        size:        isBottle ? (it.size || p.size) : (it.size || 'Decant'),
         bundleId:    bundleId,       // links all items of this bundle
         bundleDefId: id,             // the bundle definition id (for dupe check)
         bundleName:  bundle.name,    // display name of the bundle
@@ -6271,7 +6296,10 @@ function addBundleToCart(id, bundle){
   if(added){
     renderCart();
     saveCart();
-    toast(bundle.name, bundle.items.length+' decants añadidos al carrito', 'ok');
+    var parts = [];
+    if(nDecants) parts.push(nDecants+' decant'+(nDecants!==1?'s':''));
+    if(nBottles) parts.push(nBottles+' frasco'+(nBottles!==1?'s':''));
+    toast(bundle.name, parts.join(' y ')+' añadidos al carrito', 'ok');
   }
 }
 function renderCustomerArea(){
