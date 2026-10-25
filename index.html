@@ -1582,10 +1582,13 @@ footer{background:var(--dark);padding:3.5rem 4rem;text-align:center;border-top:1
 .d-icon-row{display:none}
 @media(max-width:900px){
   /* Guardar y compartir: solo íconos de línea fina, sin cajas ni texto */
-  .d-icon-row{display:flex;flex-direction:column;align-items:center;gap:0}   /* apilados: corazón arriba, compartir abajo */
+  /* Apilados (corazón arriba, compartir abajo). El margen negativo hace que la columna NO estire la fila del
+     encabezado: los íconos se asoman hacia la zona del eslogan, que deja libre su lado derecho. */
+  .d-icon-row{display:flex;flex-direction:column;align-items:center;gap:0;margin-bottom:-3.4rem}
+  .d-tagline{padding-right:3.2rem}
   .d-wish-mob,.d-share-mob{
     display:inline-flex;align-items:center;justify-content:center;
-    width:2.6rem;height:2.6rem;padding:0;border:none;border-radius:50%;
+    width:2.6rem;height:2.3rem;padding:0;border:none;border-radius:999px;
     background:transparent;color:var(--muted);cursor:pointer;
     transition:color 0.2s,background 0.2s,transform 0.15s;
     -webkit-tap-highlight-color:transparent;
