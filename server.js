@@ -2011,6 +2011,111 @@ app.get(ADMIN_ROUTE, (req, res) => {
   if (fs.existsSync(file)) return res.sendFile(file);
   res.status(404).send('Not found');
 });
+// ── Vista previa de un perfume al compartir ───────────────────────────────────
+// Los rastreadores sociales (WhatsApp, Instagram, iMessage, Telegram, Facebook, X) no ejecutan JS:
+// leen las etiquetas OG del HTML. Esta función devuelve el HTML de la página con las etiquetas
+// (y el JSON-LD) del perfume `p`: su foto, nombre, eslogan y precio, en vez del logo genérico.
+async function injectProductMeta(html, p, url, opts = {}) {
+    const BASE   = process.env.BASE_URL || 'https://sillage-sv.com';
+    // Foto del perfume como imagen de la vista previa. Las de Cloudinary se encuadran a 1200x630
+    // (formato de tarjeta de WhatsApp/Facebook/X) con el fondo crema de la ficha, en JPG para que
+    // todos los rastreadores la acepten; sin foto, cae a un asset real del sitio.
+    const rawImg = (p.photos && p.photos[0]) || '';
+    let imgUrl = rawImg
+      ? (rawImg.startsWith('http') ? rawImg : BASE + rawImg)
+      : `${BASE}/apple-touch-icon.png`;
+    const hasCard = /res\.cloudinary\.com/.test(imgUrl) && imgUrl.includes('/upload/');
+    if (hasCard) imgUrl = imgUrl.replace('/upload/', '/upload/c_pad,w_1200,h_630,b_rgb:f2ede4,f_jpg,q_auto:good/');
+    const title  = `${p.brand} ${p.name} — Sillage Parfumerie`;
+    const desc   = p.tagline
+      ? `${p.tagline} · ${p.conc || 'Eau de Parfum'} · Desde $${p.price}`
+      : `${p.conc || 'Eau de Parfum'} de ${p.brand}. Disponible en Sillage Parfumerie, El Salvador.`;
+    const shippingCost = parseFloat(await getSetting('shipping_cost', '5')) || 5;
+
+    // Quita las etiquetas genéricas (incl. og:image/twitter que la página pudiera traer) y
+    // pone las del producto: así nunca quedan duplicadas y el rastreador toma la primera.
+    html = html
+      .replace(/<meta property="og:(?:title|description|url|type|image[^"]*)"[^>]*\/>\s*/g, '')
+      .replace(/<meta name="twitter:[^"]*"[^>]*\/>\s*/g, '')
+      .replace(/<title>[\s\S]*?<\/title>/, `<title>${escHtml(title)}</title>`)
+      .replace('</head>',
+        `<meta property="og:title" content="${escHtml(title)}"/>
+<meta property="og:description" content="${escHtml(desc)}"/>
+<meta property="og:image" content="${escHtml(imgUrl)}"/>${hasCard ? `
+<meta property="og:image:width" content="1200"/>
+<meta property="og:image:height" content="630"/>` : ''}
+<meta property="og:image:alt" content="${escHtml(p.brand + ' ' + p.name)}"/>
+<meta property="og:url" content="${url}"/>
+<meta property="og:type" content="product"/>
+<meta name="twitter:card" content="summary_large_image"/>
+<meta name="twitter:title" content="${escHtml(title)}"/>
+<meta name="twitter:description" content="${escHtml(desc)}"/>
+<meta name="twitter:image" content="${escHtml(imgUrl)}"/>
+</head>`);
+    if (opts.canonical) html = html.replace(/<link rel="canonical"[^>]*\/>/, `<link rel="canonical" href="${url}"/>`);
+    // Inject Schema.org JSON-LD for product structured data
+    // LLMs and search engines use this to understand the product
+    const schema = {
+      '@context': 'https://schema.org',
+      '@type': 'Product',
+      name: `${p.brand} ${p.name}`,
+      brand: { '@type': 'Brand', name: p.brand },
+      description: p.desc || p.tagline || '',
+      image: imgUrl,
+      url,
+      offers: {
+        '@type': 'Offer',
+        price: p.price,
+        priceCurrency: 'USD',
+        availability: 'https://schema.org/InStock',
+        seller: { '@type': 'Organization', name: 'Sillage Parfumerie' },
+        // Política real: Art. 06 de Términos — 8 días hábiles, producto sin abrir/sellado.
+        hasMerchantReturnPolicy: {
+          '@type': 'MerchantReturnPolicy',
+          applicableCountry: 'SV',
+          returnPolicyCategory: 'https://schema.org/MerchantReturnFiniteReturnWindow',
+          merchantReturnDays: 8,
+          returnMethod: 'https://schema.org/ReturnByMail',
+          returnFees: 'https://schema.org/ReturnFeesCustomerResponsibility',
+        },
+        // Tiempos reales de /envios (Gran San Salvador a Interior del país).
+        shippingDetails: {
+          '@type': 'OfferShippingDetails',
+          shippingRate: {
+            '@type': 'MonetaryAmount',
+            value: shippingCost,
+            currency: 'USD',
+          },
+          shippingDestination: { '@type': 'DefinedRegion', addressCountry: 'SV' },
+          deliveryTime: {
+            '@type': 'ShippingDeliveryTime',
+            handlingTime:  { '@type': 'QuantitativeValue', minValue: 0, maxValue: 1, unitCode: 'DAY' },
+            transitTime:   { '@type': 'QuantitativeValue', minValue: 1, maxValue: 7, unitCode: 'DAY' },
+          },
+        },
+      },
+      additionalProperty: [
+        p.conc   ? { '@type': 'PropertyValue', name: 'Concentración', value: p.conc }   : null,
+        p.season ? { '@type': 'PropertyValue', name: 'Temporada',     value: p.season } : null,
+        p.sillage? { '@type': 'PropertyValue', name: 'Proyección',    value: p.sillage }: null,
+        p.long   ? { '@type': 'PropertyValue', name: 'Duración',      value: p.long }   : null,
+        p.top    ? { '@type': 'PropertyValue', name: 'Notas de salida',value: p.top }    : null,
+        p.mid    ? { '@type': 'PropertyValue', name: 'Notas de corazón',value: p.mid }   : null,
+        p.base   ? { '@type': 'PropertyValue', name: 'Notas de fondo', value: p.base }   : null,
+      ].filter(Boolean),
+    };
+    const schemaTag = `<script type="application/ld+json">${JSON.stringify(schema)}</script>`;
+    html = html.replace('</head>', schemaTag + '\n</head>');
+    return html;
+}
+
+// Busca un perfume por el slug de /fragancia/<slug> (mismo slugify que el cliente y los correos).
+async function findProductBySlug(slug) {
+  const want = String(slug || '').toLowerCase();
+  const catalogue = await getCatalogue();
+  return catalogue.find(p => nurture.slugify(p.brand + '-' + p.name) === want) || null;
+}
+
 app.get('/', async (req, res) => {
   const fs   = require('fs');
   const index = path.join(__dirname, 'index.html');
@@ -2026,86 +2131,8 @@ app.get('/', async (req, res) => {
       const catalogue = await getCatalogue();
       const p = catalogue.find(prod => prod.id === productoId);
       if (p && fs.existsSync(index)) {
-        const BASE   = process.env.BASE_URL || 'https://sillage-sv.com';
-        const imgUrl = (p.photos && p.photos[0])
-          ? (p.photos[0].startsWith('http') ? p.photos[0] : BASE + p.photos[0])
-          : `${BASE}/apple-touch-icon.png`; // og-default.jpg no existe (404) — fallback a un asset real
-        const title  = `${p.brand} ${p.name} — Sillage Parfumerie`;
-        const desc   = p.tagline
-          ? `${p.tagline} · ${p.conc || 'Eau de Parfum'} · Desde $${p.price}`
-          : `${p.conc || 'Eau de Parfum'} de ${p.brand}. Disponible en Sillage Parfumerie, El Salvador.`;
-        const url    = `${BASE}/?producto=${productoId}`;
-        const shippingCost = parseFloat(await getSetting('shipping_cost', '5')) || 5;
-
-        let html = fs.readFileSync(index, 'utf8');
-        // Replace generic OG tags with product-specific ones
-        html = html
-          .replace(/<meta property="og:title"[^>]*\/>/,
-            `<meta property="og:title" content="${escHtml(title)}"/>`)
-          .replace(/<meta property="og:description"[^>]*\/>/,
-            `<meta property="og:description" content="${escHtml(desc)}"/>`)
-          .replace(/<meta property="og:url"[^>]*\/>/, '')
-          .replace('</head>',
-            `<meta property="og:image" content="${imgUrl}"/>
-<meta property="og:url" content="${url}"/>
-<meta property="og:type" content="product"/>
-<meta name="twitter:card" content="summary_large_image"/>
-<meta name="twitter:image" content="${imgUrl}"/>
-</head>`);
-        // Inject Schema.org JSON-LD for product structured data
-        // LLMs and search engines use this to understand the product
-        const schema = {
-          '@context': 'https://schema.org',
-          '@type': 'Product',
-          name: `${p.brand} ${p.name}`,
-          brand: { '@type': 'Brand', name: p.brand },
-          description: p.desc || p.tagline || '',
-          image: imgUrl,
-          url,
-          offers: {
-            '@type': 'Offer',
-            price: p.price,
-            priceCurrency: 'USD',
-            availability: 'https://schema.org/InStock',
-            seller: { '@type': 'Organization', name: 'Sillage Parfumerie' },
-            // Política real: Art. 06 de Términos — 8 días hábiles, producto sin abrir/sellado.
-            hasMerchantReturnPolicy: {
-              '@type': 'MerchantReturnPolicy',
-              applicableCountry: 'SV',
-              returnPolicyCategory: 'https://schema.org/MerchantReturnFiniteReturnWindow',
-              merchantReturnDays: 8,
-              returnMethod: 'https://schema.org/ReturnByMail',
-              returnFees: 'https://schema.org/ReturnFeesCustomerResponsibility',
-            },
-            // Tiempos reales de /envios (Gran San Salvador a Interior del país).
-            shippingDetails: {
-              '@type': 'OfferShippingDetails',
-              shippingRate: {
-                '@type': 'MonetaryAmount',
-                value: shippingCost,
-                currency: 'USD',
-              },
-              shippingDestination: { '@type': 'DefinedRegion', addressCountry: 'SV' },
-              deliveryTime: {
-                '@type': 'ShippingDeliveryTime',
-                handlingTime:  { '@type': 'QuantitativeValue', minValue: 0, maxValue: 1, unitCode: 'DAY' },
-                transitTime:   { '@type': 'QuantitativeValue', minValue: 1, maxValue: 7, unitCode: 'DAY' },
-              },
-            },
-          },
-          additionalProperty: [
-            p.conc   ? { '@type': 'PropertyValue', name: 'Concentración', value: p.conc }   : null,
-            p.season ? { '@type': 'PropertyValue', name: 'Temporada',     value: p.season } : null,
-            p.sillage? { '@type': 'PropertyValue', name: 'Proyección',    value: p.sillage }: null,
-            p.long   ? { '@type': 'PropertyValue', name: 'Duración',      value: p.long }   : null,
-            p.top    ? { '@type': 'PropertyValue', name: 'Notas de salida',value: p.top }    : null,
-            p.mid    ? { '@type': 'PropertyValue', name: 'Notas de corazón',value: p.mid }   : null,
-            p.base   ? { '@type': 'PropertyValue', name: 'Notas de fondo', value: p.base }   : null,
-          ].filter(Boolean),
-        };
-        const schemaTag = `<script type="application/ld+json">${JSON.stringify(schema)}</script>`;
-        html = html.replace('</head>', schemaTag + '\n</head>');
-
+        const html = await injectProductMeta(fs.readFileSync(index, 'utf8'), p,
+          `${process.env.BASE_URL || 'https://sillage-sv.com'}/?producto=${productoId}`);
         return res.send(html);
       }
     } catch(e) {
@@ -2120,7 +2147,26 @@ app.get('/', async (req, res) => {
 });
 
 app.get('/nosotros',    (req, res) => res.sendFile(path.join(__dirname, 'nosotros.html')));
-app.get('/tienda',      (req, res) => res.sendFile(path.join(__dirname, 'tienda.html')));
+// Sirve tienda.html con la vista previa (OG) de un perfume cuando el enlace lo identifica.
+async function sendTiendaWithProduct(req, res, p, url) {
+  const fs = require('fs');
+  const tienda = path.join(__dirname, 'tienda.html');
+  if (p && fs.existsSync(tienda)) {
+    try {
+      return res.send(await injectProductMeta(fs.readFileSync(tienda, 'utf8'), p, url, { canonical: true }));
+    } catch (e) {
+      console.warn('OG tag generation failed:', e.message);
+    }
+  }
+  return res.sendFile(tienda);
+}
+app.get('/tienda', async (req, res) => {
+  const id = parseInt(req.query.producto);
+  let p = null;
+  if (id) { try { p = (await getCatalogue()).find(x => x.id === id) || null; } catch (e) {} }
+  const BASE = process.env.BASE_URL || 'https://sillage-sv.com';
+  return sendTiendaWithProduct(req, res, p, p ? `${BASE}/fragancia/${nurture.slugify(p.brand + '-' + p.name)}` : '');
+});
 app.get('/envios', (req, res) => res.sendFile(path.join(__dirname, 'envios.html')));
 app.get('/terminos', (req, res) => res.sendFile(path.join(__dirname, 'terminos.html')));
 app.get('/devoluciones', (req, res) => res.sendFile(path.join(__dirname, 'devoluciones.html')));
@@ -2128,11 +2174,17 @@ app.get('/devoluciones', (req, res) => res.sendFile(path.join(__dirname, 'devolu
 // Shared product and bundle links — serve tienda.html (it has the catalogue +
 // openDetail). index.html is the editorial home and has NO product grid, so it
 // can't open the detail — serving it made reloads/shares land on the home page.
-app.get('/fragancia/:slug', (req, res) => {
+app.get('/fragancia/:slug', async (req, res) => {
   const fs     = require('fs');
   const tienda = path.join(__dirname, 'tienda.html');
   const index  = path.join(__dirname, 'index.html');
-  if (fs.existsSync(tienda)) return res.sendFile(tienda);
+  // Con la ficha del perfume en las etiquetas OG, el enlace compartido muestra su foto (no el logo).
+  if (fs.existsSync(tienda)) {
+    let p = null;
+    try { p = await findProductBySlug(req.params.slug); } catch (e) {}
+    const BASE = process.env.BASE_URL || 'https://sillage-sv.com';
+    return sendTiendaWithProduct(req, res, p, p ? `${BASE}/fragancia/${nurture.slugify(p.brand + '-' + p.name)}` : '');
+  }
   if (fs.existsSync(index))  return res.sendFile(index);
   res.redirect('/');
 });
