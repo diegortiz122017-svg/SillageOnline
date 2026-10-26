@@ -1212,6 +1212,29 @@ tr:hover td{background:rgba(255,255,255,0.02)}
         </div>
 
         <div style="background:rgba(255,255,255,0.03);border:1px solid var(--border-light);padding:1.2rem;margin-bottom:1.5rem">
+          <div style="font-size:0.6rem;letter-spacing:0.2em;text-transform:uppercase;color:var(--gold);margin-bottom:0.5rem">Seguimiento a quienes ya compraron</div>
+          <div class="page-sub" id="ppSub" style="margin-bottom:1rem">Cargando…</div>
+          <div class="tbl-wrap" style="overflow-x:auto;margin-bottom:1rem">
+            <table id="ppTable" style="min-width:520px">
+              <thead><tr><th>Correo</th><th>Enviados</th><th>Omitidos</th><th>Compraron en 14 días</th><th>%</th></tr></thead>
+              <tbody id="ppBody"><tr><td colspan="5" style="text-align:center;padding:1.2rem;color:var(--muted)">Cargando…</td></tr></tbody>
+            </table>
+          </div>
+          <div style="display:flex;gap:1rem;flex-wrap:wrap;align-items:flex-end;margin-bottom:1rem">
+            <label style="display:flex;align-items:center;gap:0.5rem;font-size:0.72rem;color:var(--cream);padding-bottom:0.5rem"><input type="checkbox" id="ppEnabled"/> Activar seguimiento post-compra</label>
+            <div><label class="dte-lbl">Incluir pedidos entregados desde</label><input type="date" id="ppSince" class="dte-inp"/></div>
+            <button class="save-btn" onclick="saveFollowupV2()">Guardar</button>
+          </div>
+          <div style="display:flex;gap:0.8rem;flex-wrap:wrap;align-items:flex-end">
+            <div><label class="dte-lbl">Vista previa para</label><input id="ppPrevQ" class="dte-inp" style="min-width:240px" placeholder="n.º de pedido o correo del cliente"/></div>
+            <div><label class="dte-lbl">Correo</label>
+              <select id="ppPrevKind" class="dte-inp"><option value="followup">A los 14 días</option><option value="reorder">Recompra (45 días)</option><option value="winback">Reactivación (120 días)</option></select></div>
+            <button class="save-btn" onclick="previewFollowupV2()">Ver correo</button>
+          </div>
+          <div id="ppPrevErr" style="color:#d9534f;font-size:0.68rem;margin-top:0.5rem"></div>
+        </div>
+
+        <div style="background:rgba(255,255,255,0.03);border:1px solid var(--border-light);padding:1.2rem;margin-bottom:1.5rem">
           <div style="font-size:0.6rem;letter-spacing:0.2em;text-transform:uppercase;color:var(--gold);margin-bottom:0.5rem">Seguimiento tras el registro</div>
           <div class="page-sub" id="nurtureSub" style="margin-bottom:1rem">Cargando…</div>
           <div class="tbl-wrap" style="overflow-x:auto;margin-bottom:1rem">
@@ -4230,6 +4253,7 @@ function savePopupConfig(){
 
 function loadLeads(){
   loadNurtureStats();
+  loadFollowupV2();
   var tbody=document.getElementById('leadsBody');
   tbody.innerHTML='<tr><td colspan="6" style="text-align:center;padding:2rem;color:var(--muted);font-size:0.72rem">Cargando leads...</td></tr>';
   adminFetch(API+'/admin/leads',{}).then(function(r){return r?r.json():null;}).then(function(d){
@@ -4306,6 +4330,60 @@ function deleteCarrito(id){
   adminFetch(API+'/admin/abandoned-carts/'+id,{method:'DELETE'}).then(function(r){return r?r.json():null;}).then(function(d){
     if(d&&d.ok){ _carritosList=_carritosList.filter(function(c){return c.id!==id;}); renderCarritos(); toast('Carrito eliminado','','ok'); }
   }).catch(function(){});
+}
+var PP_KINDS={followup:'A los 14 días de la entrega',reorder:'Recompra (45 días)',winback:'Reactivación (120 días)'};
+function loadFollowupV2(){
+  var tbody=document.getElementById('ppBody'), sub=document.getElementById('ppSub');
+  if(!tbody) return;
+  adminFetch(API+'/admin/followup-v2',{}).then(function(r){return r?r.json():null;}).then(function(d){
+    if(!d||d.error||!Array.isArray(d.rows)){
+      sub.textContent='No se pudieron cargar los resultados'+(d&&d.error?' ('+d.error+')':'')+'.';
+      tbody.innerHTML='<tr><td colspan="5" style="text-align:center;padding:1.2rem;color:#d9534f">Error al cargar.</td></tr>';
+      return;
+    }
+    document.getElementById('ppEnabled').checked=!!d.enabled;
+    document.getElementById('ppSince').value=d.since?String(d.since).slice(0,10):'';
+    sub.textContent=(d.enabled?'ACTIVO':'APAGADO')+' · Correo con recomendaciones según lo que la persona compró, a quien compró con o sin cuenta: a los 14 días de la entrega, de recompra a los ~45 días y de reactivación a los ~120. '+
+      'Se envía entre 10:00 y 11:59 (hora de El Salvador), máximo 25 por pasada, nunca dos al mismo correo en 5 días, ni a quien volvió a comprar o se dio de baja'+(d.optouts?' ('+fmtN(d.optouts)+' bajas de invitados)':'')+'. '+
+      'Los de recompra y reactivación solo consideran pedidos entregados desde la fecha de abajo. "Compraron" es una correlación (pedido real en los 14 días siguientes), no mide aperturas ni clics.';
+    var by={}; d.rows.forEach(function(r){by[r.kind]=r;});
+    tbody.innerHTML=['followup','reorder','winback'].map(function(k){
+      var r=by[k]||{sent:0,skipped:0,bought:0};
+      return '<tr><td>'+esc(PP_KINDS[k])+'</td><td>'+fmtN(r.sent)+'</td><td>'+fmtN(r.skipped)+'</td><td>'+fmtN(r.bought)+'</td><td>'+(r.sent?Math.round(r.bought/r.sent*100)+'%':'—')+'</td></tr>';
+    }).join('');
+  }).catch(function(){
+    sub.textContent='No se pudieron cargar los resultados.';
+    tbody.innerHTML='<tr><td colspan="5" style="text-align:center;padding:1.2rem;color:#d9534f">Error al cargar.</td></tr>';
+  });
+}
+function saveFollowupV2(){
+  var enabled=document.getElementById('ppEnabled').checked;
+  var since=document.getElementById('ppSince').value;
+  if(enabled&&!since&&!confirm('No elegiste fecha: los correos de recompra y reactivación solo cubrirán pedidos entregados desde hoy. ¿Continuar?')) return;
+  if(enabled&&!confirm('Se enviarán correos reales a quienes ya compraron. Antes de activar, revisa la vista previa. ¿Activar?')) return;
+  adminFetch(API+'/admin/followup-v2',{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify({enabled:enabled,since:since?since+'T00:00:00-06:00':null})})
+    .then(function(r){return r?r.json():null;}).then(function(d){
+      if(d&&d.ok){ toast('Seguimiento post-compra',enabled?'Activado':'Apagado','ok'); loadFollowupV2(); }
+      else toast('No se pudo guardar',(d&&d.error)||'','err');
+    }).catch(function(){ toast('Error','Error de conexión','err'); });
+}
+function previewFollowupV2(){
+  var err=document.getElementById('ppPrevErr'); err.textContent='';
+  var q=document.getElementById('ppPrevQ').value.trim();
+  var kind=document.getElementById('ppPrevKind').value;
+  if(!q){ err.textContent='Escribe un número de pedido o el correo de un cliente.'; return; }
+  adminFetch(API+'/admin/followup-v2/preview?kind='+kind+'&q='+encodeURIComponent(q),{}).then(function(r){return r?r.json():null;}).then(function(d){
+    if(!d||d.error){ err.textContent=(d&&d.error)||'Sin respuesta.'; return; }
+    var meta='<div style="font-size:0.7rem;color:var(--muted);margin-bottom:0.8rem;line-height:1.8">'+
+      '<strong style="color:var(--cream)">Asunto:</strong> '+esc(d.subject)+'<br/>'+
+      '<strong style="color:var(--cream)">Pedido:</strong> '+esc(d.orderId)+' · '+esc(d.status)+' · '+esc(d.email)+(d.guest?' (sin cuenta)':'')+'<br/>'+
+      '<strong style="color:var(--cream)">Compró:</strong> '+esc(d.boughtNames.join(', '))+'<br/>'+
+      '<strong style="color:var(--cream)">Recomienda:</strong> '+esc(d.pickNames.join(', '))+'<br/>'+
+      (d.blocked?'<span style="color:#d98a3a">No lo recibiría ahora: '+esc(d.blocked)+'.</span><br/>':'')+
+      (d.status!=='Entregado'?'<span style="color:#d98a3a">El pedido no está "Entregado": el envío real solo ocurre con pedidos entregados.</span><br/>':'')+
+    '</div>';
+    openSlidePanel('Vista previa — '+PP_KINDS[kind], meta+'<iframe sandbox="" srcdoc="'+esc(d.html)+'" style="width:100%;height:68vh;border:1px solid var(--border-light);background:#fff"></iframe>');
+  }).catch(function(e){ err.textContent='Error: '+e.message; });
 }
 var NURTURE_VARIANTS={A:'Con perfil olfativo',B:'Con señales de interés',C:'Invitación a Nez'};
 function loadNurtureStats(){

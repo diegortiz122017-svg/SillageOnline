@@ -32,6 +32,7 @@ const { getCatalogue, saveCatalogue, deleteProduct, getInventoryMap, invalidateI
 const { calcIntensity } = require('./services/noteIntensity');
 const { calcChords, analyzeChords } = require('./services/chords');
 const nurture           = require('./services/nurture');
+const postpurchase      = require('./services/postpurchase');
 
 // logActivity also broadcasts to admin WebSocket clients
 async function logActivity(msg) {
@@ -625,6 +626,30 @@ async function initDB() {
       sent_at     DATETIME NOT NULL,
       UNIQUE KEY uq_customer_step (customer_id, step),
       INDEX idx_sent (sent_at)
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
+  `);
+
+  // Seguimiento post-compra (v2): un envío por (pedido, tipo). variant: 'X' reservado, 'S' omitido, 'OK' enviado.
+  await db.execute(`
+    CREATE TABLE IF NOT EXISTS post_purchase_log (
+      id       INT AUTO_INCREMENT PRIMARY KEY,
+      order_id VARCHAR(40)  NOT NULL,
+      kind     VARCHAR(20)  NOT NULL,
+      email    VARCHAR(255) NOT NULL,
+      variant  VARCHAR(4)   NOT NULL,
+      picks    VARCHAR(255) DEFAULT NULL,
+      sent_at  DATETIME     NOT NULL,
+      UNIQUE KEY uq_order_kind (order_id, kind),
+      INDEX idx_email (email),
+      INDEX idx_sent (sent_at)
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
+  `);
+  // Bajas de quienes compraron sin cuenta (enlace firmado en el pie del correo).
+  await db.execute(`
+    CREATE TABLE IF NOT EXISTS email_optouts (
+      email      VARCHAR(255) PRIMARY KEY,
+      source     VARCHAR(30)  DEFAULT NULL,
+      created_at DATETIME     NOT NULL
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
   `);
 
@@ -1480,7 +1505,7 @@ async function sendDeliveredEmail(order) {
     ? await buildUnsubscribeFooter(order.customer_id).catch(() => '')
     : '';
 
-  if (order.customer_id) {
+  if (order.customer_id || (ppValidEmail(order.email) && await ppEnabled().catch(() => false))) {
     const followupDate = new Date(Date.now() + 14 * 24 * 60 * 60 * 1000);
     await db.execute('UPDATE orders SET followup_scheduled_at=? WHERE id=?', [followupDate, order.id]).catch(() => {});
   }
@@ -9058,6 +9083,7 @@ app.get('/api/storefront/top-sellers', async (req, res) => {
 // ═══════════════════════════════════════════════════════
 async function runFollowupCron() {
   try {
+    if (await ppEnabled().catch(() => false)) return;   // con la v2 encendida lo hace runPostPurchaseCron
     const now = new Date();
     // Find orders due for followup: scheduled_at <= now, not yet sent, customer registered
     const [orders] = await db.execute(`
@@ -9348,6 +9374,364 @@ app.get('/api/admin/nurture/preview', requireAdmin, async (req, res) => {
   }
 });
 
+
+// ═══════════════════════════════════════════════════════
+//  SEGUIMIENTO POST-COMPRA (v2) — a quien YA compró
+//  · 14 días tras la entrega (cualquier comprador, con o sin cuenta)
+//  · ~45 días: recompra (decant → frasco, o algo para alternar)
+//  · ~120 días: reactivación
+//  Las recomendaciones salen de lo que la persona compró (services/postpurchase.js) y los
+//  correos llevan tarjetas de producto con UTM (utm_medium=postpurchase; campañas pp14,
+//  pp45, pp120). Apagado por defecto: se enciende en Admin → Leads. Mientras esté apagado
+//  todo sigue como antes (runFollowupCron: solo cuentas registradas, a los 14 días).
+//  Reglas: solo entre 10:00 y 11:59 (hora de El Salvador), máx. 25 envíos por pasada,
+//  nunca dos correos de este flujo al mismo correo en 5 días, ni si volvió a comprar,
+//  ni si se dio de baja (cuenta: preferencias · invitado: enlace /baja-correos).
+// ═══════════════════════════════════════════════════════
+function ppValidEmail(e) { return /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(String(e || '')); }
+async function ppEnabled() { return String(await getSetting('followup_v2_enabled', '0')) === '1'; }
+async function ppSince() {
+  const v = await getSetting('followup_v2_since', null);
+  const d = v ? new Date(v) : null;
+  return d && !isNaN(d.getTime()) ? d : new Date();   // sin fecha guardada: solo pedidos desde ahora
+}
+
+// Baja de invitados (sin cuenta): enlace firmado con HMAC; no hay nada que adivinar ni enumerar.
+function ppOptoutToken(email) {
+  return crypto_ref.createHmac('sha256', (process.env.SESSION_SECRET || 'fallback-secret') + '|optout')
+    .update(String(email).trim().toLowerCase()).digest('hex').slice(0, 32);
+}
+function ppOptoutOk(email, token) {
+  const a = Buffer.from(ppOptoutToken(email)), b = Buffer.from(String(token || ''));
+  return a.length === b.length && crypto_ref.timingSafeEqual(a, b);
+}
+function ppGuestFooter(email) {
+  const BASE = process.env.BASE_URL || 'https://sillage-sv.com';
+  const e = String(email).trim().toLowerCase();
+  const url = `${BASE}/baja-correos?e=${encodeURIComponent(e)}&t=${ppOptoutToken(e)}`;
+  return `
+    <div style="margin-top:32px;padding-top:16px;border-top:1px solid #e8d8b8;text-align:center">
+      <p style="font-size:10px;color:#b0a898;letter-spacing:0.05em;margin:0 0 6px">Recibiste este correo porque compraste en Sillage Parfumerie.</p>
+      <a href="${url}" style="font-size:10px;color:#b8955a;letter-spacing:1px;text-transform:uppercase;text-decoration:none">Dejar de recibir estos correos</a>
+    </div>`;
+}
+
+app.get('/baja-correos', (req, res) => {
+  const e = String(req.query.e || '').trim().toLowerCase();
+  const t = String(req.query.t || '');
+  if (!ppValidEmail(e) || !ppOptoutOk(e, t)) return res.redirect('/');
+  res.send(`<!DOCTYPE html>
+<html lang="es"><head><meta charset="UTF-8"/><meta name="viewport" content="width=device-width,initial-scale=1"/>
+<meta name="robots" content="noindex"/><title>Dejar de recibir correos — Sillage</title>
+<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;1,300&family=Jost:wght@300;400&display=swap" rel="stylesheet"/>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{background:#0e0c0a;color:#e8dcc8;font-family:'Jost',sans-serif;min-height:100vh;display:flex;align-items:center;justify-content:center;padding:2rem}
+.card{background:#1a1714;border:1px solid rgba(184,149,90,0.2);border-top:2px solid rgba(184,149,90,0.5);padding:2.5rem;max-width:420px;width:100%}
+.brand{font-family:'Cormorant Garamond',serif;font-size:1.4rem;font-weight:300;letter-spacing:0.1em;color:#b8955a;margin-bottom:0.3rem}
+h1{font-family:'Cormorant Garamond',serif;font-size:1.1rem;font-weight:300;margin-bottom:0.5rem}
+p{font-size:0.72rem;color:#8a7f72;line-height:1.8;margin-bottom:1.2rem}
+button{width:100%;background:transparent;border:1px solid rgba(184,149,90,0.4);color:rgba(184,149,90,0.9);font-family:'Jost',sans-serif;font-size:0.62rem;letter-spacing:0.2em;text-transform:uppercase;padding:0.75rem;cursor:pointer}
+button:hover{background:rgba(184,149,90,0.08);color:#e8dcc8}
+.msg{font-size:0.72rem;color:#5a9a6a;line-height:1.8}
+</style></head><body><div class="card">
+<div class="brand">SILLAGE</div><h1>Dejar de recibir estos correos</h1>
+<div id="box"><p>Dejaremos de enviar recomendaciones y novedades a <strong style="color:#e8dcc8">${escHtml(e)}</strong>. Los correos de tus pedidos (confirmación, envío, factura) se siguen enviando.</p>
+<button id="b" type="button">Confirmar</button></div>
+<script>
+document.getElementById('b').onclick=function(){
+  this.disabled=true;
+  fetch('/api/email-optout',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({e:${JSON.stringify(e)},t:${JSON.stringify(t)}})})
+  .then(function(r){return r.json();}).then(function(d){
+    document.getElementById('box').innerHTML=d&&d.ok?'<p class="msg">Listo. No volverás a recibir estos correos.</p>':'<p>No se pudo completar. Intenta de nuevo más tarde.</p>';
+  }).catch(function(){document.getElementById('box').innerHTML='<p>No se pudo completar. Intenta de nuevo más tarde.</p>';});
+};
+</script></div></body></html>`);
+});
+
+app.post('/api/email-optout', async (req, res) => {
+  const e = String((req.body && req.body.e) || '').trim().toLowerCase();
+  const t = String((req.body && req.body.t) || '');
+  if (!ppValidEmail(e) || !ppOptoutOk(e, t)) return res.status(400).json({ error: 'Enlace inválido' });
+  try {
+    await db.execute('INSERT IGNORE INTO email_optouts (email, source, created_at) VALUES (?, ?, ?)', [e, 'guest_link', new Date()]);
+    // Si ese correo también tiene cuenta, se apagan sus recomendaciones y novedades.
+    await db.execute(
+      `UPDATE email_preferences ep JOIN customers c ON c.id = ep.customer_id
+       SET ep.marketing = 0, ep.followup = 0, ep.updated_at = ? WHERE LOWER(c.email) = ?`, [new Date(), e]
+    ).catch(() => {});
+    res.json({ ok: true });
+  } catch (err) {
+    console.error('email-optout error:', err.message);
+    res.status(500).json({ error: 'No se pudo guardar' });
+  }
+});
+
+// ¿Se le puede escribir a este correo? Devuelve { reason } si no, y el id de cuenta si tiene.
+async function ppRecipientGate(email, customerId, kind) {
+  const e = String(email).trim().toLowerCase();
+  const [[opt], [unsub], [cust]] = await Promise.all([
+    db.execute('SELECT 1 FROM email_optouts WHERE email = ? LIMIT 1', [e]),
+    db.execute('SELECT 1 FROM email_leads WHERE LOWER(email) = ? AND unsubscribed = 1 LIMIT 1', [e]),
+    customerId ? db.execute('SELECT id FROM customers WHERE id = ? LIMIT 1', [customerId])
+               : db.execute('SELECT id FROM customers WHERE LOWER(email) = ? LIMIT 1', [e]),
+  ]);
+  if (opt.length) return { reason: 'baja' };
+  if (unsub.length) return { reason: 'baja (leads)' };
+  const cid = cust.length ? cust[0].id : null;
+  if (cid) {
+    const prefs = await ensureEmailPreferences(cid);
+    if (kind === 'followup' ? !prefs.followup : !prefs.marketing) return { reason: 'preferencias', customerId: cid };
+  }
+  return { reason: null, customerId: cid };
+}
+
+async function ppContext() {
+  const [catalogue, invMap, priceMap, decantsFlag, decantRows] = await Promise.all([
+    getCatalogue(), getInventoryMap(), getPricingMap(), getSetting('decants_enabled', '1'),
+    db.execute('SELECT product_id FROM decant_inventory WHERE size_ml = 10 AND stock IS NOT NULL AND stock <= 0').then(r => r[0]),
+  ]);
+  return { catalogue, invMap, priceMap, decantsEnabled: decantsFlag !== '0',
+    decantOut: new Set(decantRows.map(r => Number(r.product_id))) };
+}
+
+function ppBoughtFromItems(items, catalogue) {
+  const byId = new Map();
+  for (const it of Array.isArray(items) ? items : []) {
+    const pid = parseInt(it && it.productId, 10);
+    const p = catalogue.find(x => Number(x.id) === pid);
+    if (!p) continue;
+    const type = String(it.type || 'full').toLowerCase();
+    const prev = byId.get(p.id);
+    if (!prev || (postpurchase.isDecantType(prev.type) && !postpurchase.isDecantType(type))) byId.set(p.id, { p, type });
+  }
+  return [...byId.values()];
+}
+
+// Párrafo corto de Nez sobre lo comprado. La IA solo recibe datos del catálogo y no puede
+// nombrar otros perfumes (las sugerencias van en las tarjetas); si falla, el correo usa su texto base.
+async function ppNezNote(bought) {
+  if (!OPENAI_API_KEY) return null;
+  try {
+    const facts = bought.map(b => `${b.p.brand} ${b.p.name}: ${[b.p.top, b.p.mid, b.p.base].filter(Boolean).join(' / ') || 'sin notas cargadas'}`).join('\n');
+    const resp = await fetch('https://api.openai.com/v1/chat/completions', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${OPENAI_API_KEY}` },
+      signal: AbortSignal.timeout(15000),
+      body: JSON.stringify({
+        model: 'gpt-4o-mini', max_tokens: 160, temperature: 0.6,
+        messages: [{
+          role: 'system',
+          content: `Eres Nez, sommelier de Sillage Parfumerie. Escribe 2 o 3 oraciones de seguimiento para alguien que recibió su pedido hace dos semanas.
+VOZ: directa y cálida, sin presión, sin frases de servicio al cliente ("esperamos que disfrutes", "no dudes en contactarnos").
+REGLAS: habla solo de lo que compró y usa EXCLUSIVAMENTE los datos que te doy (no inventes notas, duración, precios ni opiniones ajenas). No nombres otros perfumes: las sugerencias aparecen debajo en tarjetas. Invita a contarte cómo le fue. Sin asteriscos, listas ni emojis. Termina con: — Nez`,
+        }, { role: 'user', content: `Compró:\n${facts}` }],
+      }),
+    });
+    if (!resp.ok) return null;
+    const data = await resp.json();
+    let text = String((data.choices && data.choices[0] && data.choices[0].message && data.choices[0].message.content) || '').replace(/\*+/g, '').trim();
+    if (!text || text.length > 600) return null;
+    return escHtml(text).replace(/\n+/g, '<br/>');
+  } catch (e) { console.warn('ppNezNote:', e.message); return null; }
+}
+
+// Arma el correo completo (sin enviarlo). Lo usan el temporizador y la vista previa.
+async function buildPostPurchaseForOrder(order, kind, gate) {
+  const ctx = await ppContext();
+  let items = [];
+  try { items = JSON.parse(order.items || '[]'); } catch (e) {}
+  const bought = ppBoughtFromItems(items, ctx.catalogue);
+  if (!bought.length) return null;
+  const picks = postpurchase.recommend(bought.map(b => b.p), ctx.catalogue, ctx.invMap, ctx.priceMap, { n: 3 });
+  if (!picks.length) return null;
+  const noteHtml = kind === 'followup' ? await ppNezNote(bought) : null;
+  const exclude = new Set([...bought.map(b => Number(b.p.id)), ...picks.map(pk => Number(pk.p.id))]);
+  const newArrival = kind === 'winback' ? postpurchase.newestAvailable(ctx.catalogue, ctx.invMap, exclude, bought.map(b => b.p), ctx.priceMap) : null;
+  const mail = postpurchase.buildPostPurchaseEmail({
+    kind, firstName: String(order.customer || '').trim().split(/\s+/)[0], bought, picks, noteHtml, newArrival, ...ctx,
+  });
+  const customerId = (gate && gate.customerId) || order.customer_id;
+  const footer = customerId
+    ? await buildUnsubscribeFooter(customerId, 'Recibiste este correo porque compraste en Sillage Parfumerie.')
+    : ppGuestFooter(order.email);
+  return {
+    subject: mail.subject, html: emailTemplate(mail.bodyHtml + footer), campaign: mail.campaign,
+    picks: picks.map(pk => Number(pk.p.id)),
+    pickNames: picks.map(pk => `${pk.p.brand} ${pk.p.name}`),
+    boughtNames: bought.map(b => `${b.p.brand} ${b.p.name}${postpurchase.isDecantType(b.type) ? ' (decant)' : ''}`),
+  };
+}
+
+// Reserva el envío ANTES de mandarlo (UNIQUE(order_id, kind)): si dos instancias corren a la vez
+// (p. ej. durante un deploy) no hay duplicados. 'X' = reservado, 'S' = omitido, 'OK' = enviado.
+// Devuelve 'sent' | 'skipped' | 'error'.
+async function ppSendOne(order, kind) {
+  const email = String(order.email || '').trim().toLowerCase();
+  if (!ppValidEmail(email)) return 'skipped';
+  try {
+    await db.execute("INSERT INTO post_purchase_log (order_id, kind, email, variant, sent_at) VALUES (?, ?, ?, 'X', ?)",
+      [order.id, kind, email, new Date()]);
+  } catch (e) { if (e.code !== 'ER_DUP_ENTRY') console.warn('PostPurchase reserve failed:', e.message); return 'skipped'; }
+  const mark = v => db.execute('UPDATE post_purchase_log SET variant=? WHERE order_id=? AND kind=?', [v, order.id, kind]).catch(() => {});
+  try {
+    const gate = await ppRecipientGate(email, order.customer_id, kind);
+    if (gate.reason) { await mark('S'); return 'skipped'; }
+    const built = await buildPostPurchaseForOrder(order, kind, gate);
+    if (!built) { await mark('S'); return 'skipped'; }
+    const ok = await sendEmail({ to: email, subject: built.subject, html: built.html, from: `Nez · Sillage <${EMAIL_HOLA}>` });
+    if (!ok) throw new Error('el envío no se confirmó');
+    await db.execute("UPDATE post_purchase_log SET variant='OK', picks=?, sent_at=? WHERE order_id=? AND kind=?",
+      [built.picks.join(','), new Date(), order.id, kind]);
+    await logActivity(`Seguimiento post-compra (${kind}) enviado a ${email} (pedido ${order.id})`);
+    return 'sent';
+  } catch (e) {
+    console.warn(`PostPurchase ${kind} failed (pedido ${order.id}):`, e.message);
+    await db.execute("DELETE FROM post_purchase_log WHERE order_id=? AND kind=? AND variant='X'", [order.id, kind]).catch(() => {});
+    return 'error';
+  }
+}
+
+let _ppRunning = false;
+async function runPostPurchaseCron() {
+  if (_ppRunning || !RESEND_API_KEY) return;
+  if (!(await ppEnabled().catch(() => false))) return;
+  const hour = nurtureLocalHour();
+  if (hour < 10 || hour >= 12) return;
+  _ppRunning = true;
+  try {
+    const now = new Date(), DAY = 24 * 60 * 60 * 1000;
+    const sleep = ms => new Promise(r => setTimeout(r, ms));
+    let budget = 25;
+
+    // 1) A los 14 días de la entrega (la fecha la agenda sendDeliveredEmail).
+    const [due] = await db.execute(
+      `SELECT id, customer, email, customer_id, items, created_at FROM orders
+       WHERE followup_scheduled_at IS NOT NULL AND followup_scheduled_at <= ? AND followup_sent_at IS NULL
+         AND status = 'Entregado' ORDER BY followup_scheduled_at ASC LIMIT 40`, [now]);
+    for (const o of due) {
+      if (budget <= 0) break;
+      const r = await ppSendOne(o, 'followup');
+      if (r === 'sent' || r === 'skipped') await db.execute('UPDATE orders SET followup_sent_at=? WHERE id=?', [new Date(), o.id]).catch(() => {});
+      if (r === 'sent') { budget--; await sleep(600); }
+    }
+
+    // 2) Recompra (45–100 días) y reactivación (120–300 días) sobre el último pedido entregado de cada correo.
+    if (budget > 0) {
+      const since = await ppSince();
+      const lower = new Date(Math.max(since.getTime(), now.getTime() - 300 * DAY));
+      const upper = new Date(now.getTime() - 45 * DAY);
+      if (lower < upper) {
+        const [rows] = await db.execute(
+          `SELECT o.id, o.customer, o.email, o.customer_id, o.items, o.created_at,
+                  COALESCE(DATE_SUB(o.followup_scheduled_at, INTERVAL 14 DAY), o.updated_at) AS delivered_at
+           FROM orders o WHERE o.status = 'Entregado'
+             AND COALESCE(DATE_SUB(o.followup_scheduled_at, INTERVAL 14 DAY), o.updated_at) BETWEEN ? AND ?
+           ORDER BY delivered_at DESC LIMIT 800`, [lower, upper]);
+        const [paid] = await db.execute(
+          `SELECT LOWER(email) AS e, MAX(created_at) AS last FROM orders
+           WHERE (payment_status = 'Pagado' OR payment_method = 'cod') AND status NOT IN ('Cancelado','No Entregado')
+           GROUP BY LOWER(email)`);
+        const lastBuy = new Map(paid.map(r => [r.e, new Date(r.last).getTime()]));
+        const [recent] = await db.execute(
+          "SELECT LOWER(email) AS e FROM post_purchase_log WHERE variant <> 'X' AND sent_at > ? GROUP BY LOWER(email)",
+          [new Date(now.getTime() - 5 * DAY)]);
+        const recentSet = new Set(recent.map(r => r.e));
+        const [outs] = await db.execute('SELECT email FROM email_optouts');
+        const outSet = new Set(outs.map(r => String(r.email).toLowerCase()));
+        const [logged] = await db.execute("SELECT order_id, kind FROM post_purchase_log WHERE kind IN ('reorder','winback')");
+        const loggedSet = new Set(logged.map(r => `${r.order_id}|${r.kind}`));
+        const seen = new Set();
+        for (const o of rows) {
+          if (budget <= 0) break;
+          const e = String(o.email || '').trim().toLowerCase();
+          if (!ppValidEmail(e) || seen.has(e)) continue;
+          seen.add(e);                                         // solo el pedido más reciente de cada correo
+          if (outSet.has(e) || recentSet.has(e)) continue;
+          if ((lastBuy.get(e) || 0) > new Date(o.created_at).getTime()) continue;   // ya volvió a comprar
+          const age = (now.getTime() - new Date(o.delivered_at).getTime()) / DAY;
+          const kind = age >= 120 ? 'winback' : (age >= 45 && age < 100 ? 'reorder' : null);
+          if (!kind || loggedSet.has(`${o.id}|${kind}`)) continue;
+          if (await nurtureRecentLeadEmail(e).catch(() => true)) continue;
+          const r = await ppSendOne(o, kind);
+          if (r === 'sent') { budget--; recentSet.add(e); await sleep(600); }
+        }
+      }
+    }
+  } catch (e) {
+    console.warn('PostPurchase cron error:', e.message);
+  } finally { _ppRunning = false; }
+}
+setTimeout(runPostPurchaseCron, 120 * 1000);
+setInterval(runPostPurchaseCron, 20 * 60 * 1000);
+
+// ── Admin ────────────────────────────────────────────────────────────────────
+app.get('/api/admin/followup-v2', requireAdmin, async (req, res) => {
+  try {
+    const [rows] = await db.execute(
+      `SELECT l.kind, SUM(l.variant = 'OK') AS sent, SUM(l.variant = 'S') AS skipped,
+              SUM(l.variant = 'OK' AND EXISTS (
+                SELECT 1 FROM orders o
+                WHERE LOWER(o.email) = l.email AND o.created_at >= l.sent_at AND o.created_at < DATE_ADD(l.sent_at, INTERVAL 14 DAY)
+                  AND (o.payment_status = 'Pagado' OR o.payment_method = 'cod') AND o.status NOT IN ('Cancelado','No Entregado')
+              )) AS bought
+       FROM post_purchase_log l WHERE l.variant <> 'X' GROUP BY l.kind`);
+    const [[optouts]] = await db.execute('SELECT COUNT(*) AS n FROM email_optouts');
+    res.json({
+      enabled: await ppEnabled(),
+      since: await getSetting('followup_v2_since', null),
+      rows: rows.map(r => ({ kind: r.kind, sent: Number(r.sent) || 0, skipped: Number(r.skipped) || 0, bought: Number(r.bought) || 0 })),
+      optouts: Number(optouts.n) || 0,
+    });
+  } catch (e) {
+    console.error('followup-v2 stats error:', e.message);
+    res.status(500).json({ error: 'Query failed' });
+  }
+});
+
+app.put('/api/admin/followup-v2', requireAdmin, async (req, res) => {
+  try {
+    const enabled = !!(req.body && req.body.enabled);
+    let since = req.body && req.body.since ? new Date(req.body.since) : null;
+    if (since && isNaN(since.getTime())) return res.status(400).json({ error: 'Fecha inválida.' });
+    if (enabled && !since) {
+      const cur = await getSetting('followup_v2_since', null);
+      since = cur ? new Date(cur) : new Date();
+    }
+    await setSetting('followup_v2_enabled', enabled ? '1' : '0');
+    if (since) await setSetting('followup_v2_since', since.toISOString());
+    await logActivity(`Seguimiento post-compra ${enabled ? 'ACTIVADO' : 'apagado'}${since ? ' (pedidos desde ' + since.toISOString().slice(0, 10) + ')' : ''}`);
+    res.json({ ok: true, enabled, since: since ? since.toISOString() : null });
+  } catch (e) {
+    console.error('followup-v2 save error:', e.message);
+    res.status(500).json({ error: 'No se pudo guardar.' });
+  }
+});
+
+// Vista previa (no envía nada): por número de pedido, o por correo (usa su último pedido entregado).
+app.get('/api/admin/followup-v2/preview', requireAdmin, async (req, res) => {
+  const kind = ['followup', 'reorder', 'winback'].includes(req.query.kind) ? req.query.kind : 'followup';
+  const q = String(req.query.q || '').trim();
+  if (!q) return res.status(400).json({ error: 'Escribe un número de pedido o un correo.' });
+  try {
+    const [rows] = q.includes('@')
+      ? await db.execute("SELECT * FROM orders WHERE LOWER(email) = ? ORDER BY (status = 'Entregado') DESC, created_at DESC LIMIT 1", [q.toLowerCase()])
+      : await db.execute('SELECT * FROM orders WHERE id = ? LIMIT 1', [q]);
+    if (!rows.length) return res.status(404).json({ error: 'No se encontró ese pedido.' });
+    const order = rows[0];
+    const gate = await ppRecipientGate(order.email, order.customer_id, kind).catch(() => ({ reason: null }));
+    const built = await buildPostPurchaseForOrder(order, kind, gate);
+    if (!built) return res.status(422).json({ error: 'Con los productos de ese pedido no hay nada que recomendar (o ya no están en el catálogo).' });
+    res.json({
+      subject: built.subject, html: built.html, pickNames: built.pickNames, boughtNames: built.boughtNames,
+      orderId: order.id, status: order.status, email: order.email,
+      blocked: gate.reason || null, guest: !(gate.customerId || order.customer_id),
+    });
+  } catch (e) {
+    console.error('followup-v2 preview error:', e.message);
+    res.status(500).json({ error: 'No se pudo armar la vista previa.' });
+  }
+});
 
 // ── Unsubscribe / Email preferences page ─────────────────
 app.get('/preferencias-email', async (req, res) => {

@@ -50,8 +50,8 @@ function available(p, invMap) {
 function productUrl(p, campaign, medium) {
   return `${BASE()}/fragancia/${slugify(p.brand + '-' + p.name)}?utm_source=email&utm_medium=${medium || 'nurture'}&utm_campaign=${campaign}`;
 }
-function nezUrl(campaign, q) {
-  return `${BASE()}/nez?utm_source=email&utm_medium=nurture&utm_campaign=${campaign}` +
+function nezUrl(campaign, q, medium) {
+  return `${BASE()}/nez?utm_source=email&utm_medium=${medium || 'nurture'}&utm_campaign=${campaign}` +
     (q ? `&q=${encodeURIComponent(q)}` : '');
 }
 
@@ -394,4 +394,7 @@ module.exports = {
   rankForProfile, pickForProfile, pickSignalProducts, findSimilar,
   chooseNurture, buildNurtureEmail, reasonForPick, productUrl, nezUrl,
   manualProductsBlock, notesLine,
+  // Piezas que reutiliza services/postpurchase.js
+  S, sameLine, available, decantOffered, decantPrice, productCard, joinEs, displayNote,
+  hoursEs, SILLAGE_ES, productText, chordList, NOTE_ALIAS,
 };
