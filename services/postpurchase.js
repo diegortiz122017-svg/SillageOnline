@@ -103,16 +103,19 @@ function recommend(bought, catalogue, invMap, priceMap, opts) {
     // "misma línea" solo se evita entre las propias sugerencias (ver brandOk).
     if (genders.size === 1 && p.g !== [...genders][0] && p.g !== 'U') continue;
     let best = null;
+    const per = [];
     for (const b of boughtList) {
       const s = similarity(idx, b, p);
+      per.push({ b, s });
       if (!best || s > best.s) best = { s, b };
     }
-    let score = best.s;
+    let mult = 1;
     // Si todo lo comprado es unisex no sabemos para quién es: se prefieren los unisex y se
     // penaliza (sin descartar) lo marcado solo hombre o mujer.
-    if (!genders.size && p.g !== 'U') score *= 0.7;
-    if (maxPrice && effectivePrice(p, priceMap) > maxPrice * 1.5) score *= 0.8;   // mucho más caro: menos probable
-    cands.push({ p, score, via: best.b, shared: sharedLabels(idx, best.b, p) });
+    if (!genders.size && p.g !== 'U') mult *= 0.7;
+    if (maxPrice && effectivePrice(p, priceMap) > maxPrice * 1.5) mult *= 0.8;   // mucho más caro: menos probable
+    cands.push({ p, score: best.s * mult, via: best.b, shared: sharedLabels(idx, best.b, p),
+      per: per.map(x => ({ b: x.b, score: x.s * mult })) });
   }
   cands.sort((a, b) => b.score - a.score);
 
@@ -124,10 +127,24 @@ function recommend(bought, catalogue, invMap, priceMap, opts) {
   };
   const brandOk = c => (brandCount.get(c.p.brand) || 0) < 2 && !picks.some(x => sameLine(x.p, c.p));
 
-  const wantDifferent = n >= 3;
-  for (const c of cands) {
-    if (picks.length >= (wantDifferent ? n - 1 : n)) break;
-    if (c.score >= MIN_SIMILAR && brandOk(c)) take(c, 'similar');
+  // Con 3 o más perfumes comprados no hay lugar para "otra dirección": cada sugerencia sale de uno distinto.
+  const wantDifferent = n >= 3 && boughtList.length < 3;
+  const similarTarget = wantDifferent ? n - 1 : n;
+  // Una sugerencia por cada perfume comprado, por turnos: así uno solo no acapara todas
+  // (quien compró Khamrah y Man Ice recibe algo dulce Y algo fresco, no tres frescos).
+  const lists = boughtList.map(b => ({
+    b, list: cands.map(c => ({ c, s: c.per.find(x => x.b === b).score })).sort((x, y) => y.s - x.s),
+  }));
+  for (let progress = true; picks.length < similarTarget && progress;) {
+    progress = false;
+    for (const { b, list } of lists) {
+      if (picks.length >= similarTarget) break;
+      const hit = list.find(x => x.s >= MIN_SIMILAR && !picks.some(pk => pk.p.id === x.c.p.id) && brandOk(x.c));
+      if (hit) {
+        take({ ...hit.c, score: hit.s, via: b, shared: b === hit.c.via ? hit.c.shared : sharedLabels(idx, b, hit.c.p) }, 'similar');
+        progress = true;
+      }
+    }
   }
   if (wantDifferent) {
     const diff = cands.find(c => !picks.some(x => x.p.id === c.p.id) && brandOk(c) && c.score >= MIN_DIFFERENT &&
@@ -193,11 +210,11 @@ function bottleReason(p, ctx) {
 function joinNames(list) { return joinEs(list.map(p => p.name)); }
 
 // Frase fija (no la escribe la IA) que explica POR QUÉ aparecen las recomendaciones y cuántas son.
-function leadIn(names, picks) {
+function leadIn(names, picks, multi) {
   const n = picks.length;
   const count = { 1: 'una fragancia', 2: 'dos fragancias', 3: 'tres fragancias' }[n] || `${n} fragancias`;
   const diff = picks.some(pk => pk.kind === 'different');
-  return `<p style="${S.p}">Como compraste ${esc(names)}, Nez eligió ${count} que van con ese gusto${diff ? ' (una va por otra dirección, por si quieres variar)' : ''}. Debajo de cada una te contamos en qué se parece:</p>`;
+  return `<p style="${S.p}">Como compraste ${esc(names)}, Nez eligió ${count} que van con ${multi ? 'lo que te llevaste' : 'ese gusto'}${diff ? ' (una va por otra dirección, por si quieres variar)' : ''}. Debajo de cada una te contamos con cuál de tus perfumes se parece y en qué:</p>`;
 }
 // Cierre según cuántas tarjetas hay de verdad.
 function closingLine(picks, ctx) {
@@ -225,13 +242,15 @@ function buildPostPurchaseEmail(ctx) {
 
   if (kind === 'followup') {
     const picks = ctx.picks || [];
-    subject = bought.length === 1 ? `¿Cómo te fue con ${first.name}? ${picks.length === 1 ? 'Una idea' : 'Tres ideas'} en la misma línea`
-      : '¿Cómo te fue con tu pedido? Ideas en la misma línea';
+    const ideas = picks.length === 1 ? 'Una idea' : picks.length === 2 ? 'Dos ideas' : 'Tres ideas';
+    subject = bought.length === 1 ? `¿Cómo te fue con ${first.name}? ${ideas} en la misma línea`
+      : bought.length === 2 ? `¿Cómo te fue con ${names}? ${ideas} para seguir`
+      : `¿Cómo te fue con tu pedido? ${ideas} para seguir`;
     const intro = ctx.noteHtml
       ? `<div style="border-left:3px solid #b8955a;padding:12px 16px;margin:0 0 20px;background:#faf8f4"><p style="font-size:10px;letter-spacing:3px;text-transform:uppercase;color:#b8955a;margin:0 0 8px">Nez te escribe</p><p style="font-family:Georgia,serif;font-size:14px;color:#4a3f35;line-height:1.9;margin:0;font-style:italic">${ctx.noteHtml}</p></div>`
-      : `<p style="${S.p}">Hace unas semanas recibiste ${esc(names)}. ¿Cómo te fue con él?</p>`;
+      : `<p style="${S.p}">Hace unas semanas recibiste ${esc(names)}. ¿Cómo te fue con ${bought.length === 1 ? 'él' : bought.length === 2 ? 'ambos' : 'ellos'}?</p>`;
     body = `<h2 style="${S.h}">Hola ${esc(firstName || '')}${firstName ? ' 👋' : ''}</h2>${intro}
-      ${leadIn(names, picks)}
+      ${leadIn(names, picks, bought.length > 1)}
       ${picks.map(pk => card(pk.p, pk.reason)).join('')}
       <p style="${S.p}">${closingLine(picks, ctx)}</p>
       ${btn('Hablar con Nez')}`;
@@ -251,7 +270,7 @@ function buildPostPurchaseEmail(ctx) {
       body = `<h2 style="${S.h}">Para alternar con ${esc(first ? first.name : 'tu perfume')}</h2>
         <p style="${S.p}">${hello}</p>
         <p style="${S.p}">Quien usa un solo perfume suele querer otro para cambiar de aire.</p>
-        ${leadIn(names, picks)}
+        ${leadIn(names, picks, bought.length > 1)}
         ${picks.map(pk => card(pk.p, pk.reason)).join('')}
         <p style="${S.p}">${closingLine(picks, ctx)}</p>
         ${btn('Hablar con Nez')}`;
@@ -263,7 +282,7 @@ function buildPostPurchaseEmail(ctx) {
     body = `<h2 style="${S.h}">Hace tiempo que no te vemos</h2>
       <p style="${S.p}">${hello}</p>
       <p style="${S.p}">${first ? `La última vez te llevaste ${esc(names)}. ` : ''}Por si quieres retomar, esto es lo que te recomendaría hoy.</p>
-      ${picks.length ? leadIn(names, picks) : ''}
+      ${picks.length ? leadIn(names, picks, bought.length > 1) : ''}
       ${picks.map(pk => card(pk.p, pk.reason)).join('')}
       ${extra ? `<p style="${S.p}">Y una de las últimas incorporaciones a la tienda, que va con tu rango de precio:</p>${card(extra, extra.tagline ? extra.tagline + '.' : (nu.notesLine(extra) || 'Novedad en la tienda.'))}` : ''}
       ${btn('Hablar con Nez')}`;

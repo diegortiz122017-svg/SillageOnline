@@ -95,6 +95,23 @@ t('cada correo explica por qué hay recomendaciones y el número que dice coinci
     assert.ok(!/entre dos/.test(m.bodyHtml) || shown === 2, kind + ': dice "entre dos" con ' + shown);
   }
 });
+t('quien compró dos perfumes distintos recibe sugerencias de AMBOS, no solo del más "fuerte"', () => {
+  const r = pp.recommend([khamrah, manIce], catalogue, {}, {});
+  const vias = new Set(r.map(x => x.via.id));
+  assert.ok(vias.has(khamrah.id) && vias.has(manIce.id), 'vías: ' + [...vias]);
+  assert.ok(r.some(x => x.p.id === qahwa.id) && r.some(x => x.p.id === platin.id));
+});
+t('con 3 o más perfumes comprados cada sugerencia sale de uno distinto', () => {
+  const r = pp.recommend([khamrah, manIce, silver], catalogue, {}, {});
+  assert.strictEqual(new Set(r.map(x => x.via.id)).size, r.length);
+  assert.ok(r.every(x => x.kind === 'similar'));
+});
+t('correo con varios perfumes: concuerda en plural y dice con cuál de los comprados se parece', () => {
+  const picks = pp.recommend([khamrah, manIce], catalogue, {}, {});
+  const m = pp.buildPostPurchaseEmail(ctx({ kind: 'followup', bought: [{ p: khamrah, type: 'full' }, { p: manIce, type: 'full' }], picks }));
+  assert.ok(/con ambos\?/.test(m.bodyHtml) && /lo que te llevaste/.test(m.bodyHtml) && /con cuál de tus perfumes/.test(m.bodyHtml));
+  assert.ok(/Khamrah y Man Ice/.test(m.subject));
+});
 t('con una sola recomendación el texto va en singular', () => {
   const picks = pp.recommend([khamrah], catalogue, {}, {}).slice(0, 1);
   const m = pp.buildPostPurchaseEmail(ctx({ kind: 'followup', bought: [{ p: khamrah, type: 'full' }], picks }));
