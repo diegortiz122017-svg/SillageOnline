@@ -1521,38 +1521,26 @@ footer{background:var(--dark);padding:3.5rem 4rem;text-align:center;border-top:1
 /* Move d-brand and d-name margin resets since they're now inside header-left */
 .d-header-left .d-brand{margin-bottom:0}
 .d-header-left .d-name{margin-bottom:0}
-/* Heart — hidden on desktop, shown on mobile */
-.d-wish-mob{display:none}
-.d-share-mob{display:none}
-.bd-share-btn{background:none;border:1px solid var(--border);color:var(--muted);font-size:0.55rem;letter-spacing:0.15em;text-transform:uppercase;padding:0.4rem 0.7rem;cursor:pointer;font-family:'Jost',sans-serif}
-.bd-share-ico{display:none}
-.d-icon-row{display:none}
-@media(max-width:900px){
-  /* Guardar y compartir: solo íconos de línea fina, sin cajas ni texto */
-  /* Apilados (corazón arriba, compartir abajo). El margen negativo hace que la columna NO estire la fila del
-     encabezado: los íconos se asoman hacia la zona del eslogan, que deja libre su lado derecho. */
-  .d-icon-row{display:flex;flex-direction:column;align-items:center;gap:0;margin-bottom:-3.4rem}
-  .d-tagline{padding-right:3.2rem}
-  .d-wish-mob,.d-share-mob{
-    display:inline-flex;align-items:center;justify-content:center;
-    width:2.6rem;height:2.3rem;padding:0;border:none;border-radius:999px;
-    background:transparent;color:var(--muted);cursor:pointer;
-    transition:color 0.2s,background 0.2s,transform 0.15s;
-    -webkit-tap-highlight-color:transparent;
-  }
-  .d-wish-mob svg,.d-share-mob svg{width:22px;height:22px;fill:none;stroke:currentColor;stroke-width:1.4;stroke-linecap:round;stroke-linejoin:round}
-  .d-wish-mob:hover,.d-share-mob:hover{color:var(--gold);background:rgba(184,149,90,0.08)}
-  .d-wish-mob:active,.d-share-mob:active{transform:scale(0.9)}
-  /* Compartir del bundle: mismo ícono silencioso que en el detalle del perfume */
-  .bd-share-btn{display:inline-flex;align-items:center;justify-content:center;width:2.6rem;height:2.6rem;padding:0;border:none;border-radius:50%;background:transparent;color:var(--muted);transition:color 0.2s,background 0.2s,transform 0.15s;-webkit-tap-highlight-color:transparent}
-  .bd-share-txt{display:none}
-  .bd-share-ico{display:block;width:22px;height:22px;fill:none;stroke:currentColor;stroke-width:1.4;stroke-linecap:round;stroke-linejoin:round}
-  .bd-share-btn:hover{color:var(--gold);background:rgba(184,149,90,0.08)}
-  .bd-share-btn:active{transform:scale(0.9)}
-  .d-wish-mob.saved{color:#c0504a}
-  .d-wish-mob.saved svg{fill:currentColor}
-  #dWishBtn{display:none}
+/* Guardar y compartir: solo íconos de línea fina, sin cajas ni texto (móvil y escritorio) */
+/* Apilados (corazón arriba, compartir abajo). El margen negativo hace que la columna NO estire la fila del
+   encabezado: los íconos se asoman hacia la zona del eslogan, que deja libre su lado derecho. */
+.d-icon-row{display:flex;flex-direction:column;align-items:center;gap:0;margin-bottom:-3.4rem}
+.d-tagline{padding-right:3.2rem}
+.d-wish-mob,.d-share-mob,.bd-share-btn{
+  display:inline-flex;align-items:center;justify-content:center;
+  width:2.6rem;height:2.3rem;padding:0;border:none;border-radius:999px;
+  background:transparent;color:var(--muted);cursor:pointer;
+  transition:color 0.2s,background 0.2s,transform 0.15s;
+  -webkit-tap-highlight-color:transparent;
 }
+.bd-share-btn{height:2.6rem}
+.d-wish-mob svg,.d-share-mob svg,.bd-share-ico{display:block;width:22px;height:22px;fill:none;stroke:currentColor;stroke-width:1.4;stroke-linecap:round;stroke-linejoin:round}
+.bd-share-txt{display:none}
+.d-wish-mob:hover,.d-share-mob:hover,.bd-share-btn:hover{color:var(--gold);background:rgba(184,149,90,0.08)}
+.d-wish-mob:active,.d-share-mob:active,.bd-share-btn:active{transform:scale(0.9)}
+.d-wish-mob.saved{color:#c0504a}
+.d-wish-mob.saved svg{fill:currentColor}
+#dWishBtn{display:none}   /* el ♡ en caja junto a "Añadir al carrito" se reemplazó por el ícono del encabezado */
 
 /* ── BUNDLES SECTION ── */
 #bundles-section{padding:6rem 4rem 7rem;background:var(--warm-white);color:var(--charcoal);border-top:1px solid rgba(184,149,90,0.12)}
