@@ -9593,6 +9593,85 @@ async function ppSendOne(order, kind) {
 }
 
 let _ppRunning = false;
+let _ppManual = null;   // progreso del envío manual: { total, done, sent, skipped, errors, finished, startedAt }
+
+// Lista (sin enviar) lo que hoy le toca a cada pedido. Misma lógica para el temporizador y para el botón del admin:
+//  1) 'followup' a los 14 días de la entrega (la fecha la agenda sendDeliveredEmail);
+//  2) sobre el último pedido entregado de cada correo y según su antigüedad: 14–45 días = seguimiento atrasado
+//     (compró antes de activar esto y nunca lo recibió), 45–100 = recompra, 120–300 = reactivación.
+//     Solo pedidos entregados desde la fecha elegida en el admin.
+async function ppCollectPending(now) {
+  const DAY = 24 * 60 * 60 * 1000;
+  const items = [];
+
+  const [due] = await db.execute(
+    `SELECT id, customer, email, customer_id, items, created_at FROM orders
+     WHERE followup_scheduled_at IS NOT NULL AND followup_scheduled_at <= ? AND followup_sent_at IS NULL
+       AND status = 'Entregado' ORDER BY followup_scheduled_at ASC LIMIT 200`, [now]);
+  for (const o of due) items.push({ o, kind: 'followup' });
+
+  const since = await ppSince();
+  const lower = new Date(Math.max(since.getTime(), now.getTime() - 300 * DAY));
+  const upper = new Date(now.getTime() - 14 * DAY);
+  if (lower < upper) {
+    const [rows] = await db.execute(
+      `SELECT o.id, o.customer, o.email, o.customer_id, o.items, o.created_at, o.followup_scheduled_at, o.followup_sent_at,
+              COALESCE(DATE_SUB(o.followup_scheduled_at, INTERVAL 14 DAY), o.updated_at) AS delivered_at
+       FROM orders o WHERE o.status = 'Entregado'
+         AND COALESCE(DATE_SUB(o.followup_scheduled_at, INTERVAL 14 DAY), o.updated_at) BETWEEN ? AND ?
+       ORDER BY delivered_at DESC LIMIT 800`, [lower, upper]);
+    const [paid] = await db.execute(
+      `SELECT LOWER(email) AS e, MAX(created_at) AS last FROM orders
+       WHERE (payment_status = 'Pagado' OR payment_method = 'cod') AND status NOT IN ('Cancelado','No Entregado')
+       GROUP BY LOWER(email)`);
+    const lastBuy = new Map(paid.map(r => [r.e, new Date(r.last).getTime()]));
+    const [recent] = await db.execute(
+      "SELECT LOWER(email) AS e FROM post_purchase_log WHERE variant <> 'X' AND sent_at > ? GROUP BY LOWER(email)",
+      [new Date(now.getTime() - 5 * DAY)]);
+    const recentSet = new Set(recent.map(r => r.e));
+    const [outs] = await db.execute('SELECT email FROM email_optouts');
+    const outSet = new Set(outs.map(r => String(r.email).toLowerCase()));
+    const [logged] = await db.execute("SELECT order_id, kind FROM post_purchase_log WHERE kind IN ('followup','reorder','winback')");
+    const loggedSet = new Set(logged.map(r => `${r.order_id}|${r.kind}`));
+    const seen = new Set();
+    for (const o of rows) {
+      const e = String(o.email || '').trim().toLowerCase();
+      if (!ppValidEmail(e) || seen.has(e)) continue;
+      seen.add(e);                                         // solo el pedido más reciente de cada correo
+      if (outSet.has(e) || recentSet.has(e)) continue;
+      if ((lastBuy.get(e) || 0) > new Date(o.created_at).getTime()) continue;   // ya volvió a comprar
+      const age = (now.getTime() - new Date(o.delivered_at).getTime()) / DAY;
+      let kind = null;
+      if (age >= 120) kind = 'winback';
+      else if (age >= 45 && age < 100) kind = 'reorder';
+      // Seguimiento atrasado: solo si nunca tuvo fecha de seguimiento (los que sí la tienen los atiende el paso 1).
+      else if (age >= 14 && age < 45 && !o.followup_scheduled_at && !o.followup_sent_at) kind = 'followup';
+      if (!kind || loggedSet.has(`${o.id}|${kind}`)) continue;
+      if (await nurtureRecentLeadEmail(e).catch(() => true)) continue;
+      items.push({ o, kind });
+    }
+  }
+  const counts = { followup: 0, reorder: 0, winback: 0 };
+  items.forEach(it => { if (ppValidEmail(it.o.email)) counts[it.kind]++; });
+  return { items, counts, total: counts.followup + counts.reorder + counts.winback };
+}
+
+// Envía hasta `budget` correos de la lista (los de seguimiento primero). onStep(r) se llama tras cada intento.
+async function ppSendBatch(items, budget, onStep) {
+  const sleep = ms => new Promise(r => setTimeout(r, ms));
+  const order = { followup: 0, reorder: 1, winback: 2 };
+  const sorted = items.slice().sort((a, b) => order[a.kind] - order[b.kind]);
+  for (const { o, kind } of sorted) {
+    if (budget <= 0) break;
+    const r = await ppSendOne(o, kind);
+    if (kind === 'followup' && (r === 'sent' || r === 'skipped')) {
+      await db.execute('UPDATE orders SET followup_sent_at=? WHERE id=?', [new Date(), o.id]).catch(() => {});
+    }
+    if (onStep) onStep(r);
+    if (r === 'sent') { budget--; await sleep(600); }
+  }
+}
+
 async function runPostPurchaseCron() {
   if (_ppRunning || !RESEND_API_KEY) return;
   if (!(await ppEnabled().catch(() => false))) return;
@@ -9600,71 +9679,8 @@ async function runPostPurchaseCron() {
   if (hour < 10 || hour >= 12) return;
   _ppRunning = true;
   try {
-    const now = new Date(), DAY = 24 * 60 * 60 * 1000;
-    const sleep = ms => new Promise(r => setTimeout(r, ms));
-    let budget = 25;
-
-    // 1) A los 14 días de la entrega (la fecha la agenda sendDeliveredEmail).
-    const [due] = await db.execute(
-      `SELECT id, customer, email, customer_id, items, created_at FROM orders
-       WHERE followup_scheduled_at IS NOT NULL AND followup_scheduled_at <= ? AND followup_sent_at IS NULL
-         AND status = 'Entregado' ORDER BY followup_scheduled_at ASC LIMIT 40`, [now]);
-    for (const o of due) {
-      if (budget <= 0) break;
-      const r = await ppSendOne(o, 'followup');
-      if (r === 'sent' || r === 'skipped') await db.execute('UPDATE orders SET followup_sent_at=? WHERE id=?', [new Date(), o.id]).catch(() => {});
-      if (r === 'sent') { budget--; await sleep(600); }
-    }
-
-    // 2) Pedidos ya entregados que NO pasaron por el paso 1, sobre el último pedido entregado de cada correo,
-    //    según su antigüedad: 14–45 días = seguimiento atrasado (compró antes de activar esto y nunca lo recibió),
-    //    45–100 = recompra, 120–300 = reactivación. Solo pedidos entregados desde la fecha elegida en el admin.
-    if (budget > 0) {
-      const since = await ppSince();
-      const lower = new Date(Math.max(since.getTime(), now.getTime() - 300 * DAY));
-      const upper = new Date(now.getTime() - 14 * DAY);
-      if (lower < upper) {
-        const [rows] = await db.execute(
-          `SELECT o.id, o.customer, o.email, o.customer_id, o.items, o.created_at, o.followup_scheduled_at, o.followup_sent_at,
-                  COALESCE(DATE_SUB(o.followup_scheduled_at, INTERVAL 14 DAY), o.updated_at) AS delivered_at
-           FROM orders o WHERE o.status = 'Entregado'
-             AND COALESCE(DATE_SUB(o.followup_scheduled_at, INTERVAL 14 DAY), o.updated_at) BETWEEN ? AND ?
-           ORDER BY delivered_at DESC LIMIT 800`, [lower, upper]);
-        const [paid] = await db.execute(
-          `SELECT LOWER(email) AS e, MAX(created_at) AS last FROM orders
-           WHERE (payment_status = 'Pagado' OR payment_method = 'cod') AND status NOT IN ('Cancelado','No Entregado')
-           GROUP BY LOWER(email)`);
-        const lastBuy = new Map(paid.map(r => [r.e, new Date(r.last).getTime()]));
-        const [recent] = await db.execute(
-          "SELECT LOWER(email) AS e FROM post_purchase_log WHERE variant <> 'X' AND sent_at > ? GROUP BY LOWER(email)",
-          [new Date(now.getTime() - 5 * DAY)]);
-        const recentSet = new Set(recent.map(r => r.e));
-        const [outs] = await db.execute('SELECT email FROM email_optouts');
-        const outSet = new Set(outs.map(r => String(r.email).toLowerCase()));
-        const [logged] = await db.execute("SELECT order_id, kind FROM post_purchase_log WHERE kind IN ('followup','reorder','winback')");
-        const loggedSet = new Set(logged.map(r => `${r.order_id}|${r.kind}`));
-        const seen = new Set();
-        for (const o of rows) {
-          if (budget <= 0) break;
-          const e = String(o.email || '').trim().toLowerCase();
-          if (!ppValidEmail(e) || seen.has(e)) continue;
-          seen.add(e);                                         // solo el pedido más reciente de cada correo
-          if (outSet.has(e) || recentSet.has(e)) continue;
-          if ((lastBuy.get(e) || 0) > new Date(o.created_at).getTime()) continue;   // ya volvió a comprar
-          const age = (now.getTime() - new Date(o.delivered_at).getTime()) / DAY;
-          let kind = null;
-          if (age >= 120) kind = 'winback';
-          else if (age >= 45 && age < 100) kind = 'reorder';
-          // Seguimiento atrasado: solo si nunca tuvo fecha de seguimiento (los que sí la tienen los atiende el paso 1).
-          else if (age >= 14 && age < 45 && !o.followup_scheduled_at && !o.followup_sent_at) kind = 'followup';
-          if (!kind || loggedSet.has(`${o.id}|${kind}`)) continue;
-          if (await nurtureRecentLeadEmail(e).catch(() => true)) continue;
-          const r = await ppSendOne(o, kind);
-          if (kind === 'followup' && (r === 'sent' || r === 'skipped')) await db.execute('UPDATE orders SET followup_sent_at=? WHERE id=?', [new Date(), o.id]).catch(() => {});
-          if (r === 'sent') { budget--; recentSet.add(e); await sleep(600); }
-        }
-      }
-    }
+    const { items } = await ppCollectPending(new Date());
+    await ppSendBatch(items, 25);
   } catch (e) {
     console.warn('PostPurchase cron error:', e.message);
   } finally { _ppRunning = false; }
@@ -9712,6 +9728,43 @@ app.put('/api/admin/followup-v2', requireAdmin, async (req, res) => {
   } catch (e) {
     console.error('followup-v2 save error:', e.message);
     res.status(500).json({ error: 'No se pudo guardar.' });
+  }
+});
+
+// Pendientes ahora mismo (lo mismo que enviaría el temporizador) y progreso del envío manual.
+app.get('/api/admin/followup-v2/pending', requireAdmin, async (req, res) => {
+  try {
+    const { counts, total } = await ppCollectPending(new Date());
+    res.json({ enabled: await ppEnabled(), counts, total, running: _ppRunning, manual: _ppManual });
+  } catch (e) {
+    console.error('followup-v2 pending error:', e.message);
+    res.status(500).json({ error: 'No se pudieron calcular los pendientes.' });
+  }
+});
+
+// Envía YA a los pendientes, sin esperar la ventana de 10:00–11:59. Se ejecuta en segundo plano
+// (600 ms entre correos); el admin consulta el progreso con GET /pending. Máximo 200 por clic.
+app.post('/api/admin/followup-v2/send-now', requireAdmin, async (req, res) => {
+  if (!RESEND_API_KEY) return res.status(503).json({ error: 'El envío de correos no está configurado.' });
+  if (!(await ppEnabled().catch(() => false))) return res.status(409).json({ error: 'Activa primero el seguimiento post-compra y guarda.' });
+  if (_ppRunning) return res.status(409).json({ error: 'Ya hay un envío en curso. Espera a que termine.' });
+  _ppRunning = true;
+  try {
+    const { items, total } = await ppCollectPending(new Date());
+    const limit = Math.min(200, Math.max(1, parseInt(req.body && req.body.limit, 10) || 200));
+    if (!total) { _ppRunning = false; return res.json({ ok: true, started: false, total: 0 }); }
+    _ppManual = { total: Math.min(total, limit), done: 0, sent: 0, skipped: 0, errors: 0, finished: false, startedAt: new Date().toISOString() };
+    await logActivity(`Envío manual del seguimiento post-compra: ${_ppManual.total} pendientes`);
+    res.json({ ok: true, started: true, total: _ppManual.total });
+    ppSendBatch(items, limit, r => {
+      _ppManual.done++;
+      if (r === 'sent') _ppManual.sent++; else if (r === 'skipped') _ppManual.skipped++; else _ppManual.errors++;
+    }).catch(e => console.warn('PostPurchase manual error:', e.message))
+      .finally(() => { _ppManual.finished = true; _ppRunning = false; });
+  } catch (e) {
+    _ppRunning = false;
+    console.error('followup-v2 send-now error:', e.message);
+    if (!res.headersSent) res.status(500).json({ error: 'No se pudo iniciar el envío.' });
   }
 });
 

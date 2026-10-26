@@ -1225,6 +1225,14 @@ tr:hover td{background:rgba(255,255,255,0.02)}
             <div><label class="dte-lbl">Incluir pedidos entregados desde</label><input type="date" id="ppSince" class="dte-inp"/></div>
             <button class="save-btn" onclick="saveFollowupV2()">Guardar</button>
           </div>
+          <div style="display:flex;gap:1rem;flex-wrap:wrap;align-items:center;margin-bottom:1rem;padding:0.8rem 1rem;border:1px solid var(--border-light)">
+            <div style="flex:1;min-width:240px">
+              <div class="dte-lbl" style="margin:0 0 0.2rem">Pendientes ahora mismo</div>
+              <div id="ppPending" style="font-size:0.74rem;color:var(--cream)">Calculando…</div>
+              <div id="ppSendMsg" style="font-size:0.66rem;color:var(--muted);margin-top:0.3rem"></div>
+            </div>
+            <button class="save-btn" id="ppSendBtn" onclick="sendFollowupNow()">Enviar ahora a los pendientes</button>
+          </div>
           <div style="display:flex;gap:0.8rem;flex-wrap:wrap;align-items:flex-end">
             <div><label class="dte-lbl">Vista previa para</label><input id="ppPrevQ" class="dte-inp" style="min-width:240px" placeholder="n.º de pedido o correo del cliente"/></div>
             <div><label class="dte-lbl">Correo</label>
@@ -4335,6 +4343,7 @@ var PP_KINDS={followup:'A los 14 días de la entrega',reorder:'Recompra (45 día
 function loadFollowupV2(){
   var tbody=document.getElementById('ppBody'), sub=document.getElementById('ppSub');
   if(!tbody) return;
+  loadFollowupPending();
   adminFetch(API+'/admin/followup-v2',{}).then(function(r){return r?r.json():null;}).then(function(d){
     if(!d||d.error||!Array.isArray(d.rows)){
       sub.textContent='No se pudieron cargar los resultados'+(d&&d.error?' ('+d.error+')':'')+'.';
@@ -4355,6 +4364,38 @@ function loadFollowupV2(){
     sub.textContent='No se pudieron cargar los resultados.';
     tbody.innerHTML='<tr><td colspan="5" style="text-align:center;padding:1.2rem;color:#d9534f">Error al cargar.</td></tr>';
   });
+}
+var _ppTimer=null, _ppWasRunning=false;
+function loadFollowupPending(){
+  var box=document.getElementById('ppPending'), btn=document.getElementById('ppSendBtn'), msg=document.getElementById('ppSendMsg');
+  if(!box) return;
+  adminFetch(API+'/admin/followup-v2/pending',{}).then(function(r){return r?r.json():null;}).then(function(d){
+    if(!d||d.error){ box.textContent=(d&&d.error)||'No se pudo calcular.'; return; }
+    var c=d.counts||{};
+    box.textContent=fmtN(d.total)+' en total: '+fmtN(c.followup||0)+' seguimiento, '+fmtN(c.reorder||0)+' recompra, '+fmtN(c.winback||0)+' reactivación';
+    var m=d.manual;
+    if(m&&!m.finished){
+      msg.textContent='Enviando… '+m.done+' de '+m.total+' (enviados '+m.sent+', omitidos '+m.skipped+', con error '+m.errors+')';
+      btn.disabled=true; _ppWasRunning=true; clearTimeout(_ppTimer); _ppTimer=setTimeout(loadFollowupPending,3000);
+    } else {
+      if(m&&m.finished) msg.textContent='Último envío manual: '+m.sent+' enviados, '+m.skipped+' omitidos, '+m.errors+' con error.';
+      else if(!d.enabled) msg.textContent='Activa el seguimiento y guarda para poder enviar.';
+      btn.disabled=!d.enabled||!d.total||d.running;
+      if(d.running&&!(m&&!m.finished)){ clearTimeout(_ppTimer); _ppTimer=setTimeout(loadFollowupPending,5000); }
+      if(_ppWasRunning){ _ppWasRunning=false; loadFollowupV2(); }   // terminó un envío: refresca la tabla de resultados (una sola vez)
+    }
+  }).catch(function(){ box.textContent='No se pudo calcular.'; });
+}
+function sendFollowupNow(){
+  var box=document.getElementById('ppPending'), msg=document.getElementById('ppSendMsg');
+  if(!confirm('Se enviarán correos REALES ahora mismo a quienes están pendientes ('+box.textContent+'), sin esperar la ventana de las 10:00. Máximo 200 por clic. ¿Enviar?')) return;
+  document.getElementById('ppSendBtn').disabled=true; msg.textContent='Iniciando…';
+  adminFetch(API+'/admin/followup-v2/send-now',{method:'POST',headers:{'Content-Type':'application/json'},body:'{}'})
+    .then(function(r){return r?r.json():null;}).then(function(d){
+      if(d&&d.ok){ toast('Envío iniciado',d.started?(d.total+' correos en cola'):'No hay pendientes','ok'); }
+      else { toast('No se pudo enviar',(d&&d.error)||'','err'); msg.textContent=(d&&d.error)||''; }
+      loadFollowupPending();
+    }).catch(function(){ toast('Error','Error de conexión','err'); loadFollowupPending(); });
 }
 function saveFollowupV2(){
   var enabled=document.getElementById('ppEnabled').checked;
