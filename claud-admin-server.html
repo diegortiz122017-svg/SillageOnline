@@ -1216,8 +1216,8 @@ tr:hover td{background:rgba(255,255,255,0.02)}
           <div class="page-sub" id="ppSub" style="margin-bottom:1rem">Cargando…</div>
           <div class="tbl-wrap" style="overflow-x:auto;margin-bottom:1rem">
             <table id="ppTable" style="min-width:520px">
-              <thead><tr><th>Correo</th><th>Enviados</th><th>Omitidos</th><th>Compraron en 14 días</th><th>%</th></tr></thead>
-              <tbody id="ppBody"><tr><td colspan="5" style="text-align:center;padding:1.2rem;color:var(--muted)">Cargando…</td></tr></tbody>
+              <thead><tr><th>Correo</th><th>Enviados</th><th>Omitidos</th><th>Entregados</th><th>Abrieron</th><th>Hicieron clic</th><th>Rebotaron</th><th>Compraron en 14 días</th></tr></thead>
+              <tbody id="ppBody"><tr><td colspan="8" style="text-align:center;padding:1.2rem;color:var(--muted)">Cargando…</td></tr></tbody>
             </table>
           </div>
           <div style="display:flex;gap:1rem;flex-wrap:wrap;align-items:flex-end;margin-bottom:1rem">
@@ -1601,7 +1601,7 @@ tr:hover td{background:rgba(255,255,255,0.02)}
         <div style="font-size:0.6rem;letter-spacing:0.2em;text-transform:uppercase;color:var(--gold);margin-bottom:0.8rem">Historial de Envíos</div>
         <div class="tbl-wrap" style="overflow-x:auto">
           <table style="min-width:760px">
-            <thead><tr><th>Fecha</th><th>Para</th><th>Asunto</th><th>Estado</th><th></th></tr></thead>
+            <thead><tr><th>Fecha</th><th>Para</th><th>Asunto</th><th>Estado</th><th>Actividad</th><th></th></tr></thead>
             <tbody id="emailsBody">
               <tr><td colspan="5" style="text-align:center;padding:2rem;color:var(--muted)">Cargando…</td></tr>
             </tbody>
@@ -3962,22 +3962,25 @@ function loadSentEmails(){
   if(!tbody) return;
   adminFetch(API+'/admin/emails',{}).then(function(r){return r?r.json():[];}).then(function(list){
     if(!Array.isArray(list)||!list.length){
-      tbody.innerHTML='<tr><td colspan="5" style="text-align:center;padding:2rem;color:var(--muted)">Aún no se han enviado emails.</td></tr>';
+      tbody.innerHTML='<tr><td colspan="6" style="text-align:center;padding:2rem;color:var(--muted)">Aún no se han enviado emails.</td></tr>';
       return;
     }
     tbody.innerHTML=list.map(function(e){
       var estado = e.status==='sent' ? '<span style="color:#5fb87a">Enviado</span>' : '<span style="color:#d9534f">Error</span>';
       var fecha = new Date(e.created_at).toLocaleString();
+      var act = e.ev_complained ? '<span style="color:#d9534f">Marcó spam</span>' : e.ev_bounced ? '<span style="color:#d9534f">Rebotó</span>' :
+        (e.ev_clicked ? '<span style="color:#5fb87a">Hizo clic</span>' : e.ev_opened ? '<span style="color:#5fb87a">Abierto</span>' : e.ev_delivered ? '<span style="color:var(--muted)">Entregado</span>' : '<span style="color:var(--muted)">—</span>');
       return '<tr>'+
         '<td style="white-space:nowrap;font-size:0.68rem">'+esc(fecha)+'</td>'+
         '<td>'+esc(e.to_email)+'</td>'+
         '<td>'+esc(e.subject||'—')+'</td>'+
         '<td>'+estado+'</td>'+
+        '<td style="font-size:0.68rem">'+act+'</td>'+
         '<td><button class="save-btn" style="padding:0.25rem 0.6rem;font-size:0.55rem" onclick="viewSentEmail('+e.id+')">Ver</button></td>'+
       '</tr>';
     }).join('');
     window._sentEmails = list;
-  }).catch(function(){ tbody.innerHTML='<tr><td colspan="5" style="text-align:center;padding:2rem;color:#d9534f">Error al cargar.</td></tr>'; });
+  }).catch(function(){ tbody.innerHTML='<tr><td colspan="6" style="text-align:center;padding:2rem;color:#d9534f">Error al cargar.</td></tr>'; });
 }
 function viewSentEmail(id){
   var e=(window._sentEmails||[]).find(function(x){return x.id===id;});
@@ -4347,22 +4350,28 @@ function loadFollowupV2(){
   adminFetch(API+'/admin/followup-v2',{}).then(function(r){return r?r.json():null;}).then(function(d){
     if(!d||d.error||!Array.isArray(d.rows)){
       sub.textContent='No se pudieron cargar los resultados'+(d&&d.error?' ('+d.error+')':'')+'.';
-      tbody.innerHTML='<tr><td colspan="5" style="text-align:center;padding:1.2rem;color:#d9534f">Error al cargar.</td></tr>';
+      tbody.innerHTML='<tr><td colspan="8" style="text-align:center;padding:1.2rem;color:#d9534f">Error al cargar.</td></tr>';
       return;
     }
     document.getElementById('ppEnabled').checked=!!d.enabled;
     document.getElementById('ppSince').value=d.since?String(d.since).slice(0,10):'';
     sub.textContent=(d.enabled?'ACTIVO':'APAGADO')+' · Correo con recomendaciones según lo que la persona compró, a quien compró con o sin cuenta: a los 14 días de la entrega, de recompra a los ~45 días y de reactivación a los ~120. '+
       'Se envía entre 10:00 y 11:59 (hora de El Salvador), máximo 25 por pasada, nunca dos al mismo correo en 5 días, ni a quien volvió a comprar o se dio de baja'+(d.optouts?' ('+fmtN(d.optouts)+' bajas de invitados)':'')+'. '+
-      'Los pedidos ya entregados desde la fecha de abajo que nunca tuvieron seguimiento reciben, según su antigüedad: seguimiento atrasado (14–45 días), recompra (45–100) o reactivación (más de 120). Al activar, se envían de a 25 por pasada, así que los atrasados salen en varios días."Compraron" es una correlación (pedido real en los 14 días siguientes), no mide aperturas ni clics.';
+      'Los pedidos ya entregados desde la fecha de abajo que nunca tuvieron seguimiento reciben, según su antigüedad: seguimiento atrasado (14–45 días), recompra (45–100) o reactivación (más de 120). Al activar, se envían de a 25 por pasada, así que los atrasados salen en varios días."Compraron" es una correlación (pedido real en los 14 días siguientes). '+
+      'Las aperturas llegan por webhook de Resend: no son exactas (Apple Mail abre solo y otros clientes bloquean la imagen); el clic y la compra son señales más fiables.'+
+      (d.tracking&&!d.tracking.webhook?' ⚠ Aún no configurado: falta RESEND_WEBHOOK_SECRET en el servidor y el webhook en Resend (apunta a /api/resend/webhook).':
+       (d.tracking&&!d.tracking.events?' ⚠ Webhook configurado pero sin eventos todavía: revisa que en Resend estén activados el seguimiento de aperturas y clics del dominio y los eventos del webhook.':''));
     var by={}; d.rows.forEach(function(r){by[r.kind]=r;});
+    var pc=function(n,t){return fmtN(n)+(t?' ('+Math.round(n/t*100)+'%)':'');};
     tbody.innerHTML=['followup','reorder','winback'].map(function(k){
-      var r=by[k]||{sent:0,skipped:0,bought:0};
-      return '<tr><td>'+esc(PP_KINDS[k])+'</td><td>'+fmtN(r.sent)+'</td><td>'+fmtN(r.skipped)+'</td><td>'+fmtN(r.bought)+'</td><td>'+(r.sent?Math.round(r.bought/r.sent*100)+'%':'—')+'</td></tr>';
+      var r=by[k]||{sent:0,skipped:0,bought:0,delivered:0,opened:0,clicked:0,bounced:0};
+      return '<tr><td>'+esc(PP_KINDS[k])+'</td><td>'+fmtN(r.sent)+'</td><td>'+fmtN(r.skipped)+'</td>'+
+        '<td>'+pc(r.delivered,r.sent)+'</td><td>'+pc(r.opened,r.sent)+'</td><td>'+pc(r.clicked,r.sent)+'</td><td>'+pc(r.bounced,r.sent)+'</td>'+
+        '<td>'+pc(r.bought,r.sent)+'</td></tr>';
     }).join('');
   }).catch(function(){
     sub.textContent='No se pudieron cargar los resultados.';
-    tbody.innerHTML='<tr><td colspan="5" style="text-align:center;padding:1.2rem;color:#d9534f">Error al cargar.</td></tr>';
+    tbody.innerHTML='<tr><td colspan="8" style="text-align:center;padding:1.2rem;color:#d9534f">Error al cargar.</td></tr>';
   });
 }
 var _ppTimer=null, _ppWasRunning=false;

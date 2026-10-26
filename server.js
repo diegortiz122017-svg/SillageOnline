@@ -653,6 +653,24 @@ async function initDB() {
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
   `);
 
+  // Eventos de entrega/apertura/clic/rebote que Resend envía por webhook (uno por svix-id, sin duplicados).
+  await db.execute(`
+    CREATE TABLE IF NOT EXISTS email_events (
+      id          INT AUTO_INCREMENT PRIMARY KEY,
+      svix_id     VARCHAR(100) NOT NULL,
+      resend_id   VARCHAR(100) NOT NULL,
+      type        VARCHAR(40)  NOT NULL,
+      link        VARCHAR(500) DEFAULT NULL,
+      occurred_at DATETIME     NOT NULL,
+      UNIQUE KEY uq_svix (svix_id),
+      INDEX idx_resend (resend_id, type)
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
+  `);
+  try { await db.execute('ALTER TABLE post_purchase_log ADD COLUMN resend_id VARCHAR(100) DEFAULT NULL'); }
+  catch (e) { if (e.code !== 'ER_DUP_FIELDNAME') console.error('⚠️ migración post_purchase_log.resend_id falló:', e.message); }
+  try { await db.execute('ALTER TABLE sent_emails ADD INDEX idx_resend (resend_id)'); }
+  catch (e) { if (e.code !== 'ER_DUP_KEYNAME') console.error('⚠️ índice sent_emails.resend_id falló:', e.message); }
+
   // Historial de ajustes de total (quién, cuándo, de cuánto a cuánto y por qué).
   await db.execute(`
     CREATE TABLE IF NOT EXISTS order_total_adjustments (
@@ -924,7 +942,7 @@ async function logSentEmail({ to, subject, html, resendId, status, error }) {
   } catch(e) { /* non-fatal: no bloquea el envío si el log falla */ console.error('logSentEmail error:', e.message); }
 }
 
-async function sendEmail({ to, subject, html, from, attachments }) {
+async function sendEmail({ to, subject, html, from, attachments, onSent }) {
   if (!RESEND_API_KEY) return false;
   try {
     const res = await fetch('https://api.resend.com/emails', {
@@ -950,6 +968,7 @@ async function sendEmail({ to, subject, html, from, attachments }) {
     const adj = (attachments || []).map(a => `${a.filename} (${Math.round(Buffer.from(a.content, 'base64').length / 1024)} KB)`).join(', ');
     console.log('✅ Email sent to', to, '— id:', data.id, adj ? '— adjuntos: ' + adj : '— sin adjuntos');
     await logSentEmail({ to, subject, html, resendId: data.id, status: 'sent' });
+    if (typeof onSent === 'function') { try { onSent(data.id); } catch (e) {} }
     return true;
   } catch(e) {
     console.error('❌ Resend fetch error:', e.message);
@@ -4565,7 +4584,11 @@ app.delete('/api/admin/promo-codes/:id', requireAdmin, async (req, res) => {
 
 // ── Admin: redactar y enviar emails + ver historial de envíos (vía Resend) ────
 app.get('/api/admin/emails', requireAdmin, async (req, res) => {
-  const [rows] = await db.execute('SELECT * FROM sent_emails ORDER BY created_at DESC LIMIT 200');
+  const ev = t => `EXISTS (SELECT 1 FROM email_events e WHERE e.resend_id = s.resend_id AND e.type = '${t}')`;
+  const [rows] = await db.execute(
+    `SELECT s.*, ${ev('email.delivered')} AS ev_delivered, ${ev('email.opened')} AS ev_opened,
+            ${ev('email.clicked')} AS ev_clicked, ${ev('email.bounced')} AS ev_bounced, ${ev('email.complained')} AS ev_complained
+     FROM sent_emails s ORDER BY s.created_at DESC LIMIT 200`);
   res.json(rows);
 });
 
@@ -9579,10 +9602,11 @@ async function ppSendOne(order, kind) {
     if (gate.reason) { await mark('S'); return 'skipped'; }
     const built = await buildPostPurchaseForOrder(order, kind, gate);
     if (!built) { await mark('S'); return 'skipped'; }
-    const ok = await sendEmail({ to: email, subject: built.subject, html: built.html, from: `Nez · Sillage <${EMAIL_HOLA}>` });
+    let resendId = null;
+    const ok = await sendEmail({ to: email, subject: built.subject, html: built.html, from: `Nez · Sillage <${EMAIL_HOLA}>`, onSent: id => { resendId = id; } });
     if (!ok) throw new Error('el envío no se confirmó');
-    await db.execute("UPDATE post_purchase_log SET variant='OK', picks=?, sent_at=? WHERE order_id=? AND kind=?",
-      [built.picks.join(','), new Date(), order.id, kind]);
+    await db.execute("UPDATE post_purchase_log SET variant='OK', picks=?, sent_at=?, resend_id=? WHERE order_id=? AND kind=?",
+      [built.picks.join(','), new Date(), resendId, order.id, kind]);
     await logActivity(`Seguimiento post-compra (${kind}) enviado a ${email} (pedido ${order.id})`);
     return 'sent';
   } catch (e) {
@@ -9693,6 +9717,8 @@ app.get('/api/admin/followup-v2', requireAdmin, async (req, res) => {
   try {
     const [rows] = await db.execute(
       `SELECT l.kind, SUM(l.variant = 'OK') AS sent, SUM(l.variant = 'S') AS skipped,
+              ${ppEventSum('email.delivered')} AS delivered, ${ppEventSum('email.opened')} AS opened,
+              ${ppEventSum('email.clicked')} AS clicked, ${ppEventSum('email.bounced')} AS bounced,
               SUM(l.variant = 'OK' AND EXISTS (
                 SELECT 1 FROM orders o
                 WHERE LOWER(o.email) = l.email AND o.created_at >= l.sent_at AND o.created_at < DATE_ADD(l.sent_at, INTERVAL 14 DAY)
@@ -9700,11 +9726,14 @@ app.get('/api/admin/followup-v2', requireAdmin, async (req, res) => {
               )) AS bought
        FROM post_purchase_log l WHERE l.variant <> 'X' GROUP BY l.kind`);
     const [[optouts]] = await db.execute('SELECT COUNT(*) AS n FROM email_optouts');
+    const [[evCount]] = await db.execute('SELECT COUNT(*) AS n FROM email_events');
     res.json({
       enabled: await ppEnabled(),
       since: await getSetting('followup_v2_since', null),
-      rows: rows.map(r => ({ kind: r.kind, sent: Number(r.sent) || 0, skipped: Number(r.skipped) || 0, bought: Number(r.bought) || 0 })),
+      rows: rows.map(r => ({ kind: r.kind, sent: Number(r.sent) || 0, skipped: Number(r.skipped) || 0, bought: Number(r.bought) || 0,
+        delivered: Number(r.delivered) || 0, opened: Number(r.opened) || 0, clicked: Number(r.clicked) || 0, bounced: Number(r.bounced) || 0 })),
       optouts: Number(optouts.n) || 0,
+      tracking: { webhook: !!process.env.RESEND_WEBHOOK_SECRET, events: Number(evCount.n) || 0 },
     });
   } catch (e) {
     console.error('followup-v2 stats error:', e.message);
@@ -9730,6 +9759,62 @@ app.put('/api/admin/followup-v2', requireAdmin, async (req, res) => {
     res.status(500).json({ error: 'No se pudo guardar.' });
   }
 });
+
+// ── Aperturas, clics y rebotes (webhooks de Resend) ──────────────────────────
+// Resend avisa por webhook (firmado con Svix) cuando un correo se entrega, se abre, se le hace clic,
+// rebota o se marca como spam. Se guarda cada evento por id de correo (sent_emails.resend_id /
+// post_purchase_log.resend_id). Requiere RESEND_WEBHOOK_SECRET y, en Resend, activar el seguimiento
+// de aperturas y clics del dominio. Un rebote permanente o una queja de spam apaga los correos de
+// marketing a esa dirección (email_optouts) para no dañar la reputación del dominio.
+// OJO al leer los números: "abrió" lo mide una imagen invisible; Apple Mail la descarga sola (infla)
+// y varios clientes la bloquean (desinfla). El clic y la compra son señales más fiables.
+function verifySvixSignature(req, secret) {
+  const id = req.get('svix-id'), ts = req.get('svix-timestamp'), sigs = req.get('svix-signature');
+  if (!id || !ts || !sigs || !req.rawBody) return false;
+  if (!Number.isFinite(Number(ts)) || Math.abs(Date.now() / 1000 - Number(ts)) > 300) return false;   // anti-repetición
+  const key = Buffer.from(String(secret).replace(/^whsec_/, ''), 'base64');
+  const expected = crypto_ref.createHmac('sha256', key).update(`${id}.${ts}.${req.rawBody.toString('utf8')}`).digest('base64');
+  return String(sigs).split(' ').some(part => {
+    const [v, sig] = part.split(',');
+    if (v !== 'v1' || !sig) return false;
+    const a = Buffer.from(sig), b = Buffer.from(expected);
+    return a.length === b.length && crypto_ref.timingSafeEqual(a, b);
+  });
+}
+
+app.post('/api/resend/webhook', async (req, res) => {
+  const secret = process.env.RESEND_WEBHOOK_SECRET;
+  if (!secret) return res.status(503).json({ error: 'Webhook no configurado' });
+  if (!verifySvixSignature(req, secret)) return res.status(401).json({ error: 'Firma inválida' });
+  const ev = req.body || {};
+  const type = String(ev.type || ''), d = ev.data || {};
+  const rid = String(d.email_id || '');
+  if (!/^email\./.test(type) || !rid) return res.json({ ok: true, ignored: true });
+  try {
+    const link = type === 'email.clicked' && d.click && d.click.link ? String(d.click.link).slice(0, 500) : null;
+    const when = ev.created_at && !isNaN(new Date(ev.created_at).getTime()) ? new Date(ev.created_at) : new Date();
+    // svix-id es único por evento: los reintentos de Resend no duplican.
+    await db.execute('INSERT IGNORE INTO email_events (svix_id, resend_id, type, link, occurred_at) VALUES (?, ?, ?, ?, ?)',
+      [String(req.get('svix-id')).slice(0, 100), rid.slice(0, 100), type.slice(0, 40), link, when]);
+    const permanent = type === 'email.bounced' && /perman|hard/i.test(String((d.bounce && (d.bounce.type || d.bounce.subType)) || ''));
+    if (type === 'email.complained' || permanent) {
+      for (const to of Array.isArray(d.to) ? d.to : []) {
+        const e = String(to || '').trim().toLowerCase();
+        if (ppValidEmail(e)) await db.execute('INSERT IGNORE INTO email_optouts (email, source, created_at) VALUES (?, ?, ?)', [e, type === 'email.complained' ? 'complaint' : 'bounce', new Date()]);
+      }
+    }
+    res.json({ ok: true });
+  } catch (e) {
+    console.error('resend webhook error:', e.message);
+    res.status(500).json({ error: 'No se pudo guardar' });   // 5xx: Resend reintenta
+  }
+});
+
+// Fragmento SQL: cuántos correos de post_purchase_log (alias l) tuvieron al menos un evento de ese tipo.
+function ppEventSum(type) {
+  return `SUM(l.variant = 'OK' AND l.resend_id IS NOT NULL AND EXISTS (
+    SELECT 1 FROM email_events ev WHERE ev.resend_id = l.resend_id AND ev.type = '${type}'))`;
+}
 
 // Pendientes ahora mismo (lo mismo que enviaría el temporizador) y progreso del envío manual.
 app.get('/api/admin/followup-v2/pending', requireAdmin, async (req, res) => {
