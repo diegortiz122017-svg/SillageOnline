@@ -216,7 +216,7 @@ function buildPostPurchaseEmail(ctx) {
       : '¿Cómo te fue con tu pedido? Ideas en la misma línea';
     const intro = ctx.noteHtml
       ? `<div style="border-left:3px solid #b8955a;padding:12px 16px;margin:0 0 20px;background:#faf8f4"><p style="font-size:10px;letter-spacing:3px;text-transform:uppercase;color:#b8955a;margin:0 0 8px">Nez te escribe</p><p style="font-family:Georgia,serif;font-size:14px;color:#4a3f35;line-height:1.9;margin:0;font-style:italic">${ctx.noteHtml}</p></div>`
-      : `<p style="${S.p}">Ya pasaron un par de semanas desde que recibiste ${esc(names)}. Si lo estás disfrutando, ${picks.length === 1 ? 'esta va' : 'estas van'} en la misma línea y están en stock:</p>`;
+      : `<p style="${S.p}">Hace unas semanas recibiste ${esc(names)}. Si lo estás disfrutando, ${picks.length === 1 ? 'esta va' : 'estas van'} en la misma línea y están en stock:</p>`;
     body = `<h2 style="${S.h}">Hola ${esc(firstName || '')}${firstName ? ' 👋' : ''}</h2>${intro}
       ${picks.map(pk => card(pk.p, pk.reason)).join('')}
       <p style="${S.p}">${picks.some(pk => decantOffered(pk.p, ctx)) ? 'Si dudas, un decant te deja probar antes de comprar el frasco.' : 'Si dudas entre dos, cuéntale a Nez y te ayuda a decidir.'}</p>

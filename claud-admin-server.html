@@ -4345,7 +4345,7 @@ function loadFollowupV2(){
     document.getElementById('ppSince').value=d.since?String(d.since).slice(0,10):'';
     sub.textContent=(d.enabled?'ACTIVO':'APAGADO')+' · Correo con recomendaciones según lo que la persona compró, a quien compró con o sin cuenta: a los 14 días de la entrega, de recompra a los ~45 días y de reactivación a los ~120. '+
       'Se envía entre 10:00 y 11:59 (hora de El Salvador), máximo 25 por pasada, nunca dos al mismo correo en 5 días, ni a quien volvió a comprar o se dio de baja'+(d.optouts?' ('+fmtN(d.optouts)+' bajas de invitados)':'')+'. '+
-      'Los de recompra y reactivación solo consideran pedidos entregados desde la fecha de abajo. "Compraron" es una correlación (pedido real en los 14 días siguientes), no mide aperturas ni clics.';
+      'Los pedidos ya entregados desde la fecha de abajo que nunca tuvieron seguimiento reciben, según su antigüedad: seguimiento atrasado (14–45 días), recompra (45–100) o reactivación (más de 120). Al activar, se envían de a 25 por pasada, así que los atrasados salen en varios días."Compraron" es una correlación (pedido real en los 14 días siguientes), no mide aperturas ni clics.';
     var by={}; d.rows.forEach(function(r){by[r.kind]=r;});
     tbody.innerHTML=['followup','reorder','winback'].map(function(k){
       var r=by[k]||{sent:0,skipped:0,bought:0};

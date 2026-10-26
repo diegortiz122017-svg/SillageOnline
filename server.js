@@ -9522,7 +9522,7 @@ async function ppNezNote(bought) {
         model: 'gpt-4o-mini', max_tokens: 160, temperature: 0.6,
         messages: [{
           role: 'system',
-          content: `Eres Nez, sommelier de Sillage Parfumerie. Escribe 2 o 3 oraciones de seguimiento para alguien que recibió su pedido hace dos semanas.
+          content: `Eres Nez, sommelier de Sillage Parfumerie. Escribe 2 o 3 oraciones de seguimiento para alguien que recibió su pedido hace unas semanas.
 VOZ: directa y cálida, sin presión, sin frases de servicio al cliente ("esperamos que disfrutes", "no dudes en contactarnos").
 REGLAS: habla solo de lo que compró y usa EXCLUSIVAMENTE los datos que te doy (no inventes notas, duración, precios ni opiniones ajenas). No nombres otros perfumes: las sugerencias aparecen debajo en tarjetas. Invita a contarte cómo le fue. Sin asteriscos, listas ni emojis. Termina con: — Nez`,
         }, { role: 'user', content: `Compró:\n${facts}` }],
@@ -9616,14 +9616,16 @@ async function runPostPurchaseCron() {
       if (r === 'sent') { budget--; await sleep(600); }
     }
 
-    // 2) Recompra (45–100 días) y reactivación (120–300 días) sobre el último pedido entregado de cada correo.
+    // 2) Pedidos ya entregados que NO pasaron por el paso 1, sobre el último pedido entregado de cada correo,
+    //    según su antigüedad: 14–45 días = seguimiento atrasado (compró antes de activar esto y nunca lo recibió),
+    //    45–100 = recompra, 120–300 = reactivación. Solo pedidos entregados desde la fecha elegida en el admin.
     if (budget > 0) {
       const since = await ppSince();
       const lower = new Date(Math.max(since.getTime(), now.getTime() - 300 * DAY));
-      const upper = new Date(now.getTime() - 45 * DAY);
+      const upper = new Date(now.getTime() - 14 * DAY);
       if (lower < upper) {
         const [rows] = await db.execute(
-          `SELECT o.id, o.customer, o.email, o.customer_id, o.items, o.created_at,
+          `SELECT o.id, o.customer, o.email, o.customer_id, o.items, o.created_at, o.followup_scheduled_at, o.followup_sent_at,
                   COALESCE(DATE_SUB(o.followup_scheduled_at, INTERVAL 14 DAY), o.updated_at) AS delivered_at
            FROM orders o WHERE o.status = 'Entregado'
              AND COALESCE(DATE_SUB(o.followup_scheduled_at, INTERVAL 14 DAY), o.updated_at) BETWEEN ? AND ?
@@ -9639,7 +9641,7 @@ async function runPostPurchaseCron() {
         const recentSet = new Set(recent.map(r => r.e));
         const [outs] = await db.execute('SELECT email FROM email_optouts');
         const outSet = new Set(outs.map(r => String(r.email).toLowerCase()));
-        const [logged] = await db.execute("SELECT order_id, kind FROM post_purchase_log WHERE kind IN ('reorder','winback')");
+        const [logged] = await db.execute("SELECT order_id, kind FROM post_purchase_log WHERE kind IN ('followup','reorder','winback')");
         const loggedSet = new Set(logged.map(r => `${r.order_id}|${r.kind}`));
         const seen = new Set();
         for (const o of rows) {
@@ -9650,10 +9652,15 @@ async function runPostPurchaseCron() {
           if (outSet.has(e) || recentSet.has(e)) continue;
           if ((lastBuy.get(e) || 0) > new Date(o.created_at).getTime()) continue;   // ya volvió a comprar
           const age = (now.getTime() - new Date(o.delivered_at).getTime()) / DAY;
-          const kind = age >= 120 ? 'winback' : (age >= 45 && age < 100 ? 'reorder' : null);
+          let kind = null;
+          if (age >= 120) kind = 'winback';
+          else if (age >= 45 && age < 100) kind = 'reorder';
+          // Seguimiento atrasado: solo si nunca tuvo fecha de seguimiento (los que sí la tienen los atiende el paso 1).
+          else if (age >= 14 && age < 45 && !o.followup_scheduled_at && !o.followup_sent_at) kind = 'followup';
           if (!kind || loggedSet.has(`${o.id}|${kind}`)) continue;
           if (await nurtureRecentLeadEmail(e).catch(() => true)) continue;
           const r = await ppSendOne(o, kind);
+          if (kind === 'followup' && (r === 'sent' || r === 'skipped')) await db.execute('UPDATE orders SET followup_sent_at=? WHERE id=?', [new Date(), o.id]).catch(() => {});
           if (r === 'sent') { budget--; recentSet.add(e); await sleep(600); }
         }
       }
