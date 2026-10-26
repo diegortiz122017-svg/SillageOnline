@@ -192,6 +192,19 @@ function bottleReason(p, ctx) {
 
 function joinNames(list) { return joinEs(list.map(p => p.name)); }
 
+// Frase fija (no la escribe la IA) que explica POR QUÉ aparecen las recomendaciones y cuántas son.
+function leadIn(names, picks) {
+  const n = picks.length;
+  const count = { 1: 'una fragancia', 2: 'dos fragancias', 3: 'tres fragancias' }[n] || `${n} fragancias`;
+  const diff = picks.some(pk => pk.kind === 'different');
+  return `<p style="${S.p}">Como compraste ${esc(names)}, Nez eligió ${count} que van con ese gusto${diff ? ' (una va por otra dirección, por si quieres variar)' : ''}. Debajo de cada una te contamos en qué se parece:</p>`;
+}
+// Cierre según cuántas tarjetas hay de verdad.
+function closingLine(picks, ctx) {
+  if (picks.some(pk => decantOffered(pk.p, ctx))) return 'Si dudas, un decant te deja probar antes de comprar el frasco.';
+  return picks.length === 1 ? 'Si tienes dudas, cuéntale a Nez y te ayuda a decidir.' : 'Si dudas entre ellas, cuéntale a Nez y te ayuda a decidir.';
+}
+
 // ctx: { kind:'followup'|'reorder'|'winback', firstName, bought:[{p,type}], picks, noteHtml?,
 //        newArrival?, decantsEnabled, decantOut, priceMap, catalogue, invMap }
 function buildPostPurchaseEmail(ctx) {
@@ -216,10 +229,11 @@ function buildPostPurchaseEmail(ctx) {
       : '¿Cómo te fue con tu pedido? Ideas en la misma línea';
     const intro = ctx.noteHtml
       ? `<div style="border-left:3px solid #b8955a;padding:12px 16px;margin:0 0 20px;background:#faf8f4"><p style="font-size:10px;letter-spacing:3px;text-transform:uppercase;color:#b8955a;margin:0 0 8px">Nez te escribe</p><p style="font-family:Georgia,serif;font-size:14px;color:#4a3f35;line-height:1.9;margin:0;font-style:italic">${ctx.noteHtml}</p></div>`
-      : `<p style="${S.p}">Hace unas semanas recibiste ${esc(names)}. Si lo estás disfrutando, ${picks.length === 1 ? 'esta va' : 'estas van'} en la misma línea y están en stock:</p>`;
+      : `<p style="${S.p}">Hace unas semanas recibiste ${esc(names)}. ¿Cómo te fue con él?</p>`;
     body = `<h2 style="${S.h}">Hola ${esc(firstName || '')}${firstName ? ' 👋' : ''}</h2>${intro}
+      ${leadIn(names, picks)}
       ${picks.map(pk => card(pk.p, pk.reason)).join('')}
-      <p style="${S.p}">${picks.some(pk => decantOffered(pk.p, ctx)) ? 'Si dudas, un decant te deja probar antes de comprar el frasco.' : 'Si dudas entre dos, cuéntale a Nez y te ayuda a decidir.'}</p>
+      <p style="${S.p}">${closingLine(picks, ctx)}</p>
       ${btn('Hablar con Nez')}`;
   } else if (kind === 'reorder') {
     const picks = ctx.picks || [];
@@ -230,14 +244,16 @@ function buildPostPurchaseEmail(ctx) {
         <p style="${S.p}">${hello}</p>
         <p style="${S.p}">Hace unas semanas probaste ${esc(bottle.name)} en decant. Si te quedaste con ganas de más, esto es lo que sigue:</p>
         ${card(bottle, bottleReason(bottle, ctx))}
-        ${picks.length ? `<p style="${S.p}">¿O prefieres probar algo distinto? Estas van en la misma línea:</p>${picks.slice(0, 2).map(pk => card(pk.p, pk.reason)).join('')}` : ''}
+        ${picks.length ? `<p style="${S.p}">¿O prefieres probar algo distinto? Como probaste ${esc(bottle.name)}, estas ${picks.slice(0, 2).length === 1 ? 'es una opción' : 'son dos opciones'} que van con ese gusto:</p>${picks.slice(0, 2).map(pk => card(pk.p, pk.reason)).join('')}` : ''}
         ${btn('Pedirle ayuda a Nez')}`;
     } else {
       subject = bought.length === 1 ? `Para alternar con ${first.name}: ${picks.length === 1 ? 'una opción' : 'tres opciones'}` : 'Para alternar con tu pedido: tres opciones';
       body = `<h2 style="${S.h}">Para alternar con ${esc(first ? first.name : 'tu perfume')}</h2>
         <p style="${S.p}">${hello}</p>
-        <p style="${S.p}">Quien usa un solo perfume suele querer otro para cambiar de aire. Con lo que ya tienes, estas ${picks.length === 1 ? 'es una opción' : 'son opciones'} que sí están en stock:</p>
+        <p style="${S.p}">Quien usa un solo perfume suele querer otro para cambiar de aire.</p>
+        ${leadIn(names, picks)}
         ${picks.map(pk => card(pk.p, pk.reason)).join('')}
+        <p style="${S.p}">${closingLine(picks, ctx)}</p>
         ${btn('Hablar con Nez')}`;
     }
   } else {   // winback
@@ -246,9 +262,10 @@ function buildPostPurchaseEmail(ctx) {
     subject = firstName ? `${firstName}, hace tiempo que no te vemos — esto sigue en stock` : 'Hace tiempo que no te vemos: fragancias que te pueden gustar';
     body = `<h2 style="${S.h}">Hace tiempo que no te vemos</h2>
       <p style="${S.p}">${hello}</p>
-      <p style="${S.p}">${first ? `La última vez te llevaste ${esc(names)}. ` : ''}Por si quieres retomar, esto es lo que te recomendaría hoy:</p>
+      <p style="${S.p}">${first ? `La última vez te llevaste ${esc(names)}. ` : ''}Por si quieres retomar, esto es lo que te recomendaría hoy.</p>
+      ${picks.length ? leadIn(names, picks) : ''}
       ${picks.map(pk => card(pk.p, pk.reason)).join('')}
-      ${extra ? card(extra, `Una de las últimas incorporaciones a la tienda${extra.tagline ? ': ' + extra.tagline : ''}.`) : ''}
+      ${extra ? `<p style="${S.p}">Y una de las últimas incorporaciones a la tienda, que va con tu rango de precio:</p>${card(extra, extra.tagline ? extra.tagline + '.' : (nu.notesLine(extra) || 'Novedad en la tienda.'))}` : ''}
       ${btn('Hablar con Nez')}`;
   }
   return { subject, bodyHtml: body, campaign };

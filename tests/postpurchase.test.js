@@ -82,6 +82,24 @@ t('recompra de un frasco: "para alternar", sin ofrecer el mismo frasco', () => {
   const m = pp.buildPostPurchaseEmail(ctx({ kind: 'reorder', bought: [{ p: khamrah, type: 'full' }], picks }));
   assert.ok(/Para alternar/.test(m.subject) && !/ahora en frasco/.test(m.bodyHtml));
 });
+const cardCount = html => (html.match(/\/fragancia\//g) || []).length;
+const WORD = { 1: 'una fragancia', 2: 'dos fragancias', 3: 'tres fragancias' };
+t('cada correo explica por qué hay recomendaciones y el número que dice coincide con las tarjetas', () => {
+  for (const kind of ['followup', 'reorder', 'winback']) {
+    const picks = pp.recommend([khamrah], catalogue, {}, {});
+    const m = pp.buildPostPurchaseEmail(ctx({ kind, bought: [{ p: khamrah, type: 'full' }], picks, noteHtml: kind === 'followup' ? 'Nota de Nez' : null }));
+    assert.ok(/Como compraste Khamrah, Nez eligió/.test(m.bodyHtml), kind + ': falta la explicación');
+    const shown = kind === 'winback' ? Math.min(2, picks.length) : picks.length;   // reactivación: 2 afines (+ una novedad aparte)
+    assert.ok(m.bodyHtml.includes(WORD[shown]), kind + ': el número no coincide');
+    assert.strictEqual(cardCount(m.bodyHtml), shown, kind + ': tarjetas');
+    assert.ok(!/entre dos/.test(m.bodyHtml) || shown === 2, kind + ': dice "entre dos" con ' + shown);
+  }
+});
+t('con una sola recomendación el texto va en singular', () => {
+  const picks = pp.recommend([khamrah], catalogue, {}, {}).slice(0, 1);
+  const m = pp.buildPostPurchaseEmail(ctx({ kind: 'followup', bought: [{ p: khamrah, type: 'full' }], picks }));
+  assert.ok(/eligió una fragancia/.test(m.bodyHtml) && !/entre ellas/.test(m.bodyHtml));
+});
 t('la incorporación reciente respeta género y rango de precio', () => {
   const caro = P('Marca', 'Edición cara', 'F', ['Floral'], ['Rosa'], { price: 200 });
   const nuevoHombre = P('Marca', 'Nuevo hombre', 'M', ['Cítrico'], ['Limón'], { price: 55 });
