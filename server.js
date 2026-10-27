@@ -2098,9 +2098,9 @@ async function injectProductMeta(html, p, url, opts = {}) {
     const rawImg = (p.photos && p.photos[0]) || '';
     let imgUrl = rawImg
       ? (rawImg.startsWith('http') ? rawImg : BASE + rawImg)
-      : `${BASE}/apple-touch-icon.png`;
-    const hasCard = /res\.cloudinary\.com/.test(imgUrl) && imgUrl.includes('/upload/');
-    if (hasCard) imgUrl = imgUrl.replace('/upload/', '/upload/c_pad,w_1200,h_630,b_rgb:f2ede4,f_jpg,q_auto:good/');
+      : `${BASE}/og-default.png`;
+    const hasCard = !rawImg || (/res\.cloudinary\.com/.test(imgUrl) && imgUrl.includes('/upload/'));
+    if (hasCard && rawImg) imgUrl = imgUrl.replace('/upload/', '/upload/c_pad,w_1200,h_630,b_rgb:f2ede4,f_jpg,q_auto:good/');
     const title  = `${p.brand} ${p.name} — Sillage Parfumerie`;
     const desc   = p.tagline
       ? `${p.tagline} · ${p.conc || 'Eau de Parfum'} · Desde $${p.price}`
@@ -2200,7 +2200,7 @@ function previewImageFor(prods, BASE) {
     hasCard = /res\.cloudinary\.com/.test(imgUrl) && imgUrl.includes('/upload/');
     if (hasCard) imgUrl = imgUrl.replace('/upload/', '/upload/c_pad,w_1200,h_630,b_rgb:f2ede4,f_jpg,q_auto:good/');
   }
-  if (!imgUrl) imgUrl = `${BASE}/apple-touch-icon.png`;
+  if (!imgUrl) { imgUrl = `${BASE}/og-default.png`; hasCard = true; }   // logotipo de Sillage, ya en 1200x630
   return { imgUrl, hasCard };
 }
 
