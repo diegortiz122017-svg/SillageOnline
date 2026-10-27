@@ -1806,6 +1806,7 @@ tr:hover td{background:rgba(255,255,255,0.02)}
           <span id="dteCountsInline" style="font-size:0.62rem;color:var(--muted)"></span>
           <span style="flex:1"></span>
           <input type="month" id="dteReportMonth" class="dte-inp" style="width:auto"/>
+          <button class="export-btn" onclick="dteRelinkManual()" title="Enlaza con el catálogo los ítems de ventas registradas desde DTE manuales">&#128279; Vincular productos de ventas manuales</button>
           <button class="export-btn" onclick="exportDteReport()">&#128197; Reporte del mes (CSV)</button>
         </div>
         <div class="tbl-wrap" style="overflow-x:auto">
@@ -3045,6 +3046,47 @@ function loadDteDocuments(){
   }).catch(function(){ tb.innerHTML='<tr><td colspan="9" style="text-align:center;padding:2rem;color:#d9534f">Error.</td></tr>'; });
 }
 
+// Enlaza con el catálogo, por nombre, los ítems de las ventas registradas desde DTE manuales y deja
+// resolver a mano los que no se pudieron (para que cuenten en "Más vendidos", marcas y demás estadísticas).
+function dteRelinkManual(){
+  adminFetch(API+'/admin/orders/relink-manual',{method:'POST',headers:{'Content-Type':'application/json'},body:'{}'})
+    .then(function(r){return r?r.json():null;}).then(function(d){
+      if(!d||d.error){ toast('No se pudo vincular',(d&&d.error)||'Sin respuesta','err'); return; }
+      var un=d.unmatched||[];
+      toast('Vinculación automática',d.linked+' ítem(s) vinculados'+(un.length?' · '+un.length+' sin coincidencia':''),un.length?'warn':'ok');
+      if(un.length) dteShowUnlinked(un); else if(!d.linked) toast('Todo al día','No hay ítems manuales pendientes de vincular','ok');
+    }).catch(function(){ toast('Error','Error de conexión','err'); });
+}
+function dteShowUnlinked(list){
+  var cat=(typeof catalogFragrances!=='undefined'&&catalogFragrances)?catalogFragrances:[];
+  var opts='<option value="">— Elegir perfume —</option>'+cat.map(function(p){
+    return '<option value="'+_dteEsc(p.id)+'">'+_dteEsc(((p.brand?p.brand+' ':'')+(p.name||'')).trim())+'</option>';
+  }).join('');
+  var rows=list.map(function(u,i){
+    return '<div id="lk_row_'+i+'" style="border:1px solid var(--border-light);padding:0.7rem;margin-bottom:0.6rem">'+
+      '<div style="font-size:0.7rem;margin-bottom:0.4rem"><strong>'+_dteEsc(u.orderId)+'</strong> · “'+_dteEsc(u.name)+'” ×'+_dteEsc(u.qty)+' · $'+Number(u.price).toFixed(2)+'</div>'+
+      '<div style="display:flex;gap:0.4rem;flex-wrap:wrap">'+
+        '<select id="lk_sel_'+i+'" class="dte-inp" style="flex:1;min-width:180px">'+opts+'</select>'+
+        '<select id="lk_typ_'+i+'" class="dte-inp" style="width:92px"><option value="full">Frasco</option><option value="decant">Decant</option></select>'+
+        '<button class="save-btn" onclick="dteLinkOne('+i+')">Vincular</button>'+
+      '</div></div>';
+  }).join('');
+  window._dteUnlinked=list;
+  openSlidePanel('Ítems sin perfume del catálogo ('+list.length+')',
+    '<div style="font-size:0.68rem;color:var(--muted);line-height:1.7;margin-bottom:0.8rem">No se pudieron enlazar solos (nombre libre o ambiguo). Elige el perfume al que corresponde cada uno para que cuente en las estadísticas. Si es un envío u otro cargo que no es un perfume, déjalo así.</div>'+rows);
+}
+function dteLinkOne(i){
+  var u=(window._dteUnlinked||[])[i]; if(!u) return;
+  var pid=document.getElementById('lk_sel_'+i).value;
+  if(!pid){ toast('Elige un perfume','','warn'); return; }
+  adminFetch(API+'/admin/orders/'+encodeURIComponent(u.orderId)+'/link-products',{method:'POST',headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({links:[{index:u.index,productId:parseInt(pid,10),type:document.getElementById('lk_typ_'+i).value}]})})
+    .then(function(r){return r?r.json():null;}).then(function(d){
+      if(d&&d.ok){ var row=document.getElementById('lk_row_'+i); if(row) row.innerHTML='<div style="font-size:0.68rem;color:#5fb87a">✓ Vinculado: '+_dteEsc(u.orderId)+' · '+_dteEsc(u.name)+'</div>'; }
+      else toast('No se pudo vincular',(d&&d.error)||'','err');
+    }).catch(function(){ toast('Error','Error de conexión','err'); });
+}
+
 // Convierte un DTE emitido a mano en un pedido (Entregado y Pagado; se puede cambiar luego en Pedidos).
 function dteCreateOrder(id){
   var r=(window._dteDocs||{})[id]; if(!r) return;
@@ -3057,7 +3099,10 @@ function dteCreateOrder(id){
   }
   adminFetch(API+'/admin/dte/documents/'+id+'/create-order',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({allowTest:allowTest})})
     .then(function(x){return x?x.json():null;}).then(function(d){
-      if(d&&d.ok){ toast('Pedido registrado',d.orderId+' · $'+Number(d.total).toFixed(2),'ok'); loadDteDocuments(); }
+      if(d&&d.ok){
+        toast('Pedido registrado',d.orderId+' · $'+Number(d.total).toFixed(2)+(d.unlinked?' · '+d.unlinked+' ítem(s) sin perfume: usa "Vincular productos"':''),'ok');
+        loadDteDocuments();
+      }
       else toast('No se pudo registrar',(d&&d.error)||'Sin respuesta','err');
     }).catch(function(){ toast('Error','Error de conexión','err'); });
 }
@@ -3190,7 +3235,8 @@ function dteManualProductOptions(){
   var opts='<option value="">— Elegir del catálogo —</option>';
   list.filter(function(p){return p&&parseFloat(p.price)>0;}).forEach(function(p){
     var label=((p.brand?p.brand+' ':'')+(p.name||'')).trim();
-    opts+='<option value="'+_dteEsc(p.id)+'" data-name="'+_dteEsc(label)+'" data-price="'+_dteEsc(p.price)+'">'+_dteEsc(label)+' · $'+_dteEsc(Number(p.price).toFixed(2))+'</option>';
+    var dp=parseFloat(p.decantPrice)||Math.round(parseFloat(p.price)*0.30);
+    opts+='<option value="'+_dteEsc(p.id)+'" data-name="'+_dteEsc(label)+'" data-price="'+_dteEsc(p.price)+'" data-decant="'+_dteEsc(dp)+'">'+_dteEsc(label)+' · $'+_dteEsc(Number(p.price).toFixed(2))+'</option>';
   });
   opts+='<option value="__custom">✎ Personalizado…</option>';
   return opts;
@@ -3204,22 +3250,34 @@ function dteManualItemRow(name, qty, price){
     '<select class="dte-inp dte-mi-sel" style="flex:1;min-width:200px">'+dteManualProductOptions()+'</select>'+
     '<input class="dte-inp dte-mi-name" style="flex:1;min-width:160px;display:none" placeholder="Descripción" value="'+_dteEsc(name)+'"/>'+
     '<input class="dte-inp dte-mi-qty" type="number" min="1" step="1" style="width:80px" placeholder="Cant." value="'+_dteEsc(qty)+'"/>'+
+    '<select class="dte-inp dte-mi-type" style="width:92px;display:none" title="Frasco o decant"><option value="full">Frasco</option><option value="decant">Decant</option></select>'+
     '<input class="dte-inp dte-mi-price" type="number" min="0" step="0.01" style="width:110px" placeholder="Precio" value="'+_dteEsc(price)+'"/>'+
     '<button class="save-btn" style="background:transparent;border:1px solid #d9534f;color:#d9534f;padding:0.25rem 0.6rem;font-size:0.6rem" title="Quitar">✕</button>';
   var sel=d.querySelector('.dte-mi-sel');
   var nameInp=d.querySelector('.dte-mi-name');
   var priceInp=d.querySelector('.dte-mi-price');
+  var typeSel=d.querySelector('.dte-mi-type');
   sel.addEventListener('change',function(){
     var o=sel.options[sel.selectedIndex];
+    typeSel.style.display='none'; typeSel.value='full';
     if(sel.value==='__custom'){
       nameInp.style.display=''; nameInp.value=''; priceInp.value=''; nameInp.focus();
     } else if(sel.value){
       nameInp.style.display='none';
       nameInp.value=o.getAttribute('data-name')||'';
       priceInp.value=o.getAttribute('data-price')||'';
+      typeSel.style.display='';   // perfume del catálogo: se puede vender en frasco o en decant
     } else {
       nameInp.style.display='none'; nameInp.value='';
     }
+    dteManualRecalc();
+  });
+  // Decant: la descripción del DTE lo dice y el precio pasa al del decant (se puede editar).
+  typeSel.addEventListener('change',function(){
+    var o=sel.options[sel.selectedIndex]; if(!o||!/^\d+$/.test(sel.value)) return;
+    var dec=typeSel.value==='decant';
+    nameInp.value=(o.getAttribute('data-name')||'')+(dec?' (Decant 10 ml)':'');
+    priceInp.value=o.getAttribute(dec?'data-decant':'data-price')||'';
     dteManualRecalc();
   });
   // Si se construye con nombre/precio (datos de prueba), mostrar como personalizado
@@ -3240,7 +3298,9 @@ function dteManualReadItems(){
     var name=(r.querySelector('.dte-mi-name').value||'').trim();
     var qty=parseInt(r.querySelector('.dte-mi-qty').value,10)||0;
     var price=parseFloat(r.querySelector('.dte-mi-price').value)||0;
-    if(name&&qty>0&&price>0) items.push({name:name,qty:qty,price:price});
+    var sv=r.querySelector('.dte-mi-sel').value;
+    var pid=/^\d+$/.test(sv)?parseInt(sv,10):null;   // perfume elegido del catálogo → cuenta en estadísticas
+    if(name&&qty>0&&price>0) items.push({name:name,qty:qty,price:price,productId:pid,type:pid?r.querySelector('.dte-mi-type').value:'full'});
   });
   return items;
 }
@@ -3326,6 +3386,7 @@ function dteManualEmit(){
       (d.total!=null?' · $'+_dteEsc(Number(d.total).toFixed(2)):'')+
       (sendEmail?(d.emailSent?' · <span style="color:var(--gold)">✓ Correo enviado</span>':' · <span style="color:#d9534f">Correo NO enviado</span>'):'')+
       (d.orderCreated?' · <span style="color:#5fb87a">✓ Registrado como pedido</span>':'')+
+      (d.orderCreated&&d.unlinked?'<div style="color:#d98a3a;margin-top:0.3rem">'+d.unlinked+' ítem(s) sin perfume del catálogo: no cuentan en estadísticas por producto. Usa "Vincular productos".</div>':'')+
       (d.orderNote?'<div style="color:#d98a3a;margin-top:0.3rem">'+_dteEsc(d.orderNote)+'</div>':'')+
       (d.observaciones?'<div style="color:#d98a3a;margin-top:0.3rem">'+_dteEsc(d.observaciones)+'</div>':'');
     // Tras una emisión PROCESADA, limpiar el formulario para no enviar dobles.

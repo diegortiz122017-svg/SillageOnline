@@ -34,6 +34,7 @@ const { calcChords, analyzeChords } = require('./services/chords');
 const nurture           = require('./services/nurture');
 const postpurchase      = require('./services/postpurchase');
 const shareimg          = require('./services/shareimg');
+const productmatch      = require('./services/productmatch');
 
 // logActivity also broadcasts to admin WebSocket clients
 async function logActivity(msg) {
@@ -3667,15 +3668,74 @@ app.post('/api/admin/dte/documents/:id/create-order', requireAdmin, async (req, 
     const o = dteSvc.orderFromDteDoc(d);
     if (!o.items.length) return res.status(422).json({ error: 'No se pudieron leer los ítems de ese DTE.' });
     o.createdAt = d.created_at;
+    // Los ítems del DTE solo traen la descripción: se enlazan al catálogo por nombre; el resto se resuelve a mano.
+    const lk = productmatch.linkItems(o.items, await getCatalogue().catch(() => []));
+    o.items = lk.items;
     const created = await insertManualOrder(o, {
       status: b.status, paymentStatus: b.paymentStatus === 'Pendiente' ? 'Pendiente' : 'Pagado', paymentMethod: 'manual',
     });
     if (!created) return res.status(409).json({ error: 'Ya existe un pedido con el número ' + o.id + '.' });
     await logActivity(`Pedido ${o.id} registrado desde el DTE manual ${d.numero_control || d.id} ($${o.total})`);
-    res.json({ ok: true, orderId: o.id, total: o.total });
+    res.json({ ok: true, orderId: o.id, total: o.total, linked: lk.linked, unlinked: lk.unmatched.length });
   } catch (e) {
     console.error('create-order from DTE error:', e.message);
     res.status(500).json({ error: 'No se pudo registrar el pedido.' });
+  }
+});
+
+// POST /api/admin/orders/relink-manual — enlaza por nombre, con el catálogo, los ítems de los pedidos
+// registrados desde DTE manuales que aún no tienen perfume (productId). Devuelve lo que SÍ enlazó y la
+// lista de ítems que quedaron sin enlazar, para resolverlos a mano (POST /orders/:id/link-products).
+app.post('/api/admin/orders/relink-manual', requireAdmin, async (req, res) => {
+  try {
+    const catalogue = await getCatalogue();
+    const [rows] = await db.execute("SELECT id, items FROM orders WHERE origin = 'manual_dte' ORDER BY created_at DESC LIMIT 2000");
+    let touched = 0, linked = 0;
+    const unmatched = [];
+    for (const r of rows) {
+      let items = [];
+      try { items = JSON.parse(r.items || '[]'); } catch (e) { continue; }
+      const out = productmatch.linkItems(items, catalogue);
+      if (out.linked) {
+        await db.execute('UPDATE orders SET items=?, updated_at=? WHERE id=?', [JSON.stringify(out.items), new Date(), r.id]);
+        touched++; linked += out.linked;
+      }
+      out.unmatched.forEach(u => unmatched.push({ orderId: r.id, ...u }));
+    }
+    if (linked) await logActivity(`Ítems de ventas manuales vinculados al catálogo: ${linked} en ${touched} pedido(s)`);
+    res.json({ ok: true, orders: rows.length, touched, linked, unmatched });
+  } catch (e) {
+    console.error('relink-manual error:', e.message);
+    res.status(500).json({ error: 'No se pudo vincular.' });
+  }
+});
+
+// POST /api/admin/orders/:id/link-products — vincula a mano ítems de UN pedido registrado desde un DTE manual.
+//   body: { links: [{ index, productId, type?: 'full'|'decant' }] }
+// Solo pedidos con origin 'manual_dte': los de la tienda traen su productId del checkout y no se editan.
+app.post('/api/admin/orders/:id/link-products', requireAdmin, async (req, res) => {
+  try {
+    const [rows] = await db.execute('SELECT id, items, origin FROM orders WHERE id=? LIMIT 1', [req.params.id]);
+    if (!rows.length) return res.status(404).json({ error: 'Pedido no encontrado.' });
+    if (rows[0].origin !== 'manual_dte') return res.status(403).json({ error: 'Solo se puede vincular en pedidos registrados desde un DTE manual.' });
+    const catalogue = await getCatalogue();
+    const items = JSON.parse(rows[0].items || '[]');
+    const links = Array.isArray(req.body && req.body.links) ? req.body.links : [];
+    let n = 0;
+    for (const l of links) {
+      const idx = parseInt(l && l.index, 10), pid = parseInt(l && l.productId, 10);
+      if (!(idx >= 0 && idx < items.length) || !catalogue.some(p => Number(p.id) === pid)) {
+        return res.status(400).json({ error: 'Ítem o perfume inválido.' });
+      }
+      items[idx] = { ...items[idx], productId: pid, type: l.type === 'decant' ? 'decant' : 'full' };
+      n++;
+    }
+    if (!n) return res.status(400).json({ error: 'No hay nada que vincular.' });
+    await db.execute('UPDATE orders SET items=?, updated_at=? WHERE id=?', [JSON.stringify(items), new Date(), rows[0].id]);
+    res.json({ ok: true, linked: n });
+  } catch (e) {
+    console.error('link-products error:', e.message);
+    res.status(500).json({ error: 'No se pudo vincular.' });
   }
 });
 
@@ -3698,12 +3758,18 @@ app.post('/api/admin/dte/emit-manual', requireAdmin, async (req, res) => {
       name:  String(it.name || it.descripcion || '').trim().slice(0, 200),
       qty:   Math.max(1, parseInt(it.qty, 10) || 0),
       price: Math.round((parseFloat(it.price) || 0) * 100) / 100,
+      productId: parseInt(it.productId, 10) || null,          // perfume elegido del catálogo (para estadísticas)
+      type:  it.type === 'decant' ? 'decant' : 'full',
     }))
     .filter(it => it.name && it.qty > 0 && it.price > 0);
   if (!items.length) {
     return res.status(400).json({ error: 'Agrega al menos un ítem con descripción, cantidad y precio.' });
   }
   const total = Math.round(items.reduce((s, it) => s + it.qty * it.price, 0) * 100) / 100;
+  // Cada ítem queda ligado a un perfume del catálogo: el productId que mandó el selector (si existe de verdad) o,
+  // si se escribió a mano, el que coincida por nombre. Lo que no se pueda enlazar queda sin productId.
+  const linked = productmatch.linkItems(items, await getCatalogue().catch(() => [])).items;
+  linked.forEach(it => { if (!it.productId) delete it.productId; });
 
   const order = {
     id:             String(b.orderId || ('MAN-' + Date.now())),
@@ -3711,7 +3777,7 @@ app.post('/api/admin/dte/emit-manual', requireAdmin, async (req, res) => {
     email:          String(b.email || cfg.DTE_EMISOR.correo || '').slice(0, 100) || null,
     phone:          b.phone ? String(b.phone).slice(0, 30) : null,
     payment_method: String(b.paymentMethod || 'cod'),
-    items:          JSON.stringify(items),
+    items:          JSON.stringify(linked),
     total,
   };
 
@@ -3753,7 +3819,7 @@ app.post('/api/admin/dte/emit-manual', requireAdmin, async (req, res) => {
         try {
           orderCreated = await insertManualOrder({
             id: order.id, customer: order.customer, email: b.email ? String(b.email).trim() : null, phone: order.phone,
-            address: b.receptor && b.receptor.complemento ? String(b.receptor.complemento) : null, items, total,
+            address: b.receptor && b.receptor.complemento ? String(b.receptor.complemento) : null, items: linked, total,
           }, { paymentMethod: order.payment_method });
           if (!orderCreated) orderNote = 'Ya existía un pedido con ese número.';
         } catch (e) { orderNote = 'No se pudo registrar el pedido: ' + e.message; }
@@ -3785,6 +3851,7 @@ app.post('/api/admin/dte/emit-manual', requireAdmin, async (req, res) => {
       numItems:      items.length,
       emailSent,
       orderCreated, orderNote,
+      unlinked: linked.filter(it => !it.productId && !productmatch.isNonProductLine(it.name)).length,
     });
   } catch(e) { res.status(500).json({ error: e.message }); }
 });
