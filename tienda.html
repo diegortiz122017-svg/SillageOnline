@@ -8441,6 +8441,7 @@ var _somMessages  = [];   // full conversation history
 var _somProfile   = null; // extracted scent profile
 var _brandsExpanded = false; // brand pills drawer state
 var _lastRecIds   = [];   // last recommended IDs for objection card fallback
+var _somRecs      = {};   // tarjetas de recomendación por posición de mensaje en _somMessages ({ idx: [datos mínimos de cada perfume] })
 var _somQuestion  = 0;    // 0-5
 var _somSession = localStorage.getItem('sillage_session_id') || null;
 
@@ -8519,7 +8520,7 @@ function saveSomTranscript(){
   try {
     if(!_somMessages.length){ localStorage.removeItem(SOM_TRANSCRIPT_KEY); return; }
     localStorage.setItem(SOM_TRANSCRIPT_KEY, JSON.stringify({
-      sessionId: _somSession, messages: _somMessages, question: _somQuestion, savedAt: Date.now()
+      sessionId: _somSession, messages: _somMessages, question: _somQuestion, recs: _somRecs, savedAt: Date.now()
     }));
   } catch(e){}
 }
@@ -8538,14 +8539,17 @@ function restoreSomTranscript(){
 
     _somMessages = data.messages;
     _somQuestion = data.question || 0;
+    _somRecs = (data.recs && typeof data.recs === 'object') ? data.recs : {};
     var container = document.getElementById('somMessages');
     if(container){
       container.innerHTML = '';
-      _somMessages.forEach(function(m){
+      _somMessages.forEach(function(m, i){
         var text = m.role === 'assistant' ? m.content.replace(/PERFIL_JSON:[\s\S]+$/, '').trim() : m.content;
-        if(text) somAddMsg(m.role === 'user' ? 'user' : 'bot', text, []);
+        // Las tarjetas que acompañaban a esa respuesta (antes no se guardaban y se perdían al recargar).
+        if(text) somAddMsg(m.role === 'user' ? 'user' : 'bot', text, m.role === 'assistant' ? (_somRecs[i] || []) : []);
       });
       updateSomProgress(_somQuestion);
+      if(_somQuestion >= 5) somMarkComplete(true);
     }
   } catch(e){}
 }
@@ -8579,17 +8583,9 @@ function openSommelierModal(){
   trackEvent('nez_open');
   _bf.modalOpenedAt = Date.now();
   _bf.interactionBeforeModal = _bf.mouseMove > 0 || _bf.scrolled;
-  // If previous consultation is complete, start a new one automatically
-  if(_somQuestion >= 5){
-    _somMessages = []; _somQuestion = 0; _lastRecIds = [];
-    saveSomTranscript();
-    var container = document.getElementById('somMessages');
-    if(container) container.innerHTML = '';
-    var input = document.getElementById('somInput');
-    var btn = document.getElementById('somSend');
-    if(input){ input.disabled = false; input.placeholder = 'Escribe tu respuesta...'; }
-    if(btn) btn.disabled = false;
-  }
+  // Consulta terminada: se conserva tal cual (con sus tarjetas) y se ofrece empezar otra con un botón.
+  // Antes se borraba todo al reabrir, y con ello las recomendaciones finales.
+  if(_somQuestion >= 5) somMarkComplete(true);
   document.getElementById('somModal').classList.add('open');
   document.body.style.overflow = 'hidden';
   if(_somMessages.length === 0) sommelierStart();
@@ -8716,9 +8712,28 @@ function showSommelierProfileActive(profile){
   active.style.display = 'flex';
 }
 
+// Datos mínimos de una tarjeta de recomendación, para poder volver a dibujarla al restaurar la conversación.
+function somSnap(p){
+  return { id: p.id, brand: p.brand, name: p.name, price: p.price,
+    decantPrice: p.decantPrice || null, decantPrice5: p.decantPrice5 || null, luxury: !!p.luxury };
+}
+// Consulta completa (5 preguntas): bloquea el campo de texto y ofrece empezar una nueva sin borrar la actual.
+function somMarkComplete(withButton){
+  var input = document.getElementById('somInput'), btn = document.getElementById('somSend');
+  if(input){ input.disabled = true; input.placeholder = 'Consulta completada ✓'; }
+  if(btn) btn.disabled = true;
+  if(!withButton) return;
+  var c = document.getElementById('somMessages');
+  if(!c || document.getElementById('somNewWrap')) return;
+  var w = document.createElement('div');
+  w.id = 'somNewWrap'; w.style.cssText = 'text-align:center;padding:0.9rem 0 0.4rem';
+  w.innerHTML = '<button type="button" onclick="newSommelierConsultation()" style="background:transparent;border:1px solid var(--gold);color:var(--gold);padding:0.75rem 1.5rem;font-family:\'Jost\',sans-serif;font-size:0.62rem;letter-spacing:0.2em;text-transform:uppercase;cursor:pointer">Empezar una nueva consulta</button>';
+  c.appendChild(w); c.scrollTop = c.scrollHeight;
+}
+
 function newSommelierConsultation(){
   // Reset conversation but KEEP the profile
-  _somMessages = []; _somQuestion = 0;
+  _somMessages = []; _somQuestion = 0; _somRecs = {}; _lastRecIds = [];
   saveSomTranscript();
   var container = document.getElementById('somMessages');
   if(container) container.innerHTML = '';
@@ -8735,7 +8750,7 @@ function resetSommelierProfile(){
   var active = document.getElementById('somProfileActive');
   if(invite) invite.style.display = 'block';
   if(active) active.style.display = 'none';
-  _somMessages = []; _somProfile = null; _somQuestion = 0;
+  _somMessages = []; _somProfile = null; _somQuestion = 0; _somRecs = {};
   saveSomTranscript();
   var container = document.getElementById('somMessages');
   if(container) container.innerHTML = '';
@@ -8784,6 +8799,7 @@ function sommelierStart(){
   // (resetSommelierProfile()).
   _somMessages  = [];
   _somQuestion  = 0;
+  _somRecs      = {};
   saveSomTranscript();
   document.getElementById('somMessages').innerHTML = '';
   updateSomProgress(0);
@@ -8978,7 +8994,7 @@ function somAddMsg(role, text, recs){
         // Selecting a recommendation is itself a taste signal — enrich the
         // profile with this product's real attributes (family/notes/intensity),
         // not just its ID.
-        enrichProfileFromProduct(p);
+        enrichProfileFromProduct((P||[]).find(function(x){ return x.id === p.id; }) || p);
         closeSommelierModal();
         setTimeout(function(){
           _detailFromNez = true;
@@ -9108,6 +9124,7 @@ function sommelierSendToAPI(primeText){
       }
     }
 
+    var _msgIdx = _somMessages.length;   // posición que tendrá esta respuesta (se agrega justo después de pedir el catálogo)
     // Resolve IDs → product objects, always via live catalogue to handle DB products not in static P
     function resolveAndDisplay(ids, replyText, liveCat){
       var cat = liveCat || [];
@@ -9157,7 +9174,12 @@ function sommelierSendToAPI(primeText){
         }
       });
 
-      somAddMsg('bot', replyText, resolved.slice(0,3));
+      var shown = resolved.slice(0,3);
+      somAddMsg('bot', replyText, shown);
+      // Las tarjetas se guardan con la conversación: sin esto, al recargar o cambiar de página el texto
+      // volvía pero las tarjetas se perdían.
+      if(shown.length){ _somRecs[_msgIdx] = shown.map(somSnap); saveSomTranscript(); }
+      if(_somQuestion >= 5) somMarkComplete(true);
     }
 
     // Show cards if IDs or bold product names present in reply
@@ -9170,6 +9192,7 @@ function sommelierSendToAPI(primeText){
         .catch(function(){ resolveAndDisplay(_recIds, reply, []); });
     } else {
       somAddMsg('bot', reply, []);
+      if(_somQuestion >= 5) somMarkComplete(true);
     }
     _somMessages.push({ role: 'assistant', content: reply });
     saveSomTranscript();
