@@ -2428,7 +2428,7 @@ app.get('/llms.txt', async (req, res) => {
   res.type('text/plain');
   res.send(`# Sillage Parfumerie
 
-> Perfumería de lujo en línea con sede en El Salvador. Fragancias 100% originales de las casas de perfumería más admiradas del mundo, con envío a domicilio en todo El Salvador.
+> Perfumería de lujo en línea con sede en El Salvador. Fragancias de las casas de perfumería más admiradas del mundo, compradas solo a cadenas de suministro autorizadas y con registro sanitario en El Salvador, con envío a domicilio en todo el país.
 
 ## Sobre Sillage
 
@@ -2436,7 +2436,7 @@ Sillage Parfumerie es una tienda en línea especializada en alta perfumería en 
 
 ## Qué ofrecemos
 
-- Frascos completos de fragancias de lujo originales y certificadas
+- Frascos completos de fragancias de lujo, de cadenas de suministro autorizadas y con registro sanitario en El Salvador
 - Decants de 5ml y 10ml para probar antes de comprar el frasco completo
 - Envío a domicilio en todo El Salvador
 - Sommelier de IA (Nez) para ayudar a encontrar la fragancia perfecta
@@ -2505,7 +2505,7 @@ app.get('/api/catalogo.json', async (req, res) => {
       store:       'Sillage Parfumerie',
       country:     'El Salvador',
       currency:    'USD',
-      description: 'Fragancias de lujo 100% originales con envío en El Salvador. Decants disponibles.',
+      description: 'Fragancias de lujo de proveedores autorizados, con registro sanitario en El Salvador y envío a todo el país. Decants disponibles.',
       url:         BASE,
       total:       products.length,
       in_stock:    products.filter(p => p.available).length,
@@ -7679,8 +7679,8 @@ app.post('/api/sommelier/chat', sommelierBurst, sommelierLimiter, async (req, re
     ? '\n- El decant es la forma más inteligente de probar un perfume de lujo antes de invertir en el frasco completo — ningún competidor te da esa seguridad.'
     : '';
   const priceObjectionLine = decantsEnabled
-    ? '- "Está caro" / "es mucho" → ofrece el decant: "Puedes probarla en decant por $XX — vial de cristal, mismo perfume, sin compromiso."\n- "¿Por qué cuesta tanto?" → explica brevemente: ingredientes premium, duración, proyección, autenticidad garantizada. Redirige al decant. SIEMPRE llama search_catalogue para obtener el ID del producto y mostrar su tarjeta — nunca respondas una objeción de precio sin tarjeta.\n- Si el decant también está fuera de rango → busca con max_price ajustado y presenta alternativas con tarjetas.'
-    : '- "Está caro" / "es mucho" → explica brevemente: ingredientes premium, duración, proyección, autenticidad garantizada. SIEMPRE llama search_catalogue para obtener el ID del producto y mostrar su tarjeta — nunca respondas una objeción de precio sin tarjeta.\n- "¿Por qué cuesta tanto?" → misma explicación, con confianza. Si el precio sigue fuera de rango → busca con max_price ajustado y presenta alternativas con tarjetas.';
+    ? '- "Está caro" / "es mucho" → ofrece el decant: "Puedes probarla en decant por $XX — vial de cristal, mismo perfume, sin compromiso."\n- "¿Por qué cuesta tanto?" → explica brevemente: ingredientes premium, duración, proyección y procedencia (compra a cadenas de suministro autorizadas). Redirige al decant. SIEMPRE llama search_catalogue para obtener el ID del producto y mostrar su tarjeta — nunca respondas una objeción de precio sin tarjeta.\n- Si el decant también está fuera de rango → busca con max_price ajustado y presenta alternativas con tarjetas.'
+    : '- "Está caro" / "es mucho" → explica brevemente: ingredientes premium, duración, proyección y procedencia (compra a cadenas de suministro autorizadas). SIEMPRE llama search_catalogue para obtener el ID del producto y mostrar su tarjeta — nunca respondas una objeción de precio sin tarjeta.\n- "¿Por qué cuesta tanto?" → misma explicación, con confianza. Si el precio sigue fuera de rango → busca con max_price ajustado y presenta alternativas con tarjetas.';
   const closingDecantLine = decantsEnabled
     ? '\n- "El decant es exactamente para esto. Lo tienes en la tarjeta."\n- "Si te convence en decant, el frasco siempre va a estar aquí."'
     : '';
@@ -7755,9 +7755,9 @@ CIERRE: Cuando el cliente muestre interés o decisión, cierra directo: "La encu
 ÚLTIMO TURNO: Si es tu último mensaje disponible en esta consulta, NUNCA termines con una pregunta — el cliente no podrá responder. Cierra con una recomendación final clara y dirige a las tarjetas con una de las frases del CIERRE FINAL.
 
 VALORES DE SILLAGE — úsalos en objeciones:
-- Autenticidad garantizada: cada fragancia pasa por una cadena de suministro verificada antes de llegar a nuestro inventario, con todos los registros sanitarios de El Salvador. Sin réplicas, sin alteraciones.${decantHigieneLines}
+- Procedencia: compramos solo de cadenas de suministro autorizadas, y cada perfume que distribuimos cuenta con registro sanitario en El Salvador. Cada compra lleva factura electrónica.${decantHigieneLines}
 - Entrega: Gran San Salvador 1-3 días hábiles, Interior del país 3-7 días, Centroamérica 7-15 días.
-- Política de devoluciones disponible.${decantValueLine}
+- Devoluciones: la política está en sillage-sv.com/devoluciones y explica cómo se tratan los casos (producto no conforme, error de envío, etc.).${decantValueLine}
 
 OBJECIONES DE PRECIO:
 ${priceObjectionLine}
@@ -7766,7 +7766,7 @@ ${priceObjectionLine}
 
 OBJECIONES DE COMPETENCIA / CONFIANZA:
 - Si el cliente menciona otro vendedor o precio más bajo → no ataques, pero planta la duda: "La diferencia está en lo que no ves — procedencia, fraccionado, almacenamiento. Con Sillage eso está resuelto."
-- Si pregunta por autenticidad → responde con confianza total y sin rodeos.
+- Si pregunta por autenticidad → responde con confianza y sin rodeos, usando SOLO estos hechos: compramos de cadenas de suministro autorizadas, cada perfume tiene registro sanitario en El Salvador, cada compra lleva factura electrónica y la política de devoluciones está en sillage-sv.com/devoluciones. NO inventes detalles que no estén aquí (nombres de proveedores, lotes, certificados, números de registro). Si pide pruebas específicas, invítalo a escribir a ${EMAIL_HOLA}.
 
 CIERRE FINAL — varía el cierre, nunca repitas la misma frase:
 - "Están en las tarjetas — es un buen momento para probarla."${closingDecantLine}
