@@ -207,6 +207,23 @@ nav a:hover{color:var(--gold)}
 .cm-btn:hover{background:var(--gold-light)}
 .cm-btn:active{transform:scale(0.985)}
 .cm-btn svg{flex-shrink:0}
+/* Página de una colección curada (/coleccion/<nombre>): reemplaza al catálogo mientras está abierta */
+#colView{display:none;background:var(--warm-white);color:var(--charcoal);padding:2rem 4rem 6rem;min-height:70vh}
+body.col-mode #colView{display:block}
+body.col-mode #home,body.col-mode #shop,body.col-mode #tiendaCollections,body.col-mode #bundles-section{display:none!important}
+.cv-inner{max-width:1400px;margin:0 auto}
+.cv-back{display:inline-flex;align-items:center;gap:0.45rem;background:none;border:none;color:var(--muted);font-family:'Jost',sans-serif;font-size:0.64rem;letter-spacing:0.2em;text-transform:uppercase;cursor:pointer;padding:0.4rem 0;margin-bottom:2rem;transition:color 0.2s}
+.cv-back:hover{color:var(--gold)}
+.cv-head{max-width:760px;margin:0 auto 3.2rem;text-align:center;position:relative}
+.cv-eyebrow{display:block;font-size:0.6rem;letter-spacing:0.35em;text-transform:uppercase;color:var(--gold);margin-bottom:0.9rem}
+.cv-title{font-family:'Cormorant Garamond',serif;font-size:clamp(2.4rem,5vw,3.8rem);font-weight:300;line-height:1.1;color:var(--charcoal);margin-bottom:0.9rem}
+.cv-desc{font-size:0.9rem;color:var(--muted);line-height:1.8;max-width:560px;margin:0 auto 1rem}
+.cv-meta{display:flex;align-items:center;justify-content:center;gap:0.6rem;font-size:0.62rem;letter-spacing:0.2em;text-transform:uppercase;color:var(--gold)}
+.cv-others{margin-top:4.5rem;padding-top:2.6rem;border-top:1px solid rgba(184,149,90,0.15);text-align:center}
+.cv-others h3{font-size:0.6rem;letter-spacing:0.3em;text-transform:uppercase;color:var(--muted);font-weight:400;margin-bottom:1.1rem}
+.cv-chip{display:inline-block;margin:0.25rem;padding:0.6rem 1.1rem;background:transparent;border:1px solid rgba(184,149,90,0.35);color:var(--charcoal);font-family:'Jost',sans-serif;font-size:0.72rem;letter-spacing:0.08em;cursor:pointer;transition:all 0.2s}
+.cv-chip:hover{border-color:var(--gold);background:rgba(184,149,90,0.08);color:var(--gold)}
+@media(max-width:900px){#colView{padding:1.4rem 1.2rem 4rem}.cv-head{margin-bottom:2.2rem}}
 @media(max-width:768px){.catalog-more{padding:2rem 1rem 0.6rem}}
 .card-img{position:relative;height:320px;background:linear-gradient(135deg,#f8f4ee,#ede8df);display:flex;align-items:center;justify-content:center;overflow:hidden}
 .view-overlay{position:absolute;inset:0;z-index:2;display:flex;align-items:center;justify-content:center;opacity:0;transition:opacity 0.3s;background:rgba(14,12,10,0.35)}
@@ -2295,6 +2312,28 @@ footer{background:var(--dark);padding:3.5rem 4rem;text-align:center;border-top:1
   </div>
 </section>
 
+<!-- PÁGINA DE UNA COLECCIÓN (vista /coleccion/<nombre>) -->
+<section id="colView" aria-label="Colección">
+  <div class="cv-inner">
+    <button type="button" class="cv-back" onclick="closeCollectionView()">&larr; Volver a la tienda</button>
+    <div class="cv-head">
+      <span class="cv-eyebrow">Colección</span>
+      <h1 class="cv-title" id="cvTitle"></h1>
+      <p class="cv-desc" id="cvDesc"></p>
+      <div class="cv-meta"><span id="cvCount"></span>
+        <button type="button" class="bd-share-btn" id="cvShare" aria-label="Compartir esta colección" title="Compartir"><svg class="bd-share-ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 15V4"/><path d="M8 8l4-4 4 4"/><path d="M5 13v6a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1v-6"/></svg><span class="bd-share-txt">&#8682; Compartir</span></button>
+      </div>
+    </div>
+    <div class="product-grid" id="cvGrid"></div>
+    <div class="catalog-more" id="cvMore" style="display:none">
+      <div class="cm-count" id="cvMoreCount" aria-live="polite"></div>
+      <div class="cm-bar"><span id="cvMoreBar" style="width:0"></span></div>
+      <button type="button" class="cm-btn" onclick="cvRenderMore()"><span>Ver más fragancias</span><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="6 9 12 15 18 9"/></svg></button>
+    </div>
+    <div class="cv-others" id="cvOthers" style="display:none"><h3>Otras colecciones</h3><div id="cvOthersList"></div></div>
+  </div>
+</section>
+
 <!-- EDITORIAL COLLECTIONS -->
 <section class="tienda-collections" id="tiendaCollections">
   <div class="tc-header">
@@ -3281,6 +3320,65 @@ function dismissNewArrivalToast(btn, key){
   try{ localStorage.setItem(key,'1'); }catch(e){}
 }
 
+// Tarjeta de un perfume (la usan el catálogo y la página de cada colección).
+function buildProductCard(p){
+      var inv=getInv(p.id),oos=inv.outOfStock;
+      var bi=getBadge(p);
+      var card=document.createElement('div');
+      card.className='product-card'+(oos?' oos':'');
+      card.dataset.id=p.id;card.dataset.brand=p.brand;
+      card.dataset.gender=p.g;card.dataset.name=p.name.toLowerCase();
+      card.dataset.notes=[cardNotes(p),p.top,p.mid,p.base].join(' ').toLowerCase();
+      // Índice de búsqueda sin acentos + familias olfativas (acordes) normalizadas, entre barras para coincidencia exacta
+      card.dataset.sx=_srchNorm([p.name,p.brand,card.dataset.notes].join(' '));
+      card.dataset.fam='|'+_famOf(p).join('|')+'|';
+      card.innerHTML=
+        '<div class="card-img">'+
+          '<div class="gender-dot '+gCls[p.g]+'">'+gMap[p.g]+'</div>'+
+          (bi?'<div class="card-badge '+bi.cls+'">'+bi.txt+'</div>':'')+
+          '<div class="view-overlay"><div class="view-hint">Ver Detalles</div></div>'+
+          (oos?'<div class="oos-cover"><div class="oos-label">Sin Stock</div></div>':'')+
+          '<div class="bottle-wrap">'+(p.photos&&p.photos.length?'<img src="'+esc(cdnImg(p.photos[0],400))+'" alt="'+esc(p.brand+' '+p.name)+'" style="width:100%;height:100%;object-fit:contain;display:block;position:absolute;top:0;left:0;" loading="lazy" />':svg(p.c,p.s,'md'))+'</div>'+
+        '</div>'+
+        '<div class="card-body">'+
+          '<div class="card-brand">'+esc(p.brand)+'</div>'+
+          '<div class="card-name">'+esc(p.name)+'</div>'+
+          '<div class="card-notes">'+esc(cardNotes(p))+'</div>'+
+          '<div class="card-footer">'+
+            '<div class="card-price-row">'+
+              (function(){
+                var ep = effectivePrice(p);
+                var dp10 = p.decantPrice ? parseFloat(p.decantPrice) : Math.round(ep * 0.30);
+                var dp5  = p.decantPrice5 ? parseFloat(p.decantPrice5) : Math.round(dp10 * 0.55);
+                var html = '<div class="card-price-pills">';
+                html += '<span class="card-price-pill bottle">Botella <b>$'+ep+'</b></span>';
+                if(decantsEnabled){
+                  html += '<span class="card-price-pill d10">10ml <b>$'+dp10+'</b></span>';
+                  if(p.luxury) html += '<span class="card-price-pill d5">5ml <b>$'+dp5+'</b></span>';
+                }
+                html += '</div>';
+                return html;
+              })()+
+            '</div>'+
+            '<button class="add-btn" data-id="'+p.id+'"'+(oos?' disabled':'')+'>+</button>'+
+          '</div>'+
+        '</div>';
+      card.querySelector('.card-img').addEventListener('click',function(e){
+        if(e.target.closest('.add-btn'))return;
+        openDetail(p.id);
+      });
+      card.querySelector('.add-btn').addEventListener('click',function(e){
+        e.stopPropagation();
+        if(!this.disabled){
+          addToCart(p.id);
+          toast(esc(p.brand+' '+p.name),'Añadido al carrito','ok');
+          var b=this;b.textContent='\u2713';b.style.background='var(--success)';b.style.borderColor='var(--success)';b.style.color='white';
+          setTimeout(function(){b.textContent='+';b.style.background='';b.style.borderColor='';b.style.color='';},1800);
+        }
+      });
+      return card;
+}
+
 function buildGrid(){
   var grid=document.getElementById('productGrid');
   var empty=document.getElementById('emptyState');
@@ -3716,61 +3814,7 @@ function buildGrid(){
   grid.querySelectorAll('.product-card').forEach(function(el){el.remove();});
   P.forEach(function(p){
     try{
-      var inv=getInv(p.id),oos=inv.outOfStock;
-      var bi=getBadge(p);
-      var card=document.createElement('div');
-      card.className='product-card'+(oos?' oos':'');
-      card.dataset.id=p.id;card.dataset.brand=p.brand;
-      card.dataset.gender=p.g;card.dataset.name=p.name.toLowerCase();
-      card.dataset.notes=[cardNotes(p),p.top,p.mid,p.base].join(' ').toLowerCase();
-      // Índice de búsqueda sin acentos + familias olfativas (acordes) normalizadas, entre barras para coincidencia exacta
-      card.dataset.sx=_srchNorm([p.name,p.brand,card.dataset.notes].join(' '));
-      card.dataset.fam='|'+_famOf(p).join('|')+'|';
-      card.innerHTML=
-        '<div class="card-img">'+
-          '<div class="gender-dot '+gCls[p.g]+'">'+gMap[p.g]+'</div>'+
-          (bi?'<div class="card-badge '+bi.cls+'">'+bi.txt+'</div>':'')+
-          '<div class="view-overlay"><div class="view-hint">Ver Detalles</div></div>'+
-          (oos?'<div class="oos-cover"><div class="oos-label">Sin Stock</div></div>':'')+
-          '<div class="bottle-wrap">'+(p.photos&&p.photos.length?'<img src="'+esc(cdnImg(p.photos[0],400))+'" alt="'+esc(p.brand+' '+p.name)+'" style="width:100%;height:100%;object-fit:contain;display:block;position:absolute;top:0;left:0;" loading="lazy" />':svg(p.c,p.s,'md'))+'</div>'+
-        '</div>'+
-        '<div class="card-body">'+
-          '<div class="card-brand">'+esc(p.brand)+'</div>'+
-          '<div class="card-name">'+esc(p.name)+'</div>'+
-          '<div class="card-notes">'+esc(cardNotes(p))+'</div>'+
-          '<div class="card-footer">'+
-            '<div class="card-price-row">'+
-              (function(){
-                var ep = effectivePrice(p);
-                var dp10 = p.decantPrice ? parseFloat(p.decantPrice) : Math.round(ep * 0.30);
-                var dp5  = p.decantPrice5 ? parseFloat(p.decantPrice5) : Math.round(dp10 * 0.55);
-                var html = '<div class="card-price-pills">';
-                html += '<span class="card-price-pill bottle">Botella <b>$'+ep+'</b></span>';
-                if(decantsEnabled){
-                  html += '<span class="card-price-pill d10">10ml <b>$'+dp10+'</b></span>';
-                  if(p.luxury) html += '<span class="card-price-pill d5">5ml <b>$'+dp5+'</b></span>';
-                }
-                html += '</div>';
-                return html;
-              })()+
-            '</div>'+
-            '<button class="add-btn" data-id="'+p.id+'"'+(oos?' disabled':'')+'>+</button>'+
-          '</div>'+
-        '</div>';
-      card.querySelector('.card-img').addEventListener('click',function(e){
-        if(e.target.closest('.add-btn'))return;
-        openDetail(p.id);
-      });
-      card.querySelector('.add-btn').addEventListener('click',function(e){
-        e.stopPropagation();
-        if(!this.disabled){
-          addToCart(p.id);
-          toast(esc(p.brand+' '+p.name),'Añadido al carrito','ok');
-          var b=this;b.textContent='\u2713';b.style.background='var(--success)';b.style.borderColor='var(--success)';b.style.color='white';
-          setTimeout(function(){b.textContent='+';b.style.background='';b.style.borderColor='';b.style.color='';},1800);
-        }
-      });
-      grid.insertBefore(card,empty);
+      grid.insertBefore(buildProductCard(p),empty);
     }catch(err){console.error('Card build error for product',p.id,err);}
   });
 
@@ -4696,7 +4740,9 @@ function closeDetail(){
   }
   // Restore base URL
   if(window.history.state && window.history.state.producto){
-    window.history.pushState({}, '', '/tienda');
+    // Abierto desde una colección: un paso atrás vuelve a su entrada del historial (la ficha se apilaba encima).
+    if(document.body.classList.contains('col-mode') && _cvCol) window.history.back();
+    else window.history.pushState({}, '', '/tienda');
   }
   if(_detailFromNez){
     _detailFromNez = false;
@@ -4719,7 +4765,17 @@ window.addEventListener('popstate', function(e) {
   if (bundleOverlay && bundleOverlay.classList.contains('open')) {
     bundleOverlay.classList.remove('open');
     document.body.style.overflow = '';
+    return;
   }
+  // Página de colección: el estado del historial dice cuál mostrar (o ninguna = volver a la tienda).
+  var st = e.state;
+  if (st && st.coleccion) {
+    // Ya está mostrada (p. ej. al cerrar la ficha de un perfume): no se rearma, para no perder la posición.
+    if (document.body.classList.contains('col-mode') && _cvCol && _cvCol.id === st.coleccion) return;
+    var col = (typeof CURATED !== 'undefined' ? CURATED : []).find(function(c){ return c.id === st.coleccion; });
+    if (col) { openCollectionView(col, { noHistory:true }); return; }
+  }
+  if (document.body.classList.contains('col-mode')) closeCollectionView({ noHistory:true });
 });
 document.getElementById('overlayBg').addEventListener('click',closeDetail);
 function gotoSlide(idx){
@@ -7597,7 +7653,7 @@ function buildCollections(){
       '<div class="cc-name">'+col.name+'</div>'+
       '<div class="cc-desc">'+col.desc+'</div>'+
       '<div class="cc-count">'+count+' fragancia'+(count!==1?'s':'')+'</div>';
-    card.addEventListener('click', function(){ filterByCurated(col); });
+    card.addEventListener('click', function(){ closeCollections(); openCollectionView(col); });
     curatedGrid.appendChild(card);
   });
 }
@@ -7643,6 +7699,111 @@ function filterByBrand(brand){
     if(shop) shop.scrollIntoView({behavior:'smooth'});
   }, 100);
 }
+
+// ── PÁGINA DE UNA COLECCIÓN ───────────────────────────────────────────────────
+// Antes, tocar una colección reutilizaba el catálogo como filtro (reiniciaba marca, género y búsqueda y
+// subía la página). Ahora cada colección tiene su propia vista con URL (/coleccion/<nombre>): se puede
+// compartir y recargar, el botón "atrás" vuelve a la tienda y el catálogo queda intacto.
+var _cvCol = null, _cvItems = [], _cvShown = 0, _cvDirect = false, _cvPrevTitle = '';
+var CV_PAGE = 18;
+function collectionPath(col){ return '/coleccion/' + slugify(col.name); }
+function collectionShareUrl(col){ return 'https://sillage-sv.com' + collectionPath(col); }
+function collectionProducts(col){
+  var list = (P||[]).filter(function(p){ try{ return col.filter(p); }catch(e){ return false; } });
+  var inStock = [], out = [];
+  list.forEach(function(p){ (getInv(p.id).outOfStock ? out : inStock).push(p); });   // disponibles primero
+  return inStock.concat(out);
+}
+function openCollectionView(col, opts){
+  opts = opts || {};
+  var view = document.getElementById('colView');
+  if(!view || !col) return;
+  var alreadyOpen = document.body.classList.contains('col-mode');
+  _cvCol = col; _cvItems = collectionProducts(col); _cvShown = 0;
+  document.getElementById('cvTitle').textContent = col.name;
+  var desc = document.getElementById('cvDesc');
+  desc.textContent = col.desc || ''; desc.style.display = col.desc ? '' : 'none';
+  var n = _cvItems.length;
+  document.getElementById('cvCount').textContent = n + ' ' + (n === 1 ? 'fragancia' : 'fragancias');
+  document.getElementById('cvGrid').innerHTML = '';
+  cvRenderMore();
+  cvRenderOthers();
+  document.body.classList.add('col-mode');
+  if(!_cvPrevTitle) _cvPrevTitle = document.title;
+  document.title = col.name + ' — Colección · Sillage Parfumerie';
+  // Entrada nueva en el historial solo al venir de la tienda; entre colecciones se reemplaza (un solo "atrás").
+  var replace = !!opts.replace || alreadyOpen;
+  if(!opts.noHistory){
+    try{
+      if(replace) history.replaceState({coleccion: col.id}, '', collectionPath(col));
+      else history.pushState({coleccion: col.id}, '', collectionPath(col));
+    }catch(e){}
+    if(!alreadyOpen) _cvDirect = !!opts.replace;   // abierta directo desde un enlace: no hay "tienda" a la que volver con atrás
+  }
+  window.scrollTo({top:0, behavior:'instant'});
+  try{ trackEvent('collection_view', {id: col.id, name: col.name}); }catch(e){}
+}
+function cvRenderMore(){
+  var grid = document.getElementById('cvGrid');
+  if(!grid) return;
+  var next = _cvItems.slice(_cvShown, _cvShown + CV_PAGE);
+  next.forEach(function(p){
+    try{ grid.appendChild(buildProductCard(p)); }catch(err){ console.error('Card build error for product', p.id, err); }
+  });
+  _cvShown += next.length;
+  var total = _cvItems.length, more = document.getElementById('cvMore');
+  if(more){
+    more.style.display = total > _cvShown ? '' : 'none';
+    document.getElementById('cvMoreCount').textContent = 'Mostrando ' + _cvShown + ' de ' + total + ' fragancias';
+    document.getElementById('cvMoreBar').style.width = (total ? Math.round(_cvShown / total * 100) : 0) + '%';
+  }
+  if(!total) grid.innerHTML = '<div class="empty-state show"><h3>Esta colección está vacía por ahora</h3><p>Vuelve pronto: estamos sumando fragancias.</p></div>';
+}
+function cvRenderOthers(){
+  var box = document.getElementById('cvOthers'), list = document.getElementById('cvOthersList');
+  if(!box || !list) return;
+  list.innerHTML = '';
+  var shown = 0;
+  orderedCurated().forEach(function(c){
+    if(_cvCol && c.id === _cvCol.id) return;
+    var has = (P||[]).some(function(p){ try{ return c.filter(p); }catch(e){ return false; } });
+    if(!has) return;
+    var b = document.createElement('button');
+    b.type = 'button'; b.className = 'cv-chip'; b.textContent = c.name;
+    b.addEventListener('click', function(){ openCollectionView(c); });
+    list.appendChild(b); shown++;
+  });
+  box.style.display = shown ? '' : 'none';
+}
+function closeCollectionView(opts){
+  opts = opts || {};
+  if(!document.body.classList.contains('col-mode')) return;
+  document.body.classList.remove('col-mode');
+  if(_cvPrevTitle){ document.title = _cvPrevTitle; _cvPrevTitle = ''; }
+  var col = _cvCol; _cvCol = null;
+  if(!opts.noHistory){
+    // Si la colección se abrió desde la tienda, "volver" = un paso atrás en el historial; si se abrió directo
+    // desde un enlace compartido, no hay tienda detrás: se queda en /tienda.
+    if(!_cvDirect && history.state && history.state.coleccion){ history.back(); }
+    else { try{ history.replaceState({}, '', '/tienda'); }catch(e){} }
+  }
+  // Deja a la persona donde estaba: en la lista de colecciones si venía de ahí.
+  var anchor = document.getElementById('tiendaCollections');
+  if(anchor && col){ setTimeout(function(){ anchor.scrollIntoView({behavior:'instant', block:'start'}); }, 30); }
+}
+document.addEventListener('DOMContentLoaded', function(){
+  var sh = document.getElementById('cvShare');
+  if(!sh) return;
+  sh.addEventListener('click', function(){
+    if(!_cvCol) return;
+    var data = { title: _cvCol.name + ' — Colección · Sillage Parfumerie', text: _cvCol.desc || ('Descubre la colección ' + _cvCol.name), url: collectionShareUrl(_cvCol) };
+    if(navigator.share){ navigator.share(data).catch(function(){}); }
+    else {
+      navigator.clipboard.writeText(data.url).then(function(){ toast('Enlace copiado','Comparte donde quieras','ok'); })
+        .catch(function(){ toast('Enlace de la colección', data.url, 'ok'); });
+    }
+  });
+});
 
 function filterByCurated(col){
   closeCollections();
@@ -9396,12 +9557,23 @@ document.addEventListener('DOMContentLoaded', function(){
       if((P && P.length && CURATED && CURATED.length) || tries > 40){
         clearInterval(interval);
         var col = CURATED.find(function(c){ return c.id === colId; });
-        if(col){
-          filterByCurated(col);
-          // Scroll to shop grid
-          var shop = document.getElementById('shop');
-          if(shop) setTimeout(function(){ shop.scrollIntoView({ behavior:'smooth', block:'start' }); }, 100);
-        }
+        if(col) openCollectionView(col, { replace:true });   // enlaces antiguos ?coleccion=id → ahora abren su página
+      }
+    }, 150);
+  })();
+  // Enlace directo / recarga en /coleccion/<nombre>: espera catálogo y colecciones y abre esa página.
+  (function(){
+    var m = window.location.pathname.match(/^\/coleccion\/([^\/?#]+)/);
+    if(!m) return;
+    var slug = ''; try{ slug = decodeURIComponent(m[1]).toLowerCase(); }catch(e){ slug = m[1].toLowerCase(); }
+    var tries = 0;
+    var iv = setInterval(function(){
+      tries++;
+      if((P && P.length && _curatedLoaded) || tries > 60){
+        clearInterval(iv);
+        var col = (CURATED || []).find(function(c){ return slugify(c.name) === slug; });
+        if(col) openCollectionView(col, { replace:true });
+        else { try{ history.replaceState({}, '', '/tienda'); }catch(e){} }   // colección que ya no existe
       }
     }, 150);
   })();
@@ -9436,12 +9608,9 @@ function buildTiendaCollections(){
         '</div>' +
       '</div>';
 
-    row.addEventListener('click', function(){
-      filterByCurated(col);
-      // Scroll to top of shop grid
-      var shop = document.getElementById('shop');
-      if(shop) shop.scrollIntoView({ behavior:'smooth', block:'start' });
-    });
+    row.setAttribute('role', 'link'); row.tabIndex = 0;
+    row.addEventListener('click', function(){ openCollectionView(col); });
+    row.addEventListener('keydown', function(e){ if(e.key === 'Enter' || e.key === ' '){ e.preventDefault(); openCollectionView(col); } });
 
     list.appendChild(row);
   });

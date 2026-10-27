@@ -7535,12 +7535,8 @@ function buildCollections(){
       '<div class="cc-desc">'+col.desc+'</div>'+
       '<div class="cc-count">'+count+' fragancia'+(count!==1?'s':'')+'</div>';
     card.addEventListener('click', function(){
-      // On tienda: filter in place. On homepage: navigate to tienda with param.
-      if(document.getElementById('productGrid')){
-        filterByCurated(col);
-      } else {
-        window.location.href = '/tienda?coleccion=' + encodeURIComponent(col.id);
-      }
+      // La colección vive en su propia página: /coleccion/<nombre>
+      window.location.href = '/coleccion/' + slugify(col.name);
     });
     curatedGrid.appendChild(card);
   });

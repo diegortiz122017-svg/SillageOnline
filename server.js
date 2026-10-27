@@ -35,6 +35,7 @@ const nurture           = require('./services/nurture');
 const postpurchase      = require('./services/postpurchase');
 const shareimg          = require('./services/shareimg');
 const productmatch      = require('./services/productmatch');
+const collectionsSvc    = require('./services/collections');
 
 // logActivity also broadcasts to admin WebSocket clients
 async function logActivity(msg) {
@@ -2187,6 +2188,22 @@ async function findBundle({ slug, id }) {
   return null;
 }
 
+// Imagen de vista previa para un grupo de perfumes (bundle o colección): collage 1200x630 con sus fotos
+// (services/shareimg.js); si no se puede armar, la foto del primero; sin fotos, un asset real del sitio.
+function previewImageFor(prods, BASE) {
+  const abs = u => (String(u).startsWith('http') ? u : BASE + u);
+  const photos = prods.map(p => p.photos && p.photos[0]).filter(Boolean).map(abs);
+  let imgUrl = shareimg.bundleCollageUrl(photos);
+  let hasCard = !!imgUrl;
+  if (!imgUrl && photos.length) {
+    imgUrl = photos[0];
+    hasCard = /res\.cloudinary\.com/.test(imgUrl) && imgUrl.includes('/upload/');
+    if (hasCard) imgUrl = imgUrl.replace('/upload/', '/upload/c_pad,w_1200,h_630,b_rgb:f2ede4,f_jpg,q_auto:good/');
+  }
+  if (!imgUrl) imgUrl = `${BASE}/apple-touch-icon.png`;
+  return { imgUrl, hasCard };
+}
+
 // Etiquetas de vista previa de un bundle: collage con las fotos de sus perfumes (services/shareimg.js).
 // Si el collage no se puede armar (menos de 2 fotos, fotos fuera de Cloudinary…), usa la foto del
 // primer perfume y, sin fotos, un asset real del sitio: la vista previa nunca queda sin imagen.
@@ -2198,16 +2215,7 @@ async function injectBundleMeta(html, b, url) {
     const p = catalogue.find(x => Number(x.id) === parseInt(it && it.productId, 10));
     if (p && !seen.has(p.id)) { seen.add(p.id); prods.push(p); }
   }
-  const abs = u => (String(u).startsWith('http') ? u : BASE + u);
-  const photos = prods.map(p => p.photos && p.photos[0]).filter(Boolean).map(abs);
-  let imgUrl = shareimg.bundleCollageUrl(photos);
-  let hasCard = !!imgUrl;
-  if (!imgUrl && photos.length) {
-    imgUrl = photos[0];
-    hasCard = /res\.cloudinary\.com/.test(imgUrl) && imgUrl.includes('/upload/');
-    if (hasCard) imgUrl = imgUrl.replace('/upload/', '/upload/c_pad,w_1200,h_630,b_rgb:f2ede4,f_jpg,q_auto:good/');
-  }
-  if (!imgUrl) imgUrl = `${BASE}/apple-touch-icon.png`;
+  const { imgUrl, hasCard } = previewImageFor(prods, BASE);
 
   const price = parseFloat(b.price) || 0, orig = parseFloat(b.orig_price) || 0;
   const save = orig > price ? ` · Ahorras $${Math.round((orig - price) * 100) / 100}` : '';
@@ -2265,6 +2273,37 @@ async function sendTiendaWithProduct(req, res, p, url) {
   }
   return res.sendFile(tienda);
 }
+// Colección activa por slug (las de la base de datos; las predeterminadas viven solo en el navegador).
+async function findCollectionBySlug(slug) {
+  const [rows] = await db.query('SELECT * FROM collections WHERE active=1 ORDER BY sort_order ASC, id ASC');
+  return rows.find(c => collectionsSvc.collectionSlug(c) === String(slug || '').toLowerCase()) || null;
+}
+async function injectCollectionMeta(html, c, url) {
+  const BASE = process.env.BASE_URL || 'https://sillage-sv.com';
+  const prods = collectionsSvc.collectionProducts(c, await getCatalogue());
+  const { imgUrl, hasCard } = previewImageFor(prods.filter(p => p.photos && p.photos[0]).slice(0, 4), BASE);
+  const n = prods.length;
+  const intro = String(c.description || '').trim().slice(0, 120);
+  const count = n ? `${n} ${n === 1 ? 'fragancia' : 'fragancias'}` : '';
+  const desc = [intro, count].filter(Boolean).join(' · ') || 'Colección curada de Sillage Parfumerie';
+  return applyShareMeta(html, {
+    title: `${c.name} — Colección · Sillage Parfumerie`, desc, imgUrl, hasCard, alt: `Colección ${c.name}`, url, type: 'website', canonical: true,
+  });
+}
+app.get('/coleccion/:slug', async (req, res) => {
+  const fs = require('fs');
+  const tienda = path.join(__dirname, 'tienda.html');
+  if (!fs.existsSync(tienda)) return res.redirect('/');
+  try {
+    const c = await findCollectionBySlug(req.params.slug);
+    if (c) {
+      const BASE = process.env.BASE_URL || 'https://sillage-sv.com';
+      return res.send(await injectCollectionMeta(fs.readFileSync(tienda, 'utf8'), c, `${BASE}/coleccion/${collectionsSvc.collectionSlug(c)}`));
+    }
+  } catch (e) { console.warn('OG collection tag generation failed:', e.message); }
+  return res.sendFile(tienda);   // sin coincidencia en la base: el navegador resuelve las colecciones predeterminadas
+});
+
 // Igual, para un bundle (collage de sus perfumes como imagen de la vista previa).
 async function sendTiendaWithBundle(req, res, b) {
   const fs = require('fs');
@@ -2497,7 +2536,14 @@ app.get('/sitemap.xml', async (req, res) => {
     freq:     'weekly',
   }));
 
-  const allPages = [...staticPages, ...productPages];
+  let collectionPages = [];
+  try {
+    const [cols] = await db.query('SELECT * FROM collections WHERE active=1');
+    collectionPages = cols.filter(c => collectionsSvc.collectionProducts(c, catalogue).length)
+      .map(c => ({ url: `${BASE}/coleccion/${collectionsSvc.collectionSlug(c)}`, priority: '0.6', freq: 'weekly' }));
+  } catch (e) {}
+
+  const allPages = [...staticPages, ...collectionPages, ...productPages];
 
   res.type('application/xml');
   res.send([
