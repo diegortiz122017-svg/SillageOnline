@@ -65,11 +65,33 @@ t('es determinista (mismo resultado siempre)', () => {
 t('sin nada comprado no recomienda', () => assert.deepStrictEqual(pp.recommend([], catalogue, {}, {}), []));
 
 const ctx = (extra) => ({ decantsEnabled: true, decantOut: new Set(), priceMap: {}, catalogue, invMap: {}, firstName: 'Ana', ...extra });
-t('correo de 14 días: tarjetas con UTM utm_medium=postpurchase y campaña pp14', () => {
-  const picks = pp.recommend([khamrah], catalogue, {}, {});
-  const m = pp.buildPostPurchaseEmail(ctx({ kind: 'followup', bought: [{ p: khamrah, type: 'full' }], picks }));
+t('correo de 14 días: solo acompañamiento — sin tarjetas, precios, decants ni recomendaciones', () => {
+  const m = pp.buildPostPurchaseEmail(ctx({ kind: 'followup', bought: [{ p: khamrah, type: 'full' }], picks: [] }));
   assert.strictEqual(m.campaign, 'pp14');
-  assert.ok((m.bodyHtml.match(/utm_medium=postpurchase&amp;utm_campaign=pp14/g) || []).length >= picks.length);
+  assert.ok(!/\/fragancia\//.test(m.bodyHtml), 'no debe enlazar productos');
+  assert.ok(!/\$\d|Frasco|[Dd]ecant|eligió/.test(m.bodyHtml), 'no debe mostrar precios, decants ni recomendaciones');
+  assert.ok(/cómo te va con él/.test(m.bodyHtml) && /responde este correo/.test(m.bodyHtml));
+  assert.strictEqual(m.subject, '¿Cómo te va con Khamrah?');
+});
+t('correo de 14 días: el único enlace es a Nez, con UTM (utm_medium=postpurchase, campaña pp14) para medir el clic', () => {
+  const m = pp.buildPostPurchaseEmail(ctx({ kind: 'followup', bought: [{ p: khamrah, type: 'full' }], picks: [] }));
+  const links = m.bodyHtml.match(/href="[^"]+"/g) || [];
+  assert.strictEqual(links.length, 1);
+  assert.ok(/\/nez\?utm_source=email&amp;utm_medium=postpurchase&amp;utm_campaign=pp14/.test(links[0]), links[0]);
+  assert.ok(/tips%20para%20sacarle/.test(links[0]), 'la pregunta a Nez es de uso, no de compra');
+});
+t('tips de uso: los datos salen de la ficha y el resto son consejos generales', () => {
+  const tips = pp.usageTips([{ ...khamrah, sillage: 'Strong', long: '12+ Hours' }]);
+  assert.ok(/según su ficha tiene proyección fuerte y 12\+ horas de duración; con 1 o 2 aplicaciones/.test(tips[0]), tips[0]);
+  assert.ok(tips.length === 3 && /piel hidratada/.test(tips[1]) && /calor/.test(tips[2]));
+  // sin datos de proyección/duración no inventa nada específico del perfume
+  assert.strictEqual(pp.usageTips([{ ...khamrah, sillage: '', long: '' }]).length, 2);
+});
+t('tips con dos perfumes: uno por perfume (máximo 2) y los generales', () => {
+  const a = { ...khamrah, sillage: 'Moderate', long: '8+ Hours' }, b = { ...manIce, sillage: 'Light', long: '6+ Hours' };
+  const tips = pp.usageTips([a, b, { ...qahwa, sillage: 'Strong', long: '10+ Hours' }]);
+  assert.strictEqual(tips.length, 4);
+  assert.ok(/^Khamrah:/.test(tips[0]) && /^Man Ice:/.test(tips[1]));
 });
 t('recompra de un decant: ofrece el frasco completo y calcula el precio por ml solo con datos del catálogo', () => {
   const k = { ...khamrah, price: 60, decantPrice: 15 };
@@ -85,9 +107,9 @@ t('recompra de un frasco: "para alternar", sin ofrecer el mismo frasco', () => {
 const cardCount = html => (html.match(/\/fragancia\//g) || []).length;
 const WORD = { 1: 'una fragancia', 2: 'dos fragancias', 3: 'tres fragancias' };
 t('cada correo explica por qué hay recomendaciones y el número que dice coincide con las tarjetas', () => {
-  for (const kind of ['followup', 'reorder', 'winback']) {
+  for (const kind of ['reorder', 'winback']) {   // el de 14 días no recomienda nada
     const picks = pp.recommend([khamrah], catalogue, {}, {});
-    const m = pp.buildPostPurchaseEmail(ctx({ kind, bought: [{ p: khamrah, type: 'full' }], picks, noteHtml: kind === 'followup' ? 'Nota de Nez' : null }));
+    const m = pp.buildPostPurchaseEmail(ctx({ kind, bought: [{ p: khamrah, type: 'full' }], picks }));
     assert.ok(/Como compraste Khamrah, Nez eligió/.test(m.bodyHtml), kind + ': falta la explicación');
     const shown = kind === 'winback' ? Math.min(2, picks.length) : picks.length;   // reactivación: 2 afines (+ una novedad aparte)
     assert.ok(m.bodyHtml.includes(WORD[shown]), kind + ': el número no coincide');
@@ -106,15 +128,21 @@ t('con 3 o más perfumes comprados cada sugerencia sale de uno distinto', () => 
   assert.strictEqual(new Set(r.map(x => x.via.id)).size, r.length);
   assert.ok(r.every(x => x.kind === 'similar'));
 });
-t('correo con varios perfumes: concuerda en plural y dice con cuál de los comprados se parece', () => {
+t('recompra con varios perfumes: concuerda en plural y dice con cuál de los comprados se parece', () => {
   const picks = pp.recommend([khamrah, manIce], catalogue, {}, {});
-  const m = pp.buildPostPurchaseEmail(ctx({ kind: 'followup', bought: [{ p: khamrah, type: 'full' }, { p: manIce, type: 'full' }], picks }));
-  assert.ok(/con ambos\?/.test(m.bodyHtml) && /lo que te llevaste/.test(m.bodyHtml) && /con cuál de tus perfumes/.test(m.bodyHtml));
-  assert.ok(/Khamrah y Man Ice/.test(m.subject));
+  const m = pp.buildPostPurchaseEmail(ctx({ kind: 'reorder', bought: [{ p: khamrah, type: 'full' }, { p: manIce, type: 'full' }], picks }));
+  assert.ok(/lo que te llevaste/.test(m.bodyHtml) && /con cuál de tus perfumes/.test(m.bodyHtml));
+});
+t('seguimiento de 14 días con varios perfumes: asunto con los nombres y "con ambos"', () => {
+  const m = pp.buildPostPurchaseEmail(ctx({ kind: 'followup', bought: [{ p: khamrah, type: 'full' }, { p: manIce, type: 'full' }], picks: [] }));
+  assert.strictEqual(m.subject, '¿Cómo te va con Khamrah y Man Ice?');
+  assert.ok(/cómo te va con ambos/.test(m.bodyHtml));
+  const m3 = pp.buildPostPurchaseEmail(ctx({ kind: 'followup', bought: [khamrah, manIce, silver].map(p => ({ p, type: 'full' })), picks: [] }));
+  assert.strictEqual(m3.subject, '¿Cómo te va con tu pedido?');
 });
 t('con una sola recomendación el texto va en singular', () => {
   const picks = pp.recommend([khamrah], catalogue, {}, {}).slice(0, 1);
-  const m = pp.buildPostPurchaseEmail(ctx({ kind: 'followup', bought: [{ p: khamrah, type: 'full' }], picks }));
+  const m = pp.buildPostPurchaseEmail(ctx({ kind: 'reorder', bought: [{ p: khamrah, type: 'full' }], picks }));
   assert.ok(/eligió una fragancia/.test(m.bodyHtml) && !/entre ellas/.test(m.bodyHtml));
 });
 t('la incorporación reciente respeta género y rango de precio', () => {

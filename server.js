@@ -9629,7 +9629,7 @@ async function ppNezNote(bought) {
           role: 'system',
           content: `Eres Nez, sommelier de Sillage Parfumerie. Escribe 2 o 3 oraciones de seguimiento para alguien que recibió su pedido hace unas semanas.
 VOZ: directa y cálida, sin presión, sin frases de servicio al cliente ("esperamos que disfrutes", "no dudes en contactarnos").
-REGLAS: habla solo de lo que compró y usa EXCLUSIVAMENTE los datos que te doy (no inventes notas, duración, precios ni opiniones ajenas). No nombres otros perfumes: las sugerencias aparecen debajo en tarjetas. Invita a contarte cómo le fue. Sin asteriscos, listas ni emojis. Termina con: — Nez`,
+REGLAS: habla solo de lo que compró y usa EXCLUSIVAMENTE los datos que te doy (no inventes notas, duración, precios ni opiniones ajenas). No nombres otros perfumes ni vendas nada: debajo van unos tips de uso, no los repitas. Es un saludo para seguir cerca, no una oferta. Invita a contarte cómo le fue. Sin asteriscos, listas ni emojis. Termina con: — Nez`,
         }, { role: 'user', content: `Compró:\n${facts}` }],
       }),
     });
@@ -9648,8 +9648,9 @@ async function buildPostPurchaseForOrder(order, kind, gate) {
   try { items = JSON.parse(order.items || '[]'); } catch (e) {}
   const bought = ppBoughtFromItems(items, ctx.catalogue);
   if (!bought.length) return null;
-  const picks = postpurchase.recommend(bought.map(b => b.p), ctx.catalogue, ctx.invMap, ctx.priceMap, { n: 3 });
-  if (!picks.length) return null;
+  // El de los 14 días es solo acompañamiento (sin productos): no necesita recomendaciones.
+  const picks = kind === 'followup' ? [] : postpurchase.recommend(bought.map(b => b.p), ctx.catalogue, ctx.invMap, ctx.priceMap, { n: 3 });
+  if (!picks.length && kind !== 'followup') return null;
   const noteHtml = kind === 'followup' ? await ppNezNote(bought) : null;
   const exclude = new Set([...bought.map(b => Number(b.p.id)), ...picks.map(pk => Number(pk.p.id))]);
   const newArrival = kind === 'winback' ? postpurchase.newestAvailable(ctx.catalogue, ctx.invMap, exclude, bought.map(b => b.p), ctx.priceMap) : null;

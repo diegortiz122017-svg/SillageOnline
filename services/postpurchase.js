@@ -222,6 +222,23 @@ function closingLine(picks, ctx) {
   return picks.length === 1 ? 'Si tienes dudas, cuéntale a Nez y te ayuda a decidir.' : 'Si dudas entre ellas, cuéntale a Nez y te ayuda a decidir.';
 }
 
+// Tips de uso para el primer seguimiento. Los datos de cada perfume (proyección, duración) salen de su
+// ficha; el resto son consejos generales de uso y cuidado que no afirman nada del producto.
+function usageTips(products) {
+  const tips = [];
+  for (const p of (products || []).slice(0, 2)) {
+    const s = norm(p.sillage || '');
+    const sprays = s === 'light' ? 'con 3 o 4 aplicaciones (cuello, muñecas y pecho) se nota sin saturar'
+      : s === 'moderate' ? 'suelen bastar 2 o 3 aplicaciones'
+      : (s === 'strong' || s === 'very strong') ? 'con 1 o 2 aplicaciones rinde, y más puede saturar' : '';
+    const facts = [SILLAGE_ES[s], hoursEs(p)].filter(Boolean).join(' y ');
+    if (facts && sprays) tips.push(`${p.name}: según su ficha tiene ${facts}; ${sprays}.`);
+  }
+  tips.push('Aplícalo sobre la piel hidratada y en puntos de pulso (cuello y muñecas): el aroma se fija mejor.');
+  tips.push('Guárdalo lejos del calor y de la luz directa (ojo con dejarlo en el carro): así conserva su aroma por más tiempo.');
+  return tips;
+}
+
 // ctx: { kind:'followup'|'reorder'|'winback', firstName, bought:[{p,type}], picks, noteHtml?,
 //        newArrival?, decantsEnabled, decantOut, priceMap, catalogue, invMap }
 function buildPostPurchaseEmail(ctx) {
@@ -234,25 +251,27 @@ function buildPostPurchaseEmail(ctx) {
   const campaign = kind === 'followup' ? 'pp14' : kind === 'reorder' ? 'pp45' : 'pp120';
   const med = 'postpurchase';
   const card = (p, why) => productCard(p, why, campaign, ctx, med);
-  const nezQ = bought.length
-    ? `Compré ${bought.map(b => b.p.brand + ' ' + b.p.name).slice(0, 2).join(' y ')} y quiero algo parecido, o distinto pero que me guste.`
-    : 'Quiero que me ayudes a elegir mi próximo perfume.';
+  const boughtLabel = bought.map(b => b.p.brand + ' ' + b.p.name).slice(0, 2).join(' y ');
+  const nezQ = !bought.length ? 'Quiero que me ayudes a elegir mi próximo perfume.'
+    : kind === 'followup' ? `Compré ${boughtLabel} hace unas semanas. ¿Me das tips para sacarle el mayor provecho?`
+    : `Compré ${boughtLabel} y quiero algo parecido, o distinto pero que me guste.`;
   const btn = label => `<a href="${esc(nu.nezUrl(campaign, nezQ, med))}" style="${S.btn}">${esc(label)}</a>`;
   let subject, body;
 
   if (kind === 'followup') {
-    const picks = ctx.picks || [];
-    const ideas = picks.length === 1 ? 'Una idea' : picks.length === 2 ? 'Dos ideas' : 'Tres ideas';
-    subject = bought.length === 1 ? `¿Cómo te fue con ${first.name}? ${ideas} en la misma línea`
-      : bought.length === 2 ? `¿Cómo te fue con ${names}? ${ideas} para seguir`
-      : `¿Cómo te fue con tu pedido? ${ideas} para seguir`;
+    // Primer contacto tras la entrega: acompañar, NO vender. Sin tarjetas de producto, precios ni
+    // decants; solo una nota cercana, tips de uso con datos del catálogo y una invitación a responder.
+    subject = bought.length === 1 ? `¿Cómo te va con ${first.name}?`
+      : bought.length === 2 ? `¿Cómo te va con ${names}?`
+      : '¿Cómo te va con tu pedido?';
     const intro = ctx.noteHtml
       ? `<div style="border-left:3px solid #b8955a;padding:12px 16px;margin:0 0 20px;background:#faf8f4"><p style="font-size:10px;letter-spacing:3px;text-transform:uppercase;color:#b8955a;margin:0 0 8px">Nez te escribe</p><p style="font-family:Georgia,serif;font-size:14px;color:#4a3f35;line-height:1.9;margin:0;font-style:italic">${ctx.noteHtml}</p></div>`
-      : `<p style="${S.p}">Hace unas semanas recibiste ${esc(names)}. ¿Cómo te fue con ${bought.length === 1 ? 'él' : bought.length === 2 ? 'ambos' : 'ellos'}?</p>`;
+      : `<p style="${S.p}">Hace unas semanas recibiste ${esc(names)} y solo queríamos saber cómo te va con ${bought.length === 1 ? 'él' : bought.length === 2 ? 'ambos' : 'ellos'}.</p>`;
+    const tips = usageTips(bought.map(b => b.p));
     body = `<h2 style="${S.h}">Hola ${esc(firstName || '')}${firstName ? ' 👋' : ''}</h2>${intro}
-      ${leadIn(names, picks, bought.length > 1)}
-      ${picks.map(pk => card(pk.p, pk.reason)).join('')}
-      <p style="${S.p}">${closingLine(picks, ctx)}</p>
+      <p style="${S.p}">Por si te sirve, unos tips para sacarle más provecho:</p>
+      <ul style="margin:0 0 16px;padding-left:18px;font-size:13px;color:#6b6258;line-height:1.8">${tips.map(x => `<li style="margin:0 0 6px">${esc(x)}</li>`).join('')}</ul>
+      <p style="${S.p}">Y si quieres contarnos cómo te fue —lo que te gustó y lo que no—, responde este correo y nos llega directo.</p>
       ${btn('Hablar con Nez')}`;
   } else if (kind === 'reorder') {
     const picks = ctx.picks || [];
@@ -291,6 +310,6 @@ function buildPostPurchaseEmail(ctx) {
 }
 
 module.exports = {
-  recommend, buildPostPurchaseEmail, newestAvailable, isDecantType, similarity, buildIndex,
+  recommend, buildPostPurchaseEmail, newestAvailable, isDecantType, similarity, buildIndex, usageTips,
   MIN_SIMILAR, MIN_DIFFERENT,
 };

@@ -4355,7 +4355,7 @@ function loadFollowupV2(){
     }
     document.getElementById('ppEnabled').checked=!!d.enabled;
     document.getElementById('ppSince').value=d.since?String(d.since).slice(0,10):'';
-    sub.textContent=(d.enabled?'ACTIVO':'APAGADO')+' · Correo con recomendaciones según lo que la persona compró, a quien compró con o sin cuenta: a los 14 días de la entrega, de recompra a los ~45 días y de reactivación a los ~120. '+
+    sub.textContent=(d.enabled?'ACTIVO':'APAGADO')+' · A quien compró, con o sin cuenta: a los 14 días de la entrega un saludo de acompañamiento (sin productos ni precios: tips de uso y una invitación a contar cómo le fue), y después correos con recomendaciones según lo que compró: de recompra a los ~45 días y de reactivación a los ~120. '+
       'Se envía entre 10:00 y 11:59 (hora de El Salvador), máximo 25 por pasada, nunca dos al mismo correo en 5 días, ni a quien volvió a comprar o se dio de baja'+(d.optouts?' ('+fmtN(d.optouts)+' bajas de invitados)':'')+'. '+
       'Los pedidos ya entregados desde la fecha de abajo que nunca tuvieron seguimiento reciben, según su antigüedad: seguimiento atrasado (14–45 días), recompra (45–100) o reactivación (más de 120). Al activar, se envían de a 25 por pasada, así que los atrasados salen en varios días."Compraron" es una correlación (pedido real en los 14 días siguientes). '+
       'Las aperturas llegan por webhook de Resend: no son exactas (Apple Mail abre solo y otros clientes bloquean la imagen); el clic y la compra son señales más fiables.'+
@@ -4428,7 +4428,7 @@ function previewFollowupV2(){
       '<strong style="color:var(--cream)">Asunto:</strong> '+esc(d.subject)+'<br/>'+
       '<strong style="color:var(--cream)">Pedido:</strong> '+esc(d.orderId)+' · '+esc(d.status)+' · '+esc(d.email)+(d.guest?' (sin cuenta)':'')+'<br/>'+
       '<strong style="color:var(--cream)">Compró:</strong> '+esc(d.boughtNames.join(', '))+'<br/>'+
-      '<strong style="color:var(--cream)">Recomienda:</strong> '+esc(d.pickNames.join(', '))+'<br/>'+
+      (d.pickNames&&d.pickNames.length?'<strong style="color:var(--cream)">Recomienda:</strong> '+esc(d.pickNames.join(', '))+'<br/>':'<span>Este correo no recomienda productos: es solo un acompañamiento.</span><br/>')+
       (d.blocked?'<span style="color:#d98a3a">No lo recibiría ahora: '+esc(d.blocked)+'.</span><br/>':'')+
       (d.status!=='Entregado'?'<span style="color:#d98a3a">El pedido no está "Entregado": el envío real solo ocurre con pedidos entregados.</span><br/>':'')+
     '</div>';
