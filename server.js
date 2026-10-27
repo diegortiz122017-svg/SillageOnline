@@ -33,6 +33,7 @@ const { calcIntensity } = require('./services/noteIntensity');
 const { calcChords, analyzeChords } = require('./services/chords');
 const nurture           = require('./services/nurture');
 const postpurchase      = require('./services/postpurchase');
+const shareimg          = require('./services/shareimg');
 
 // logActivity also broadcasts to admin WebSocket clients
 async function logActivity(msg) {
@@ -2059,6 +2060,32 @@ app.get(ADMIN_ROUTE, (req, res) => {
 // Los rastreadores sociales (WhatsApp, Instagram, iMessage, Telegram, Facebook, X) no ejecutan JS:
 // leen las etiquetas OG del HTML. Esta función devuelve el HTML de la página con las etiquetas
 // (y el JSON-LD) del perfume `p`: su foto, nombre, eslogan y precio, en vez del logo genérico.
+// Quita las etiquetas genéricas (incl. og:image/twitter que la página pudiera traer) y pone las del
+// producto o bundle: así nunca quedan duplicadas y el rastreador toma la primera.
+// m: { title, desc, imgUrl, hasCard (imagen 1200x630), alt, url, type, canonical }
+function applyShareMeta(html, m) {
+  html = html
+    .replace(/<meta property="og:(?:title|description|url|type|image[^"]*)"[^>]*\/>\s*/g, '')
+    .replace(/<meta name="twitter:[^"]*"[^>]*\/>\s*/g, '')
+    .replace(/<title>[\s\S]*?<\/title>/, `<title>${escHtml(m.title)}</title>`)
+    .replace('</head>',
+      `<meta property="og:title" content="${escHtml(m.title)}"/>
+<meta property="og:description" content="${escHtml(m.desc)}"/>
+<meta property="og:image" content="${escHtml(m.imgUrl)}"/>${m.hasCard ? `
+<meta property="og:image:width" content="1200"/>
+<meta property="og:image:height" content="630"/>` : ''}
+<meta property="og:image:alt" content="${escHtml(m.alt)}"/>
+<meta property="og:url" content="${m.url}"/>
+<meta property="og:type" content="${m.type || 'website'}"/>
+<meta name="twitter:card" content="summary_large_image"/>
+<meta name="twitter:title" content="${escHtml(m.title)}"/>
+<meta name="twitter:description" content="${escHtml(m.desc)}"/>
+<meta name="twitter:image" content="${escHtml(m.imgUrl)}"/>
+</head>`);
+  if (m.canonical) html = html.replace(/<link rel="canonical"[^>]*\/>/, `<link rel="canonical" href="${m.url}"/>`);
+  return html;
+}
+
 async function injectProductMeta(html, p, url, opts = {}) {
     const BASE   = process.env.BASE_URL || 'https://sillage-sv.com';
     // Foto del perfume como imagen de la vista previa. Las de Cloudinary se encuadran a 1200x630
@@ -2078,25 +2105,7 @@ async function injectProductMeta(html, p, url, opts = {}) {
 
     // Quita las etiquetas genéricas (incl. og:image/twitter que la página pudiera traer) y
     // pone las del producto: así nunca quedan duplicadas y el rastreador toma la primera.
-    html = html
-      .replace(/<meta property="og:(?:title|description|url|type|image[^"]*)"[^>]*\/>\s*/g, '')
-      .replace(/<meta name="twitter:[^"]*"[^>]*\/>\s*/g, '')
-      .replace(/<title>[\s\S]*?<\/title>/, `<title>${escHtml(title)}</title>`)
-      .replace('</head>',
-        `<meta property="og:title" content="${escHtml(title)}"/>
-<meta property="og:description" content="${escHtml(desc)}"/>
-<meta property="og:image" content="${escHtml(imgUrl)}"/>${hasCard ? `
-<meta property="og:image:width" content="1200"/>
-<meta property="og:image:height" content="630"/>` : ''}
-<meta property="og:image:alt" content="${escHtml(p.brand + ' ' + p.name)}"/>
-<meta property="og:url" content="${url}"/>
-<meta property="og:type" content="product"/>
-<meta name="twitter:card" content="summary_large_image"/>
-<meta name="twitter:title" content="${escHtml(title)}"/>
-<meta name="twitter:description" content="${escHtml(desc)}"/>
-<meta name="twitter:image" content="${escHtml(imgUrl)}"/>
-</head>`);
-    if (opts.canonical) html = html.replace(/<link rel="canonical"[^>]*\/>/, `<link rel="canonical" href="${url}"/>`);
+    html = applyShareMeta(html, { title, desc, imgUrl, hasCard, alt: p.brand + ' ' + p.name, url, type: 'product', canonical: opts.canonical });
     // Inject Schema.org JSON-LD for product structured data
     // LLMs and search engines use this to understand the product
     const schema = {
@@ -2160,6 +2169,55 @@ async function findProductBySlug(slug) {
   return catalogue.find(p => nurture.slugify(p.brand + '-' + p.name) === want) || null;
 }
 
+// Bundle activo por slug o por id. Mismo criterio que GET /api/bundles: con la venta de decants
+// apagada no se muestran (ni se comparten con vista previa) los bundles que los incluyen.
+async function findBundle({ slug, id }) {
+  const decantsOn = (await getSetting('decants_enabled', '1')) !== '0';
+  const [rows] = await db.query('SELECT * FROM bundles WHERE active=1 ORDER BY created_at DESC');
+  for (const b of rows) {
+    if (slug != null ? nurture.slugify(b.name) !== String(slug).toLowerCase() : Number(b.id) !== Number(id)) continue;
+    let items = [];
+    try { items = JSON.parse(b.items || '[]'); } catch (e) {}
+    if (!decantsOn && bundleHasDecants(items)) return null;
+    return { ...b, items };
+  }
+  return null;
+}
+
+// Etiquetas de vista previa de un bundle: collage con las fotos de sus perfumes (services/shareimg.js).
+// Si el collage no se puede armar (menos de 2 fotos, fotos fuera de Cloudinary…), usa la foto del
+// primer perfume y, sin fotos, un asset real del sitio: la vista previa nunca queda sin imagen.
+async function injectBundleMeta(html, b, url) {
+  const BASE = process.env.BASE_URL || 'https://sillage-sv.com';
+  const catalogue = await getCatalogue();
+  const prods = [], seen = new Set();
+  for (const it of b.items) {
+    const p = catalogue.find(x => Number(x.id) === parseInt(it && it.productId, 10));
+    if (p && !seen.has(p.id)) { seen.add(p.id); prods.push(p); }
+  }
+  const abs = u => (String(u).startsWith('http') ? u : BASE + u);
+  const photos = prods.map(p => p.photos && p.photos[0]).filter(Boolean).map(abs);
+  let imgUrl = shareimg.bundleCollageUrl(photos);
+  let hasCard = !!imgUrl;
+  if (!imgUrl && photos.length) {
+    imgUrl = photos[0];
+    hasCard = /res\.cloudinary\.com/.test(imgUrl) && imgUrl.includes('/upload/');
+    if (hasCard) imgUrl = imgUrl.replace('/upload/', '/upload/c_pad,w_1200,h_630,b_rgb:f2ede4,f_jpg,q_auto:good/');
+  }
+  if (!imgUrl) imgUrl = `${BASE}/apple-touch-icon.png`;
+
+  const price = parseFloat(b.price) || 0, orig = parseFloat(b.orig_price) || 0;
+  const save = orig > price ? ` · Ahorras $${Math.round((orig - price) * 100) / 100}` : '';
+  const intro = String(b.description || '').trim().slice(0, 110);
+  const names = prods.slice(0, 4).map(p => `${p.brand} ${p.name}`).join(', ') + (prods.length > 4 ? ' y más' : '');
+  const desc = intro ? `${intro} · $${price}${save}`
+    : `${prods.length ? prods.length + (prods.length === 1 ? ' fragancia: ' : ' fragancias: ') + names + ' · ' : 'Bundle de fragancias · '}$${price}${save}`;
+  return applyShareMeta(html, {
+    title: `${b.name} — Bundle · Sillage Parfumerie`, desc, imgUrl, hasCard,
+    alt: `${b.name}${names ? ': ' + names : ''}`, url, type: 'website', canonical: true,
+  });
+}
+
 app.get('/', async (req, res) => {
   const fs   = require('fs');
   const index = path.join(__dirname, 'index.html');
@@ -2204,8 +2262,28 @@ async function sendTiendaWithProduct(req, res, p, url) {
   }
   return res.sendFile(tienda);
 }
+// Igual, para un bundle (collage de sus perfumes como imagen de la vista previa).
+async function sendTiendaWithBundle(req, res, b) {
+  const fs = require('fs');
+  const tienda = path.join(__dirname, 'tienda.html');
+  if (b && fs.existsSync(tienda)) {
+    try {
+      const BASE = process.env.BASE_URL || 'https://sillage-sv.com';
+      return res.send(await injectBundleMeta(fs.readFileSync(tienda, 'utf8'), b, `${BASE}/bundle/${nurture.slugify(b.name)}`));
+    } catch (e) {
+      console.warn('OG bundle tag generation failed:', e.message);
+    }
+  }
+  return res.sendFile(tienda);
+}
 app.get('/tienda', async (req, res) => {
   const id = parseInt(req.query.producto);
+  const bid = parseInt(req.query.bundle);
+  if (!id && bid) {
+    let b = null;
+    try { b = await findBundle({ id: bid }); } catch (e) {}
+    return sendTiendaWithBundle(req, res, b);
+  }
   let p = null;
   if (id) { try { p = (await getCatalogue()).find(x => x.id === id) || null; } catch (e) {} }
   const BASE = process.env.BASE_URL || 'https://sillage-sv.com';
@@ -2233,11 +2311,15 @@ app.get('/fragancia/:slug', async (req, res) => {
   res.redirect('/');
 });
 
-app.get('/bundle/:slug', (req, res) => {
+app.get('/bundle/:slug', async (req, res) => {
   const fs     = require('fs');
   const tienda = path.join(__dirname, 'tienda.html');
   const index  = path.join(__dirname, 'index.html');
-  if (fs.existsSync(tienda)) return res.sendFile(tienda);
+  if (fs.existsSync(tienda)) {
+    let b = null;
+    try { b = await findBundle({ slug: req.params.slug }); } catch (e) {}
+    return sendTiendaWithBundle(req, res, b);
+  }
   if (fs.existsSync(index))  return res.sendFile(index);
   res.redirect('/');
 });
