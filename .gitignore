@@ -5,3 +5,6 @@ uploads/
 
 # Artefactos de compilación Maven (Railway los genera en el build).
 target/
+
+# Dependencias instaladas localmente.
+node_modules/

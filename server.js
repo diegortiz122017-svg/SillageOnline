@@ -34,6 +34,7 @@ const { calcChords, analyzeChords } = require('./services/chords');
 const nurture           = require('./services/nurture');
 const postpurchase      = require('./services/postpurchase');
 const shareimg          = require('./services/shareimg');
+const collectionimg     = require('./services/collectionimg');
 const productmatch      = require('./services/productmatch');
 const collectionsSvc    = require('./services/collections');
 
@@ -2281,7 +2282,11 @@ async function findCollectionBySlug(slug) {
 async function injectCollectionMeta(html, c, url) {
   const BASE = process.env.BASE_URL || 'https://sillage-sv.com';
   const prods = collectionsSvc.collectionProducts(c, await getCatalogue());
-  const { imgUrl, hasCard } = previewImageFor(prods.filter(p => p.photos && p.photos[0]).slice(0, 4), BASE);
+  // Portada de la colección (nombre + frase, como su página); si no se puede dibujar, collage con sus fotos.
+  const card = { name: c.name, tagline: c.description };
+  const { imgUrl, hasCard } = collectionimg.available()
+    ? { imgUrl: `${BASE}/coleccion/${collectionsSvc.collectionSlug(c)}/og.png?v=${collectionimg.cardVersion(card)}`, hasCard: true }
+    : previewImageFor(prods.filter(p => p.photos && p.photos[0]).slice(0, 4), BASE);
   const n = prods.length;
   const intro = String(c.description || '').trim().slice(0, 120);
   const count = n ? `${n} ${n === 1 ? 'fragancia' : 'fragancias'}` : '';
@@ -2290,6 +2295,18 @@ async function injectCollectionMeta(html, c, url) {
     title: `${c.name} — Colección · Sillage Parfumerie`, desc, imgUrl, hasCard, alt: `Colección ${c.name}`, url, type: 'website', canonical: true,
   });
 }
+// Imagen de vista previa de la colección (PNG 1200x630). La URL lleva ?v=<huella>, así que puede cachearse mucho.
+app.get('/coleccion/:slug/og.png', async (req, res) => {
+  try {
+    const c = await findCollectionBySlug(req.params.slug);
+    const png = c && collectionimg.renderCollectionPng({ name: c.name, tagline: c.description });
+    if (png) {
+      res.set({ 'Content-Type': 'image/png', 'Cache-Control': 'public, max-age=86400' });
+      return res.send(png);
+    }
+  } catch (e) { console.warn('OG collection image failed:', e.message); }
+  res.redirect(302, '/og-default.png');
+});
 app.get('/coleccion/:slug', async (req, res) => {
   const fs = require('fs');
   const tienda = path.join(__dirname, 'tienda.html');
