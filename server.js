@@ -2277,11 +2277,11 @@ async function sendTiendaWithProduct(req, res, p, url) {
 // Colección activa por slug (las de la base de datos; las predeterminadas viven solo en el navegador).
 async function findCollectionBySlug(slug) {
   const [rows] = await db.query('SELECT * FROM collections WHERE active=1 ORDER BY sort_order ASC, id ASC');
-  return rows.find(c => collectionsSvc.collectionSlug(c) === String(slug || '').toLowerCase()) || null;
+  return collectionsSvc.findCollection(rows, slug);
 }
 async function injectCollectionMeta(html, c, url) {
   const BASE = process.env.BASE_URL || 'https://sillage-sv.com';
-  const prods = collectionsSvc.collectionProducts(c, await getCatalogue());
+  const prods = c.builtin ? [] : collectionsSvc.collectionProducts(c, await getCatalogue());   // las predeterminadas no tienen conteo en el servidor
   // Portada de la colección (nombre + frase, como su página); si no se puede dibujar, collage con sus fotos.
   const card = { name: c.name, tagline: c.description };
   const { imgUrl, hasCard } = collectionimg.available()

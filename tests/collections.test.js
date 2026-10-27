@@ -1,7 +1,7 @@
 'use strict';
 // Pruebas de las colecciones del lado del servidor. Ejecutar:  node tests/collections.test.js
 const assert = require('assert');
-const { collectionProducts, collectionSlug } = require('../services/collections');
+const { collectionProducts, collectionSlug, findCollection, DEFAULT_COLLECTIONS } = require('../services/collections');
 
 let passed = 0;
 function t(name, fn) { fn(); passed++; console.log('ok  -', name); }
@@ -40,6 +40,19 @@ t('el slug coincide con el de los perfumes y bundles (sin acentos ni signos)', (
   assert.strictEqual(collectionSlug({ name: 'Para la Oficina' }), 'para-la-oficina');
   assert.strictEqual(collectionSlug({ name: 'Noches de Verano & Playa' }), 'noches-de-verano-playa');
   assert.strictEqual(collectionSlug({ name: 'Cálidas y Dulces' }), 'calidas-y-dulces');
+});
+
+t('sin colecciones en la base de datos se reconocen las predeterminadas (como hace el navegador)', () => {
+  assert.strictEqual(findCollection([], 'para-regalar').name, 'Para Regalar');
+  assert.strictEqual(findCollection(null, 'frescos-citricos').name, 'Frescos & Cítricos');
+  assert.strictEqual(findCollection([], 'la-oficina').builtin, true);
+  assert.strictEqual(findCollection([], 'no-existe'), null);
+  assert.strictEqual(DEFAULT_COLLECTIONS.length, 6);
+});
+t('con colecciones en la base de datos mandan solo esas', () => {
+  const rows = [{ name: 'Mi Selección', type: 'manual', product_ids: '[1]' }];
+  assert.strictEqual(findCollection(rows, 'mi-seleccion').name, 'Mi Selección');
+  assert.strictEqual(findCollection(rows, 'para-regalar'), null);
 });
 
 console.log(`\n${passed} pruebas pasaron`);

@@ -37,4 +37,24 @@ function collectionProducts(c, catalogue) {
 
 const collectionSlug = c => slugify(c.name);
 
-module.exports = { collectionProducts, collectionSlug };
+// Colecciones predeterminadas de la tienda (CURATED_FALLBACK en tienda.html): el navegador las usa SOLO
+// cuando la base de datos no tiene ninguna activa. Aquí van únicamente nombre y frase (lo que necesita la
+// vista previa al compartir); a qué perfumes alcanzan lo decide el navegador, por eso no hay conteo.
+const DEFAULT_COLLECTIONS = [
+  { name: 'La Oficina',         description: 'Presente sin saturar. El tipo que hace que pregunten.' },
+  { name: 'Noche Especial',     description: 'Para cuando quieres dejar rastro.' },
+  { name: 'Frescos & Cítricos', description: 'Abre una ventana. Energía inmediata.' },
+  { name: 'Para Regalar',       description: 'Piezas que impresionan. Para quien merece lo mejor.' },
+  { name: 'Los Más Vendidos',   description: 'Las fragancias más queridas por nuestros clientes.' },
+  { name: 'Una Primera Cita',   description: 'Suave, memorable. Que invite a acercarse.' },
+].map(c => Object.assign({ builtin: true }, c));
+
+// rows: colecciones activas de la base de datos. Misma regla que el navegador: si hay alguna, solo esas;
+// si no hay ninguna, las predeterminadas.
+function findCollection(rows, slug) {
+  const want = String(slug || '').toLowerCase();
+  const pool = rows && rows.length ? rows : DEFAULT_COLLECTIONS;
+  return pool.find(c => collectionSlug(c) === want) || null;
+}
+
+module.exports = { collectionProducts, collectionSlug, findCollection, DEFAULT_COLLECTIONS };
