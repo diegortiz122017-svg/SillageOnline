@@ -211,19 +211,19 @@ nav a:hover{color:var(--gold)}
 #colView{display:none;background:var(--warm-white);color:var(--charcoal);padding:2rem 4rem 6rem;min-height:70vh}
 body.col-mode #colView{display:block}
 body.col-mode #home,body.col-mode #shop,body.col-mode #tiendaCollections,body.col-mode #bundles-section{display:none!important}
-.cv-inner{max-width:1400px;margin:0 auto}
-.cv-back{display:inline-flex;align-items:center;gap:0.45rem;background:none;border:none;color:var(--muted);font-family:'Jost',sans-serif;font-size:0.64rem;letter-spacing:0.2em;text-transform:uppercase;cursor:pointer;padding:0.4rem 0;margin-bottom:2rem;transition:color 0.2s}
-.cv-back:hover{color:var(--gold)}
-.cv-head{max-width:760px;margin:0 auto 3.2rem;text-align:center;position:relative}
-.cv-eyebrow{display:block;font-size:0.6rem;letter-spacing:0.35em;text-transform:uppercase;color:var(--gold);margin-bottom:0.9rem}
-.cv-title{font-family:'Cormorant Garamond',serif;font-size:clamp(2.4rem,5vw,3.8rem);font-weight:300;line-height:1.1;color:var(--charcoal);margin-bottom:0.9rem}
-.cv-desc{font-size:0.9rem;color:var(--muted);line-height:1.8;max-width:560px;margin:0 auto 1rem}
-.cv-meta{display:flex;align-items:center;justify-content:center;gap:0.6rem;font-size:0.62rem;letter-spacing:0.2em;text-transform:uppercase;color:var(--gold)}
-.cv-others{margin-top:4.5rem;padding-top:2.6rem;border-top:1px solid rgba(184,149,90,0.15);text-align:center}
-.cv-others h3{font-size:0.6rem;letter-spacing:0.3em;text-transform:uppercase;color:var(--muted);font-weight:400;margin-bottom:1.1rem}
-.cv-chip{display:inline-block;margin:0.25rem;padding:0.6rem 1.1rem;background:transparent;border:1px solid rgba(184,149,90,0.35);color:var(--charcoal);font-family:'Jost',sans-serif;font-size:0.72rem;letter-spacing:0.08em;cursor:pointer;transition:all 0.2s}
-.cv-chip:hover{border-color:var(--gold);background:rgba(184,149,90,0.08);color:var(--gold)}
-@media(max-width:900px){#colView{padding:1.4rem 1.2rem 4rem}.cv-head{margin-bottom:2.2rem}}
+.colv-inner{max-width:1400px;margin:0 auto}
+.colv-back{display:inline-flex;align-items:center;gap:0.45rem;background:none;border:none;color:var(--muted);font-family:'Jost',sans-serif;font-size:0.64rem;letter-spacing:0.2em;text-transform:uppercase;cursor:pointer;padding:0.4rem 0;margin-bottom:2rem;transition:color 0.2s}
+.colv-back:hover{color:var(--gold)}
+.colv-head{max-width:760px;margin:0 auto 3.2rem;text-align:center;position:relative}
+.colv-eyebrow{display:block;font-size:0.6rem;letter-spacing:0.35em;text-transform:uppercase;color:var(--gold);margin-bottom:0.9rem}
+.colv-title{font-family:'Cormorant Garamond',serif;font-size:clamp(2.4rem,5vw,3.8rem);font-weight:300;line-height:1.1;color:var(--charcoal);margin-bottom:0.9rem}
+.colv-desc{font-size:0.9rem;color:var(--muted);line-height:1.8;max-width:560px;margin:0 auto 1rem}
+.colv-meta{display:flex;align-items:center;justify-content:center;gap:0.6rem;font-size:0.62rem;letter-spacing:0.2em;text-transform:uppercase;color:var(--gold)}
+.colv-others{margin-top:4.5rem;padding-top:2.6rem;border-top:1px solid rgba(184,149,90,0.15);text-align:center}
+.colv-others h3{font-size:0.6rem;letter-spacing:0.3em;text-transform:uppercase;color:var(--muted);font-weight:400;margin-bottom:1.1rem}
+.colv-chip{display:inline-block;margin:0.25rem;padding:0.6rem 1.1rem;background:transparent;border:1px solid rgba(184,149,90,0.35);color:var(--charcoal);font-family:'Jost',sans-serif;font-size:0.72rem;letter-spacing:0.08em;cursor:pointer;transition:all 0.2s}
+.colv-chip:hover{border-color:var(--gold);background:rgba(184,149,90,0.08);color:var(--gold)}
+@media(max-width:900px){#colView{padding:1.4rem 1.2rem 4rem}.colv-head{margin-bottom:2.2rem}}
 @media(max-width:768px){.catalog-more{padding:2rem 1rem 0.6rem}}
 .card-img{position:relative;height:320px;background:linear-gradient(135deg,#f8f4ee,#ede8df);display:flex;align-items:center;justify-content:center;overflow:hidden}
 .view-overlay{position:absolute;inset:0;z-index:2;display:flex;align-items:center;justify-content:center;opacity:0;transition:opacity 0.3s;background:rgba(14,12,10,0.35)}
@@ -2314,13 +2314,13 @@ footer{background:var(--dark);padding:3.5rem 4rem;text-align:center;border-top:1
 
 <!-- PÁGINA DE UNA COLECCIÓN (vista /coleccion/<nombre>) -->
 <section id="colView" aria-label="Colección">
-  <div class="cv-inner">
-    <button type="button" class="cv-back" onclick="closeCollectionView()">&larr; Volver a la tienda</button>
-    <div class="cv-head">
-      <span class="cv-eyebrow">Colección</span>
-      <h1 class="cv-title" id="cvTitle"></h1>
-      <p class="cv-desc" id="cvDesc"></p>
-      <div class="cv-meta"><span id="cvCount"></span>
+  <div class="colv-inner">
+    <button type="button" class="colv-back" onclick="closeCollectionView()">&larr; Volver a la tienda</button>
+    <div class="colv-head">
+      <span class="colv-eyebrow">Colección</span>
+      <h1 class="colv-title" id="cvTitle"></h1>
+      <p class="colv-desc" id="cvDesc"></p>
+      <div class="colv-meta"><span id="cvCount"></span>
         <button type="button" class="bd-share-btn" id="cvShare" aria-label="Compartir esta colección" title="Compartir"><svg class="bd-share-ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 15V4"/><path d="M8 8l4-4 4 4"/><path d="M5 13v6a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1v-6"/></svg><span class="bd-share-txt">&#8682; Compartir</span></button>
       </div>
     </div>
@@ -2330,7 +2330,7 @@ footer{background:var(--dark);padding:3.5rem 4rem;text-align:center;border-top:1
       <div class="cm-bar"><span id="cvMoreBar" style="width:0"></span></div>
       <button type="button" class="cm-btn" onclick="cvRenderMore()"><span>Ver más fragancias</span><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="6 9 12 15 18 9"/></svg></button>
     </div>
-    <div class="cv-others" id="cvOthers" style="display:none"><h3>Otras colecciones</h3><div id="cvOthersList"></div></div>
+    <div class="colv-others" id="cvOthers" style="display:none"><h3>Otras colecciones</h3><div id="cvOthersList"></div></div>
   </div>
 </section>
 
@@ -7769,7 +7769,7 @@ function cvRenderOthers(){
     var has = (P||[]).some(function(p){ try{ return c.filter(p); }catch(e){ return false; } });
     if(!has) return;
     var b = document.createElement('button');
-    b.type = 'button'; b.className = 'cv-chip'; b.textContent = c.name;
+    b.type = 'button'; b.className = 'colv-chip'; b.textContent = c.name;
     b.addEventListener('click', function(){ openCollectionView(c); });
     list.appendChild(b); shown++;
   });
