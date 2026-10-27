@@ -1723,6 +1723,14 @@ tr:hover td{background:rgba(255,255,255,0.02)}
             <div id="dteManualEmailWarn" style="display:none;font-size:0.62rem;color:#d98a3a;width:100%">Escribe el correo del cliente arriba para poder enviarle la factura.</div>
           </div>
 
+          <!-- Registrar también como pedido -->
+          <div style="display:flex;align-items:flex-start;gap:0.5rem;margin-bottom:0.9rem">
+            <input type="checkbox" id="dteManualRegister" checked style="margin-top:0.2rem"/>
+            <label class="dte-lbl" for="dteManualRegister" style="margin:0;text-transform:none;letter-spacing:0.02em">Registrar también como pedido (cuenta en Pedidos, ventas y clientes)
+              <span style="display:block;color:var(--muted);font-size:0.58rem;margin-top:0.15rem">No lo marques si es una corrección o un reenvío de una venta que ya tiene pedido. Solo en producción; no aplica a notas de crédito. Si no lo marcas ahora, puedes hacerlo después desde la lista de documentos.</span>
+            </label>
+          </div>
+
           <!-- Líneas de la transacción -->
           <label class="dte-lbl">Ítems (precio con IVA incluido)</label>
           <div id="dteManualItems" style="margin:0.3rem 0 0.5rem"></div>
@@ -3011,6 +3019,7 @@ function loadDteDocuments(){
   adminFetch(url,{}).then(function(r){return r?r.json():[];}).then(function(rows){
     if(!rows||!rows.length){ tb.innerHTML='<tr><td colspan="9" style="text-align:center;padding:2rem;color:var(--muted)">Sin documentos.</td></tr>'; return; }
     var tipoTxt={'01':'FC','03':'CCF','05':'NC'};
+    window._dteDocs={}; rows.forEach(function(r){ window._dteDocs[r.id]=r; });
     tb.innerHTML=rows.map(function(r){
       var fecha=r.createdAt?String(r.createdAt).slice(0,10):'—';
       var sello=r.selloRecibido?('<span title="'+_dteEsc(r.selloRecibido)+'">'+_dteEsc(r.selloRecibido).slice(0,10)+'…</span>'):'—';
@@ -3018,8 +3027,11 @@ function loadDteDocuments(){
       var jsonLink='<a href="#" onclick="dteViewJson('+r.id+');return false" style="color:var(--gold)">JSON</a> · <a href="#" onclick="dteDownloadJson('+r.id+');return false" style="color:var(--muted)">↓</a>'+
         (r.estado==='PROCESADO'?' · <a href="#" onclick="dteDownloadPdf('+r.id+');return false" style="color:var(--gold)">PDF</a>':'');
       var obs=r.observaciones?('<div style="font-size:0.56rem;color:#d98a3a;max-width:280px">'+_dteEsc(r.observaciones)+'</div>'):'';
+      var orderBit = r.hasOrder ? '<div style="font-size:0.54rem;color:#5fb87a;margin-top:0.15rem">✓ Es un pedido</div>'
+        : ((r.tipoDte==='01'||r.tipoDte==='03') && r.estado!=='RECHAZADO'
+          ? '<div style="margin-top:0.15rem"><a href="#" onclick="dteCreateOrder('+r.id+');return false" style="font-size:0.56rem;color:var(--gold)" title="Crea un pedido con los datos de este DTE">Marcar como pedido</a></div>' : '');
       return '<tr>'+
-        '<td>'+_dteEsc(r.orderId)+'</td>'+
+        '<td>'+_dteEsc(r.orderId)+orderBit+'</td>'+
         '<td>'+(tipoTxt[r.tipoDte]||r.tipoDte)+'</td>'+
         '<td>'+_dteEsc(r.ambiente)+'</td>'+
         '<td><span style="color:'+_dteEstadoColor(r.estado)+'">'+_dteEsc(r.estado)+'</span>'+obs+'</td>'+
@@ -3031,6 +3043,23 @@ function loadDteDocuments(){
       '</tr>';
     }).join('');
   }).catch(function(){ tb.innerHTML='<tr><td colspan="9" style="text-align:center;padding:2rem;color:#d9534f">Error.</td></tr>'; });
+}
+
+// Convierte un DTE emitido a mano en un pedido (Entregado y Pagado; se puede cambiar luego en Pedidos).
+function dteCreateOrder(id){
+  var r=(window._dteDocs||{})[id]; if(!r) return;
+  var quien=(r.customer?(' de '+r.customer):'')+(r.total!=null?(' por $'+Number(r.total).toFixed(2)):'');
+  if(!confirm('¿Crear un pedido a partir de este DTE'+quien+'?\n\nQuedará como Entregado y Pagado, y contará en Pedidos, ventas y clientes. No recibirá correos automáticos de seguimiento.')) return;
+  var allowTest=false;
+  if(r.ambiente!=='01'){
+    if(!confirm('Este documento es de PRUEBAS (ambiente '+r.ambiente+'), no una venta real.\n\n¿Registrarlo como pedido de todas formas?')) return;
+    allowTest=true;
+  }
+  adminFetch(API+'/admin/dte/documents/'+id+'/create-order',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({allowTest:allowTest})})
+    .then(function(x){return x?x.json():null;}).then(function(d){
+      if(d&&d.ok){ toast('Pedido registrado',d.orderId+' · $'+Number(d.total).toFixed(2),'ok'); loadDteDocuments(); }
+      else toast('No se pudo registrar',(d&&d.error)||'Sin respuesta','err');
+    }).catch(function(){ toast('Error','Error de conexión','err'); });
 }
 
 // Abre un payload de DTE (con jsonDte) en una pestaña nueva, formateado.
@@ -3264,6 +3293,7 @@ function dteManualEmit(){
     paymentMethod:document.getElementById('dteManualPago').value,
     items:items,
     sendEmail:sendEmail,
+    registerOrder:(tipo!=='05')&&!!(document.getElementById('dteManualRegister')||{}).checked,
     reason:document.getElementById('dteManualReason').value,
     customMessage:(document.getElementById('dteManualCustomMsg').value||'').trim()||undefined
   };
@@ -3295,6 +3325,8 @@ function dteManualEmit(){
       (d.selloRecibido?' · Sello '+_dteEsc(d.selloRecibido).slice(0,16)+'…':'')+
       (d.total!=null?' · $'+_dteEsc(Number(d.total).toFixed(2)):'')+
       (sendEmail?(d.emailSent?' · <span style="color:var(--gold)">✓ Correo enviado</span>':' · <span style="color:#d9534f">Correo NO enviado</span>'):'')+
+      (d.orderCreated?' · <span style="color:#5fb87a">✓ Registrado como pedido</span>':'')+
+      (d.orderNote?'<div style="color:#d98a3a;margin-top:0.3rem">'+_dteEsc(d.orderNote)+'</div>':'')+
       (d.observaciones?'<div style="color:#d98a3a;margin-top:0.3rem">'+_dteEsc(d.observaciones)+'</div>':'');
     // Tras una emisión PROCESADA, limpiar el formulario para no enviar dobles.
     if(d.ok) dteManualReset();
@@ -3308,6 +3340,7 @@ function dteManualReset(){
     var el=document.getElementById(id); if(el) el.value='';
   });
   document.getElementById('dteManualSendEmail').checked=false;
+  var _rg=document.getElementById('dteManualRegister'); if(_rg) _rg.checked=true;
   document.getElementById('dteManualReason').value='compra_manual';
   dteManualToggleEmail();
   dteManualRecalc();
@@ -3855,7 +3888,7 @@ function renderOrdersList(list, banner){
     div.innerHTML=
       '<div class="oc-top">'+
         '<div>'+
-          '<div class="oc-id">'+esc(o.id)+'</div>'+
+          '<div class="oc-id">'+esc(o.id)+(o.origin==='manual_dte'?' <span style="font-size:0.5rem;letter-spacing:0.08em;text-transform:uppercase;color:var(--gold);border:1px solid var(--gold);padding:0.05rem 0.35rem;margin-left:0.4rem" title="Registrado desde un DTE emitido a mano">Manual · DTE</span>':'')+'</div>'+
           '<div class="oc-name">'+esc(o.customer)+'</div>'+
           '<div class="oc-email">'+esc(o.email)+(o.phone?' &nbsp;·&nbsp; 📞 '+esc(o.phone):'')+'</div>'+
         '</div>'+

@@ -1421,7 +1421,43 @@ async function checkConnectivity() {
   return out;
 }
 
+// Reconstruye los datos de un pedido a partir de un DTE ya emitido. La emisión manual desde el admin
+// arma el pedido solo en memoria (id "MAN-…") y no deja fila en `orders`; esto permite registrarla
+// después. Los precios de los ítems quedan CON IVA incluido (como los captura el admin y como los
+// guarda el checkout): la Factura (01) ya los trae así y el CCF (03) los guarda netos, se les suma el IVA.
+// row: fila de dte_documents { order_id, tipo_dte, json_dte, customer, email, total }.
+function orderFromDteDoc(row) {
+  let j = {};
+  try { j = typeof row.json_dte === 'string' ? JSON.parse(row.json_dte) : (row.json_dte || {}); } catch (e) {}
+  const tipo = String(row.tipo_dte);
+  const lines = Array.isArray(j.cuerpoDocumento) ? j.cuerpoDocumento : [];
+  const items = lines.map(l => {
+    const unit = parseFloat(l.precioUni) || 0;
+    return {
+      productId: null,
+      name:  String(l.descripcion || 'Producto').slice(0, 200),
+      qty:   Math.max(1, parseInt(l.cantidad, 10) || 1),
+      price: tipo === '03' ? round2(unit * (1 + IVA_RATE)) : round2(unit),
+      type:  'full',
+    };
+  }).filter(it => it.price > 0);
+  const rec = j.receptor || {};
+  const dir = rec.direccion || {};
+  const sumItems = round2(items.reduce((s, it) => s + it.qty * it.price, 0));
+  const total = row.total != null && row.total !== '' ? round2(parseFloat(row.total))
+    : round2(parseFloat(j.resumen && j.resumen.totalPagar) || sumItems);
+  return {
+    id: row.order_id,
+    customer: String(row.customer || rec.nombre || 'Consumidor Final').slice(0, 250),
+    email: String(row.email || rec.correo || '').trim() || null,
+    phone: rec.telefono ? String(rec.telefono).slice(0, 30) : null,
+    address: dir.complemento ? String(dir.complemento) : null,
+    items, total,
+  };
+}
+
 module.exports = {
+  orderFromDteDoc,
   emitForOrder,
   getByOrderId,
   verificacionUrl,

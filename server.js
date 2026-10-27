@@ -726,6 +726,8 @@ async function migrateOrders() {
     "original_total     DECIMAL(10,2) DEFAULT NULL",
     "total_adjusted_at  DATETIME      DEFAULT NULL",
     "total_adjust_note  VARCHAR(255)  DEFAULT NULL",
+    // De dónde nació el pedido: NULL = checkout de la tienda · 'manual_dte' = registrado desde un DTE emitido a mano.
+    "origin             VARCHAR(20)   DEFAULT NULL",
   ];
   for (const col of cols) {
     const colName = col.trim().split(' ')[0];
@@ -3611,6 +3613,72 @@ app.post('/api/admin/dte/homologacion/emit', requireAdmin, async (req, res) => {
   } catch(e) { res.status(500).json({ error: e.message }); }
 });
 
+// Correos propios (emisor del DTE, remitentes, avisos al admin). Una emisión manual sin correo del cliente
+// cae al del emisor: esa dirección nunca debe tratarse como un cliente (seguimiento, lista de clientes…).
+function isInternalEmail(e) {
+  const s = String(e || '').trim().toLowerCase();
+  if (!s) return false;
+  return [cfg.DTE_EMISOR && cfg.DTE_EMISOR.correo, EMAIL_HOLA, EMAIL_PEDIDOS, cfg.FROM_EMAIL, cfg.ADMIN_NOTIFY_EMAIL]
+    .some(x => x && String(x).trim().toLowerCase() === s);
+}
+
+// Registra en `orders` una venta emitida a mano (DTE manual): así cuenta en Pedidos, ventas, clientes y
+// estadísticas. Usa el MISMO id que ya lleva el DTE (p. ej. "MAN-…"), por lo que el documento queda enlazado.
+// No duplica: devuelve false si ya existe un pedido con ese id.
+const MANUAL_ORDER_STEPS = { 'Pendiente de Pago': 0, 'Procesando': 1, 'Empaquetado': 2, 'Enviado': 3, 'Entregado': 4 };
+async function insertManualOrder(o, opts = {}) {
+  const [ex] = await db.execute('SELECT 1 FROM orders WHERE id=? LIMIT 1', [o.id]);
+  if (ex.length) return false;
+  const now = new Date();
+  const status = MANUAL_ORDER_STEPS[opts.status] != null ? opts.status : 'Entregado';
+  let customerId = null;
+  if (o.email && !isInternalEmail(o.email)) {
+    const [c] = await db.execute('SELECT id FROM customers WHERE LOWER(email)=? LIMIT 1', [String(o.email).trim().toLowerCase()]);
+    if (c.length) customerId = c[0].id;
+  }
+  const items = (o.items || []).map(i => ({
+    productId: null, type: 'full', ...i,
+    total: Math.round((Number(i.qty) || 1) * (Number(i.price) || 0) * 100) / 100,
+  }));
+  await db.execute(
+    `INSERT INTO orders (id,customer,email,phone,address,items,total,status,payment_status,payment_method,tracker_step,customer_id,origin,created_at,updated_at)
+     VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
+    [o.id, String(o.customer || 'Consumidor Final').slice(0, 250), String(o.email || (cfg.DTE_EMISOR && cfg.DTE_EMISOR.correo) || '').slice(0, 200),
+     o.phone || null, o.address || null, JSON.stringify(items), o.total, status, opts.paymentStatus || 'Pagado',
+     String(opts.paymentMethod || 'manual').slice(0, 50), MANUAL_ORDER_STEPS[status], customerId, 'manual_dte',
+     o.createdAt || now, now]
+  );
+  return true;
+}
+
+// POST /api/admin/dte/documents/:id/create-order — convierte un DTE emitido a mano en un pedido.
+//   body: { status?: 'Entregado'|..., paymentStatus?: 'Pagado'|'Pendiente', allowTest?: bool }
+app.post('/api/admin/dte/documents/:id/create-order', requireAdmin, async (req, res) => {
+  try {
+    const [rows] = await db.execute('SELECT * FROM dte_documents WHERE id=? LIMIT 1', [parseInt(req.params.id, 10)]);
+    if (!rows.length) return res.status(404).json({ error: 'Documento no encontrado.' });
+    const d = rows[0];
+    if (!['01', '03'].includes(String(d.tipo_dte))) return res.status(400).json({ error: 'Solo una Factura (01) o un CCF (03) puede registrarse como pedido; una nota de crédito es un ajuste, no una venta.' });
+    if (d.estado === 'RECHAZADO') return res.status(400).json({ error: 'El documento fue RECHAZADO por Hacienda: no corresponde a una venta.' });
+    const b = req.body || {};
+    if (String(d.ambiente) !== '01' && !b.allowTest) {
+      return res.status(409).json({ code: 'TEST_ENV', error: 'Es un documento de PRUEBAS (ambiente ' + d.ambiente + '), no una venta real.' });
+    }
+    const o = dteSvc.orderFromDteDoc(d);
+    if (!o.items.length) return res.status(422).json({ error: 'No se pudieron leer los ítems de ese DTE.' });
+    o.createdAt = d.created_at;
+    const created = await insertManualOrder(o, {
+      status: b.status, paymentStatus: b.paymentStatus === 'Pendiente' ? 'Pendiente' : 'Pagado', paymentMethod: 'manual',
+    });
+    if (!created) return res.status(409).json({ error: 'Ya existe un pedido con el número ' + o.id + '.' });
+    await logActivity(`Pedido ${o.id} registrado desde el DTE manual ${d.numero_control || d.id} ($${o.total})`);
+    res.json({ ok: true, orderId: o.id, total: o.total });
+  } catch (e) {
+    console.error('create-order from DTE error:', e.message);
+    res.status(500).json({ error: 'No se pudo registrar el pedido.' });
+  }
+});
+
 // POST /api/admin/dte/emit-manual — emite un DTE con los detalles reales capturados a mano.
 // Sirve igual en homologación y en PRODUCCIÓN: el admin escribe cliente, ítems y pago.
 //   body: { tipoDte, receptor?:{nit,nrc,nombre}, customer?, email?, phone?,
@@ -3675,6 +3743,23 @@ app.post('/api/admin/dte/emit-manual', requireAdmin, async (req, res) => {
     }
     const rec = await dteSvc.emitForOrder(order, options);
 
+    // Registro opcional como pedido (casilla del formulario). Solo en producción: en pruebas (ambiente 00)
+    // no se crean pedidos para no ensuciar ventas y estadísticas; ahí queda el botón por documento.
+    let orderCreated = false, orderNote = null;
+    if (b.registerOrder && rec && rec.estado !== 'RECHAZADO' && tipoDte !== '05') {
+      if (cfg.DTE_AMBIENTE !== '01') {
+        orderNote = 'Ambiente de pruebas: no se registró como pedido.';
+      } else {
+        try {
+          orderCreated = await insertManualOrder({
+            id: order.id, customer: order.customer, email: b.email ? String(b.email).trim() : null, phone: order.phone,
+            address: b.receptor && b.receptor.complemento ? String(b.receptor.complemento) : null, items, total,
+          }, { paymentMethod: order.payment_method });
+          if (!orderCreated) orderNote = 'Ya existía un pedido con ese número.';
+        } catch (e) { orderNote = 'No se pudo registrar el pedido: ' + e.message; }
+      }
+    }
+
     // Envío opcional del correo al cliente — nunca al correo de respaldo del
     // emisor (order.email cae ahí si no se dio un correo real, ver arriba).
     let emailSent = false;
@@ -3699,6 +3784,7 @@ app.post('/api/admin/dte/emit-manual', requireAdmin, async (req, res) => {
       total,
       numItems:      items.length,
       emailSent,
+      orderCreated, orderNote,
     });
   } catch(e) { res.status(500).json({ error: e.message }); }
 });
@@ -3829,10 +3915,11 @@ app.get('/api/admin/dte/documents', requireAdmin, async (req, res) => {
   try {
     const estado = req.query.estado;
     const limit  = Math.min(parseInt(req.query.limit, 10) || 100, 500);
-    let sql = 'SELECT id, order_id, tipo_dte, ambiente, estado, numero_control, codigo_generacion, sello_recibido, observaciones, created_at FROM dte_documents';
+    let sql = 'SELECT d.id, d.order_id, d.tipo_dte, d.ambiente, d.estado, d.numero_control, d.codigo_generacion, d.sello_recibido, d.observaciones, d.created_at, d.customer, d.total, ' +
+      '(SELECT COUNT(*) FROM orders o WHERE o.id = d.order_id) AS has_order FROM dte_documents d';
     const params = [];
-    if (estado) { sql += ' WHERE estado=?'; params.push(estado); }
-    sql += ' ORDER BY id DESC LIMIT ' + limit;
+    if (estado) { sql += ' WHERE d.estado=?'; params.push(estado); }
+    sql += ' ORDER BY d.id DESC LIMIT ' + limit;
     const [rows] = await db.execute(sql, params);
     res.json((rows || []).map(r => {
       const fecEmi = (r.created_at instanceof Date ? r.created_at.toISOString() : String(r.created_at)).slice(0, 10);
@@ -3847,6 +3934,9 @@ app.get('/api/admin/dte/documents', requireAdmin, async (req, res) => {
         selloRecibido:    r.sello_recibido,
         observaciones:    r.observaciones,
         createdAt:        r.created_at,
+        customer:         r.customer || null,
+        total:            r.total != null ? Number(r.total) : null,
+        hasOrder:         Number(r.has_order) > 0,
         verificacionUrl:  r.codigo_generacion ? dteSvc.verificacionUrl(r.codigo_generacion, fecEmi) : null,
       };
     }));
@@ -7094,6 +7184,7 @@ app.get('/api/admin/guest-customers', requireAdmin, async (req, res) => {
     );
     const by = new Map();
     for (const r of rows) {                                   // más reciente primero
+      if (isInternalEmail(r.email)) continue;               // ventas manuales sin correo del cliente caen al del emisor
       const key = String(r.email).trim().toLowerCase();
       let g = by.get(key);
       if (!g) { g = { email: key, name: '', phone: '', address: '', city: '', state: '', country: '', orders: 0, spent: 0, firstOrder: null, lastOrder: r.created_at, orderIds: [] }; by.set(key, g); }
@@ -9674,7 +9765,7 @@ async function buildPostPurchaseForOrder(order, kind, gate) {
 // Devuelve 'sent' | 'skipped' | 'error'.
 async function ppSendOne(order, kind) {
   const email = String(order.email || '').trim().toLowerCase();
-  if (!ppValidEmail(email)) return 'skipped';
+  if (!ppValidEmail(email) || isInternalEmail(email)) return 'skipped';
   try {
     await db.execute("INSERT INTO post_purchase_log (order_id, kind, email, variant, sent_at) VALUES (?, ?, ?, 'X', ?)",
       [order.id, kind, email, new Date()]);
@@ -9714,7 +9805,7 @@ async function ppCollectPending(now) {
   const [due] = await db.execute(
     `SELECT id, customer, email, customer_id, items, created_at FROM orders
      WHERE followup_scheduled_at IS NOT NULL AND followup_scheduled_at <= ? AND followup_sent_at IS NULL
-       AND status = 'Entregado' ORDER BY followup_scheduled_at ASC LIMIT 200`, [now]);
+       AND status = 'Entregado' AND (origin IS NULL OR origin <> 'manual_dte') ORDER BY followup_scheduled_at ASC LIMIT 200`, [now]);
   for (const o of due) items.push({ o, kind: 'followup' });
 
   const since = await ppSince();
@@ -9724,7 +9815,7 @@ async function ppCollectPending(now) {
     const [rows] = await db.execute(
       `SELECT o.id, o.customer, o.email, o.customer_id, o.items, o.created_at, o.followup_scheduled_at, o.followup_sent_at,
               COALESCE(DATE_SUB(o.followup_scheduled_at, INTERVAL 14 DAY), o.updated_at) AS delivered_at
-       FROM orders o WHERE o.status = 'Entregado'
+       FROM orders o WHERE o.status = 'Entregado' AND (o.origin IS NULL OR o.origin <> 'manual_dte')
          AND COALESCE(DATE_SUB(o.followup_scheduled_at, INTERVAL 14 DAY), o.updated_at) BETWEEN ? AND ?
        ORDER BY delivered_at DESC LIMIT 800`, [lower, upper]);
     const [paid] = await db.execute(
@@ -9743,7 +9834,7 @@ async function ppCollectPending(now) {
     const seen = new Set();
     for (const o of rows) {
       const e = String(o.email || '').trim().toLowerCase();
-      if (!ppValidEmail(e) || seen.has(e)) continue;
+      if (!ppValidEmail(e) || isInternalEmail(e) || seen.has(e)) continue;
       seen.add(e);                                         // solo el pedido más reciente de cada correo
       if (outSet.has(e) || recentSet.has(e)) continue;
       if ((lastBuy.get(e) || 0) > new Date(o.created_at).getTime()) continue;   // ya volvió a comprar
@@ -9759,7 +9850,7 @@ async function ppCollectPending(now) {
     }
   }
   const counts = { followup: 0, reorder: 0, winback: 0 };
-  items.forEach(it => { if (ppValidEmail(it.o.email)) counts[it.kind]++; });
+  items.forEach(it => { if (ppValidEmail(it.o.email) && !isInternalEmail(it.o.email)) counts[it.kind]++; });
   return { items, counts, total: counts.followup + counts.reorder + counts.winback };
 }
 
