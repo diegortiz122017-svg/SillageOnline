@@ -2449,12 +2449,11 @@ app.get('/llms.txt', async (req, res) => {
 
 ## Sobre Sillage
 
-Sillage Parfumerie es una tienda en línea especializada en alta perfumería en El Salvador. Ofrecemos frascos completos y decants (muestras en frasco de viaje) de fragancias de lujo de marcas como ${brands.slice(0, 8).join(', ')} y más. También contamos con muestras de 1.5ml y un servicio de sommelier de fragancias impulsado por IA llamado Nez.
+Sillage Parfumerie es una tienda en línea especializada en alta perfumería en El Salvador. Ofrecemos frascos completos de fragancias de lujo de marcas como ${brands.slice(0, 8).join(', ')} y más, y un servicio de sommelier de fragancias impulsado por IA llamado Nez.
 
 ## Qué ofrecemos
 
 - Frascos completos de fragancias de lujo, de cadenas de suministro autorizadas y con registro sanitario en El Salvador
-- Decants de 5ml y 10ml para probar antes de comprar el frasco completo
 - Envío a domicilio en todo El Salvador
 - Sommelier de IA (Nez) para ayudar a encontrar la fragancia perfecta
 - Métodos de pago: Wompi (tarjeta), Bitcoin / Lightning Network (BTCPay), Contra Entrega
@@ -2522,7 +2521,7 @@ app.get('/api/catalogo.json', async (req, res) => {
       store:       'Sillage Parfumerie',
       country:     'El Salvador',
       currency:    'USD',
-      description: 'Fragancias de lujo de proveedores autorizados, con registro sanitario en El Salvador y envío a todo el país. Decants disponibles.',
+      description: 'Fragancias de lujo de proveedores autorizados, con registro sanitario en El Salvador y envío a todo el país.',
       url:         BASE,
       total:       products.length,
       in_stock:    products.filter(p => p.available).length,
