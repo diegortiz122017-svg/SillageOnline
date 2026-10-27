@@ -1216,8 +1216,8 @@ tr:hover td{background:rgba(255,255,255,0.02)}
           <div class="page-sub" id="ppSub" style="margin-bottom:1rem">Cargando…</div>
           <div class="tbl-wrap" style="overflow-x:auto;margin-bottom:1rem">
             <table id="ppTable" style="min-width:520px">
-              <thead><tr><th>Correo</th><th>Enviados</th><th>Omitidos</th><th>Entregados</th><th>Abrieron</th><th>Hicieron clic</th><th>Rebotaron</th><th>Compraron en 14 días</th></tr></thead>
-              <tbody id="ppBody"><tr><td colspan="8" style="text-align:center;padding:1.2rem;color:var(--muted)">Cargando…</td></tr></tbody>
+              <thead><tr><th>Correo</th><th>Enviados</th><th>Omitidos</th><th>Entregados</th><th>Abrieron</th><th>Hicieron clic</th><th>Clic en redes</th><th>Rebotaron</th><th>Compraron en 14 días</th></tr></thead>
+              <tbody id="ppBody"><tr><td colspan="9" style="text-align:center;padding:1.2rem;color:var(--muted)">Cargando…</td></tr></tbody>
             </table>
           </div>
           <div style="display:flex;gap:1rem;flex-wrap:wrap;align-items:flex-end;margin-bottom:1rem">
@@ -4350,7 +4350,7 @@ function loadFollowupV2(){
   adminFetch(API+'/admin/followup-v2',{}).then(function(r){return r?r.json():null;}).then(function(d){
     if(!d||d.error||!Array.isArray(d.rows)){
       sub.textContent='No se pudieron cargar los resultados'+(d&&d.error?' ('+d.error+')':'')+'.';
-      tbody.innerHTML='<tr><td colspan="8" style="text-align:center;padding:1.2rem;color:#d9534f">Error al cargar.</td></tr>';
+      tbody.innerHTML='<tr><td colspan="9" style="text-align:center;padding:1.2rem;color:#d9534f">Error al cargar.</td></tr>';
       return;
     }
     document.getElementById('ppEnabled').checked=!!d.enabled;
@@ -4366,12 +4366,12 @@ function loadFollowupV2(){
     tbody.innerHTML=['followup','reorder','winback'].map(function(k){
       var r=by[k]||{sent:0,skipped:0,bought:0,delivered:0,opened:0,clicked:0,bounced:0};
       return '<tr><td>'+esc(PP_KINDS[k])+'</td><td>'+fmtN(r.sent)+'</td><td>'+fmtN(r.skipped)+'</td>'+
-        '<td>'+pc(r.delivered,r.sent)+'</td><td>'+pc(r.opened,r.sent)+'</td><td>'+pc(r.clicked,r.sent)+'</td><td>'+pc(r.bounced,r.sent)+'</td>'+
+        '<td>'+pc(r.delivered,r.sent)+'</td><td>'+pc(r.opened,r.sent)+'</td><td>'+pc(r.clicked,r.sent)+'</td><td>'+pc(r.social||0,r.sent)+'</td><td>'+pc(r.bounced,r.sent)+'</td>'+
         '<td>'+pc(r.bought,r.sent)+'</td></tr>';
     }).join('');
   }).catch(function(){
     sub.textContent='No se pudieron cargar los resultados.';
-    tbody.innerHTML='<tr><td colspan="8" style="text-align:center;padding:1.2rem;color:#d9534f">Error al cargar.</td></tr>';
+    tbody.innerHTML='<tr><td colspan="9" style="text-align:center;padding:1.2rem;color:#d9534f">Error al cargar.</td></tr>';
   });
 }
 var _ppTimer=null, _ppWasRunning=false;

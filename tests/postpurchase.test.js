@@ -69,16 +69,38 @@ t('correo de 14 días: solo acompañamiento — sin tarjetas, precios, decants n
   const m = pp.buildPostPurchaseEmail(ctx({ kind: 'followup', bought: [{ p: khamrah, type: 'full' }], picks: [] }));
   assert.strictEqual(m.campaign, 'pp14');
   assert.ok(!/\/fragancia\//.test(m.bodyHtml), 'no debe enlazar productos');
+  assert.ok(!/(utm_campaign=pp14)[^"]*"[^>]*>[^<]*(Compra|Comprar|Pide)/i.test(m.bodyHtml), 'ningún botón de compra');
   assert.ok(!/\$\d|Frasco|[Dd]ecant|eligió/.test(m.bodyHtml), 'no debe mostrar precios, decants ni recomendaciones');
   assert.ok(/cómo te va con él/.test(m.bodyHtml) && /responde este correo/.test(m.bodyHtml));
   assert.strictEqual(m.subject, '¿Cómo te va con Khamrah?');
 });
-t('correo de 14 días: el único enlace es a Nez, con UTM (utm_medium=postpurchase, campaña pp14) para medir el clic', () => {
+t('correo de 14 días: el enlace a Nez lleva UTM (utm_medium=postpurchase, campaña pp14) para medir el clic', () => {
   const m = pp.buildPostPurchaseEmail(ctx({ kind: 'followup', bought: [{ p: khamrah, type: 'full' }], picks: [] }));
   const links = m.bodyHtml.match(/href="[^"]+"/g) || [];
-  assert.strictEqual(links.length, 1);
-  assert.ok(/\/nez\?utm_source=email&amp;utm_medium=postpurchase&amp;utm_campaign=pp14/.test(links[0]), links[0]);
-  assert.ok(/tips%20para%20sacarle/.test(links[0]), 'la pregunta a Nez es de uso, no de compra');
+  const nez = links.filter(l => /\/nez\?/.test(l));
+  assert.strictEqual(nez.length, 1);
+  assert.ok(/utm_source=email&amp;utm_medium=postpurchase&amp;utm_campaign=pp14/.test(nez[0]), nez[0]);
+  assert.ok(/tips%20para%20sacarle/.test(nez[0]), 'la pregunta a Nez es de uso, no de compra');
+});
+t('correo de 14 días: invita a seguir en Instagram y Facebook (y no en los correos de venta)', () => {
+  const m = pp.buildPostPurchaseEmail(ctx({ kind: 'followup', bought: [{ p: khamrah, type: 'full' }], picks: [] }));
+  assert.ok(/seguir cerca, nos encuentras en/.test(m.bodyHtml));
+  assert.ok(/href="https:\/\/www\.instagram\.com\/sillage_sv_oficial\/"/.test(m.bodyHtml) && /@sillage_sv_oficial/.test(m.bodyHtml));
+  assert.ok(/href="https:\/\/www\.facebook\.com\/profile\.php\?id=61590520170493"/.test(m.bodyHtml));
+  const picks = pp.recommend([khamrah], catalogue, {}, {});
+  assert.ok(!/instagram|facebook/i.test(pp.buildPostPurchaseEmail(ctx({ kind: 'reorder', bought: [{ p: khamrah, type: 'full' }], picks })).bodyHtml));
+});
+t('las redes se pueden cambiar o quitar por variable de entorno', () => {
+  const env = process.env;
+  try {
+    process.env.SOCIAL_INSTAGRAM_URL = 'https://www.instagram.com/otra_cuenta/';
+    process.env.SOCIAL_FACEBOOK_URL = 'off';
+    const m = pp.buildPostPurchaseEmail(ctx({ kind: 'followup', bought: [{ p: khamrah, type: 'full' }], picks: [] }));
+    assert.ok(/otra_cuenta/.test(m.bodyHtml) && !/facebook/i.test(m.bodyHtml));
+    process.env.SOCIAL_INSTAGRAM_URL = 'off';
+    const m2 = pp.buildPostPurchaseEmail(ctx({ kind: 'followup', bought: [{ p: khamrah, type: 'full' }], picks: [] }));
+    assert.ok(!/seguir cerca/.test(m2.bodyHtml), 'sin redes no debe quedar la frase suelta');
+  } finally { delete process.env.SOCIAL_INSTAGRAM_URL; delete process.env.SOCIAL_FACEBOOK_URL; }
 });
 t('tips de uso: los datos salen de la ficha y el resto son consejos generales', () => {
   const tips = pp.usageTips([{ ...khamrah, sillage: 'Strong', long: '12+ Hours' }]);

@@ -9801,7 +9801,8 @@ app.get('/api/admin/followup-v2', requireAdmin, async (req, res) => {
     const [rows] = await db.execute(
       `SELECT l.kind, SUM(l.variant = 'OK') AS sent, SUM(l.variant = 'S') AS skipped,
               ${ppEventSum('email.delivered')} AS delivered, ${ppEventSum('email.opened')} AS opened,
-              ${ppEventSum('email.clicked')} AS clicked, ${ppEventSum('email.bounced')} AS bounced,
+              ${ppEventSum('email.clicked', PP_CONTENT_CLICK)} AS clicked, ${ppEventSum('email.clicked', `ev.link REGEXP '${PP_SOCIAL_RE}'`)} AS social,
+              ${ppEventSum('email.bounced')} AS bounced,
               SUM(l.variant = 'OK' AND EXISTS (
                 SELECT 1 FROM orders o
                 WHERE LOWER(o.email) = l.email AND o.created_at >= l.sent_at AND o.created_at < DATE_ADD(l.sent_at, INTERVAL 14 DAY)
@@ -9814,7 +9815,7 @@ app.get('/api/admin/followup-v2', requireAdmin, async (req, res) => {
       enabled: await ppEnabled(),
       since: await getSetting('followup_v2_since', null),
       rows: rows.map(r => ({ kind: r.kind, sent: Number(r.sent) || 0, skipped: Number(r.skipped) || 0, bought: Number(r.bought) || 0,
-        delivered: Number(r.delivered) || 0, opened: Number(r.opened) || 0, clicked: Number(r.clicked) || 0, bounced: Number(r.bounced) || 0 })),
+        delivered: Number(r.delivered) || 0, opened: Number(r.opened) || 0, clicked: Number(r.clicked) || 0, social: Number(r.social) || 0, bounced: Number(r.bounced) || 0 })),
       optouts: Number(optouts.n) || 0,
       tracking: { webhook: !!process.env.RESEND_WEBHOOK_SECRET, events: Number(evCount.n) || 0 },
     });
@@ -9894,9 +9895,13 @@ app.post('/api/resend/webhook', async (req, res) => {
 });
 
 // Fragmento SQL: cuántos correos de post_purchase_log (alias l) tuvieron al menos un evento de ese tipo.
-function ppEventSum(type) {
+// `cond` (opcional) filtra por enlace: así un clic en las redes o en "darse de baja" no cuenta como
+// interés en el contenido del correo.
+const PP_SOCIAL_RE = "instagram[.]com|facebook[.]com";
+const PP_CONTENT_CLICK = `(ev.link IS NULL OR ev.link NOT REGEXP '${PP_SOCIAL_RE}|baja-correos|preferencias-email')`;
+function ppEventSum(type, cond) {
   return `SUM(l.variant = 'OK' AND l.resend_id IS NOT NULL AND EXISTS (
-    SELECT 1 FROM email_events ev WHERE ev.resend_id = l.resend_id AND ev.type = '${type}'))`;
+    SELECT 1 FROM email_events ev WHERE ev.resend_id = l.resend_id AND ev.type = '${type}'${cond ? ' AND ' + cond : ''}))`;
 }
 
 // Pendientes ahora mismo (lo mismo que enviaría el temporizador) y progreso del envío manual.

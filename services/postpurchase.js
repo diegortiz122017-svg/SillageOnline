@@ -13,6 +13,25 @@ const nu = require('./nurture');
 const { norm, esc, S, sameLine, available, decantOffered, effectivePrice, decantPrice,
   productCard, joinEs, displayNote, hoursEs, SILLAGE_ES, NOTE_ALIAS } = nu;
 
+// Redes de la tienda (las mismas del pie de index.html / tienda.html). Se pueden cambiar sin tocar
+// código con SOCIAL_INSTAGRAM_URL / SOCIAL_FACEBOOK_URL (poner "off" quita esa red del correo).
+function socialLinks() {
+  const pick = (envKey, fallback) => {
+    const v = String(process.env[envKey] || '').trim();
+    return v.toLowerCase() === 'off' ? '' : (v || fallback);
+  };
+  return [
+    { name: 'Instagram', handle: '@sillage_sv_oficial', url: pick('SOCIAL_INSTAGRAM_URL', 'https://www.instagram.com/sillage_sv_oficial/') },
+    { name: 'Facebook', handle: '', url: pick('SOCIAL_FACEBOOK_URL', 'https://www.facebook.com/profile.php?id=61590520170493') },
+  ].filter(s => s.url);
+}
+function socialLine() {
+  const links = socialLinks();
+  if (!links.length) return '';
+  const a = s => `<a href="${esc(s.url)}" style="color:#b8955a;text-decoration:none">${esc(s.name)}${s.handle ? ' (' + esc(s.handle) + ')' : ''}</a>`;
+  return `<p style="font-size:12px;color:#8a7f72;line-height:1.8;margin:18px 0 0">Si quieres seguir cerca, nos encuentras en ${links.map(a).join(' y ')}.</p>`;
+}
+
 const DECANT_TYPES = ['decant', 'decant5', 'sample'];
 const isDecantType = t => DECANT_TYPES.includes(String(t || '').toLowerCase());
 
@@ -272,7 +291,8 @@ function buildPostPurchaseEmail(ctx) {
       <p style="${S.p}">Por si te sirve, unos tips para sacarle más provecho:</p>
       <ul style="margin:0 0 16px;padding-left:18px;font-size:13px;color:#6b6258;line-height:1.8">${tips.map(x => `<li style="margin:0 0 6px">${esc(x)}</li>`).join('')}</ul>
       <p style="${S.p}">Y si quieres contarnos cómo te fue —lo que te gustó y lo que no—, responde este correo y nos llega directo.</p>
-      ${btn('Hablar con Nez')}`;
+      ${btn('Hablar con Nez')}
+      ${socialLine()}`;
   } else if (kind === 'reorder') {
     const picks = ctx.picks || [];
     const bottle = decantBought.find(p => available(p, ctx.invMap) && mlOf(p) >= 30);
@@ -310,6 +330,6 @@ function buildPostPurchaseEmail(ctx) {
 }
 
 module.exports = {
-  recommend, buildPostPurchaseEmail, newestAvailable, isDecantType, similarity, buildIndex, usageTips,
+  recommend, buildPostPurchaseEmail, newestAvailable, isDecantType, similarity, buildIndex, usageTips, socialLinks,
   MIN_SIMILAR, MIN_DIFFERENT,
 };
