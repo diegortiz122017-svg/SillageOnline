@@ -1628,6 +1628,34 @@ footer{background:var(--dark);padding:3.5rem 4rem;text-align:center;border-top:1
 .bdm-save{font-size:0.62rem;color:var(--bm-ok);background:rgba(63,122,82,0.1);border:1px solid rgba(63,122,82,0.3);padding:2px 8px}
 .bdm-ship{font-size:0.62rem;color:var(--bm-muted);margin-top:4px}
 .bundle-modal-footer .d-add-btn{width:auto;padding:0.9rem 1.6rem;white-space:nowrap}
+@media(min-width:601px){
+  .bundle-modal{max-width:700px;max-height:92vh}
+  .bdm-hero{height:clamp(190px,30vh,260px);gap:22px;padding:26px 32px 16px}
+  .bdm-fab{top:16px;width:38px;height:38px}
+  .bdm-fab-share{right:64px}
+  .bdm-fab-close{right:16px}
+  .bdm-head{padding:28px 36px 6px}
+  .bdm-eyebrow{font-size:0.64rem}
+  .bdm-name{font-size:2.6rem}
+  .bdm-desc{font-size:0.9rem;max-width:520px;margin:0.6rem 0 1rem}
+  .bdm-tag{font-size:0.64rem;padding:4px 11px}
+  .bundle-modal-body{padding:20px 36px 10px;gap:0.75rem}
+  .bundle-prod-row{padding:0.9rem;gap:1.2rem}
+  .bundle-prod-img{width:88px;height:88px}
+  .bundle-prod-brand{font-size:0.58rem}
+  .bundle-prod-name{font-size:1.4rem}
+  .bundle-prod-notes{font-size:0.78rem;margin-top:2px}
+  .bundle-prod-chip{font-size:0.64rem;margin-top:7px}
+  .bundle-prod-price{font-size:1.3rem}
+  .bdm-sum{margin:10px 36px 28px;padding:1.1rem 1.2rem;font-size:0.84rem;gap:0.55rem}
+  .bdm-sum-price{font-size:1.5rem}
+  .bundle-modal-footer{padding:20px 36px;gap:1.5rem}
+  .bdm-price{font-size:2.5rem}
+  .bdm-orig{font-size:0.9rem}
+  .bdm-save{font-size:0.7rem;padding:3px 10px}
+  .bdm-ship{font-size:0.7rem}
+  .bundle-modal-footer .d-add-btn{padding:1.05rem 2.4rem;font-size:0.7rem}
+}
 @media(max-width:600px){
   .bundle-modal-overlay{align-items:flex-end}
   .bundle-modal{width:100%;max-width:none;max-height:92vh;border-radius:18px 18px 0 0;border-bottom:none}
@@ -3048,7 +3076,7 @@ function loadViaREST() {
       var _bid = parseInt(_urlBundle);
       setTimeout(function(){
         var found = (window._allBundles||[]).find(function(b){ return b.id===_bid; });
-        if(found) openBundleDetail(found);
+        if(found) openBundleDetail(found, { fromLink: true });
       }, 600); // slightly longer delay to ensure bundles are loaded
       window.history.replaceState(null, '', window.location.pathname);
     }
@@ -3058,7 +3086,7 @@ function loadViaREST() {
       var _bslug = _bundleSlug[1];
       setTimeout(function(){
         var found = (window._allBundles||[]).find(function(b){ return slugify(b.name) === _bslug; });
-        if(found) openBundleDetail(found);
+        if(found) openBundleDetail(found, { fromLink: true });
       }, 700);
       window.history.replaceState(null, '', '/tienda');
     }
@@ -6224,10 +6252,10 @@ var _detailFromBundle = null;
 // en vez de dejar al cliente en la colección.
 var _detailFromNez = false;
 
-// Al abrir un bundle (típicamente por link compartido) dejamos la página de
-// fondo ya posicionada en la sección de Bundles de la tienda — invisible
-// mientras el modal está abierto, pero así, si lo cierran, ya están ahí en
-// vez de quedar en la parte de arriba de la tienda sin rastro del bundle.
+// Al abrir un bundle por un enlace compartido dejamos la página de fondo ya posicionada en la sección de
+// Bundles de la tienda — invisible mientras el modal está abierto, pero así, si lo cierran, ya están ahí en
+// vez de quedar en la parte de arriba de la tienda sin rastro del bundle. Solo para enlaces (opts.fromLink):
+// si la persona abrió el bundle desde una tarjeta, o volvió desde un perfume, la página no debe moverse.
 function scrollToBundlesSection(){
   var section = document.getElementById('bundles-section');
   if(section) section.scrollIntoView({ behavior: 'instant' });   // sin animación: el modal se abre encima
@@ -6253,9 +6281,9 @@ function _bundleItemChip(it){
 }
 function _money(n){ return '$' + (Math.round(n * 100) / 100).toFixed(2); }
 
-function openBundleDetail(b){
+function openBundleDetail(b, opts){
   _lastBundleViewed = b;
-  scrollToBundlesSection();
+  if(opts && opts.fromLink) scrollToBundlesSection();
   var items = b.items || [];
   var rows = items.map(function(it){
     var prod = (P||[]).find(function(p){ return p.id === it.productId || p.id === +it.productId; });
