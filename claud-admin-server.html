@@ -1149,7 +1149,10 @@ tr:hover td{background:rgba(255,255,255,0.02)}
               <div class="page-title" style="font-size:1.2rem">Bundles</div>
               <div class="page-sub">Crea y gestiona paquetes de decants con precios especiales</div>
             </div>
-            <button class="add-btn-lg" onclick="openBundleModal(null)">+ Nuevo Bundle</button>
+            <div style="display:flex;gap:0.6rem;flex-wrap:wrap">
+              <button class="bc-btn" id="bundleAiFillBtn" style="flex:none;padding:0.6rem 1rem" onclick="generateBundleDescriptions()" title="La IA redacta la descripción de los bundles que no tienen una">Redactar pendientes con IA</button>
+              <button class="add-btn-lg" onclick="openBundleModal(null)">+ Nuevo Bundle</button>
+            </div>
           </div>
           <div id="bundlesList" class="bundles-list"></div>
         </div><!-- end cat-tab-bundles -->
@@ -2042,8 +2045,8 @@ tr:hover td{background:rgba(255,255,255,0.02)}
         <input id="bmName" type="text" placeholder="Ej: Trio Oriental" style="width:100%;box-sizing:border-box;background:#0e0c0a;border:1px solid rgba(184,149,90,0.2);color:#e8dcc8;font-size:0.78rem;padding:0.5rem 0.7rem;outline:none"/>
       </div>
       <div>
-        <label style="display:block;font-size:0.6rem;letter-spacing:0.15em;text-transform:uppercase;color:#8a7f72;margin-bottom:0.4rem">Descripción</label>
-        <textarea id="bmDesc" rows="2" placeholder="Descripción breve..." style="width:100%;box-sizing:border-box;background:#0e0c0a;border:1px solid rgba(184,149,90,0.2);color:#e8dcc8;font-size:0.78rem;padding:0.5rem 0.7rem;outline:none;resize:vertical"></textarea>
+        <label style="display:block;font-size:0.6rem;letter-spacing:0.15em;text-transform:uppercase;color:#8a7f72;margin-bottom:0.4rem">Descripción <span id="bmDescAi" style="display:none;color:var(--gold,#b8955a);letter-spacing:0.08em;text-transform:none">· redactada por IA (si la editas, pasa a ser tuya)</span></label>
+        <textarea id="bmDesc" rows="2" placeholder="Opcional: si la dejas vacía, la IA la redacta al guardar" style="width:100%;box-sizing:border-box;background:#0e0c0a;border:1px solid rgba(184,149,90,0.2);color:#e8dcc8;font-size:0.78rem;padding:0.5rem 0.7rem;outline:none;resize:vertical"></textarea>
       </div>
       <div>
         <label style="display:block;font-size:0.6rem;letter-spacing:0.15em;text-transform:uppercase;color:#8a7f72;margin-bottom:0.4rem">Fragancias incluidas *</label>
@@ -6225,7 +6228,7 @@ function renderBundles(){
             '<span class="bc-badge '+(b.active?'active':'inactive')+'">'+(b.active?'Activo':'Inactivo')+'</span>'+
             '<span class="bc-badge" style="margin-left:0.3rem;border:1px solid var(--border-light);color:'+(b.hasDecants?'var(--muted)':'var(--gold)')+'" title="'+(b.hasDecants?'Se oculta y no se vende mientras la venta de decants esté desactivada':'Solo botellas: se vende aunque la venta de decants esté desactivada')+'">'+(b.hasDecants?'Con decants':'Solo botellas')+'</span>'+
           '</div>'+
-          (b.description?'<div class="bc-desc">'+esc(b.description)+'</div>':'')+
+          (b.description?'<div class="bc-desc">'+esc(b.description)+(b.description_ai?' <span style="color:var(--gold);font-size:0.55rem;letter-spacing:0.1em;text-transform:uppercase;white-space:nowrap">· IA</span>':'')+'</div>':'<div class="bc-desc" style="opacity:0.6">Sin descripción</div>')+
           '<div class="bc-items-list">'+itemsList+'</div>'+
           '<div class="bc-pricing">'+
             '<span class="bc-price">$'+parseFloat(b.price).toFixed(2)+'</span>'+
@@ -6251,6 +6254,7 @@ function openBundleModal(bundle){
   document.getElementById('bmTitle').textContent = bundle ? 'Editar Bundle' : 'Nuevo Bundle';
   document.getElementById('bmName').value      = bundle ? bundle.name        : '';
   document.getElementById('bmDesc').value      = bundle ? (bundle.description||'') : '';
+  document.getElementById('bmDescAi').style.display = (bundle && bundle.description_ai && bundle.description) ? 'inline' : 'none';
   document.getElementById('bmPrice').value     = bundle ? bundle.price       : '';
   document.getElementById('bmOrigPrice').value = bundle ? (bundle.orig_price||'') : '';
   document.getElementById('bmErr').textContent = '';
@@ -6324,14 +6328,39 @@ function saveBundle(){
   var method = _editingBundleId ? 'PATCH' : 'POST';
   var body   = { name:name, description:desc, items:items, price:price, orig_price:origPrice };
 
+  // Sin descripción escrita, el servidor la pide a la IA y puede tardar unos segundos.
+  var saveBtn = document.querySelector('#bundleModal button[onclick="saveBundle()"]');
+  var saveTxt = saveBtn ? saveBtn.textContent : '';
+  if(saveBtn){ saveBtn.disabled = true; saveBtn.textContent = desc ? 'Guardando...' : 'Redactando y guardando...'; }
+  function restore(){ if(saveBtn){ saveBtn.disabled = false; saveBtn.textContent = saveTxt; } }
   adminFetch(url,{method:method,headers:{'Content-Type':'application/json'},body:JSON.stringify(body)})
     .then(function(r){ if(!r)return null; return r.json(); })
     .then(function(res){
+      restore();
       if(!res) return;
-      if(res.ok){ closeBundleModal(); renderBundles(); toast('Bundle guardado','','ok'); }
+      if(res.ok){
+        closeBundleModal(); renderBundles();
+        toast('Bundle guardado', (!desc && res.description) ? 'Descripción redactada por IA' : '', 'ok');
+      }
       else{ errEl.textContent = res.error||'Error al guardar.'; }
     })
-    .catch(function(){ errEl.textContent='Error de conexión.'; });
+    .catch(function(){ restore(); errEl.textContent='Error de conexión.'; });
+}
+
+function generateBundleDescriptions(){
+  var btn = document.getElementById('bundleAiFillBtn');
+  if(btn){ btn.disabled = true; btn.textContent = 'Redactando...'; }
+  adminFetch(API+'/bundles/generate-descriptions',{method:'POST'})
+    .then(function(r){ if(!r)return null; return r.json(); })
+    .then(function(res){
+      if(btn){ btn.disabled = false; btn.textContent = 'Redactar pendientes con IA'; }
+      if(!res) return;
+      if(res.ok){
+        toast(res.generated ? (res.generated+' descripción'+(res.generated>1?'es redactadas':' redactada')+' por IA') : 'No hay descripciones pendientes','','ok');
+        if(res.generated) renderBundles();
+      } else { toast('No se pudo redactar', res.error||'', 'error'); }
+    })
+    .catch(function(){ if(btn){ btn.disabled = false; btn.textContent = 'Redactar pendientes con IA'; } toast('Error de conexión','','error'); });
 }
 
 function editBundle(id){

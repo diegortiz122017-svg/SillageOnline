@@ -35,6 +35,7 @@ const nurture           = require('./services/nurture');
 const postpurchase      = require('./services/postpurchase');
 const shareimg          = require('./services/shareimg');
 const collectionimg     = require('./services/collectionimg');
+const bundleDesc        = require('./services/bundledesc');
 const productmatch      = require('./services/productmatch');
 const collectionsSvc    = require('./services/collections');
 
@@ -364,6 +365,9 @@ async function initDB() {
       created_at  DATETIME NOT NULL
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
   `);
+
+  // 1 = la descripción la redactó la IA (se rehace si cambian los perfumes); 0 = escrita a mano
+  try { await db.execute('ALTER TABLE bundles ADD COLUMN description_ai TINYINT(1) DEFAULT 0'); } catch(e) {}
 
   await db.execute(`
     CREATE TABLE IF NOT EXISTS collections (
@@ -8470,25 +8474,95 @@ app.get('/api/bundles/all', requireAdmin, async (req, res) => {
   } catch(e) { res.json([]); }
 });
 
-// POST /api/bundles — create
+// Descripción de un bundle redactada por IA (services/bundledesc.js) con los datos reales de sus perfumes.
+// Devuelve '' si no hay clave, no hay perfumes en el catálogo o la IA no responde bien: el bundle queda sin
+// descripción en vez de fallar o publicar algo dudoso.
+async function generateBundleDescription(bundle) {
+  if (!OPENAI_API_KEY) return '';
+  try {
+    const { messages, count } = bundleDesc.buildMessages(bundle, await getCatalogue());
+    if (!count) return '';
+    const resp = await fetch('https://api.openai.com/v1/chat/completions', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${OPENAI_API_KEY}` },
+      signal: AbortSignal.timeout(15000),
+      body: JSON.stringify({ model: 'gpt-4o-mini', max_tokens: 120, temperature: 0.5, messages }),
+    });
+    if (!resp.ok) return '';
+    const data = await resp.json();
+    return bundleDesc.cleanDescription(data.choices?.[0]?.message?.content);
+  } catch (e) {
+    console.warn('Bundle description generation failed:', e.message);
+    return '';
+  }
+}
+
+// Rellena los bundles que siguen sin descripción (los creados antes de esta función o cuando la IA falló).
+// El UPDATE solo escribe si sigue vacía, para no pisar lo que alguien acabe de escribir a mano.
+async function backfillBundleDescriptions(limit = 20) {
+  if (!OPENAI_API_KEY) return 0;
+  const [rows] = await db.query(`SELECT id, name, items FROM bundles WHERE description IS NULL OR TRIM(description)='' ORDER BY id DESC LIMIT ${Number(limit) | 0}`);
+  let done = 0;
+  for (const b of rows) {
+    let items = []; try { items = JSON.parse(b.items || '[]'); } catch (e) {}
+    const text = await generateBundleDescription({ name: b.name, items });
+    if (!text) continue;
+    const [r] = await db.execute(`UPDATE bundles SET description=?, description_ai=1 WHERE id=? AND (description IS NULL OR TRIM(description)='')`, [text, b.id]);
+    if (r.affectedRows) done++;
+  }
+  return done;
+}
+
+// POST /api/bundles/generate-descriptions — admin: redacta con IA las descripciones que faltan
+app.post('/api/bundles/generate-descriptions', requireAdmin, async (req, res) => {
+  try {
+    if (!OPENAI_API_KEY) return res.status(503).json({ error: 'La IA no está configurada en el servidor.' });
+    const generated = await backfillBundleDescriptions(30);
+    if (generated) await logActivity('Descripciones de bundles redactadas por IA: ' + generated);
+    res.json({ ok: true, generated });
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+// POST /api/bundles — create. Sin descripción escrita a mano, la redacta la IA.
 app.post('/api/bundles', requireAdmin, async (req, res) => {
   const { name, description, items, price, orig_price } = req.body;
   if (!name || !items || !price) return res.status(400).json({ error: 'Missing fields' });
+  const plan = bundleDesc.planDescription(null, { description });
+  let desc = String(description || '').trim(), ai = 0;
+  if (plan.action === 'generate') {
+    const g = await generateBundleDescription({ name, items });
+    if (g) { desc = g; ai = 1; }
+  }
   await db.execute(
-    'INSERT INTO bundles (name, description, items, price, orig_price, active, created_at) VALUES (?,?,?,?,?,1,?)',
-    [name, description || '', JSON.stringify(items), parseFloat(price), parseFloat(orig_price || 0), new Date()]
+    'INSERT INTO bundles (name, description, description_ai, items, price, orig_price, active, created_at) VALUES (?,?,?,?,?,?,1,?)',
+    [name, desc, ai, JSON.stringify(items), parseFloat(price), parseFloat(orig_price || 0), new Date()]
   );
   await logActivity('Bundle creado: ' + name);
-  res.json({ ok: true });
+  res.json({ ok: true, description: desc, ai: !!ai });
 });
 
-// PATCH /api/bundles/:id — update
+// PATCH /api/bundles/:id — update. Lo escrito a mano no se toca; el texto de la IA se rehace si cambian los
+// perfumes, y si borran la descripción la redacta de nuevo.
 app.patch('/api/bundles/:id', requireAdmin, async (req, res) => {
   const { name, description, items, price, orig_price, active } = req.body;
   const fields = [];
   const vals   = [];
+  let outDesc;
   if (name        !== undefined) { fields.push('name=?');        vals.push(name); }
-  if (description !== undefined) { fields.push('description=?'); vals.push(description); }
+  if (description !== undefined || items !== undefined) {
+    const [rows] = await db.execute('SELECT name, description, description_ai, items FROM bundles WHERE id=?', [req.params.id]);
+    if (!rows.length) return res.json({ ok: true });
+    const cur = rows[0];
+    let curItems = []; try { curItems = JSON.parse(cur.items || '[]'); } catch (e) {}
+    const plan = bundleDesc.planDescription({ description: cur.description, description_ai: cur.description_ai, items: curItems }, { description, items });
+    if (plan.action === 'set') {
+      fields.push('description=?', 'description_ai=?'); vals.push(plan.description, 0); outDesc = plan.description;
+    } else if (plan.action === 'generate') {
+      const g = await generateBundleDescription({ name: name !== undefined ? name : cur.name, items: items !== undefined ? items : curItems });
+      if (g) { fields.push('description=?', 'description_ai=?'); vals.push(g, 1); outDesc = g; }
+      else if (description !== undefined) { fields.push('description=?', 'description_ai=?'); vals.push('', 0); outDesc = ''; }   // la borraron y la IA no pudo: queda vacía
+    }
+  }
   if (items       !== undefined) { fields.push('items=?');       vals.push(JSON.stringify(items)); }
   if (price       !== undefined) { fields.push('price=?');       vals.push(parseFloat(price)); }
   if (orig_price  !== undefined) { fields.push('orig_price=?');  vals.push(parseFloat(orig_price)); }
@@ -8496,7 +8570,7 @@ app.patch('/api/bundles/:id', requireAdmin, async (req, res) => {
   if (!fields.length) return res.json({ ok: true });
   vals.push(req.params.id);
   await db.execute('UPDATE bundles SET ' + fields.join(',') + ' WHERE id=?', vals);
-  res.json({ ok: true });
+  res.json({ ok: true, description: outDesc });
 });
 
 // DELETE /api/bundles/:id
@@ -10014,6 +10088,8 @@ async function runPostPurchaseCron() {
 }
 setTimeout(runPostPurchaseCron, 120 * 1000);
 setInterval(runPostPurchaseCron, 20 * 60 * 1000);
+// Una vez al arrancar: redacta con IA las descripciones de bundles que sigan vacías.
+setTimeout(() => backfillBundleDescriptions().then(n => { if (n) console.log('Bundle descriptions generated:', n); }).catch(e => console.warn('Bundle descriptions backfill:', e.message)), 90 * 1000);
 
 // ── Admin ────────────────────────────────────────────────────────────────────
 app.get('/api/admin/followup-v2', requireAdmin, async (req, res) => {

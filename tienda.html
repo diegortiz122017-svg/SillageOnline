@@ -1583,17 +1583,75 @@ footer{background:var(--dark);padding:3.5rem 4rem;text-align:center;border-top:1
 #bundles-section .bsc-orig{color:var(--muted)}
 .bundle-modal-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,0.75);z-index:650;align-items:center;justify-content:center}
 .bundle-modal-overlay.open{display:flex}
-.bundle-modal{background:var(--dark);border:1px solid var(--border);max-width:520px;width:90%;max-height:85vh;overflow-y:auto;position:relative}
-.bundle-modal-hdr{padding:1.5rem;border-bottom:1px solid var(--border);display:flex;justify-content:space-between;align-items:flex-start}
-.bundle-modal-body{padding:1.5rem;display:flex;flex-direction:column;gap:0.8rem}
-.bundle-prod-row{display:flex;align-items:center;gap:1rem;padding:0.8rem;background:rgba(255,255,255,0.02);border:1px solid var(--border-light);cursor:pointer;transition:border-color 0.2s}
+.bundle-modal{background:var(--dark);border:1px solid var(--border);max-width:500px;width:92%;max-height:90vh;display:flex;flex-direction:column;overflow:hidden;position:relative}
+.bdm-hero{background:#f2ede4;position:relative;flex-shrink:0;height:176px;display:flex;align-items:flex-end;justify-content:center;gap:16px;padding:18px 20px 12px}
+.bdm-hero.bdm-nophoto{height:56px}
+.bdm-bottle{height:100%;max-width:28%;display:flex;align-items:flex-end;justify-content:center}
+.bdm-bottle img{height:100%;width:auto;max-width:100%;object-fit:contain;mix-blend-mode:multiply}
+.bdm-more{align-self:center;font-size:0.7rem;letter-spacing:0.08em;color:#8a7f72}
+.bdm-handle{display:none;position:absolute;top:8px;left:50%;transform:translateX(-50%);width:38px;height:4px;border-radius:2px;background:#b4aa98}
+.bdm-fab{position:absolute;top:12px;width:34px;height:34px;padding:0;border-radius:50%;background:rgba(14,12,10,0.82);border:1px solid #3a342c;color:var(--cream);display:flex;align-items:center;justify-content:center;cursor:pointer;font-size:0.9rem;line-height:1;transition:color 0.2s,border-color 0.2s}
+.bdm-fab:hover{color:var(--gold);border-color:var(--gold)}
+.bdm-fab .bd-share-ico{width:17px;height:17px}
+.bdm-fab-share{right:54px}
+.bdm-fab-close{right:12px}
+.bdm-scroll{flex:1;min-height:0;overflow-y:auto;-webkit-overflow-scrolling:touch}
+.bdm-head{padding:18px 22px 4px}
+.bdm-eyebrow{font-size:0.58rem;letter-spacing:0.22em;text-transform:uppercase;color:var(--gold);margin-bottom:0.3rem;display:flex;align-items:center;gap:0.5rem}
+.bdm-name{font-family:'Cormorant Garamond',serif;font-size:1.9rem;line-height:1.15;font-weight:300;color:var(--cream)}
+.bdm-desc{font-size:0.74rem;line-height:1.65;color:var(--muted);margin:0.45rem 0 0.8rem;max-width:400px}
+.bdm-desc:empty{display:none}
+.bdm-tags{display:flex;gap:0.5rem;flex-wrap:wrap}
+.bdm-tag{font-size:0.58rem;letter-spacing:0.1em;text-transform:uppercase;color:#cfc6b8;border:1px solid #3a342c;padding:3px 9px}
+.bundle-modal-body{padding:14px 22px 8px;display:flex;flex-direction:column;gap:0.6rem}
+.bundle-prod-row{display:flex;align-items:center;gap:0.9rem;padding:0.7rem;background:rgba(255,255,255,0.02);border:1px solid var(--border-light);cursor:pointer;transition:border-color 0.2s}
 .bundle-prod-row:hover{border-color:var(--gold)}
-.bundle-prod-img{width:50px;height:50px;object-fit:cover;flex-shrink:0;background:rgba(255,255,255,0.03)}
+.bundle-prod-img{width:64px;height:64px;object-fit:contain;padding:4px;flex-shrink:0;background:#f2ede4;mix-blend-mode:normal}
 .bundle-prod-info{flex:1;min-width:0}
-.bundle-prod-brand{font-size:0.5rem;letter-spacing:0.15em;text-transform:uppercase;color:var(--muted)}
-.bundle-prod-name{font-family:Cormorant Garamond,serif;font-size:1rem;color:var(--cream)}
-.bundle-prod-size{font-size:0.6rem;color:var(--muted)}
-.bundle-modal-footer{padding:1.5rem;border-top:1px solid var(--border);display:flex;flex-direction:column;gap:1rem}
+.bundle-prod-brand{font-size:0.52rem;letter-spacing:0.16em;text-transform:uppercase;color:var(--muted)}
+.bundle-prod-name{font-family:'Cormorant Garamond',serif;font-size:1.1rem;line-height:1.2;color:var(--cream)}
+.bundle-prod-notes{font-size:0.66rem;line-height:1.4;color:var(--muted);margin-top:1px}
+.bundle-prod-chip{display:inline-block;font-size:0.58rem;letter-spacing:0.06em;color:var(--gold);border:1px solid rgba(184,149,90,0.4);padding:1px 7px;margin-top:5px}
+.bundle-prod-side{display:flex;flex-direction:column;align-items:flex-end;gap:2px;color:var(--muted);font-size:0.8rem}
+.bundle-prod-price{font-family:'Cormorant Garamond',serif;font-size:1.1rem;color:#cfc6b8}
+.bdm-sum{margin:6px 22px 18px;border:1px solid var(--border);padding:0.8rem 0.95rem;display:flex;flex-direction:column;gap:0.4rem;font-size:0.74rem}
+.bdm-sum>div{display:flex;justify-content:space-between;align-items:baseline}
+.bdm-sum-muted{color:var(--muted)}
+.bdm-sum-muted s{color:var(--muted)}
+.bdm-sum-price{font-family:'Cormorant Garamond',serif;font-size:1.3rem;color:var(--gold)}
+.bdm-sum-save{color:var(--success)}
+.bundle-modal-footer{padding:14px 22px;border-top:1px solid var(--border);background:var(--dark);flex-shrink:0;display:flex;align-items:center;justify-content:space-between;gap:1rem}
+.bdm-price-row{display:flex;align-items:baseline;gap:0.6rem}
+.bdm-price{font-family:'Cormorant Garamond',serif;font-size:1.9rem;line-height:1;color:var(--gold)}
+.bdm-orig{font-size:0.75rem;color:var(--muted);text-decoration:line-through}
+.bdm-orig:empty,.bdm-save:empty{display:none}
+.bdm-save{font-size:0.62rem;color:var(--success);background:rgba(90,154,106,0.12);border:1px solid rgba(90,154,106,0.3);padding:2px 8px}
+.bdm-ship{font-size:0.62rem;color:var(--muted);margin-top:4px}
+.bundle-modal-footer .d-add-btn{width:auto;padding:0.9rem 1.6rem;white-space:nowrap}
+@media(max-width:600px){
+  .bundle-modal-overlay{align-items:flex-end}
+  .bundle-modal{width:100%;max-width:none;max-height:92vh;border-radius:18px 18px 0 0;border-bottom:none}
+  .bundle-modal-overlay.open .bundle-modal{animation:bdmUp 0.28s cubic-bezier(0.22,1,0.36,1)}
+  .bdm-handle{display:block}
+  .bdm-hero{height:120px;padding:26px 16px 10px;gap:12px}
+  .bdm-hero.bdm-nophoto{height:44px}
+  .bdm-fab{top:8px;width:30px;height:30px}
+  .bdm-fab-share{right:46px}
+  .bdm-head{padding:14px 18px 2px}
+  .bdm-name{font-size:1.6rem}
+  .bundle-modal-body{padding:10px 18px 6px;gap:0.5rem}
+  .bundle-prod-row{padding:0.55rem;gap:0.7rem}
+  .bundle-prod-img{width:50px;height:50px}
+  .bundle-prod-name{font-size:1rem}
+  .bundle-prod-notes{display:none}
+  .bdm-sum{margin:6px 18px 14px}
+  .bundle-modal-footer{flex-direction:column;align-items:stretch;gap:0.7rem;padding:12px 18px calc(14px + env(safe-area-inset-bottom))}
+  .bdm-price-row .bdm-save{margin-left:auto}
+  .bdm-ship{display:none}
+  .bundle-modal-footer .d-add-btn{width:100%}
+}
+@keyframes bdmUp{from{transform:translateY(36px);opacity:0}to{transform:none;opacity:1}}
+@media(prefers-reduced-motion:reduce){.bundle-modal-overlay.open .bundle-modal{animation:none}}
 .bundle-store-card:hover{border-color:var(--gold);background:rgba(184,149,90,0.08)}
 .bsc-tag{font-size:0.52rem;letter-spacing:0.2em;text-transform:uppercase;color:var(--gold);margin-bottom:0.8rem;display:block}
 .bsc-name{font-family:Cormorant Garamond,serif;font-size:1.3rem;font-weight:300;color:var(--cream);margin-bottom:0.5rem}
@@ -2363,25 +2421,33 @@ footer{background:var(--dark);padding:3.5rem 4rem;text-align:center;border-top:1
 
 <!-- Bundle Detail Modal -->
 <div class="bundle-modal-overlay" id="bundleDetailOverlay" onclick="if(event.target===this)closeBundleDetail()">
-  <div class="bundle-modal">
-    <div class="bundle-modal-hdr">
-      <div>
-        <div style="font-size:0.5rem;letter-spacing:0.2em;text-transform:uppercase;color:var(--gold);margin-bottom:0.3rem;display:flex;align-items:center;gap:0.5rem">Bundle<span id="bundleDetailGender"></span></div>
-        <div id="bundleDetailName" style="font-family:Cormorant Garamond,serif;font-size:1.4rem;color:var(--cream);font-weight:300"></div>
-        <div id="bundleDetailDesc" style="font-size:0.7rem;color:var(--muted);margin-top:0.3rem"></div>
-      </div>
-      <div style="display:flex;align-items:center;gap:0.6rem">
-        <button id="bundleShareBtn" class="bd-share-btn" aria-label="Compartir" title="Compartir"><svg class="bd-share-ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 15V4"/><path d="M8 8l4-4 4 4"/><path d="M5 13v6a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1v-6"/></svg><span class="bd-share-txt">&#8682; Compartir</span></button>
-        <button onclick="closeBundleDetail()" style="background:none;border:none;color:var(--muted);font-size:1.1rem;cursor:pointer;line-height:1">&#10005;</button>
-      </div>
+  <div class="bundle-modal" role="dialog" aria-modal="true" aria-labelledby="bundleDetailName">
+    <div class="bdm-hero" id="bundleDetailHero">
+      <span class="bdm-handle" aria-hidden="true"></span>
+      <button id="bundleShareBtn" class="bdm-fab bdm-fab-share" aria-label="Compartir" title="Compartir"><svg class="bd-share-ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 15V4"/><path d="M8 8l4-4 4 4"/><path d="M5 13v6a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1v-6"/></svg></button>
+      <button type="button" class="bdm-fab bdm-fab-close" onclick="closeBundleDetail()" aria-label="Cerrar" title="Cerrar">&#10005;</button>
+      <div id="bundleDetailBottles" style="display:contents"></div>
     </div>
-    <div class="bundle-modal-body" id="bundleDetailBody"></div>
+    <div class="bdm-scroll">
+      <div class="bdm-head">
+        <div class="bdm-eyebrow">Bundle<span id="bundleDetailGender"></span></div>
+        <div id="bundleDetailName" class="bdm-name"></div>
+        <div id="bundleDetailDesc" class="bdm-desc"></div>
+        <div id="bundleDetailTags" class="bdm-tags"></div>
+      </div>
+      <div class="bundle-modal-body" id="bundleDetailBody"></div>
+      <div class="bdm-sum" id="bundleDetailSummary" style="display:none"></div>
+    </div>
     <div class="bundle-modal-footer">
       <div>
-        <div id="bundleDetailPrice" style="font-family:Cormorant Garamond,serif;font-size:1.6rem;color:var(--gold)"></div>
-        <div id="bundleDetailSaving" style="font-size:0.6rem;color:var(--success);margin-top:0.1rem"></div>
+        <div class="bdm-price-row">
+          <span id="bundleDetailPrice" class="bdm-price"></span>
+          <span id="bundleDetailOrig" class="bdm-orig"></span>
+          <span id="bundleDetailSaving" class="bdm-save"></span>
+        </div>
+        <div class="bdm-ship">Envío a todo El Salvador</div>
       </div>
-      <button id="bundleDetailAddBtn" class="d-add-btn" style="width:auto;padding:0.8rem 1.5rem">Añadir al Carrito</button>
+      <button id="bundleDetailAddBtn" class="d-add-btn">Añadir al Carrito</button>
     </div>
   </div>
 </div>
@@ -6161,36 +6227,105 @@ function scrollToBundlesSection(){
   if(section) section.scrollIntoView();
 }
 
+// Valor de un perfume dentro de un bundle (lo que costaría por separado): frasco al precio vigente, decant
+// al precio de decant de su tamaño. Solo para mostrarlo; el cobro lo calcula el servidor.
+function _bundleItemValue(it, prod){
+  if(!prod) return 0;
+  var ep = parseFloat(effectivePrice(prod)) || 0;
+  if(String(it.type||'decant').toLowerCase() === 'botella') return ep;
+  var d10 = prod.decantPrice ? parseFloat(prod.decantPrice) : Math.round(ep * 0.30);
+  if(/^\s*5(\.0)?\s*ml/i.test(it.size||'')) return prod.decantPrice5 ? parseFloat(prod.decantPrice5) : Math.round(d10 * 0.55);
+  return d10;
+}
+function _bundleItemNotes(prod){
+  var raw = prod && (prod.notes || [prod.top, prod.mid, prod.base].filter(Boolean).join(', '));
+  return String(raw||'').split(',').map(function(s){ return s.trim(); }).filter(Boolean).slice(0, 3).join(' · ');
+}
+function _bundleItemChip(it){
+  var bottle = String(it.type||'decant').toLowerCase() === 'botella';
+  return (bottle ? 'Frasco' : 'Decant') + (it.size ? ' ' + String(it.size).replace(/(\d)\s*ml/i, '$1 ml') : '');
+}
+function _money(n){ return '$' + (Math.round(n * 100) / 100).toFixed(2); }
+
 function openBundleDetail(b){
   _lastBundleViewed = b;
   scrollToBundlesSection();
+  var items = b.items || [];
+  var rows = items.map(function(it){
+    var prod = (P||[]).find(function(p){ return p.id === it.productId || p.id === +it.productId; });
+    return { it: it, prod: prod, value: _bundleItemValue(it, prod) };
+  });
+  var price = parseFloat(b.price) || 0, orig = parseFloat(b.orig_price) || 0;
+  var saving = orig > price ? orig - price : 0;
+
   document.getElementById('bundleDetailName').textContent = b.name;
   document.getElementById('bundleDetailDesc').textContent = b.description || '';
-  document.getElementById('bundleDetailGender').innerHTML = _bundleGenderBadge(b.items);
-  document.getElementById('bundleDetailPrice').textContent = '$'+parseFloat(b.price).toFixed(2);
-  var saving = b.orig_price && parseFloat(b.orig_price) > parseFloat(b.price)
-    ? parseFloat(b.orig_price) - parseFloat(b.price) : 0;
-  document.getElementById('bundleDetailSaving').textContent = saving > 0 ? 'Ahorras $'+saving.toFixed(2) : '';
+  document.getElementById('bundleDetailGender').innerHTML = _bundleGenderBadge(items);
 
-  var body = document.getElementById('bundleDetailBody');
-  body.innerHTML = (b.items||[]).map(function(it){
-    var prod = (P||[]).find(function(p){ return p.id === it.productId || p.id === +it.productId; });
-    var img = prod && prod.photos && prod.photos.length ? '<img class="bundle-prod-img" src="'+cdnImg(prod.photos[0],80)+'" loading="lazy"/>' :
+  // Portada con los frascos (hasta 4; el resto se resume en "+N")
+  var seen = {}, shots = [];
+  rows.forEach(function(r){
+    var ph = r.prod && r.prod.photos && r.prod.photos[0];
+    if(ph && !seen[r.prod.id]){ seen[r.prod.id] = 1; shots.push(ph); }
+  });
+  var hero = document.getElementById('bundleDetailHero');
+  hero.classList.toggle('bdm-nophoto', !shots.length);
+  document.getElementById('bundleDetailBottles').innerHTML = shots.slice(0, 4).map(function(ph){
+    return '<div class="bdm-bottle"><img src="'+cdnImg(ph, 360)+'" alt="" loading="lazy" onerror="this.parentNode.style.display=\'none\'"/></div>';
+  }).join('') + (shots.length > 4 ? '<span class="bdm-more">+'+(shots.length - 4)+'</span>' : '');
+
+  // Etiquetas: cuántas fragancias y de qué formato
+  var nB = 0, nD = 0;
+  items.forEach(function(it){ if(String(it.type||'decant').toLowerCase() === 'botella') nB++; else nD++; });
+  var fmt = [];
+  if(nB) fmt.push(nB + (nB === 1 ? ' frasco' : ' frascos'));
+  if(nD) fmt.push(nD + (nD === 1 ? ' decant' : ' decants'));
+  document.getElementById('bundleDetailTags').innerHTML =
+    '<span class="bdm-tag">'+items.length+(items.length === 1 ? ' fragancia' : ' fragancias')+'</span>'+
+    (items.length ? '<span class="bdm-tag">'+fmt.join(' · ')+'</span>' : '');
+
+  // Precios por perfume: solo si cuadran con el precio original que fijó el admin (así no se contradicen)
+  var sum = rows.reduce(function(t, r){ return t + r.value; }, 0);
+  var showValues = saving > 0 && rows.length && rows.every(function(r){ return r.value > 0; }) && Math.abs(sum - orig) <= 1.5;
+
+  document.getElementById('bundleDetailBody').innerHTML = rows.map(function(r){
+    var prod = r.prod, it = r.it;
+    var img = prod && prod.photos && prod.photos.length ? '<img class="bundle-prod-img" src="'+cdnImg(prod.photos[0],160)+'" alt="" loading="lazy"/>' :
       '<div class="bundle-prod-img" style="display:flex;align-items:center;justify-content:center">'+(prod?svg(prod.c,prod.s,'sm'):'🌸')+'</div>';
-    var brand = prod ? esc(prod.brand) : '';
-    var name  = prod ? esc(prod.name)  : esc(it.name||'');
-    var size  = _bundleItemSize(it) ? '<div class="bundle-prod-size">'+esc(_bundleItemSize(it))+'</div>' : '';
-    var pid   = prod ? prod.id : null;
+    var notes = _bundleItemNotes(prod);
+    var pid = prod ? prod.id : null;
     return '<div class="bundle-prod-row"'+(pid?' onclick="openBundleProdDetail('+pid+')"':'')+'>'+
       img+
       '<div class="bundle-prod-info">'+
-        '<div class="bundle-prod-brand">'+brand+'</div>'+
-        '<div class="bundle-prod-name">'+name+'</div>'+
-        size+
+        '<div class="bundle-prod-brand">'+(prod ? esc(prod.brand) : '')+'</div>'+
+        '<div class="bundle-prod-name">'+(prod ? esc(prod.name) : esc(it.name||''))+'</div>'+
+        (notes ? '<div class="bundle-prod-notes">'+esc(notes)+'</div>' : '')+
+        '<span class="bundle-prod-chip">'+esc(_bundleItemChip(it))+'</span>'+
       '</div>'+
-      (pid?'<span style="color:var(--muted);font-size:0.8rem">&#8594;</span>':'')+
+      '<div class="bundle-prod-side">'+
+        (showValues ? '<span class="bundle-prod-price">$'+Math.round(r.value)+'</span>' : '')+
+        (pid ? '<span>&#8250;</span>' : '')+
+      '</div>'+
     '</div>';
   }).join('');
+
+  // Resumen del ahorro + pie fijo
+  var sumEl = document.getElementById('bundleDetailSummary');
+  if(saving > 0){
+    var pct = Math.round(saving / orig * 100);
+    sumEl.innerHTML =
+      '<div class="bdm-sum-muted"><span>Precio original</span><s>'+_money(orig)+'</s></div>'+
+      '<div><span>Precio del bundle</span><span class="bdm-sum-price">'+_money(price)+'</span></div>'+
+      '<div class="bdm-sum-save"><span>Ahorras</span><span>'+_money(saving)+' · '+pct+' %</span></div>';
+    sumEl.style.display = '';
+    document.getElementById('bundleDetailOrig').textContent = _money(orig).replace('.00', '');
+    document.getElementById('bundleDetailSaving').textContent = '−' + pct + ' %';
+  } else {
+    sumEl.style.display = 'none';
+    document.getElementById('bundleDetailOrig').textContent = '';
+    document.getElementById('bundleDetailSaving').textContent = '';
+  }
+  document.getElementById('bundleDetailPrice').textContent = _money(price).replace('.00', '');
 
   document.getElementById('bundleDetailAddBtn').onclick = function(){ addBundleToCart(b.id, b); closeBundleDetail(); };
 
@@ -6216,6 +6351,8 @@ function openBundleDetail(b){
   }
 
   document.getElementById('bundleDetailOverlay').classList.add('open');
+  var scroller = document.querySelector('#bundleDetailOverlay .bdm-scroll');
+  if(scroller) scroller.scrollTop = 0;   // después de abrir: con el modal oculto el scroll no se reinicia
   window.history.pushState({bundle: b.id}, '', bundleUrl(b));
 }
 
