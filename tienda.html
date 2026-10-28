@@ -1658,7 +1658,10 @@ footer{background:var(--dark);padding:3.5rem 4rem;text-align:center;border-top:1
 }
 @media(max-width:600px){
   .bundle-modal-overlay{align-items:flex-end}
-  .bundle-modal{width:100%;max-width:none;max-height:92vh;border-radius:18px 18px 0 0;border-bottom:none}
+  /* Alto: la pantalla realmente visible (dvh), no la "grande" con las barras del navegador recogidas (vh);
+     con la barra visible, 92vh era más alto que el espacio disponible y la parte de arriba quedaba tapada.
+     Siempre se deja un margen arriba (y el área segura del notch). */
+  .bundle-modal{width:100%;max-width:none;max-height:calc(100vh - 56px);max-height:calc(100dvh - 56px - env(safe-area-inset-top));border-radius:18px 18px 0 0;border-bottom:none}
   .bundle-modal-overlay.open .bundle-modal{animation:bdmUp 0.28s cubic-bezier(0.22,1,0.36,1)}
   .bdm-handle{display:block}
   .bdm-hero{height:120px;padding:26px 16px 10px;gap:12px}
