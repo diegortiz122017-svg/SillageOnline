@@ -1697,6 +1697,11 @@ footer{background:var(--dark);padding:3.5rem 4rem;text-align:center;border-top:1
 .som-profile-btn:hover{border-color:var(--gold);color:var(--gold)}
 .som-profile-btn.reset:hover{border-color:#c05050;color:#c05050}
 
+/* Mientras Nez está abierto la página de fondo no se desplaza (ver syncScrollLock). */
+html.scroll-lock,html.scroll-lock body{overflow:hidden!important;overscroll-behavior:none}
+.som-modal-bg{overscroll-behavior:contain}
+.som-messages{overscroll-behavior:contain}
+
 /* Modal overlay */
 .som-modal-bg{
   position:fixed;inset:0;z-index:950;
@@ -8385,6 +8390,29 @@ function closeSommelierModal(){
   document.getElementById('somModal').classList.remove('open');
   document.body.style.overflow = '';
 }
+
+// Bloqueo del scroll de la página mientras haya un modal grande abierto (bundle, Nez). Se calcula a partir
+// de qué modales están abiertos, no de quién abrió o cerró cada uno: otros cierres de ventana ponen
+// body.style.overflow='' y soltaban el bloqueo con el modal todavía abierto. En móvil, además, se frenan
+// los gestos de arrastre que no empiezan dentro de una zona desplazable (si no, arrastran la página de atrás).
+(function(){
+  function init(){
+    var els = ['bundleDetailOverlay', 'somModal'].map(function(id){ return document.getElementById(id); }).filter(Boolean);
+    function syncScrollLock(){
+      var locked = els.some(function(el){ return el.classList.contains('open'); });
+      document.documentElement.classList.toggle('scroll-lock', locked);
+    }
+    var obs = new MutationObserver(syncScrollLock);
+    els.forEach(function(el){
+      obs.observe(el, { attributes: true, attributeFilter: ['class'] });
+      el.addEventListener('touchmove', function(e){
+        if(!e.target.closest || !e.target.closest('.bdm-scroll, .som-messages, textarea, input')) e.preventDefault();
+      }, { passive: false });
+    });
+    syncScrollLock();
+  }
+  if(document.readyState === 'loading') document.addEventListener('DOMContentLoaded', init); else init();
+})();
 
 function toggleSommelier(){
   if(_somOpen) closeSommelierModal();

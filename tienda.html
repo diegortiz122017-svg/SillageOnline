@@ -1581,52 +1581,52 @@ footer{background:var(--dark);padding:3.5rem 4rem;text-align:center;border-top:1
 #bundles-section .bsc-desc{color:var(--muted)}
 #bundles-section .bsc-item{color:var(--charcoal);opacity:0.72}
 #bundles-section .bsc-orig{color:var(--muted)}
-.bundle-modal-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,0.75);z-index:650;align-items:center;justify-content:center}
+.bundle-modal-overlay{display:none;position:fixed;inset:0;background:rgba(26,23,20,0.62);backdrop-filter:blur(3px);z-index:650;align-items:center;justify-content:center;overscroll-behavior:contain}
 .bundle-modal-overlay.open{display:flex}
-.bundle-modal{background:var(--dark);border:1px solid var(--border);max-width:500px;width:92%;max-height:90vh;display:flex;flex-direction:column;overflow:hidden;position:relative}
-.bdm-hero{background:#f2ede4;position:relative;flex-shrink:0;height:176px;display:flex;align-items:flex-end;justify-content:center;gap:16px;padding:18px 20px 12px}
+.bundle-modal{--bm-bg:#faf8f4;--bm-card:#fff;--bm-ink:#1a1714;--bm-muted:#8a7f72;--bm-line:rgba(26,23,20,0.12);--bm-gold:#8a6a2a;--bm-ok:#3f7a52;
+  background:var(--bm-bg);color:var(--bm-ink);border:1px solid var(--bm-line);max-width:500px;width:92%;max-height:90vh;display:flex;flex-direction:column;overflow:hidden;position:relative;box-shadow:0 24px 70px rgba(0,0,0,0.35)}
+.bdm-hero{background:#f2ede4;position:relative;flex-shrink:0;height:176px;display:flex;align-items:flex-end;justify-content:center;gap:16px;padding:18px 20px 12px;border-bottom:1px solid var(--bm-line)}
 .bdm-hero.bdm-nophoto{height:56px}
 .bdm-bottle{height:100%;max-width:28%;display:flex;align-items:flex-end;justify-content:center}
 .bdm-bottle img{height:100%;width:auto;max-width:100%;object-fit:contain;mix-blend-mode:multiply}
-.bdm-more{align-self:center;font-size:0.7rem;letter-spacing:0.08em;color:#8a7f72}
-.bdm-handle{display:none;position:absolute;top:8px;left:50%;transform:translateX(-50%);width:38px;height:4px;border-radius:2px;background:#b4aa98}
-.bdm-fab{position:absolute;top:12px;width:34px;height:34px;padding:0;border-radius:50%;background:rgba(14,12,10,0.82);border:1px solid #3a342c;color:var(--cream);display:flex;align-items:center;justify-content:center;cursor:pointer;font-size:0.9rem;line-height:1;transition:color 0.2s,border-color 0.2s}
-.bdm-fab:hover{color:var(--gold);border-color:var(--gold)}
+.bdm-more{align-self:center;font-size:0.7rem;letter-spacing:0.08em;color:var(--bm-muted)}
+.bdm-handle{display:none;position:absolute;top:8px;left:50%;transform:translateX(-50%);width:38px;height:4px;border-radius:2px;background:#c9bfae}
+.bdm-fab{position:absolute;top:12px;width:34px;height:34px;padding:0;border-radius:50%;background:rgba(255,255,255,0.92);border:1px solid var(--bm-line);color:var(--bm-ink);display:flex;align-items:center;justify-content:center;cursor:pointer;font-size:0.9rem;line-height:1;transition:color 0.2s,border-color 0.2s}
+.bdm-fab:hover{color:var(--bm-gold);border-color:var(--gold)}
 .bdm-fab .bd-share-ico{width:17px;height:17px}
 .bdm-fab-share{right:54px}
 .bdm-fab-close{right:12px}
-.bdm-scroll{flex:1;min-height:0;overflow-y:auto;-webkit-overflow-scrolling:touch}
+.bdm-scroll{flex:1;min-height:0;overflow-y:auto;overscroll-behavior:contain;-webkit-overflow-scrolling:touch;scrollbar-width:thin;scrollbar-color:#cfc5b3 transparent}
 .bdm-head{padding:18px 22px 4px}
-.bdm-eyebrow{font-size:0.58rem;letter-spacing:0.22em;text-transform:uppercase;color:var(--gold);margin-bottom:0.3rem;display:flex;align-items:center;gap:0.5rem}
-.bdm-name{font-family:'Cormorant Garamond',serif;font-size:1.9rem;line-height:1.15;font-weight:300;color:var(--cream)}
-.bdm-desc{font-size:0.74rem;line-height:1.65;color:var(--muted);margin:0.45rem 0 0.8rem;max-width:400px}
+.bdm-eyebrow{font-size:0.58rem;letter-spacing:0.22em;text-transform:uppercase;color:var(--bm-gold);margin-bottom:0.3rem;display:flex;align-items:center;gap:0.5rem}
+.bdm-name{font-family:'Cormorant Garamond',serif;font-size:1.9rem;line-height:1.15;font-weight:300;color:var(--bm-ink)}
+.bdm-desc{font-size:0.76rem;line-height:1.65;color:var(--bm-muted);margin:0.45rem 0 0.8rem;max-width:400px}
 .bdm-desc:empty{display:none}
 .bdm-tags{display:flex;gap:0.5rem;flex-wrap:wrap}
-.bdm-tag{font-size:0.58rem;letter-spacing:0.1em;text-transform:uppercase;color:#cfc6b8;border:1px solid #3a342c;padding:3px 9px}
+.bdm-tag{font-size:0.58rem;letter-spacing:0.1em;text-transform:uppercase;color:#6b6055;border:1px solid var(--bm-line);padding:3px 9px;background:var(--bm-card)}
 .bundle-modal-body{padding:14px 22px 8px;display:flex;flex-direction:column;gap:0.6rem}
-.bundle-prod-row{display:flex;align-items:center;gap:0.9rem;padding:0.7rem;background:rgba(255,255,255,0.02);border:1px solid var(--border-light);cursor:pointer;transition:border-color 0.2s}
-.bundle-prod-row:hover{border-color:var(--gold)}
-.bundle-prod-img{width:64px;height:64px;object-fit:contain;padding:4px;flex-shrink:0;background:#f2ede4;mix-blend-mode:normal}
+.bundle-prod-row{display:flex;align-items:center;gap:0.9rem;padding:0.7rem;background:var(--bm-card);border:1px solid var(--bm-line);cursor:pointer;transition:border-color 0.2s,box-shadow 0.2s}
+.bundle-prod-row:hover{border-color:var(--gold);box-shadow:0 2px 10px rgba(184,149,90,0.15)}
+.bundle-prod-img{width:64px;height:64px;object-fit:contain;padding:4px;flex-shrink:0;background:#f2ede4}
 .bundle-prod-info{flex:1;min-width:0}
-.bundle-prod-brand{font-size:0.52rem;letter-spacing:0.16em;text-transform:uppercase;color:var(--muted)}
-.bundle-prod-name{font-family:'Cormorant Garamond',serif;font-size:1.1rem;line-height:1.2;color:var(--cream)}
-.bundle-prod-notes{font-size:0.66rem;line-height:1.4;color:var(--muted);margin-top:1px}
-.bundle-prod-chip{display:inline-block;font-size:0.58rem;letter-spacing:0.06em;color:var(--gold);border:1px solid rgba(184,149,90,0.4);padding:1px 7px;margin-top:5px}
-.bundle-prod-side{display:flex;flex-direction:column;align-items:flex-end;gap:2px;color:var(--muted);font-size:0.8rem}
-.bundle-prod-price{font-family:'Cormorant Garamond',serif;font-size:1.1rem;color:#cfc6b8}
-.bdm-sum{margin:6px 22px 18px;border:1px solid var(--border);padding:0.8rem 0.95rem;display:flex;flex-direction:column;gap:0.4rem;font-size:0.74rem}
+.bundle-prod-brand{font-size:0.52rem;letter-spacing:0.16em;text-transform:uppercase;color:var(--bm-muted)}
+.bundle-prod-name{font-family:'Cormorant Garamond',serif;font-size:1.1rem;line-height:1.2;color:var(--bm-ink)}
+.bundle-prod-notes{font-size:0.66rem;line-height:1.4;color:var(--bm-muted);margin-top:1px}
+.bundle-prod-chip{display:inline-block;font-size:0.58rem;letter-spacing:0.06em;color:var(--bm-gold);border:1px solid rgba(138,106,42,0.4);padding:1px 7px;margin-top:5px}
+.bundle-prod-side{display:flex;flex-direction:column;align-items:flex-end;gap:2px;color:var(--bm-muted);font-size:0.8rem}
+.bundle-prod-price{font-family:'Cormorant Garamond',serif;font-size:1.1rem;color:var(--bm-ink)}
+.bdm-sum{margin:6px 22px 18px;border:1px solid var(--bm-line);background:var(--bm-card);padding:0.8rem 0.95rem;display:flex;flex-direction:column;gap:0.4rem;font-size:0.74rem}
 .bdm-sum>div{display:flex;justify-content:space-between;align-items:baseline}
-.bdm-sum-muted{color:var(--muted)}
-.bdm-sum-muted s{color:var(--muted)}
-.bdm-sum-price{font-family:'Cormorant Garamond',serif;font-size:1.3rem;color:var(--gold)}
-.bdm-sum-save{color:var(--success)}
-.bundle-modal-footer{padding:14px 22px;border-top:1px solid var(--border);background:var(--dark);flex-shrink:0;display:flex;align-items:center;justify-content:space-between;gap:1rem}
+.bdm-sum-muted,.bdm-sum-muted s{color:var(--bm-muted)}
+.bdm-sum-price{font-family:'Cormorant Garamond',serif;font-size:1.3rem;color:var(--bm-gold)}
+.bdm-sum-save{color:var(--bm-ok)}
+.bundle-modal-footer{padding:14px 22px;border-top:1px solid var(--bm-line);background:var(--bm-card);flex-shrink:0;display:flex;align-items:center;justify-content:space-between;gap:1rem}
 .bdm-price-row{display:flex;align-items:baseline;gap:0.6rem}
-.bdm-price{font-family:'Cormorant Garamond',serif;font-size:1.9rem;line-height:1;color:var(--gold)}
-.bdm-orig{font-size:0.75rem;color:var(--muted);text-decoration:line-through}
+.bdm-price{font-family:'Cormorant Garamond',serif;font-size:1.9rem;line-height:1;color:var(--bm-gold)}
+.bdm-orig{font-size:0.75rem;color:var(--bm-muted);text-decoration:line-through}
 .bdm-orig:empty,.bdm-save:empty{display:none}
-.bdm-save{font-size:0.62rem;color:var(--success);background:rgba(90,154,106,0.12);border:1px solid rgba(90,154,106,0.3);padding:2px 8px}
-.bdm-ship{font-size:0.62rem;color:var(--muted);margin-top:4px}
+.bdm-save{font-size:0.62rem;color:var(--bm-ok);background:rgba(63,122,82,0.1);border:1px solid rgba(63,122,82,0.3);padding:2px 8px}
+.bdm-ship{font-size:0.62rem;color:var(--bm-muted);margin-top:4px}
 .bundle-modal-footer .d-add-btn{width:auto;padding:0.9rem 1.6rem;white-space:nowrap}
 @media(max-width:600px){
   .bundle-modal-overlay{align-items:flex-end}
@@ -1652,6 +1652,12 @@ footer{background:var(--dark);padding:3.5rem 4rem;text-align:center;border-top:1
 }
 @keyframes bdmUp{from{transform:translateY(36px);opacity:0}to{transform:none;opacity:1}}
 @media(prefers-reduced-motion:reduce){.bundle-modal-overlay.open .bundle-modal{animation:none}}
+
+/* Mientras haya un modal grande abierto (bundle, Nez) la página de fondo no se desplaza. Se activa según
+   qué modales están abiertos (ver syncScrollLock), así que ningún otro cierre de ventana lo libera por error. */
+html.scroll-lock,html.scroll-lock body{overflow:hidden!important;overscroll-behavior:none}
+.som-modal-bg{overscroll-behavior:contain}
+.som-messages{overscroll-behavior:contain}
 .bundle-store-card:hover{border-color:var(--gold);background:rgba(184,149,90,0.08)}
 .bsc-tag{font-size:0.52rem;letter-spacing:0.2em;text-transform:uppercase;color:var(--gold);margin-bottom:0.8rem;display:block}
 .bsc-name{font-family:Cormorant Garamond,serif;font-size:1.3rem;font-weight:300;color:var(--cream);margin-bottom:0.5rem}
@@ -6224,7 +6230,7 @@ var _detailFromNez = false;
 // vez de quedar en la parte de arriba de la tienda sin rastro del bundle.
 function scrollToBundlesSection(){
   var section = document.getElementById('bundles-section');
-  if(section) section.scrollIntoView();
+  if(section) section.scrollIntoView({ behavior: 'instant' });   // sin animación: el modal se abre encima
 }
 
 // Valor de un perfume dentro de un bundle (lo que costaría por separado): frasco al precio vigente, decant
@@ -8746,6 +8752,29 @@ function closeSommelierModal(){
   // Update tienda profile zone if on tienda page
   if(typeof renderTiendaProfile === 'function') renderTiendaProfile();
 }
+
+// Bloqueo del scroll de la página mientras haya un modal grande abierto (bundle, Nez). Se calcula a partir
+// de qué modales están abiertos, no de quién abrió o cerró cada uno: otros cierres de ventana ponen
+// body.style.overflow='' y soltaban el bloqueo con el modal todavía abierto. En móvil, además, se frenan
+// los gestos de arrastre que no empiezan dentro de una zona desplazable (si no, arrastran la página de atrás).
+(function(){
+  function init(){
+    var els = ['bundleDetailOverlay', 'somModal'].map(function(id){ return document.getElementById(id); }).filter(Boolean);
+    function syncScrollLock(){
+      var locked = els.some(function(el){ return el.classList.contains('open'); });
+      document.documentElement.classList.toggle('scroll-lock', locked);
+    }
+    var obs = new MutationObserver(syncScrollLock);
+    els.forEach(function(el){
+      obs.observe(el, { attributes: true, attributeFilter: ['class'] });
+      el.addEventListener('touchmove', function(e){
+        if(!e.target.closest || !e.target.closest('.bdm-scroll, .som-messages, textarea, input')) e.preventDefault();
+      }, { passive: false });
+    });
+    syncScrollLock();
+  }
+  if(document.readyState === 'loading') document.addEventListener('DOMContentLoaded', init); else init();
+})();
 
 function toggleSommelier(){
   if(_somOpen) closeSommelierModal();
