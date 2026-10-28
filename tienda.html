@@ -1585,7 +1585,7 @@ footer{background:var(--dark);padding:3.5rem 4rem;text-align:center;border-top:1
 .bundle-modal-overlay.open{display:flex}
 .bundle-modal{--bm-bg:#faf8f4;--bm-card:#fff;--bm-ink:#1a1714;--bm-muted:#8a7f72;--bm-line:rgba(26,23,20,0.12);--bm-gold:#8a6a2a;--bm-ok:#3f7a52;
   background:var(--bm-bg);color:var(--bm-ink);border:1px solid var(--bm-line);max-width:500px;width:92%;max-height:90vh;display:flex;flex-direction:column;overflow:hidden;position:relative;box-shadow:0 24px 70px rgba(0,0,0,0.35)}
-.bdm-hero{background:#f2ede4;position:relative;flex-shrink:0;height:176px;display:flex;align-items:flex-end;justify-content:center;gap:16px;padding:18px 20px 12px;border-bottom:1px solid var(--bm-line)}
+.bdm-hero{background:#f2ede4;position:relative;flex-shrink:0;touch-action:none;height:176px;display:flex;align-items:flex-end;justify-content:center;gap:16px;padding:18px 20px 12px;border-bottom:1px solid var(--bm-line)}
 .bdm-hero.bdm-nophoto{height:56px}
 .bdm-bottle{height:100%;max-width:28%;display:flex;align-items:flex-end;justify-content:center}
 .bdm-bottle img{height:100%;width:auto;max-width:100%;object-fit:contain;mix-blend-mode:multiply}
@@ -6396,6 +6396,67 @@ function closeBundleDetail(){
     window.history.pushState({}, '', '/tienda');
   }
 }
+
+// Hoja inferior en móvil: se baja arrastrando la rayita, la portada o el contenido (si ya está arriba del todo).
+// Al soltar se cierra si se bajó lo suficiente o con un gesto rápido; si no, vuelve a su sitio.
+(function(){
+  function init(){
+    var overlay = document.getElementById('bundleDetailOverlay');
+    var sheet = overlay && overlay.querySelector('.bundle-modal');
+    var scroller = sheet && sheet.querySelector('.bdm-scroll');
+    if(!sheet || !scroller) return;
+    var mq = window.matchMedia('(max-width:600px)');
+    var startY = 0, startT = 0, dy = 0, fromScroll = false, tracking = false, dragging = false;
+
+    function reset(){ sheet.style.transition = ''; sheet.style.transform = ''; overlay.style.background = ''; }
+
+    sheet.addEventListener('touchstart', function(e){
+      tracking = false; dragging = false;
+      if(!mq.matches || e.touches.length !== 1) return;
+      if(e.target.closest('.bdm-fab, .bundle-modal-footer')) return;
+      var inScroll = scroller.contains(e.target);
+      if(!inScroll && !e.target.closest('.bdm-hero')) return;
+      tracking = true; fromScroll = inScroll; dy = 0;
+      startY = e.touches[0].clientY; startT = Date.now();
+    }, { passive: true });
+
+    sheet.addEventListener('touchmove', function(e){
+      if(!tracking) return;
+      var d = e.touches[0].clientY - startY;
+      if(!dragging){
+        if(d < -6 || (fromScroll && scroller.scrollTop > 0)){ tracking = false; return; }   // scroll normal del contenido
+        if(d <= 6) return;
+        dragging = true;
+        sheet.style.transition = 'none';
+      }
+      dy = Math.max(0, d);
+      sheet.style.transform = 'translateY(' + dy + 'px)';
+      overlay.style.background = 'rgba(26,23,20,' + (0.62 * (1 - Math.min(dy / sheet.offsetHeight, 1))).toFixed(3) + ')';
+      if(e.cancelable) e.preventDefault();
+    }, { passive: false });
+
+    function end(){
+      var wasDragging = dragging;
+      tracking = false; dragging = false;
+      if(!wasDragging) return;
+      var h = sheet.offsetHeight, speed = dy / Math.max(Date.now() - startT, 1);   // px por ms
+      if(dy > h * 0.3 || (speed > 0.6 && dy > 40)){
+        sheet.style.transition = 'transform 0.22s ease-out';
+        sheet.style.transform = 'translateY(' + h + 'px)';
+        overlay.style.background = 'rgba(26,23,20,0)';
+        setTimeout(function(){ closeBundleDetail(); reset(); }, 220);
+      } else {
+        sheet.style.transition = 'transform 0.25s cubic-bezier(0.22,1,0.36,1)';
+        sheet.style.transform = '';
+        overlay.style.background = '';
+        setTimeout(function(){ sheet.style.transition = ''; }, 260);
+      }
+    }
+    sheet.addEventListener('touchend', end);
+    sheet.addEventListener('touchcancel', end);
+  }
+  if(document.readyState === 'loading') document.addEventListener('DOMContentLoaded', init); else init();
+})();
 
 function openBundleProdDetail(pid){
   var bundleOverlay = document.getElementById('bundleDetailOverlay');
