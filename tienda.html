@@ -2285,6 +2285,7 @@ html.scroll-lock,html.scroll-lock body{overflow:hidden!important;overscroll-beha
 .size-opt.active .so-label{color:var(--charcoal)}
 .size-opt .so-size{display:inline;font-size:0.7rem;color:var(--muted)}
 .size-opt .so-price{display:block;margin-top:0.1rem;font-size:1.35rem;font-weight:400}
+.size-selector.d-single{display:none}   /* solo frasco: nada que elegir */
 .decant-note{margin-top:-0.4rem}
 
 .d-facts{display:grid;grid-template-columns:1fr 1fr;gap:0.9rem 1.2rem;margin:1.3rem 0 1.2rem}
@@ -2333,7 +2334,8 @@ html.scroll-lock,html.scroll-lock body{overflow:hidden!important;overscroll-beha
   .detail-bar{padding:0.55rem 0.7rem;gap:0.4rem}
   .back-btn{font-size:0.6rem;letter-spacing:0.12em;min-width:0;max-width:44vw;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
   .detail-info{padding:1.3rem 1.2rem 0}
-  .d-name{font-size:clamp(2rem,9vw,2.6rem)}
+  .d-name{font-size:clamp(1.65rem,7.4vw,2.1rem)}
+  .d-tagline{font-size:1rem;margin-bottom:0.8rem}
   .d-facts{gap:0.8rem 0.9rem}
   .d-actions{flex-direction:row;gap:0.7rem;margin:0 -1.2rem;padding:0.7rem 1.2rem calc(0.9rem + env(safe-area-inset-bottom))}
   .d-actions .d-add-btn{width:auto;padding:0.95rem 0.6rem}
@@ -4686,7 +4688,7 @@ function openDetail(pid, nav){
       '<div class="d-name">'+esc(p.name)+'</div>'+
       (p.tagline ? '<div class="d-tagline">'+esc(p.tagline)+'</div>' : '')+
       '<div class="d-price-row"><span class="d-price">'+dPrice+'</span><span class="d-size-lbl">'+p.size+'</span></div>'+
-      '<div class="size-selector" id="sizeSel">'+
+      '<div class="size-selector'+(decantsEnabled?'':' d-single')+'" id="sizeSel">'+
         '<button class="size-opt active" data-type="full" data-price="'+ep+'" data-size="'+p.size+'">'+
           '<span class="so-label">Frasco</span>'+
           '<span class="so-size">'+p.size+'</span>'+
