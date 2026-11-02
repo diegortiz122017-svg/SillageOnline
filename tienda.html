@@ -2241,6 +2241,104 @@ html.scroll-lock,html.scroll-lock body{overflow:hidden!important;overscroll-beha
   .tpz-left{width:100%}
   .tpz-actions{width:100%}
 }
+
+/* ═══ DETALLE DE PERFUME — ficha editorial ═══
+   Galería con miniaturas a la izquierda (fija al hacer scroll), ficha a la derecha con formato junto al precio,
+   datos en cuadrícula, notas con etiquetas, secciones plegables y barra de compra siempre visible. */
+.detail-bar{padding:0.7rem 2rem;gap:0.8rem}
+.detail-bar .breadcrumb{display:none}
+.dbar-r{display:flex;align-items:center;gap:0.2rem;margin-left:auto}
+.detail-bar .d-wish-mob,.detail-bar .d-share-mob{color:var(--cream)}
+.detail-bar .d-wish-mob:hover,.detail-bar .d-share-mob:hover{color:var(--gold);background:rgba(184,149,90,0.12)}
+.detail-bar .d-wish-mob.saved{color:#e07a72}
+.detail-bar .d-wish-mob svg,.detail-bar .d-share-mob svg{width:20px;height:20px}
+.detail-cart-btn{margin-left:0.5rem}
+
+.detail-grid,.suggestions{flex-shrink:0}
+.detail-grid{grid-template-columns:5fr 6fr;min-height:calc(100vh - 58px);align-items:start}
+.gallery{position:sticky;top:58px;height:calc(100vh - 58px);background:#f2ede4}
+.slides{min-height:0}
+.slide-bottle{width:100%;height:100%;display:flex;align-items:center;justify-content:center}
+.slide-bottle img{max-width:100%;max-height:100%}
+.slide{background:#f2ede4 !important;padding:3rem 3rem 3.5rem 6.5rem}
+.g-thumbs{position:absolute;left:1.2rem;top:1.2rem;z-index:3;display:flex;flex-direction:column;gap:0.5rem}
+.g-thumb{width:56px;height:56px;padding:3px;border:1px solid #d8cfbf;background:#f8f4ec;cursor:pointer;display:flex;align-items:center;justify-content:center;transition:border-color 0.2s}
+.g-thumb img{max-width:100%;max-height:100%;object-fit:contain;mix-blend-mode:multiply}
+.g-thumb:hover{border-color:var(--gold)}
+.g-thumb.on{border-color:var(--gold);box-shadow:0 0 0 1px var(--gold) inset}
+.gallery-controls{position:absolute;left:0;right:0;bottom:0;justify-content:flex-start;padding:1rem 1.4rem;pointer-events:none}
+.gallery-controls .dots,.gallery-controls .arrows{display:none}
+
+.detail-info{padding:2.2rem 3rem 0;overflow:visible;display:flex;flex-direction:column;min-height:calc(100vh - 58px);background:var(--warm-white)}
+.d-body{flex:1 0 auto;padding-bottom:1.6rem}
+.d-eyebrow{font-size:0.62rem;letter-spacing:0.22em;text-transform:uppercase;color:#8a6a2a}
+.d-eyebrow .d-brand{font-size:inherit;letter-spacing:inherit;color:inherit}
+.d-eyebrow b{font-weight:400;color:var(--muted)}
+.d-name{font-size:clamp(2.4rem,4.2vw,3.4rem);line-height:1.05;margin:0.25rem 0 0.2rem}
+.d-tagline{padding:0;border:none;margin:0 0 1rem;font-family:Cormorant Garamond,serif;font-size:1.2rem;line-height:1.35;font-style:italic;color:var(--muted)}
+.d-price-row{margin-bottom:0.9rem}
+.d-price{font-size:2.1rem;color:#8a6a2a}
+.size-selector{display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:0.6rem;margin-bottom:1rem}
+.size-opt{text-align:left;padding:0.7rem 0.9rem;background:#fff;border:1px solid rgba(26,23,20,0.14)}
+.size-opt.active{border-color:var(--gold);box-shadow:0 0 0 1px var(--gold) inset;background:#fbf7ee}
+.size-opt .so-label{display:inline;margin:0 0.3rem 0 0;font-size:0.68rem;letter-spacing:0.08em;color:var(--charcoal)}
+.size-opt.active .so-label{color:var(--charcoal)}
+.size-opt .so-size{display:inline;font-size:0.7rem;color:var(--muted)}
+.size-opt .so-price{display:block;margin-top:0.1rem;font-size:1.35rem;font-weight:400}
+.decant-note{margin-top:-0.4rem}
+
+.d-facts{display:grid;grid-template-columns:1fr 1fr;gap:0.9rem 1.2rem;margin:1.3rem 0 1.2rem}
+.d-fact{display:flex;gap:0.65rem;align-items:flex-start}
+.d-fact svg{width:20px;height:20px;flex-shrink:0;fill:none;stroke:#8a6a2a;stroke-width:1.5;stroke-linecap:round;stroke-linejoin:round;margin-top:2px}
+.d-fact b{display:block;font-weight:500;font-size:0.82rem;color:var(--charcoal)}
+.d-fact span{font-size:0.66rem;color:var(--muted)}
+.d-meter{display:inline-flex;gap:2px;margin-left:7px;vertical-align:1px}
+.d-meter u{width:9px;height:4px;background:#d8cfbf;text-decoration:none}
+.d-meter u.f{background:var(--gold)}
+
+.d-notes{margin-bottom:0.6rem}
+.d-notes .d-section-lbl{margin-bottom:0.2rem}
+.d-nrow{display:flex;gap:1rem;align-items:baseline;padding:0.55rem 0 0.1rem;border-top:1px solid rgba(26,23,20,0.1)}
+.d-nrow .k{width:68px;flex-shrink:0;font-size:0.6rem;letter-spacing:0.15em;text-transform:uppercase;color:var(--muted)}
+.d-nchip{display:inline-block;border:1px solid rgba(26,23,20,0.14);background:#fff;padding:2px 10px;font-size:0.76rem;margin:0 6px 6px 0;color:var(--charcoal)}
+
+.d-acc{border-top:1px solid rgba(26,23,20,0.1)}
+.d-acc>summary{list-style:none;cursor:pointer;display:flex;justify-content:space-between;align-items:center;padding:0.85rem 0;font-size:0.66rem;letter-spacing:0.18em;text-transform:uppercase;color:var(--charcoal)}
+.d-acc>summary::-webkit-details-marker{display:none}
+.d-acc>summary::after{content:'';width:7px;height:7px;margin-right:4px;border-right:1.5px solid var(--muted);border-bottom:1.5px solid var(--muted);transform:rotate(45deg);transition:transform 0.2s}
+.d-acc[open]>summary::after{transform:rotate(-135deg)}
+.d-acc .d-desc{margin:0 0 1rem;font-size:0.86rem;line-height:1.8}
+.d-acc .d-chord-tags{margin-bottom:1rem}
+
+.d-actions{position:sticky;bottom:0;z-index:5;margin:0 -3rem;padding:0.9rem 3rem;background:#fff;border-top:1px solid rgba(26,23,20,0.12);display:flex;align-items:center;gap:1rem}
+.d-foot-price{min-width:84px}
+.d-foot-amt{font-family:Cormorant Garamond,serif;font-size:1.9rem;line-height:1;color:#8a6a2a}
+.d-foot-sub{font-size:0.62rem;color:var(--muted);margin-top:3px}
+.d-actions .d-add-btn{flex:1;width:auto;padding:1rem}
+#dWishBtn{display:flex;width:48px;height:48px;flex-shrink:0;border-color:rgba(26,23,20,0.18);color:var(--charcoal);background:#fff}
+#dWishBtn:hover{border-color:var(--gold)}
+#dWishBtn.on{color:#e06060;border-color:#e06060;background:rgba(224,96,96,0.08)}
+
+@media(max-width:900px){
+  .detail-grid{grid-template-columns:1fr;min-height:auto;align-items:stretch}
+  .gallery{position:relative;top:auto;height:auto;background:#f2ede4}
+  .slides{height:300px;flex:none;min-height:0}
+  .slide{padding:1.5rem}
+  .g-thumbs,.slide-counter,.gallery-controls .arrows{display:none}
+  .gallery-controls{bottom:6px;justify-content:center;padding:0}
+  .gallery-controls .dots{display:flex;pointer-events:auto}
+  .detail-info{padding:1.4rem 1.3rem 0;min-height:0}
+}
+@media(max-width:680px){
+  .detail-bar{padding:0.55rem 0.7rem;gap:0.4rem}
+  .back-btn{font-size:0.6rem;letter-spacing:0.12em;min-width:0;max-width:44vw;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .detail-info{padding:1.3rem 1.2rem 0}
+  .d-name{font-size:clamp(2rem,9vw,2.6rem)}
+  .d-facts{gap:0.8rem 0.9rem}
+  .d-actions{flex-direction:row;gap:0.7rem;margin:0 -1.2rem;padding:0.7rem 1.2rem calc(0.9rem + env(safe-area-inset-bottom))}
+  .d-actions .d-add-btn{width:auto;padding:0.95rem 0.6rem}
+  #dWishBtn{width:46px;height:46px}
+}
 </style>
 <script type="application/ld+json">
 {
@@ -2540,10 +2638,15 @@ html.scroll-lock,html.scroll-lock body{overflow:hidden!important;overscroll-beha
     <div class="detail-bar">
       <button class="back-btn" id="backBtn">&#8592; Volver a la Colección</button>
       <div class="breadcrumb">Sillage &rsaquo; <b id="bcBrand"></b> &rsaquo; <b id="bcName"></b></div>
-      <button class="detail-cart-btn" id="detailCartBtn" onclick="openCart();" title="Ver carrito"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M6 2L3 6v14a2 2 0 002 2h14a2 2 0 002-2V6l-3-4z"/><line x1="3" y1="6" x2="21" y2="6"/><path d="M16 10a4 4 0 01-8 0"/></svg><span class="dcb-count" id="detailCartCount"></span></button>
+      <div class="dbar-r">
+        <button class="d-share-mob" id="dShareBtn" aria-label="Compartir" title="Compartir"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 15V4"/><path d="M8 8l4-4 4 4"/><path d="M5 13v6a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1v-6"/></svg></button>
+        <button class="d-wish-mob" id="dWishMob" aria-pressed="false" aria-label="Guardar en favoritos" title="Guardar"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/></svg></button>
+        <button class="detail-cart-btn" id="detailCartBtn" onclick="openCart();" title="Ver carrito"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M6 2L3 6v14a2 2 0 002 2h14a2 2 0 002-2V6l-3-4z"/><line x1="3" y1="6" x2="21" y2="6"/><path d="M16 10a4 4 0 01-8 0"/></svg><span class="dcb-count" id="detailCartCount"></span></button>
+      </div>
     </div>
     <div class="detail-grid">
       <div class="gallery">
+        <div class="g-thumbs" id="gThumbs"></div>
         <div class="slides" id="slides"></div>
         <div class="gallery-controls">
           <div class="dots" id="dots"></div>
@@ -4491,6 +4594,29 @@ var _detailOpenPid=null;
 // Pila de productos vistos dentro del mismo modal: al tocar una sugerencia se apila el producto actual
 // y "volver" (botón, Esc o atrás del navegador) regresa a él en vez de cerrar todo.
 var _detailStack = [];
+// ── Ficha de perfume: piezas de la vista (datos en cuadrícula, notas con etiquetas) ──
+var D_ICONS = {
+  conc:   '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3s6 6.2 6 10.5A6 6 0 0 1 6 13.5C6 9.2 12 3 12 3z"/></svg>',
+  season: '<svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M2 12h2M20 12h2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/></svg>',
+  wind:   '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 8h10a3 3 0 1 0-3-3"/><path d="M3 12h15a3 3 0 1 1-3 3"/><path d="M3 16h7"/></svg>',
+  clock:  '<svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>'
+};
+// Estela (sillage) en 1–5 para dibujar las barritas; 0 = no se reconoce y no se dibuja nada.
+function dSillageLevel(s){
+  var m = { 'very strong':5, 'strong':4, 'moderate':3, 'light to moderate':2, 'light':2, 'soft':2, 'intimate':1 };
+  return m[String(s||'').toLowerCase()] || 0;
+}
+// "8+ Hours" → "8+ horas" (el dato viene en inglés)
+function dLong(s){ return s ? String(s).replace(/\bhours?\b/gi, function(m){ return /s$/i.test(m) ? 'horas' : 'hora'; }) : s; }
+function dFact(icon, val, label, extra){
+  if(!val) return '';
+  return '<div class="d-fact">'+D_ICONS[icon]+'<div><b>'+esc(val)+(extra||'')+'</b><span>'+label+'</span></div></div>';
+}
+function dNoteRow(label, text){
+  var chips = String(text||'').split(/[,·]/).map(function(x){ return x.trim(); }).filter(Boolean)
+    .map(function(x){ return '<span class="d-nchip">'+esc(x)+'</span>'; }).join('');
+  return chips ? '<div class="d-nrow"><span class="k">'+label+'</span><span>'+chips+'</span></div>' : '';
+}
 // nav: 'push' = abierto desde una sugerencia del modal · 'pop' = regreso al producto anterior · (nada) = apertura normal
 function openDetail(pid, nav){
   var p=P.find(function(x){return x.id===pid;});if(!p)return;
@@ -4513,7 +4639,7 @@ function openDetail(pid, nav){
     : '← Volver a la Colección';
   var slidesEl=document.getElementById('slides');slidesEl.innerHTML='';
   var bgs=['background:linear-gradient(135deg,#f2ede4,#e8e0d4)'];
-  var overlays=['','<div style="position:absolute;bottom:1.5rem;left:1.5rem;right:1.5rem"><p style=\'font-family:Cormorant Garamond,serif;font-size:1.4rem;font-weight:300;color:#6b5843;font-style:italic\'>"'+p.tagline+'"</p></div>','<div style="position:absolute;top:1.2rem;left:1.2rem;padding:0.4rem 0.9rem;border:1px solid rgba(184,149,90,0.4);background:rgba(255,255,255,0.75)"><p style=\'font-size:0.52rem;letter-spacing:0.22em;text-transform:uppercase;color:#b8955a\'>'+p.conc+'</p></div>','<div style="position:absolute;bottom:1.5rem;right:1.5rem;font-family:Cormorant Garamond,serif;font-size:2.8rem;font-weight:300;color:rgba(20,15,10,0.08)">'+p.name.split(' ').pop()+'</div>'];
+  var overlays=['','','',''];
   // Un slide por foto real (mínimo 1) — los captions siguen rotando por índice,
   // así que con menos de 4 fotos igual se ven variados en vez de repetir siempre el mismo.
   slideCount = (p.photos && p.photos.length) ? p.photos.length : 1;
@@ -4530,107 +4656,96 @@ function openDetail(pid, nav){
     (function(idx){dot.addEventListener('click',function(){gotoSlide(idx);});})(j);
     dotsEl.appendChild(dot);
   }
+  var thumbsEl=document.getElementById('gThumbs');thumbsEl.innerHTML='';
+  if(slideCount>1 && p.photos){
+    p.photos.forEach(function(ph,idx){
+      var tb=document.createElement('button');tb.type='button';tb.className='g-thumb'+(idx===0?' on':'');
+      tb.setAttribute('aria-label','Foto '+(idx+1));
+      tb.innerHTML='<img src="'+esc(cdnImg(ph,120))+'" alt="" loading="lazy"/>';
+      tb.addEventListener('click',function(){gotoSlide(idx);});
+      thumbsEl.appendChild(tb);
+    });
+  }
   updateSlideUI();
   var inv=getInv(p.id),pr=getPr(p.id),oos=inv.outOfStock,low=inv.lowStock&&!oos;
   var ep=effectivePrice(p);
   var dPrice=pr.onSale&&pr.salePrice?'<span class="d-orig">$'+p.price+'</span> <span class="d-sale-p">$'+Math.round(+pr.salePrice)+'</span>':'$'+p.price;
   var decantPrice = p.decantPrice ? parseFloat(p.decantPrice) : Math.round(ep * 0.30);
   var decantSize  = 'Decant';
+  // Datos en cuadrícula: solo los que existen (antes se veían como "undefined")
+  var _lvl = dSillageLevel(p.sillage), _meter = '';
+  if(_lvl){ _meter = '<span class="d-meter" aria-hidden="true">'; for(var _k=1;_k<=5;_k++) _meter += '<u'+(_k<=_lvl?' class="f"':'')+'></u>'; _meter += '</span>'; }
+  var _facts = dFact('conc', translateConc(p.conc), 'Concentración')
+             + dFact('season', translateSeason(p.season), 'Temporada')
+             + dFact('wind', translateSillage(p.sillage), 'Estela', _meter)
+             + dFact('clock', dLong(p.long), 'Duración');
+  var _notes = dNoteRow('Salida', p.top) + dNoteRow('Corazón', p.mid) + dNoteRow('Fondo', p.base);
   document.getElementById('detailInfo').innerHTML=
-    '<div class="d-header-row">'+
-      '<div class="d-header-left">'+
-        '<span class="d-brand">'+esc(p.brand)+'</span>'+
-        '<div class="d-name">'+esc(p.name)+'</div>'+
-      '</div>'+
-      '<div class="d-header-right">'+
-        '<span class="d-gender dg-'+p.g.toLowerCase()+'">'+gLabel[p.g]+'</span>'+
-        '<div class="d-icon-row">'+
-          '<button class="d-wish-mob'+(isFav(pid)?' saved':'')+'" id="dWishMob" aria-pressed="'+(isFav(pid)?'true':'false')+'" aria-label="'+(isFav(pid)?'Quitar de favoritos':'Guardar en favoritos')+'" title="'+(isFav(pid)?'En favoritos':'Guardar')+'"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/></svg></button>'+
-          '<button class="d-share-mob" id="dShareBtn" aria-label="Compartir" title="Compartir"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 15V4"/><path d="M8 8l4-4 4 4"/><path d="M5 13v6a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1v-6"/></svg></button>'+
-        '</div>'+
-      '</div>'+
-    '</div>'+
-    '<div class="d-tagline">'+esc(p.tagline||'')+'</div>'+
-    '<div class="d-price-row"><span class="d-price">'+dPrice+'</span><span class="d-size-lbl">'+p.size+'</span></div>'+
-    '<div class="notes-section">'+
-      '<div class="notes-hdr">'+
-        '<div class="d-section-lbl" style="margin-bottom:0">Notas de Fragancia</div>'+
-        '<div class="notes-info">'+
-          '<button class="notes-info-btn" aria-label="¿Qué miden las barras?">?</button>'+
-          '<div class="notes-info-tip">'+
-            'Las barras muestran la <strong>intensidad de proyección</strong> de cada familia de notas — qué tanto irradia desde la piel, según concentración e ingredientes.'+
-          '</div>'+
-        '</div>'+
-      '</div>'+
-      '<div class="note-row"><span class="note-lbl">Top</span><div class="note-bar"><div class="note-fill" style="width:'+(p.top_intensity||90)+'%"></div></div><span class="note-text">'+p.top+'</span></div>'+
-      '<div class="note-row"><span class="note-lbl">Corazón</span><div class="note-bar"><div class="note-fill" style="width:'+(p.mid_intensity||70)+'%"></div></div><span class="note-text">'+p.mid+'</span></div>'+
-      '<div class="note-row"><span class="note-lbl">Fondo</span><div class="note-bar"><div class="note-fill" style="width:'+(p.base_intensity||50)+'%"></div></div><span class="note-text">'+p.base+'</span></div>'+
-    '</div>'+
-    '<p class="d-desc">'+p.desc+'</p>'+
-    (p.chords && p.chords.length ?
-      '<div class="d-chords">'+
-        '<div class="d-chords-hdr">'+
-          '<div class="d-section-lbl" style="margin-bottom:0">Acordes</div>'+
-          '<div class="notes-info">'+
-            '<button class="notes-info-btn" aria-label="¿Qué son los acordes?">?</button>'+
-            '<div class="notes-info-tip">'+
-              'Los <strong>acordes</strong> describen el carácter olfativo del drydown — las familias predominantes cuando la fragancia se asienta en la piel, no las notas de apertura.'+
-            '</div>'+
-          '</div>'+
-        '</div>'+
-        '<div class="d-chord-tags">'+
-          p.chords.map(function(c){ return '<span class="d-chord-tag">'+esc(c)+'</span>'; }).join('')+
-        '</div>'+
-      '</div>'
-    : '')+
-    '<div class="d-profile">'+
-      '<div><div class="d-prof-lbl">Concentración</div><div class="d-prof-val">'+translateConc(p.conc)+'</div></div>'+
-      '<div><div class="d-prof-lbl">Temporada</div><div class="d-prof-val">'+translateSeason(p.season)+'</div></div>'+
-      '<div><div class="d-prof-lbl">Sillage</div><div class="d-prof-val">'+translateSillage(p.sillage)+'</div></div>'+
-      '<div><div class="d-prof-lbl">Duración</div><div class="d-prof-val">'+p.long+'</div></div>'+
-    '</div>'+
-    '<div class="size-selector" id="sizeSel">'+
-      '<button class="size-opt active" data-type="full" data-price="'+ep+'" data-size="'+p.size+'">'+
-        '<span class="so-label">Botella</span>'+
-        '<span class="so-size">'+p.size+'</span>'+
-        '<span class="so-price">$'+ep+'</span>'+
-      '</button>'+
-      (decantsEnabled ? (
-      '<button class="size-opt" data-type="decant" data-price="'+decantPrice+'" data-size="10ml">'+
-        '<span class="so-label">Decant</span>'+
-        '<span class="so-size">10ml</span>'+
-        '<span class="so-price">$'+decantPrice+'</span>'+
-      '</button>'+
-      (p.luxury ? (
-        '<button class="size-opt" data-type="decant5" data-price="'+(p.decantPrice5?parseFloat(p.decantPrice5):Math.round(decantPrice*0.55))+'" data-size="5ml">'+
+    '<div class="d-body">'+
+      '<div class="d-eyebrow"><span class="d-brand">'+esc(p.brand)+'</span> <b>· '+esc(gLabel[p.g]||'')+'</b></div>'+
+      '<div class="d-name">'+esc(p.name)+'</div>'+
+      (p.tagline ? '<div class="d-tagline">'+esc(p.tagline)+'</div>' : '')+
+      '<div class="d-price-row"><span class="d-price">'+dPrice+'</span><span class="d-size-lbl">'+p.size+'</span></div>'+
+      '<div class="size-selector" id="sizeSel">'+
+        '<button class="size-opt active" data-type="full" data-price="'+ep+'" data-size="'+p.size+'">'+
+          '<span class="so-label">Frasco</span>'+
+          '<span class="so-size">'+p.size+'</span>'+
+          '<span class="so-price">$'+ep+'</span>'+
+        '</button>'+
+        (decantsEnabled ? (
+        '<button class="size-opt" data-type="decant" data-price="'+decantPrice+'" data-size="10ml">'+
           '<span class="so-label">Decant</span>'+
-          '<span class="so-size">5ml</span>'+
-          '<span class="so-price">$'+(p.decantPrice5?parseFloat(p.decantPrice5):Math.round(decantPrice*0.55))+'</span>'+
-        '</button>'
-      ) : '')
-      ) : '')+
+          '<span class="so-size">10ml</span>'+
+          '<span class="so-price">$'+decantPrice+'</span>'+
+        '</button>'+
+        (p.luxury ? (
+          '<button class="size-opt" data-type="decant5" data-price="'+(p.decantPrice5?parseFloat(p.decantPrice5):Math.round(decantPrice*0.55))+'" data-size="5ml">'+
+            '<span class="so-label">Decant</span>'+
+            '<span class="so-size">5ml</span>'+
+            '<span class="so-price">$'+(p.decantPrice5?parseFloat(p.decantPrice5):Math.round(decantPrice*0.55))+'</span>'+
+          '</button>'
+        ) : '')
+        ) : '')+
+      '</div>'+
+      '<p class="decant-note" id="decantNote" style="display:none">Un decant es una muestra en frasco de viaje. Perfecto para probar antes de invertir en el frasco completo.</p>'+
+      (_facts ? '<div class="d-facts">'+_facts+'</div>' : '')+
+      (_notes ? '<div class="d-notes"><div class="d-section-lbl">Notas</div>'+_notes+'</div>' : '')+
+      (p.desc ? '<details class="d-acc" open><summary>Descripción</summary><p class="d-desc">'+p.desc+'</p></details>' : '')+
+      (p.chords && p.chords.length ?
+        '<details class="d-acc"><summary>Acordes</summary>'+
+          '<div class="d-chord-tags">'+p.chords.map(function(c){ return '<span class="d-chord-tag">'+esc(c)+'</span>'; }).join('')+'</div>'+
+        '</details>'
+      : '')+
+      (low?'<p class="inv-note">⚠ Solo '+inv.stock+' unidades — ordena pronto</p>':'')+
+      (pr.onSale&&pr.salePrice?'<p style="font-size:0.62rem;color:var(--error);margin-top:0.4rem">Oferta activa — ahorra $'+(p.price-Math.round(+pr.salePrice))+'</p>':'')+
+      (oos ?
+        '<div id="stockNotifyWrap_'+pid+'" style="margin-top:0.8rem">'+
+          '<p style="font-size:0.62rem;color:var(--muted);margin-bottom:0.4rem">Avísame cuando esté disponible</p>'+
+          '<div style="display:flex;gap:0.4rem">'+
+            '<input id="stockNotifyEmail_'+pid+'" type="email" placeholder="tu@correo.com"'+
+              ' style="flex:1;padding:0.5rem 0.7rem;background:#0e0c0a;border:1px solid var(--border);'+
+              'color:var(--cream);font-family:Jost,sans-serif;font-size:0.68rem;outline:none"/>'+
+            '<button id="stockNotifyBtn_'+pid+'" onclick="submitStockNotify('+pid+')"'+
+              ' style="padding:0.5rem 0.8rem;background:transparent;border:1px solid var(--border);'+
+              'color:var(--muted);font-family:Jost,sans-serif;font-size:0.58rem;letter-spacing:0.12em;'+
+              'text-transform:uppercase;cursor:pointer;white-space:nowrap">Notificarme</button>'+
+          '</div>'+
+          '<div id="stockNotifyMsg_'+pid+'" style="font-size:0.6rem;margin-top:0.3rem;min-height:1rem"></div>'+
+        '</div>'
+      : '')+
     '</div>'+
-    '<p class="decant-note" id="decantNote" style="display:none">Un decant es una muestra en frasco de viaje. Perfecto para probar antes de invertir en el frasco completo.</p>'+
-    (low?'<p class="inv-note">\u26a0 Solo '+inv.stock+' unidades — ordena pronto</p>':'')+
-    (pr.onSale&&pr.salePrice?'<p style="font-size:0.62rem;color:var(--error);margin-top:0.4rem">Oferta activa — ahorra $'+(p.price-Math.round(+pr.salePrice))+'</p>':'')+
-    '<div class="d-actions"><button class="d-add-btn" id="dAddBtn"'+(oos?' disabled':'')+'>'+
-      (oos?'Sin Stock':'Añadir al Carrito — $'+ep)+
-    '</button><button class="d-wish-btn" id="dWishBtn">'+(isFav(pid)?'♥':'♡')+'</button></div>'+
-    (oos ?
-      '<div id="stockNotifyWrap_'+pid+'" style="margin-top:0.8rem">'+
-        '<p style="font-size:0.62rem;color:var(--muted);margin-bottom:0.4rem">Avísame cuando esté disponible</p>'+
-        '<div style="display:flex;gap:0.4rem">'+
-          '<input id="stockNotifyEmail_'+pid+'" type="email" placeholder="tu@correo.com"'+
-            ' style="flex:1;padding:0.5rem 0.7rem;background:#0e0c0a;border:1px solid var(--border);'+
-            'color:var(--cream);font-family:Jost,sans-serif;font-size:0.68rem;outline:none"/>'+
-          '<button id="stockNotifyBtn_'+pid+'" onclick="submitStockNotify('+pid+')"'+
-            ' style="padding:0.5rem 0.8rem;background:transparent;border:1px solid var(--border);'+
-            'color:var(--muted);font-family:Jost,sans-serif;font-size:0.58rem;letter-spacing:0.12em;'+
-            'text-transform:uppercase;cursor:pointer;white-space:nowrap">Notificarme</button>'+
-        '</div>'+
-        '<div id="stockNotifyMsg_'+pid+'" style="font-size:0.6rem;margin-top:0.3rem;min-height:1rem"></div>'+
-      '</div>'
-    : '');
+    '<div class="d-actions">'+
+      '<div class="d-foot-price"><div class="d-foot-amt" id="dFootAmt">$'+ep+'</div><div class="d-foot-sub" id="dFootSub">Frasco '+p.size+'</div></div>'+
+      '<button class="d-add-btn" id="dAddBtn"'+(oos?' disabled':'')+'>'+(oos?'Sin Stock':'Añadir al carrito')+'</button>'+
+      '<button class="d-wish-btn" id="dWishBtn">'+(isFav(pid)?'♥':'♡')+'</button>'+
+    '</div>';
+  // El corazón de la barra superior ya no se regenera con la ficha: se pinta según el perfume abierto
+  var _wm = document.getElementById('dWishMob');
+  if(_wm){
+    var _fv = isFav(pid);
+    _wm.classList.toggle('saved', _fv); _wm.setAttribute('aria-pressed', _fv?'true':'false');
+    _wm.setAttribute('aria-label', _fv?'Quitar de favoritos':'Guardar en favoritos'); _wm.title = _fv?'En favoritos':'Guardar';
+  }
   // Track selected size for this product
   var _selType  = 'full';
   var _selPrice = ep;
@@ -4646,7 +4761,9 @@ function openDetail(pid, nav){
     _selPrice = parseFloat(btn.dataset.price);
     _selSize  = btn.dataset.size;
     var addBtn = document.getElementById('dAddBtn');
-    if(addBtn && !addBtn.disabled) addBtn.textContent = 'Añadir al Carrito — $' + _selPrice;
+    var fAmt = document.getElementById('dFootAmt'), fSub = document.getElementById('dFootSub');
+    if(fAmt) fAmt.textContent = '$' + _selPrice;
+    if(fSub) fSub.textContent = (_selType === 'full' ? 'Frasco ' : 'Decant ') + _selSize;
     var note = document.getElementById('decantNote');
     if(note) note.style.display = (_selType === 'decant' || _selType === 'decant5') ? 'block' : 'none';
   });
@@ -4658,13 +4775,13 @@ function openDetail(pid, nav){
     btn.textContent = '\u2713 A\u00f1adido';
     btn.classList.add('added');
     setTimeout(function(){
-      btn.textContent = 'A\u00f1adir al Carrito \u2014 $' + _selPrice;
+      btn.textContent = 'A\u00f1adir al carrito';
       btn.classList.remove('added');
     }, 1800);
     updateDetailCartBtn();
     toast(label, 'A\u00f1adido \u2014 toca el carrito para pagar', 'ok');
   });
-  document.getElementById('dShareBtn').addEventListener('click', function(){
+  document.getElementById('dShareBtn').onclick = function(){
     var shareData = {
       title: p.brand + ' ' + p.name + ' — Sillage Parfumerie',
       text: p.tagline || ('Descubre ' + p.brand + ' ' + p.name + ' en Sillage Parfumerie'),
@@ -4680,7 +4797,7 @@ function openDetail(pid, nav){
         toast('Enlace copiado', productUrl(p), 'ok');
       });
     }
-  });
+  };
 
   function toggleWish(){
     if(typeof currentCustomer === 'undefined' || !currentCustomer){
@@ -4711,7 +4828,7 @@ function openDetail(pid, nav){
   }
   document.getElementById('dWishBtn').addEventListener('click', toggleWish);
   var mobWish = document.getElementById('dWishMob');
-  if(mobWish) mobWish.addEventListener('click', toggleWish);
+  if(mobWish) mobWish.onclick = toggleWish;
   // Score each fragrance for relevance (deterministic)
   // ── Similar fragrances — deterministic scoring ──────────────────────────
   function scoreMatch(a, b) {
@@ -4894,6 +5011,7 @@ function gotoSlide(idx){
   var prev=curSlide;setTimeout(function(){if(sls[prev])sls[prev].classList.remove('leaving');},520);
   curSlide=idx;sls[curSlide].classList.add('active');
   dts.forEach(function(d,i){d.classList.toggle('active',i===curSlide);});
+  document.querySelectorAll('#gThumbs .g-thumb').forEach(function(t,i){t.classList.toggle('on',i===curSlide);});
   updateSlideUI();
 }
 function updateSlideUI(){document.getElementById('slideCounter').textContent=(curSlide+1)+' / '+slideCount;}
