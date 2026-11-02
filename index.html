@@ -1145,11 +1145,13 @@ footer{background:var(--dark);padding:3.5rem 4rem;text-align:center;border-top:1
     z-index:1;
   }
 
-  /* Progreso: una línea fina en el borde derecho con una gota que baja por ella — la estela (sillage) que va dejando.
-     Es un hijo "sticky" de altura 0: se queda a la vista mientras se recorre la sección y se va con ella. */
+  /* Progreso: una línea fina en el borde izquierdo con una gota que baja por ella — la estela (sillage) que va dejando.
+     El carril (.na-vrail) mide lo mismo que la sección y la barra (.na-vr) se queda pegada dentro de él mientras se
+     recorre: al llegar al final de la sección se detiene ahí, así que nunca invade la sección siguiente. */
   .na-rail-bot{display:none}
-  .na-vrail{display:block;position:sticky;top:0;height:0;z-index:6;pointer-events:none;--p:0}
-  .na-vr{position:absolute;right:0.25rem;top:calc(50svh - 17svh);height:34svh;width:10px}
+  .na-vrail{display:block;position:absolute;left:0.25rem;top:0;bottom:0;width:10px;z-index:6;pointer-events:none;--p:0}
+  .na-vr{position:sticky;top:33svh;height:34svh;display:flex;flex-direction:column;align-items:center;gap:0.5rem}
+  .na-vr-track{position:relative;flex:1;width:10px}
   .na-vr-line,.na-vr-fill{position:absolute;left:50%;top:0;width:1px;margin-left:-0.5px}
   .na-vr-line{bottom:0;background:rgba(184,149,90,0.28)}
   .na-vr-fill{height:calc(var(--p) * 100%);background:var(--gold);transition:height 0.18s linear}
@@ -1157,9 +1159,7 @@ footer{background:var(--dark);padding:3.5rem 4rem;text-align:center;border-top:1
   .na-vr-tick.done{background:var(--gold)}
   .na-vr-tick.on{width:9px;margin-left:-4.5px;background:var(--gold)}
   .na-vr-drop{position:absolute;left:50%;top:calc(var(--p) * 100%);width:7px;height:7px;margin:-4px 0 0 -3.5px;border-radius:0 50% 50% 50%;transform:rotate(-45deg);background:var(--gold);box-shadow:0 0 0 3px rgba(184,149,90,0.16);transition:top 0.18s linear}
-  .na-vr-n{position:absolute;left:50%;transform:translateX(-50%);font-size:0.46rem;letter-spacing:0.08em;color:var(--muted);font-variant-numeric:tabular-nums}
-  .na-vr-n.s{top:-1.2rem}
-  .na-vr-n.e{bottom:-1.2rem}
+  .na-vr-n{flex:none;font-size:0.46rem;line-height:1;letter-spacing:0.08em;color:var(--muted);font-variant-numeric:tabular-nums}
   @media(prefers-reduced-motion:reduce){.na-vr-fill,.na-vr-drop,.na-vr-tick{transition:none}}
 
   /* Mobile carousel */
@@ -3605,9 +3605,9 @@ function buildGrid(){
     if(diary.length > 1){
       var naVR = document.createElement('div');
       naVR.className = 'na-vrail'; naVR.id = 'naVRail'; naVR.setAttribute('aria-hidden','true');
-      naVR.innerHTML = '<div class="na-vr"><span class="na-vr-n s">01</span><i class="na-vr-line"></i><i class="na-vr-fill"></i>'+
+      naVR.innerHTML = '<div class="na-vr"><span class="na-vr-n">01</span><div class="na-vr-track"><i class="na-vr-line"></i><i class="na-vr-fill"></i>'+
         diary.map(function(_,i){ return '<i class="na-vr-tick" style="top:'+(((i+0.5)/diary.length)*100).toFixed(2)+'%"></i>'; }).join('')+
-        '<i class="na-vr-drop"></i><span class="na-vr-n e">'+lastNum+'</span></div>';
+        '<i class="na-vr-drop"></i></div><span class="na-vr-n">'+lastNum+'</span></div>';
       naWrap.appendChild(naVR);
     }
     naWrap.appendChild(naMobileCarouselEl);
