@@ -1102,6 +1102,7 @@ footer{background:var(--dark);padding:3.5rem 4rem;text-align:center;border-top:1
 .na-meta b{font-weight:400;color:var(--charcoal)}
 .na-cta{min-height:44px;margin-left:auto;padding:0.65rem 1.4rem;border:1px solid var(--charcoal);background:transparent;color:var(--charcoal);font-family:'Jost',sans-serif;font-size:0.55rem;letter-spacing:0.28em;text-transform:uppercase;cursor:pointer;transition:background 0.3s,color 0.3s,border-color 0.3s}
 .na-cta:hover{background:var(--charcoal);color:var(--warm-white)}
+.na-vrail{display:none}
 .na-rail-bot{position:absolute;bottom:1.6rem;left:50%;transform:translateX(-50%);display:flex;align-items:center;gap:1rem;z-index:6;font-size:0.5rem;letter-spacing:0.28em;text-transform:uppercase;color:var(--muted)}
 .na-rail-track{width:200px;height:44px;position:relative}
 .na-rail-line{position:absolute;top:50%;left:0;width:100%;height:1px;background:rgba(184,149,90,0.25)}
@@ -1144,21 +1145,22 @@ footer{background:var(--dark);padding:3.5rem 4rem;text-align:center;border-top:1
     z-index:1;
   }
 
-  /* Rail */
-  .na-rail-bot{
-    display:flex;
-    position:sticky;bottom:0;
-    width:100%;
-    padding:0.4rem 1.4rem;
-    background:rgba(250,248,244,0.92);
-    backdrop-filter:blur(14px);
-    border-top:1px solid rgba(184,149,90,0.12);
-    box-sizing:border-box;
-    z-index:10;
-    justify-content:space-between;
-    align-items:center;
-  }
-  .na-rail-track{flex:1;margin:0 0.8rem;height:44px}
+  /* Progreso: una línea fina en el borde derecho con una gota que baja por ella — la estela (sillage) que va dejando.
+     Es un hijo "sticky" de altura 0: se queda a la vista mientras se recorre la sección y se va con ella. */
+  .na-rail-bot{display:none}
+  .na-vrail{display:block;position:sticky;top:0;height:0;z-index:6;pointer-events:none;--p:0}
+  .na-vr{position:absolute;right:0.25rem;top:calc(50svh - 17svh);height:34svh;width:10px}
+  .na-vr-line,.na-vr-fill{position:absolute;left:50%;top:0;width:1px;margin-left:-0.5px}
+  .na-vr-line{bottom:0;background:rgba(184,149,90,0.28)}
+  .na-vr-fill{height:calc(var(--p) * 100%);background:var(--gold);transition:height 0.18s linear}
+  .na-vr-tick{position:absolute;left:50%;width:5px;height:1px;margin-left:-2.5px;background:rgba(184,149,90,0.5);transition:width 0.3s,margin-left 0.3s,background 0.3s}
+  .na-vr-tick.done{background:var(--gold)}
+  .na-vr-tick.on{width:9px;margin-left:-4.5px;background:var(--gold)}
+  .na-vr-drop{position:absolute;left:50%;top:calc(var(--p) * 100%);width:7px;height:7px;margin:-4px 0 0 -3.5px;border-radius:0 50% 50% 50%;transform:rotate(-45deg);background:var(--gold);box-shadow:0 0 0 3px rgba(184,149,90,0.16);transition:top 0.18s linear}
+  .na-vr-n{position:absolute;left:50%;transform:translateX(-50%);font-size:0.46rem;letter-spacing:0.08em;color:var(--muted);font-variant-numeric:tabular-nums}
+  .na-vr-n.s{top:-1.2rem}
+  .na-vr-n.e{bottom:-1.2rem}
+  @media(prefers-reduced-motion:reduce){.na-vr-fill,.na-vr-drop,.na-vr-tick{transition:none}}
 
   /* Mobile carousel */
   .na-mobile-carousel{
@@ -3600,6 +3602,14 @@ function buildGrid(){
 
     naSticky.appendChild(naPanel);
     naWrap.appendChild(naSticky);
+    if(diary.length > 1){
+      var naVR = document.createElement('div');
+      naVR.className = 'na-vrail'; naVR.id = 'naVRail'; naVR.setAttribute('aria-hidden','true');
+      naVR.innerHTML = '<div class="na-vr"><span class="na-vr-n s">01</span><i class="na-vr-line"></i><i class="na-vr-fill"></i>'+
+        diary.map(function(_,i){ return '<i class="na-vr-tick" style="top:'+(((i+0.5)/diary.length)*100).toFixed(2)+'%"></i>'; }).join('')+
+        '<i class="na-vr-drop"></i><span class="na-vr-n e">'+lastNum+'</span></div>';
+      naWrap.appendChild(naVR);
+    }
     naWrap.appendChild(naMobileCarouselEl);
     naWrap.appendChild(naRailEl);
 
@@ -3799,7 +3809,15 @@ function buildGrid(){
       }
       function onScroll(){
         if(raf) return;
-        raf = requestAnimationFrame(function(){ raf = 0; compute(); });
+        raf = requestAnimationFrame(function(){ raf = 0; compute(); updateVRail(); });
+      }
+      // Barra vertical (móvil): la gota sigue el avance real por la lista; las marcas dicen cuál tarjeta está activa
+      var vrEl = document.getElementById('naVRail');
+      var vrTicks = vrEl ? vrEl.querySelectorAll('.na-vr-tick') : [];
+      function updateVRail(){
+        if(!vrEl || !mobileCarousel || window.innerWidth > 768) return;
+        var r = mobileCarousel.getBoundingClientRect();
+        vrEl.style.setProperty('--p', naClamp((window.innerHeight * 0.5 - r.top) / Math.max(1, r.height)).toFixed(4));
       }
       var mobileActiveIdx = -1;
       var mobileCards = mobileCarousel ? mobileCarousel.querySelectorAll('.na-mobile-card') : [];
@@ -3808,6 +3826,7 @@ function buildGrid(){
         idx = Math.max(0, Math.min(N-1, idx));
         if(idx === mobileActiveIdx) return;
         mobileActiveIdx = idx;
+        vrTicks.forEach(function(t,i){ t.classList.toggle('on', i === idx); t.classList.toggle('done', i < idx); });
         var active = diary[idx];
         if(!active) return;
         // Update rail
@@ -3870,13 +3889,14 @@ function buildGrid(){
       }
       apply(0);
       applyMobileActive(0);
+      updateVRail();
       // Reveal first slot's text immediately when section enters — IO threshold
       // means localP is 0 at entry so setInner won't fire; force it here
       if(textSlots[0]) setTimeout(function(){ revealSlot(textSlots[0]); }, 320);
       // Mobile: first card is below the sticky fold, IO will handle its reveal
       compute();
       window.addEventListener('scroll', onScroll, {passive:true});
-      window.addEventListener('resize', function(){ compute(); mobileFallbackActive(); });
+      window.addEventListener('resize', function(){ compute(); mobileFallbackActive(); updateVRail(); });
     })();
   }
 
