@@ -2254,13 +2254,9 @@ html.scroll-lock,html.scroll-lock body{overflow:hidden!important;overscroll-beha
 .d-nrow .k{width:68px;flex-shrink:0;font-size:0.6rem;letter-spacing:0.15em;text-transform:uppercase;color:var(--muted)}
 .d-nchip{display:inline-block;border:1px solid rgba(26,23,20,0.14);background:#fff;padding:2px 10px;font-size:0.76rem;margin:0 6px 6px 0;color:var(--charcoal)}
 
-.d-acc{border-top:1px solid rgba(26,23,20,0.1)}
-.d-acc>summary{list-style:none;cursor:pointer;display:flex;justify-content:space-between;align-items:center;padding:0.85rem 0;font-size:0.66rem;letter-spacing:0.18em;text-transform:uppercase;color:var(--charcoal)}
-.d-acc>summary::-webkit-details-marker{display:none}
-.d-acc>summary::after{content:'';width:7px;height:7px;margin-right:4px;border-right:1.5px solid var(--muted);border-bottom:1.5px solid var(--muted);transform:rotate(45deg);transition:transform 0.2s}
-.d-acc[open]>summary::after{transform:rotate(-135deg)}
-.d-acc .d-desc{margin:0 0 1rem;font-size:0.86rem;line-height:1.8}
-.d-acc .d-chord-tags{margin-bottom:1rem}
+.d-chords{margin:0.2rem 0 1.2rem;padding-top:0.9rem;border-top:1px solid rgba(26,23,20,0.1)}
+.d-chords .d-section-lbl{margin-bottom:0.5rem}
+.d-body .d-desc{margin:0 0 1rem;padding-top:0.9rem;border-top:1px solid rgba(26,23,20,0.1);font-size:0.86rem;line-height:1.8}
 
 .d-actions{position:sticky;bottom:0;z-index:5;margin:0 -3rem;padding:0.9rem 3rem;background:#fff;border-top:1px solid rgba(26,23,20,0.12);display:flex;align-items:center;gap:1rem}
 .d-foot-price{min-width:84px}
@@ -4540,12 +4536,12 @@ function openDetail(pid, nav){
       '<p class="decant-note" id="decantNote" style="display:none">Un decant es una muestra en frasco de viaje. Perfecto para probar antes de invertir en el frasco completo.</p>'+
       (_facts ? '<div class="d-facts">'+_facts+'</div>' : '')+
       (_notes ? '<div class="d-notes"><div class="d-section-lbl">Notas</div>'+_notes+'</div>' : '')+
-      (p.desc ? '<details class="d-acc" open><summary>Descripción</summary><p class="d-desc">'+p.desc+'</p></details>' : '')+
       (p.chords && p.chords.length ?
-        '<details class="d-acc"><summary>Acordes</summary>'+
+        '<div class="d-chords"><div class="d-section-lbl">Acordes</div>'+
           '<div class="d-chord-tags">'+p.chords.map(function(c){ return '<span class="d-chord-tag">'+esc(c)+'</span>'; }).join('')+'</div>'+
-        '</details>'
+        '</div>'
       : '')+
+      (p.desc ? '<p class="d-desc">'+p.desc+'</p>' : '')+
       (low?'<p class="inv-note">⚠ Solo '+inv.stock+' unidades — ordena pronto</p>':'')+
       (pr.onSale&&pr.salePrice?'<p style="font-size:0.62rem;color:var(--error);margin-top:0.4rem">Oferta activa — ahorra $'+(p.price-Math.round(+pr.salePrice))+'</p>':'')+
       (oos ?
