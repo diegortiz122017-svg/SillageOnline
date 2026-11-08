@@ -2305,16 +2305,10 @@ html.scroll-lock,html.scroll-lock body{overflow:hidden!important;overscroll-beha
 
 .d-chords{margin:0.2rem 0 1.2rem;padding-top:0.9rem;border-top:1px solid rgba(26,23,20,0.1)}
 .d-chords .d-section-lbl{margin-bottom:0.5rem}
-.d-acc-row{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:0.6rem;margin-top:0.2rem}
-.d-acc-tile{border:1px solid rgba(26,23,20,0.12);background:#fff;padding:0.8rem 0.4rem 0.65rem;text-align:center}
-.d-acc-tile.main{border-color:var(--gold);box-shadow:0 0 0 1px var(--gold) inset;background:#fbf7ee}
-.d-acc-ic{width:42px;height:42px;border-radius:50%;border:1px solid rgba(138,106,42,0.45);background:#faf8f4;display:flex;align-items:center;justify-content:center;margin:0 auto 0.5rem;color:#8a6a2a}
-.d-acc-ic svg{width:22px;height:22px;fill:none;stroke:currentColor;stroke-width:1.5;stroke-linecap:round;stroke-linejoin:round}
-.d-acc-tile b{display:block;font-weight:500;font-size:0.78rem;color:var(--charcoal)}
-.d-acc-tile span{display:block;font-size:0.62rem;color:var(--muted);min-height:1em}
-.d-acc-chips{margin-top:0.75rem}
-.d-acc-chip{display:inline-flex;align-items:center;gap:0.4rem;border:1px solid rgba(26,23,20,0.14);background:#fff;padding:3px 11px 3px 8px;font-size:0.76rem;margin:0 6px 6px 0;color:var(--charcoal)}
-.d-acc-chip svg{width:15px;height:15px;flex-shrink:0;fill:none;stroke:#8a6a2a;stroke-width:1.6;stroke-linecap:round;stroke-linejoin:round}
+.d-acc-line{display:flex;flex-wrap:wrap;gap:0.6rem 1.35rem;margin-top:0.2rem}
+.d-acc-item{display:inline-flex;align-items:center;gap:0.45rem;font-size:0.8rem;color:var(--muted)}
+.d-acc-item.main{color:var(--charcoal);font-weight:500}
+.d-acc-item svg{width:19px;height:19px;flex-shrink:0;fill:none;stroke:#8a6a2a;stroke-width:1.5;stroke-linecap:round;stroke-linejoin:round}
 .d-acc-note{font-size:0.68rem;line-height:1.5;color:var(--muted);margin-top:0.3rem}
 .d-body .d-desc{margin:0 0 1rem;padding-top:0.9rem;border-top:1px solid rgba(26,23,20,0.1);font-size:0.86rem;line-height:1.8}
 
@@ -2347,11 +2341,6 @@ html.scroll-lock,html.scroll-lock body{overflow:hidden!important;overscroll-beha
   .d-actions{flex-direction:row;gap:0.7rem;margin:0 -1.2rem;padding:0.7rem 1.2rem calc(0.9rem + env(safe-area-inset-bottom))}
   .d-actions .d-add-btn{width:auto;padding:0.95rem 0.6rem}
   #dWishBtn{width:46px;height:46px}
-  .d-acc-row{gap:0.45rem}
-  .d-acc-tile{padding:0.65rem 0.2rem 0.5rem}
-  .d-acc-ic{width:36px;height:36px;margin-bottom:0.4rem}
-  .d-acc-ic svg{width:19px;height:19px}
-  .d-acc-tile b{font-size:0.72rem}
 }
 </style>
 <script type="application/ld+json">
@@ -4643,17 +4632,12 @@ function dAccordIcon(name){
   var p = D_ACCORD_PATHS[name];
   return p ? '<svg viewBox="0 0 24 24" aria-hidden="true">'+p+'</svg>' : '';
 }
-// Los 3 primeros acordes (el primero es el principal) como fichas con ícono; el resto, como etiquetas.
+// Acordes en una sola línea, ligera: ícono + nombre. El primero es el principal y va resaltado.
 function dAccordsHtml(chords){
-  var main = chords.slice(0, 3), rest = chords.slice(3);
   return '<div class="d-chords"><div class="d-section-lbl">Acordes</div>'+
-    '<div class="d-acc-row">'+
-      main.map(function(c, i){
-        var ic = dAccordIcon(c);
-        return '<div class="d-acc-tile'+(i===0?' main':'')+'">'+(ic ? '<div class="d-acc-ic">'+ic+'</div>' : '')+'<b>'+esc(c)+'</b><span>'+(i===0?'Principal':'&nbsp;')+'</span></div>';
-      }).join('')+
+    '<div class="d-acc-line">'+
+      chords.map(function(c, i){ return '<span class="d-acc-item'+(i===0?' main':'')+'">'+dAccordIcon(c)+esc(c)+'</span>'; }).join('')+
     '</div>'+
-    (rest.length ? '<div class="d-acc-chips">'+rest.map(function(c){ return '<span class="d-acc-chip">'+dAccordIcon(c)+esc(c)+'</span>'; }).join('')+'</div>' : '')+
     '<p class="d-acc-note">Las familias que dominan cuando el perfume se asienta en la piel.</p>'+
   '</div>';
 }
