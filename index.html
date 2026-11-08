@@ -2258,6 +2258,17 @@ html.scroll-lock,html.scroll-lock body{overflow:hidden!important;overscroll-beha
 
 .d-chords{margin:0.2rem 0 1.2rem;padding-top:0.9rem;border-top:1px solid rgba(26,23,20,0.1)}
 .d-chords .d-section-lbl{margin-bottom:0.5rem}
+.d-acc-row{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:0.6rem;margin-top:0.2rem}
+.d-acc-tile{border:1px solid rgba(26,23,20,0.12);background:#fff;padding:0.8rem 0.4rem 0.65rem;text-align:center}
+.d-acc-tile.main{border-color:var(--gold);box-shadow:0 0 0 1px var(--gold) inset;background:#fbf7ee}
+.d-acc-ic{width:42px;height:42px;border-radius:50%;border:1px solid rgba(138,106,42,0.45);background:#faf8f4;display:flex;align-items:center;justify-content:center;margin:0 auto 0.5rem;color:#8a6a2a}
+.d-acc-ic svg{width:22px;height:22px;fill:none;stroke:currentColor;stroke-width:1.5;stroke-linecap:round;stroke-linejoin:round}
+.d-acc-tile b{display:block;font-weight:500;font-size:0.78rem;color:var(--charcoal)}
+.d-acc-tile span{display:block;font-size:0.62rem;color:var(--muted);min-height:1em}
+.d-acc-chips{margin-top:0.75rem}
+.d-acc-chip{display:inline-flex;align-items:center;gap:0.4rem;border:1px solid rgba(26,23,20,0.14);background:#fff;padding:3px 11px 3px 8px;font-size:0.76rem;margin:0 6px 6px 0;color:var(--charcoal)}
+.d-acc-chip svg{width:15px;height:15px;flex-shrink:0;fill:none;stroke:#8a6a2a;stroke-width:1.6;stroke-linecap:round;stroke-linejoin:round}
+.d-acc-note{font-size:0.68rem;line-height:1.5;color:var(--muted);margin-top:0.3rem}
 .d-body .d-desc{margin:0 0 1rem;padding-top:0.9rem;border-top:1px solid rgba(26,23,20,0.1);font-size:0.86rem;line-height:1.8}
 
 .d-actions{position:sticky;bottom:0;z-index:5;margin:0 -3rem;padding:0.9rem 3rem;background:#fff;border-top:1px solid rgba(26,23,20,0.12);display:flex;align-items:center;gap:1rem}
@@ -2289,6 +2300,11 @@ html.scroll-lock,html.scroll-lock body{overflow:hidden!important;overscroll-beha
   .d-actions{flex-direction:row;gap:0.7rem;margin:0 -1.2rem;padding:0.7rem 1.2rem calc(0.9rem + env(safe-area-inset-bottom))}
   .d-actions .d-add-btn{width:auto;padding:0.95rem 0.6rem}
   #dWishBtn{width:46px;height:46px}
+  .d-acc-row{gap:0.45rem}
+  .d-acc-tile{padding:0.65rem 0.2rem 0.5rem}
+  .d-acc-ic{width:36px;height:36px;margin-bottom:0.4rem}
+  .d-acc-ic svg{width:19px;height:19px}
+  .d-acc-tile b{font-size:0.72rem}
 }
 </style>
 <script type="application/ld+json">
@@ -4447,6 +4463,48 @@ var D_ICONS = {
   wind:   '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 8h10a3 3 0 1 0-3-3"/><path d="M3 12h15a3 3 0 1 1-3 3"/><path d="M3 16h7"/></svg>',
   clock:  '<svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>'
 };
+// ── Acordes: un ícono de línea por cada uno de los 20 del catálogo (services/chords.js) ──
+// Solo el interior del <svg viewBox="0 0 24 24">; el trazo (fino, redondeado) lo pone el CSS.
+var D_ACCORD_PATHS = {
+  'Cítrico':   '<circle cx="12" cy="12" r="8"/><path d="M12 4v16M4 12h16M6.3 6.3l11.4 11.4M17.7 6.3L6.3 17.7"/>',
+  'Acuático':  '<path d="M3 9c2-2 4-2 6 0s4 2 6 0 4-2 6 0"/><path d="M3 15c2-2 4-2 6 0s4 2 6 0 4-2 6 0"/>',
+  'Verde':     '<path d="M5 19C5 10 10 5 19 5c0 9-5 14-14 14z"/><path d="M5 19L14 10"/>',
+  'Aromático': '<path d="M12 21V8"/><ellipse cx="12" cy="5.5" rx="1.6" ry="2.5"/><ellipse cx="9.2" cy="9.5" rx="1.5" ry="2.3" transform="rotate(-25 9.2 9.5)"/><ellipse cx="14.8" cy="9.5" rx="1.5" ry="2.3" transform="rotate(25 14.8 9.5)"/><ellipse cx="9.4" cy="13.5" rx="1.5" ry="2.2" transform="rotate(-25 9.4 13.5)"/><ellipse cx="14.6" cy="13.5" rx="1.5" ry="2.2" transform="rotate(25 14.6 13.5)"/>',
+  'Floral':    '<circle cx="12" cy="12" r="2.4"/><circle cx="12" cy="6.4" r="3"/><circle cx="17.3" cy="10.3" r="3"/><circle cx="15.3" cy="16.5" r="3"/><circle cx="8.7" cy="16.5" r="3"/><circle cx="6.7" cy="10.3" r="3"/>',
+  'Frutal':    '<path d="M12 8c-3-2-7 0-7 5 0 4 3 7 5 7 1 0 1.2-.5 2-.5s1 .5 2 .5c2 0 5-3 5-7 0-5-4-7-7-5z"/><path d="M12 8c0-2 1-4 3-5"/>',
+  'Empolvado': '<circle cx="12" cy="13" r="5.5"/><path d="M9.5 11.5h.01M12.5 10.5h.01M14.5 13.5h.01M10 15h.01M12.5 16h.01"/><path d="M6 5.5h.01M10 3.5h.01M16 4.5h.01M19 7.5h.01"/>',
+  'Especiado': '<rect x="6" y="6" width="12" height="12" rx="1"/><rect x="6" y="6" width="12" height="12" rx="1" transform="rotate(45 12 12)"/><circle cx="12" cy="12" r="1.2"/>',
+  'Amaderado': '<circle cx="12" cy="12" r="8.5"/><circle cx="12" cy="12" r="5"/><circle cx="12" cy="12" r="1.5"/>',
+  'Terroso':   '<path d="M3 19l6.5-11 4 6.5 2.5-4 5 8.5z"/>',
+  'Ahumado':   '<path d="M9 21c-2-2-2-4 0-6s2-4 0-6c-1-1.2-1-2.5 0-4"/><path d="M15 21c-2-2-2-4 0-6s2-4 0-6"/>',
+  'Ambarado':  '<path d="M7 4h10l4 6-9 11L3 10z"/><path d="M3 10h18M9 4l-2 6 5 11M15 4l2 6-5 11"/>',
+  'Oriental':  '<path d="M19 14.5A8 8 0 1 1 9.5 5a6.5 6.5 0 0 0 9.5 9.5z"/><path d="M17 4.5v3M15.5 6h3"/>',
+  'Dulce':     '<circle cx="12" cy="12" r="4.5"/><path d="M7.8 9.8L3.5 7.5v9l4.3-2.3M16.2 9.8l4.3-2.3v9l-4.3-2.3"/>',
+  'Gourmand':  '<path d="M20.5 12.5A8.5 8.5 0 1 1 11.5 3.5 3.5 3.5 0 0 0 15 7a3.5 3.5 0 0 0 5.5 5.5z"/><path d="M8.5 10h.01M12 15h.01M16.5 15.5h.01M8 15.5h.01"/>',
+  'Fresco':    '<path d="M12 3v18M4.2 7.5l15.6 9M19.8 7.5l-15.6 9"/><path d="M9.5 4.5L12 7l2.5-2.5M9.5 19.5L12 17l2.5 2.5"/>',
+  'Herbal':    '<path d="M12 21v-9"/><path d="M12 14c-4 0-6-3-6-7 4 0 6 3 6 7z"/><path d="M12 11c0-4 2-7 6-7 0 4-2 7-6 7z"/>',
+  'Cálido':    '<path d="M4 17h16"/><path d="M7 17a5 5 0 0 1 10 0"/><path d="M12 6v2.5M5.5 9.5l1.8 1.8M18.5 9.5l-1.8 1.8"/>',
+  'Sensual':   '<path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/>',
+  'Animalic':  '<circle cx="7" cy="10" r="1.8"/><circle cx="11" cy="6.5" r="1.8"/><circle cx="16" cy="7.5" r="1.8"/><circle cx="19" cy="12" r="1.8"/><path d="M8 17c0-3 2.5-5 5-5s5 2 5 5c0 2-1.5 3-3.5 3-1 0-1.5-.5-2.5-.5s-1.5.5-2.5.5C9 20 8 19 8 17z"/>'
+};
+function dAccordIcon(name){
+  var p = D_ACCORD_PATHS[name];
+  return p ? '<svg viewBox="0 0 24 24" aria-hidden="true">'+p+'</svg>' : '';
+}
+// Los 3 primeros acordes (el primero es el principal) como fichas con ícono; el resto, como etiquetas.
+function dAccordsHtml(chords){
+  var main = chords.slice(0, 3), rest = chords.slice(3);
+  return '<div class="d-chords"><div class="d-section-lbl">Acordes</div>'+
+    '<div class="d-acc-row">'+
+      main.map(function(c, i){
+        var ic = dAccordIcon(c);
+        return '<div class="d-acc-tile'+(i===0?' main':'')+'">'+(ic ? '<div class="d-acc-ic">'+ic+'</div>' : '')+'<b>'+esc(c)+'</b><span>'+(i===0?'Principal':'&nbsp;')+'</span></div>';
+      }).join('')+
+    '</div>'+
+    (rest.length ? '<div class="d-acc-chips">'+rest.map(function(c){ return '<span class="d-acc-chip">'+dAccordIcon(c)+esc(c)+'</span>'; }).join('')+'</div>' : '')+
+    '<p class="d-acc-note">Las familias que dominan cuando el perfume se asienta en la piel.</p>'+
+  '</div>';
+}
 // Estela (sillage) en 1–5 para dibujar las barritas; 0 = no se reconoce y no se dibuja nada.
 function dSillageLevel(s){
   var m = { 'very strong':5, 'strong':4, 'moderate':3, 'light to moderate':2, 'light':2, 'soft':2, 'intimate':1 };
@@ -4556,11 +4614,7 @@ function openDetail(pid, nav){
       '<p class="decant-note" id="decantNote" style="display:none">Un decant es una muestra en frasco de viaje. Perfecto para probar antes de invertir en el frasco completo.</p>'+
       (_facts ? '<div class="d-facts">'+_facts+'</div>' : '')+
       (_notes ? '<div class="d-notes"><div class="d-section-lbl">Notas</div>'+_notes+'</div>' : '')+
-      (p.chords && p.chords.length ?
-        '<div class="d-chords"><div class="d-section-lbl">Acordes</div>'+
-          '<div class="d-chord-tags">'+p.chords.map(function(c){ return '<span class="d-chord-tag">'+esc(c)+'</span>'; }).join('')+'</div>'+
-        '</div>'
-      : '')+
+      (p.chords && p.chords.length ? dAccordsHtml(p.chords) : '')+
       (p.desc ? '<p class="d-desc">'+p.desc+'</p>' : '')+
       (low?'<p class="inv-note">⚠ Solo '+inv.stock+' unidades — ordena pronto</p>':'')+
       (pr.onSale&&pr.salePrice?'<p style="font-size:0.62rem;color:var(--error);margin-top:0.4rem">Oferta activa — ahorra $'+(p.price-Math.round(+pr.salePrice))+'</p>':'')+
