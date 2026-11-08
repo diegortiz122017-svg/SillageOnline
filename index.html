@@ -4613,9 +4613,9 @@ function openDetail(pid, nav){
       '</div>'+
       '<p class="decant-note" id="decantNote" style="display:none">Un decant es una muestra en frasco de viaje. Perfecto para probar antes de invertir en el frasco completo.</p>'+
       (_facts ? '<div class="d-facts">'+_facts+'</div>' : '')+
+      (p.desc ? '<p class="d-desc">'+p.desc+'</p>' : '')+
       (_notes ? '<div class="d-notes"><div class="d-section-lbl">Notas</div>'+_notes+'</div>' : '')+
       (p.chords && p.chords.length ? dAccordsHtml(p.chords) : '')+
-      (p.desc ? '<p class="d-desc">'+p.desc+'</p>' : '')+
       (low?'<p class="inv-note">⚠ Solo '+inv.stock+' unidades — ordena pronto</p>':'')+
       (pr.onSale&&pr.salePrice?'<p style="font-size:0.62rem;color:var(--error);margin-top:0.4rem">Oferta activa — ahorra $'+(p.price-Math.round(+pr.salePrice))+'</p>':'')+
       (oos ?
