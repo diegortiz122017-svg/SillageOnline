@@ -2259,8 +2259,7 @@ html.scroll-lock,html.scroll-lock body{overflow:hidden!important;overscroll-beha
 .d-chords{margin:0.2rem 0 1.2rem;padding-top:0.9rem;border-top:1px solid rgba(26,23,20,0.1)}
 .d-chords .d-section-lbl{margin-bottom:0.5rem}
 .d-acc-line{display:flex;flex-wrap:wrap;gap:0.6rem 1.35rem;margin-top:0.2rem}
-.d-acc-item{display:inline-flex;align-items:center;gap:0.45rem;font-size:0.8rem;color:var(--muted)}
-.d-acc-item.main{color:var(--charcoal);font-weight:500}
+.d-acc-item{display:inline-flex;align-items:center;gap:0.45rem;font-size:0.8rem;color:var(--charcoal)}
 .d-acc-item svg{width:19px;height:19px;flex-shrink:0;fill:none;stroke:#8a6a2a;stroke-width:1.5;stroke-linecap:round;stroke-linejoin:round}
 .d-acc-note{font-size:0.68rem;line-height:1.5;color:var(--muted);margin-top:0.3rem}
 .d-body .d-desc{margin:0 0 1rem;padding-top:0.9rem;border-top:1px solid rgba(26,23,20,0.1);font-size:0.86rem;line-height:1.8}
@@ -4462,7 +4461,7 @@ var D_ACCORD_PATHS = {
   'Floral':    '<circle cx="12" cy="12" r="2.4"/><circle cx="12" cy="6.4" r="3"/><circle cx="17.3" cy="10.3" r="3"/><circle cx="15.3" cy="16.5" r="3"/><circle cx="8.7" cy="16.5" r="3"/><circle cx="6.7" cy="10.3" r="3"/>',
   'Frutal':    '<path d="M12 8c-3-2-7 0-7 5 0 4 3 7 5 7 1 0 1.2-.5 2-.5s1 .5 2 .5c2 0 5-3 5-7 0-5-4-7-7-5z"/><path d="M12 8c0-2 1-4 3-5"/>',
   'Empolvado': '<circle cx="12" cy="13" r="5.5"/><path d="M9.5 11.5h.01M12.5 10.5h.01M14.5 13.5h.01M10 15h.01M12.5 16h.01"/><path d="M6 5.5h.01M10 3.5h.01M16 4.5h.01M19 7.5h.01"/>',
-  'Especiado': '<rect x="6" y="6" width="12" height="12" rx="1"/><rect x="6" y="6" width="12" height="12" rx="1" transform="rotate(45 12 12)"/><circle cx="12" cy="12" r="1.2"/>',
+  'Especiado': '<g transform="rotate(-40 12 12)"><rect x="2.5" y="7" width="19" height="4.2" rx="2.1"/><rect x="2.5" y="12.8" width="19" height="4.2" rx="2.1"/><circle cx="4.7" cy="9.1" r="0.9"/><circle cx="4.7" cy="14.9" r="0.9"/><path d="M14 6.4v11.2"/></g>',
   'Amaderado': '<circle cx="12" cy="12" r="8.5"/><circle cx="12" cy="12" r="5"/><circle cx="12" cy="12" r="1.5"/>',
   'Terroso':   '<path d="M3 19l6.5-11 4 6.5 2.5-4 5 8.5z"/>',
   'Ahumado':   '<path d="M9 21c-2-2-2-4 0-6s2-4 0-6c-1-1.2-1-2.5 0-4"/><path d="M15 21c-2-2-2-4 0-6s2-4 0-6"/>',
@@ -4480,11 +4479,11 @@ function dAccordIcon(name){
   var p = D_ACCORD_PATHS[name];
   return p ? '<svg viewBox="0 0 24 24" aria-hidden="true">'+p+'</svg>' : '';
 }
-// Acordes en una sola línea, ligera: ícono + nombre. El primero es el principal y va resaltado.
+// Acordes en una sola línea, ligera: ícono + nombre, en orden de peso (sin resaltar ninguno).
 function dAccordsHtml(chords){
   return '<div class="d-chords"><div class="d-section-lbl">Acordes</div>'+
     '<div class="d-acc-line">'+
-      chords.map(function(c, i){ return '<span class="d-acc-item'+(i===0?' main':'')+'">'+dAccordIcon(c)+esc(c)+'</span>'; }).join('')+
+      chords.map(function(c, i){ return '<span class="d-acc-item">'+dAccordIcon(c)+esc(c)+'</span>'; }).join('')+
     '</div>'+
     '<p class="d-acc-note">Las familias que dominan cuando el perfume se asienta en la piel.</p>'+
   '</div>';
