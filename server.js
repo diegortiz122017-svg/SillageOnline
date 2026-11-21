@@ -3972,6 +3972,46 @@ app.get('/api/admin/dte/invalidables', requireAdmin, async (req, res) => {
   } catch(e) { res.status(500).json({ error: e.message }); }
 });
 
+// Un DTE de venta (Factura o CCF) invalidado deja sin efecto la venta: el pedido pasa a "Cancelado" para que no
+// siga contando en pedidos, ingresos ni estadísticas (todo eso ya excluye "Cancelado"). Solo en producción (ambiente
+// 01: las pruebas de homologación no tocan pedidos reales) y solo si no queda otro DTE de venta vigente del mismo
+// pedido (p. ej. se anuló uno con error y ya se emitió el correcto). No devuelve inventario ni avisa al cliente.
+async function cancelOrderOfInvalidatedDte(doc) {
+  if (!doc || !doc.order_id || !['01', '03'].includes(String(doc.tipo_dte))) return false;
+  if (String(doc.ambiente) !== '01') return false;
+  const [vigentes] = await db.execute(
+    "SELECT COUNT(*) AS c FROM dte_documents WHERE order_id=? AND id<>? AND estado='PROCESADO' AND tipo_dte IN ('01','03')",
+    [doc.order_id, doc.id]
+  );
+  if (vigentes && vigentes[0] && Number(vigentes[0].c) > 0) return false;
+  const [r] = await db.execute(
+    "UPDATE orders SET status='Cancelado', updated_at=? WHERE id=? AND COALESCE(status,'')<>'Cancelado'",
+    [new Date(), doc.order_id]
+  );
+  if (!r || !r.affectedRows) return false;
+  await logActivity('Pedido ' + escHtml(doc.order_id) + ' → Cancelado (DTE invalidado)');
+  broadcastAdmin('order_update', { id: doc.order_id, status: 'Cancelado' });
+  return true;
+}
+
+// Una sola vez al arrancar (es idempotente): pedidos cuyo DTE de venta ya estaba invalidado antes de este cambio
+// y que no tienen otro vigente. Si falla (p. ej. por collation) solo avisa: no impide arrancar.
+async function backfillCancelledOrdersFromInvalidatedDtes() {
+  try {
+    const [r] = await db.execute(
+      `UPDATE orders o SET o.status='Cancelado', o.updated_at=?
+        WHERE COALESCE(o.status,'')<>'Cancelado'
+          AND EXISTS (SELECT 1 FROM dte_documents d WHERE d.order_id=o.id AND d.estado='ANULADO' AND d.ambiente='01' AND d.tipo_dte IN ('01','03'))
+          AND NOT EXISTS (SELECT 1 FROM dte_documents d2 WHERE d2.order_id=o.id AND d2.estado='PROCESADO' AND d2.tipo_dte IN ('01','03'))`,
+      [new Date()]
+    );
+    if (r && r.affectedRows) {
+      console.log('Pedidos marcados como Cancelado por tener su DTE invalidado:', r.affectedRows);
+      await logActivity('Pedidos cancelados por DTE invalidado (revisión automática): ' + r.affectedRows);
+    }
+  } catch (e) { console.warn('Revisión de pedidos con DTE invalidado omitida:', e.message); }
+}
+
 // POST /api/admin/dte/invalidar — anula un DTE PROCESADO específico.
 //   body: { dteId, tipoAnulacion?, motivoAnulacion?, codigoGeneracionR? }
 app.post('/api/admin/dte/invalidar', requireAdmin, async (req, res) => {
@@ -3996,6 +4036,11 @@ app.post('/api/admin/dte/invalidar', requireAdmin, async (req, res) => {
       codigoGeneracionR: (req.body && req.body.codigoGeneracionR) || null,
     };
     const rec = await dteSvc.invalidarDte(doc, motivo);
+    let orderCancelled = false;
+    if (rec && rec.estado === 'PROCESADO') {
+      try { orderCancelled = await cancelOrderOfInvalidatedDte(doc); }
+      catch (e) { console.error('No se pudo cancelar el pedido del DTE invalidado:', e.message); }
+    }
     // Entrega al cliente: evento firmado + su PDF. Un fallo del correo nunca deshace la invalidación.
     let email = { sent: false, to: null };
     if (rec && rec.estado === 'PROCESADO' && !(req.body && req.body.sendEmail === false)) {
@@ -4009,6 +4054,7 @@ app.post('/api/admin/dte/invalidar', requireAdmin, async (req, res) => {
       observaciones: rec?.observaciones || null,
       emailSent:     email.sent,
       emailTo:       email.to,
+      orderCancelled, orderId: doc.order_id,
     });
   } catch(e) { res.status(500).json({ error: e.message }); }
 });
@@ -9239,7 +9285,7 @@ app.get('/api/analytics', requireAdmin, async (req, res) => {
         COUNT(CASE WHEN payment_status='Pagado' THEN 1 END)                            AS paid,
         AVG(CASE WHEN DATE(created_at) BETWEEN ? AND ? THEN total END)                 AS avgOrderValue
       FROM orders
-      WHERE payment_status='Pagado' OR (payment_method='cod' AND status='Entregado')
+      WHERE COALESCE(status,'')<>'Cancelado' AND (payment_status='Pagado' OR (payment_method='cod' AND status='Entregado'))
     `, [today, yesterday, day7, day30, rangeFrom, rangeTo, today, day7, rangeFrom, rangeTo, rangeFrom, rangeTo]);
 
     // ── Revenue by day (last 14 days) ─────────────────
@@ -9247,13 +9293,14 @@ app.get('/api/analytics', requireAdmin, async (req, res) => {
       SELECT DATE(created_at) as date, COALESCE(SUM(total),0) as revenue, COUNT(*) as orders
       FROM orders
       WHERE DATE(created_at) BETWEEN ? AND ?
+        AND COALESCE(status,'')<>'Cancelado'
         AND (payment_status='Pagado' OR (payment_method='cod' AND status='Entregado'))
       GROUP BY DATE(created_at)
       ORDER BY date ASC
     `, [rangeFrom, rangeTo]);
 
     // ── Top products ───────────────────────────────────
-    const [orderRows] = await db.query("SELECT items FROM orders WHERE (payment_status='Pagado' OR (payment_method='cod' AND status='Entregado')) AND DATE(created_at) BETWEEN ? AND ?", [rangeFrom, rangeTo]);
+    const [orderRows] = await db.query("SELECT items FROM orders WHERE COALESCE(status,'')<>'Cancelado' AND (payment_status='Pagado' OR (payment_method='cod' AND status='Entregado')) AND DATE(created_at) BETWEEN ? AND ?", [rangeFrom, rangeTo]);
     const productSales = {};
     orderRows.forEach(r => {
       try {
@@ -9326,7 +9373,7 @@ app.get('/api/analytics', requireAdmin, async (req, res) => {
     // ── Payment methods breakdown ──────────────────────
     const [pmRows] = await db.query(`
       SELECT payment_method, COUNT(*) as cnt, SUM(total) as rev
-      FROM orders GROUP BY payment_method
+      FROM orders WHERE COALESCE(status,'')<>'Cancelado' GROUP BY payment_method
     `);
 
     // ── Traffic / activity funnel ──────────────────────
@@ -9354,6 +9401,7 @@ app.get('/api/analytics', requireAdmin, async (req, res) => {
       SELECT COUNT(*) AS purchased
       FROM orders
       WHERE DATE(created_at) BETWEEN ? AND ?
+        AND COALESCE(status,'')<>'Cancelado'
         AND (payment_status='Pagado' OR payment_method='cod')
     `, [rangeFrom, rangeTo]);
 
@@ -10511,6 +10559,7 @@ async function start() {
     await auth.restoreRevocations();
     await fixCorruptedInventoryRows();
     await migrateInventoryRows();
+    await backfillCancelledOrdersFromInvalidatedDtes();
     console.log('\u2705 SILLAGE PARFUMERIE v3.1 - Server Ready | ' + BASE_URL);
   } catch(err) {
     console.error('\u274C DB startup failed:', err.message);

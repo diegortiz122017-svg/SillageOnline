@@ -2412,6 +2412,7 @@ function connectWS(){
           if(msg.payload.paymentStatus) o.payment_status=msg.payload.paymentStatus;
         }
         if(currentPage==='orders') renderOrders();
+        renderOverview();   // el Resumen cambia si un pedido pasa a Cancelado (p. ej. por un DTE invalidado)
         // Also refresh QV if it's open showing orders
         if(activeQV === 'orders' || activeQV === 'pending') refreshQV();
       }
@@ -2773,6 +2774,7 @@ function updateRangeLabel(){
 // estado de despacho (status), no de pago, y ya estaba correcto.
 function getPaidOrders(list){
   return (list||orders).filter(function(o){
+    if(o.status==='Cancelado') return false;   // p. ej. su DTE fue invalidado: la venta no cuenta
     return o.paymentStatus==='Pagado' || (o.payment_method==='cod' && o.status==='Entregado');
   });
 }
@@ -3473,8 +3475,10 @@ function dteInvalidar(){
       (d.observaciones?'<div style="color:#d98a3a;margin-top:0.3rem">'+_dteEsc(d.observaciones)+'</div>':'')+
       (d.ok?(d.emailSent
         ? '<div style="color:#5cb85c;margin-top:0.3rem">✉ Aviso enviado a '+_dteEsc(d.emailTo)+' con el evento (JSON + PDF).</div>'
-        : '<div style="color:#d98a3a;margin-top:0.3rem">✉ No se envió aviso al cliente (desmarcado, sin correo válido o falló el envío). Puedes descargar el PDF del evento desde la tabla de documentos.</div>'):'');
+        : '<div style="color:#d98a3a;margin-top:0.3rem">✉ No se envió aviso al cliente (desmarcado, sin correo válido o falló el envío). Puedes descargar el PDF del evento desde la tabla de documentos.</div>'):'')+
+      (d.orderCancelled?'<div style="color:#5cb85c;margin-top:0.3rem">✓ El pedido '+_dteEsc(d.orderId)+' pasó a Cancelado: ya no cuenta en pedidos ni en ingresos.</div>':'');
     if(d.ok){ loadDteDocuments(); loadHomologacion(); }
+    if(d.orderCancelled){ var oc=orders.find(function(x){return x.id===d.orderId;}); if(oc) oc.status='Cancelado'; renderOverview(); if(currentPage==='orders') renderOrders(); }
   }).catch(function(e){ out.innerHTML='<span style="color:#d9534f">Error: '+_dteEsc(e.message)+'</span>'; });
 }
 
