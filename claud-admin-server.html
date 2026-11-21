@@ -1750,7 +1750,7 @@ tr:hover td{background:rgba(255,255,255,0.02)}
           <div style="font-size:0.62rem;color:var(--muted);margin-bottom:1rem">Anula un DTE ya PROCESADO ante el MH. La invalidación es definitiva. Para pruebas de homologación usa los botones de arriba (“Evento de Invalidación”).</div>
           <div style="display:flex;gap:0.6rem;flex-wrap:wrap;align-items:flex-end">
             <div style="flex:1;min-width:240px">
-              <label class="dte-lbl">DTE a invalidar</label>
+              <label class="dte-lbl">DTE a invalidar <a href="#" onclick="loadInvalidables();return false" style="color:var(--gold);text-transform:none;letter-spacing:0;margin-left:0.5rem">↻ Actualizar</a></label>
               <select id="dteInvSelect" class="dte-inp" style="width:100%"><option value="">Cargando…</option></select>
             </div>
             <div>
@@ -2889,7 +2889,6 @@ function renderDtePage(){
   loadHomologacion();
   loadDteDocuments();
   dteManualInit();
-  loadInvalidables();
   loadContingenciaPending();
   var mEl=document.getElementById('dteReportMonth');
   if(mEl && !mEl.value) mEl.value=new Date().toISOString().slice(0,7);
@@ -3017,6 +3016,7 @@ function loadDteStatus(){
 
 function loadDteDocuments(){
   var tb=document.getElementById('dteDocsBody'); if(!tb) return;
+  loadInvalidables();   // la lista de DTEs invalidables sale de los mismos documentos: si cambian, se actualiza
   var estado=document.getElementById('dteFilterEstado').value;
   var url=API+'/admin/dte/documents?limit=200'+(estado?('&estado='+estado):'');
   tb.innerHTML='<tr><td colspan="9" style="text-align:center;padding:2rem;color:var(--muted)">Cargando…</td></tr>';
@@ -3443,13 +3443,18 @@ function dteContDeclarar(){
 // ── Invalidación de un DTE ────────────────────────────────
 function loadInvalidables(){
   var sel=document.getElementById('dteInvSelect'); if(!sel) return;
+  var prev=sel.value;   // si ya había uno elegido, se conserva tras recargar
   adminFetch(API+'/admin/dte/invalidables',{}).then(function(r){return r?r.json():null;}).then(function(list){
     if(!Array.isArray(list)||!list.length){ sel.innerHTML='<option value="">No hay DTEs procesados para anular</option>'; return; }
     var tipoLbl={'01':'Factura','03':'CCF','05':'Nota de Crédito'};
-    sel.innerHTML='<option value="">— Elegir DTE —</option>'+list.map(function(d){
+    sel.innerHTML='<option value="">— Elegir DTE ('+list.length+') —</option>'+list.map(function(d){
       var lim=d.limiteInvalidacion?(d.vencido?' · FUERA DE PLAZO':' · hasta '+_dteEsc(d.limiteInvalidacion)):'';
-      return '<option value="'+d.id+'"'+(d.vencido?' disabled':'')+'>'+(tipoLbl[d.tipoDte]||d.tipoDte)+' · '+_dteEsc(d.numeroControl)+' · pedido '+_dteEsc(d.orderId)+lim+'</option>';
+      // Los emitidos a mano solo tienen un id "MAN-<hora>": el cliente y el monto los hacen reconocibles
+      var partes=[tipoLbl[d.tipoDte]||d.tipoDte, d.numeroControl, d.customer, d.total!=null?'$'+Number(d.total).toFixed(2):'', 'pedido '+d.orderId]
+        .filter(function(x){return x;}).map(_dteEsc);
+      return '<option value="'+d.id+'"'+(d.vencido?' disabled':'')+'>'+partes.join(' · ')+lim+'</option>';
     }).join('');
+    if(prev && sel.querySelector('option[value="'+prev+'"]')) sel.value=prev;
   }).catch(function(){ sel.innerHTML='<option value="">Error al cargar</option>'; });
 }
 function dteInvalidar(){
@@ -3469,7 +3474,7 @@ function dteInvalidar(){
       (d.ok?(d.emailSent
         ? '<div style="color:#5cb85c;margin-top:0.3rem">✉ Aviso enviado a '+_dteEsc(d.emailTo)+' con el evento (JSON + PDF).</div>'
         : '<div style="color:#d98a3a;margin-top:0.3rem">✉ No se envió aviso al cliente (desmarcado, sin correo válido o falló el envío). Puedes descargar el PDF del evento desde la tabla de documentos.</div>'):'');
-    if(d.ok){ loadInvalidables(); loadDteDocuments(); loadHomologacion(); }
+    if(d.ok){ loadDteDocuments(); loadHomologacion(); }
   }).catch(function(e){ out.innerHTML='<span style="color:#d9534f">Error: '+_dteEsc(e.message)+'</span>'; });
 }
 

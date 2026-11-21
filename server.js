@@ -3953,7 +3953,7 @@ app.post('/api/admin/dte/contingencia/declarar', requireAdmin, async (req, res) 
 app.get('/api/admin/dte/invalidables', requireAdmin, async (req, res) => {
   try {
     const [rows] = await db.execute(
-      `SELECT id, order_id, tipo_dte, numero_control, codigo_generacion, created_at, json_dte
+      `SELECT id, order_id, tipo_dte, numero_control, codigo_generacion, created_at, json_dte, customer, total
          FROM dte_documents
         WHERE estado='PROCESADO' AND ambiente=? AND tipo_dte NOT IN ('AN','CG')
         ORDER BY id DESC LIMIT 100`,
@@ -3965,6 +3965,7 @@ app.get('/api/admin/dte/invalidables', requireAdmin, async (req, res) => {
       return {
         id: r.id, orderId: r.order_id, tipoDte: r.tipo_dte,
         numeroControl: r.numero_control, codigoGeneracion: r.codigo_generacion, createdAt: r.created_at,
+        customer: r.customer || null, total: r.total != null ? Number(r.total) : null,
         limiteInvalidacion: v ? v.limite : null, vencido: v ? v.vencido : false,
       };
     }));
